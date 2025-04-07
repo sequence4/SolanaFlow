@@ -40,8 +40,11 @@ export function generateFileFromTemplate(
       }
 
       if (!programName) throw new Error('programName required for instruction file path');
-      filePath = `programs/${programName}/src/instructions/${instrDetail.name}.rs`;
-      console.log(`[DEBUG_FILE_GEN] Generating instruction file template for: ${instrDetail.name}.rs`);
+      
+      let fileName = instrDetail.name;
+      
+      filePath = `programs/${programName}/src/instructions/${fileName}.rs`;
+      console.log(`[DEBUG_FILE_GEN] Generating instruction file template for: ${fileName}.rs`);
       console.log(`[DEBUG_FILE_GEN] Instruction file will be created at: ${filePath}`);
       break;
     }
