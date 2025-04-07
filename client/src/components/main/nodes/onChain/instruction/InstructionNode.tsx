@@ -527,9 +527,6 @@ export function InstructionGroupNode({ data }: { data: InstructionGroupNodeData 
       >
         {activeSection === "Context" && accounts.length > 0 && (
           <>
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="text-sm font-medium text-[#5d5dff]">Initialize Mint Context</h4>
-            </div>
             {accounts.map((account, idx) => (
               <AccountSection key={idx} account={account} />
             ))}
