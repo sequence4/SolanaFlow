@@ -221,29 +221,7 @@ set -euo pipefail
 
 cd /usr/src/${rootPath}
 
-echo "===== Step 1: Checking name in each program's Cargo.toml ====="
-if [ -d programs ]; then
-  for DIR in programs/*; do
-    if [ -f "$DIR/Cargo.toml" ]; then
-      echo "Checking $DIR/Cargo.toml..."
-      PNAME=$(grep -m 1 '^name *=' "$DIR/Cargo.toml" | cut -d '"' -f 2)
-      if [ -n "$PNAME" ]; then
-        echo "Program name in $DIR/Cargo.toml: $PNAME"
-        if [ -f Anchor.toml ] && grep -q "$PNAME" Anchor.toml; then
-          echo "✓ Program name $PNAME found in Anchor.toml"
-        else
-          echo "WARNING: Program name $PNAME not found in Anchor.toml"
-        fi
-      else
-        echo "No 'name' field in $DIR/Cargo.toml"
-      fi
-    fi
-  done
-else
-  echo "No programs directory found."
-fi
-
-echo "===== Step 2: Running anchor build ====="
+echo "===== Running anchor build ====="
 anchor build
 `;
       
