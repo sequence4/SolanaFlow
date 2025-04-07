@@ -214,149 +214,14 @@ export const startAnchorBuildTask = async (
       
       const rootPath = await getProjectRootPath(projectId);
       
-      console.log(`Starting anchor build preparation for project ${projectId} in container ${containerName}...`);
+      console.log(`Starting anchor build for project ${projectId} in container ${containerName}...`);
       
-      const scriptContent = `const fs = require('fs');
-const path = require('path');
-
-/**
- * Patches Cargo.toml with:
- *
- *   [patch.crates-io]
- *   bytemuck_derive = "=1.8.1"
- *
- * if it's not already there.
- */
-
-// Minimal function to check if a Cargo.toml has [workspace]
-function isWorkspaceToml(tomlContent) {
-  return tomlContent.includes('[workspace]');
-}
-
-function patchCargoToml(cargoTomlPath) {
-  // 1) Read the existing Cargo.toml
-  if (!fs.existsSync(cargoTomlPath)) {
-    console.error(\`Cargo.toml not found at: \${cargoTomlPath}\`);
-    return false;
-  }
-  const originalToml = fs.readFileSync(cargoTomlPath, "utf8");
-
-  // 2) Check if we already have the "bytemuck_derive" override
-  const alreadyHasPatch = originalToml.includes("[patch.crates-io]") && 
-                        originalToml.includes("bytemuck_derive =");
-
-  // 3) If it's already pinned, do nothing
-  if (alreadyHasPatch) {
-    console.log(\`bytemuck_derive override already found in \${cargoTomlPath}. No change needed.\`);
-    return true;
-  }
-
-  // 4) Otherwise, see if there's already a [patch.crates-io] block for us to append to
-  if (originalToml.includes("[patch.crates-io]")) {
-    // Insert the line under the existing [patch.crates-io] block
-    const patchedToml = originalToml.replace(
-      /\\[patch\\.crates-io\\]/,
-      \`[patch.crates-io]\\nbytemuck_derive = "=1.8.1"\`
-    );
-    fs.writeFileSync(cargoTomlPath, patchedToml, "utf8");
-    console.log(\`Inserted bytemuck_derive override in existing [patch.crates-io] block in \${cargoTomlPath}\`);
-  } else {
-    // Add a new block at the end of the file
-    const appendedToml = \`\${originalToml.trim()}
-
-[patch.crates-io]
-bytemuck_derive = "=1.8.1"
-\`;
-    fs.writeFileSync(cargoTomlPath, appendedToml, "utf8");
-    console.log(\`Added new [patch.crates-io] block with bytemuck_derive override to \${cargoTomlPath}\`);
-  }
-  return true;
-}
-
-// Find all Cargo.toml files in the project directory
-function findCargoTomlFiles(startPath) {
-  if (!fs.existsSync(startPath)) {
-    console.error("Directory not found: " + startPath);
-    return [];
-  }
-
-  let results = [];
-  const files = fs.readdirSync(startPath);
-  
-  for (const file of files) {
-    const filename = path.join(startPath, file);
-    const stat = fs.statSync(filename);
-    
-    if (stat.isDirectory() && file !== 'target' && file !== 'node_modules' && !file.startsWith('.')) {
-      // Skip target/ and node_modules/ directories for efficiency
-      results = results.concat(findCargoTomlFiles(filename));
-    } else if (file === 'Cargo.toml') {
-      results.push(filename);
-    }
-  }
-  
-  return results;
-}
-
-// Main logic
-const projectDir = process.argv[2];
-if (!projectDir) {
-  console.error("Usage: node patchCargoToml.js /path/to/project/directory");
-  process.exit(1);
-}
-
-// First find the top-level Cargo.toml
-const topLevelCargoToml = path.join(projectDir, 'Cargo.toml');
-if (!fs.existsSync(topLevelCargoToml)) {
-  console.log('No top-level Cargo.toml found; nothing to patch.');
-  process.exit(0);
-}
-
-// 1) Is the top-level a workspace?
-const topLevelContent = fs.readFileSync(topLevelCargoToml, 'utf8');
-const hasWorkspace = isWorkspaceToml(topLevelContent);
-
-// 2) If workspace, patch only the top-level. If not, patch them all
-if (hasWorkspace) {
-  console.log(\`Top-level Cargo.toml has [workspace], so only patching the root Cargo.toml.\`);
-  patchCargoToml(topLevelCargoToml);
-} else {
-  console.log(\`No [workspace] in top-level, so patching all Cargo.toml files...\`);
-  const allCargoTomlFiles = findCargoTomlFiles(projectDir);
-  console.log(\`Found \${allCargoTomlFiles.length} Cargo.toml files in project\`);
-  // Patch them all
-  for (const cargoTomlPath of allCargoTomlFiles) {
-    patchCargoToml(cargoTomlPath);
-  }
-}
-
-console.log("All relevant Cargo.toml files have been patched successfully");`;
-
       const buildScriptContent = `#!/bin/bash
 set -euo pipefail
 
 cd /usr/src/${rootPath}
 
-echo "===== Step 1: Removing Cargo registry cache to prevent using cached bytemuck_derive 1.9.1 ====="
-rm -rf /root/.cargo/registry
-
-echo "===== Step 2: Removing all Cargo.lock files to force fresh dependency resolution ====="
-find . -name 'Cargo.lock' -type f -delete
-
-echo "===== Step 3: Patching Cargo.toml files to force bytemuck_derive = 1.8.1 ====="
-node /tmp/patchCargoToml.js /usr/src/${rootPath}
-
-echo "===== Step 4: Explicitly pinning bytemuck_derive to version 1.8.1 ====="
-cargo update -p bytemuck_derive --precise 1.8.1 || echo "Cargo update step completed (this warning is normal if bytemuck_derive hasn't been pulled yet)"
-
-echo "===== Step 5: Generating a fresh Cargo.lock file ====="
-cargo generate-lockfile
-
-echo "===== Step 6: Forcing Cargo.lock to version 3 to fix '-Znext-lockfile-bump' error ====="
-sed -i 's/^version = 4$/version = 3/' Cargo.lock
-echo "Cargo.lock set to version 3"
-
-echo "===== Step 7: Performing name check between Cargo.toml and Anchor.toml ====="
+echo "===== Step 1: Performing name check between Cargo.toml and Anchor.toml ====="
 if [ -f Cargo.toml ] && [ -f Anchor.toml ]; then
   CARGO_NAME=$(grep -m 1 '^name *=' Cargo.toml | cut -d '"' -f 2)
   echo "Program name in Cargo.toml: $CARGO_NAME"
@@ -369,7 +234,7 @@ else
   echo "WARNING: One or more configuration files missing"
 fi
 
-echo "===== Step 8: Running anchor build with prepared environment ====="
+echo "===== Step 2: Running anchor build ====="
 anchor build
 `;
       
@@ -378,26 +243,15 @@ anchor build
         fs.mkdirSync(tempDir, { recursive: true });
       }
       
-      const patchScriptPath = path.join(tempDir, `patch-${projectId}.js`);
-      fs.writeFileSync(patchScriptPath, scriptContent, 'utf8');
-      
       const buildScriptPath = path.join(tempDir, `build-${projectId}.sh`);
       fs.writeFileSync(buildScriptPath, buildScriptContent, 'utf8');
       
-      console.log(`Created build scripts locally at ${tempDir}`);
+      console.log(`Created build script locally at ${tempDir}`);
 
-      console.log(`Starting comprehensive build for project ${projectId}...`);
+      console.log(`Starting anchor build for project ${projectId}...`);
       
       try {
         await updateTaskStatus(sanitizedTaskId, 'doing', 'Anchor build in progress...');
-        
-        console.log(`Copying JS patch script to container ${containerName}...`);
-        await runCommand(
-          `docker cp ${patchScriptPath} ${containerName}:/tmp/patchCargoToml.js`,
-          '.',
-          sanitizedTaskId,
-          { skipSuccessUpdate: true }
-        );
         
         console.log(`Copying build script to container ${containerName}...`);
         await runCommand(
@@ -432,7 +286,6 @@ anchor build
         );
         
         try {
-          fs.unlinkSync(patchScriptPath);
           fs.unlinkSync(buildScriptPath);
         } catch (cleanupError: any) {
           console.log(`Non-critical error cleaning up temp files: ${cleanupError.message}`);
@@ -454,7 +307,6 @@ anchor build
         );
         
         try {
-          fs.unlinkSync(patchScriptPath);
           fs.unlinkSync(buildScriptPath);
         } catch (cleanupError: any) {
           console.log(`Non-critical error cleaning up temp files: ${cleanupError.message}`);
