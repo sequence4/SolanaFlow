@@ -1,4 +1,4 @@
-# Solana Flowcode
+# Solana FlowCode
 
 A monorepo containing a **Next.js** front-end (`client`) and a **TypeScript**-based Express server (`server`). The client is served on **localhost:3000** (by default) while the server listens on **localhost:9999** (by default). This repository also includes some additional directories and tooling.
 
@@ -89,7 +89,7 @@ FLOWCODE (root)
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/hhdgknsn/solana-flowcode.git
+   git clone https://github.com/ChainLabs-Technologies/solana-flowcode.git
    ```
 
 2. **Install dependencies** (at the monorepo root):
