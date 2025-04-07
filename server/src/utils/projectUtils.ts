@@ -30,6 +30,25 @@ function hasWarning(output: string): boolean {
   return lowercasedOutput.includes('warning');
 }
 
+async function getContainerHostPort(containerName: string, containerPort = 3000, taskId: string): Promise<string> {
+  try {
+    const portCmd = `docker port ${containerName} ${containerPort}/tcp`;
+    // Get the port mapping which looks like "0.0.0.0:randomPort"
+    const portMapping = await runCommand(portCmd, '.', taskId, { skipSuccessUpdate: true });
+    const portMatch = portMapping.trim().match(/:(\d+)$/);
+    
+    if (!portMatch) {
+      console.error(`Could not parse host port from Docker output: ${portMapping}`);
+      throw new Error(`Failed to get host port for container ${containerName}`);
+    }
+    
+    return portMatch[1]; // Return the port number as a string
+  } catch (error: any) {
+    console.error(`Error getting container host port: ${error.message}`);
+    throw error;
+  }
+}
+
 export async function runCommand(
   command: string,
   cwd: string,
@@ -708,16 +727,18 @@ export const startCreateProjectDirectoryTask = async (
       const startContainerCmd = 
         `docker run -d \\
           --name ${containerName} \\
-          -p 3001:3000 \\
-          flowcode-base:latest \\
+          -p 0.0.0.0::3000 \\
+          flowcode-project-base:latest \\
           bash -c "cd /usr/src && tail -f /dev/null"
       `;
       console.log(`[DEBUG_CONTAINER] About to execute docker run command: ${startContainerCmd}`);
       await runCommand(startContainerCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
-      console.log(`[DEBUG_CONTAINER] Docker container created: name=${containerName}, about to update DB with container_url`);
+      console.log(`[DEBUG_CONTAINER] Docker container created: name=${containerName}, about to get host port and update DB`);
 
       try {
-        const containerUrl = `http://localhost:3001`;
+        // Get the randomly assigned host port
+        const hostPort = await getContainerHostPort(containerName, 3000, sanitizedTaskId);
+        const containerUrl = `http://localhost:${hostPort}`;
         console.log(`[DEBUG_CONTAINER] Setting containerUrl=${containerUrl} for container=${containerName}, projectId=${projectId}`);
 
         const updateResult = await pool.query(
@@ -1250,13 +1271,15 @@ async function createNewContainer(
   const startContainerCmd = `
     docker run -d \\
       --name ${containerName} \\
-      -p 3001:3000 \\
-      flowcode-base:latest \\
+      -p 0.0.0.0::3000 \\
+      flowcode-project-base:latest \\
       bash -c "cd /usr/src && tail -f /dev/null"
   `;
   await runCommand(startContainerCmd, '.', taskId, { skipSuccessUpdate: true });
   
-  const containerUrl = `http://localhost:3001`;
+  // Get the randomly assigned host port
+  const hostPort = await getContainerHostPort(containerName, 3000, taskId);
+  const containerUrl = `http://localhost:${hostPort}`;
   
   await pool.query(
     'UPDATE solanaproject SET container_name = $1, container_url = $2 WHERE id = $3',
