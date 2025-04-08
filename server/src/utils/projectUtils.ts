@@ -337,6 +337,8 @@ export const startAnchorDeployTask = async (
   let programId: string | null = null;
   const sanitizedTaskId = taskId.trim().replace(/,$/, '');
 
+  console.log(`[DEPLOY_DEBUG] Starting anchor deploy task ${sanitizedTaskId} for project ${projectId}${ephemeralPubkey ? ' with ephemeral key: ' + ephemeralPubkey : ''}`);
+
   setImmediate(async () => {
     try {
       const containerName = await getContainerName(projectId);
@@ -346,97 +348,121 @@ export const startAnchorDeployTask = async (
 
       const rootPath = await getProjectRootPath(projectId);
 
-      await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && solana config set --url https://api.devnet.solana.com"`, '.', sanitizedTaskId);
+      await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && solana config set --url https://api.devnet.solana.com"`, '.', sanitizedTaskId, { skipSuccessUpdate: true });
       
       let walletPath;
       let containerWalletPath;
       
       if (ephemeralPubkey) {
         walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${ephemeralPubkey}.json`);
-        console.log(`Using ephemeral key for deployment: ${ephemeralPubkey}`);
+        console.log(`[DEPLOY_DEBUG] Using ephemeral key for deployment: ${ephemeralPubkey}`);
+        console.log(`[DEPLOY_DEBUG] Ephemeral key file path: ${walletPath}`);
         
-        // Debug: Check if ephemeral key file exists and get its size
+        if (!fs.existsSync(walletPath)) {
+          console.error(`[DEPLOY_DEBUG] ERROR: Ephemeral key file not found at ${walletPath}`);
+          throw new Error(`Ephemeral key file not found at ${walletPath}`);
+        }
+        
         try {
           const fileStats = fs.statSync(walletPath);
-          console.log(`[EPHEMERAL_DEBUG] Key file exists: ${walletPath}, size: ${fileStats.size} bytes`);
+          console.log(`[DEPLOY_DEBUG] Key file exists: ${walletPath}, size: ${fileStats.size} bytes`);
           
-          // Verify key file content format
           const keyContent = fs.readFileSync(walletPath, 'utf8');
           const keyArray = JSON.parse(keyContent);
-          console.log(`[EPHEMERAL_DEBUG] Key array length: ${keyArray.length}, first bytes: [${keyArray.slice(0, 3).join(', ')}...]`);
+          console.log(`[DEPLOY_DEBUG] Key array length: ${keyArray.length}, first few bytes: [${keyArray.slice(0, 3).join(', ')}...]`);
           if (keyArray.length !== 64) {
-            console.warn(`[EPHEMERAL_DEBUG] WARNING: Key file does not contain a 64-byte array! Found ${keyArray.length} bytes.`);
+            console.warn(`[DEPLOY_DEBUG] WARNING: Key file does not contain a 64-byte array! Found ${keyArray.length} bytes.`);
           }
         } catch (err: any) {
-          console.error(`[EPHEMERAL_DEBUG] ERROR reading key file: ${err.message}`);
+          console.error(`[DEPLOY_DEBUG] ERROR reading key file: ${err.message}`);
+          throw new Error(`Error reading ephemeral key file: ${err.message}`);
         }
         
         containerWalletPath = `/tmp/${ephemeralPubkey}.json`;
-        await runCommand(`docker cp ${walletPath} ${containerName}:${containerWalletPath}`, '.', sanitizedTaskId);
+        console.log(`[DEPLOY_DEBUG] Copying ephemeral key to container path: ${containerWalletPath}`);
         
-        // Debug: Verify key was copied into container
-        console.log(`[EPHEMERAL_DEBUG] Verifying key file in container...`);
+        await runCommand(`docker cp ${walletPath} ${containerName}:${containerWalletPath}`, '.', sanitizedTaskId, { skipSuccessUpdate: true });
+        
         try {
-          const keyCheckCmd = `docker exec ${containerName} ls -la ${containerWalletPath}`;
-          const keyCheckResult = await runCommand(keyCheckCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
-          console.log(`[EPHEMERAL_DEBUG] Container key check: ${keyCheckResult}`);
+          const fileCheckCmd = `docker exec ${containerName} ls -la ${containerWalletPath}`;
+          const fileCheckResult = await runCommand(fileCheckCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
+          console.log(`[DEPLOY_DEBUG] Container key file check: ${fileCheckResult}`);
           
-          // Verify key content in container
-          const catCmd = `docker exec ${containerName} cat ${containerWalletPath} | wc -c`;
-          const catResult = await runCommand(catCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
-          console.log(`[EPHEMERAL_DEBUG] Container key file size: ${catResult.trim()} bytes`);
-          
-          // Verify key can be recognized by Solana tools
           const pubkeyCmd = `docker exec ${containerName} bash -c "solana-keygen pubkey ${containerWalletPath} || echo 'KEYGEN_FAILED'"`;
           const pubkeyResult = await runCommand(pubkeyCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
-          console.log(`[EPHEMERAL_DEBUG] Pubkey check result: ${pubkeyResult.trim()}`);
+          console.log(`[DEPLOY_DEBUG] Solana-keygen pubkey result: ${pubkeyResult.trim()}`);
           
           if (pubkeyResult.trim() !== ephemeralPubkey) {
-            console.error(`[EPHEMERAL_DEBUG] ERROR: Key verification failed! Expected: ${ephemeralPubkey}, Got: ${pubkeyResult.trim()}`);
+            console.error(`[DEPLOY_DEBUG] ERROR: Key verification failed! Expected: ${ephemeralPubkey}, Got: ${pubkeyResult.trim()}`);
+            throw new Error(`Ephemeral key verification failed. Expected: ${ephemeralPubkey}, Got: ${pubkeyResult.trim()}`);
           } else {
-            console.log(`[EPHEMERAL_DEBUG] Key verification SUCCESS: ${pubkeyResult.trim()}`);
+            console.log(`[DEPLOY_DEBUG] Key verification SUCCESS: ${pubkeyResult.trim()}`);
           }
           
-          // Check balance
-          const balanceCmd = `docker exec ${containerName} bash -c "solana balance ${containerWalletPath} --url devnet || echo 'BALANCE_CHECK_FAILED'"`;
-          const balanceResult = await runCommand(balanceCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
-          console.log(`[EPHEMERAL_DEBUG] Balance check: ${balanceResult.trim()}`);
+          const anchorTomlCmd = `docker exec ${containerName} bash -c "cat /usr/src/${rootPath}/Anchor.toml || echo 'ANCHOR_TOML_NOT_FOUND'"`;
+          const anchorTomlContent = await runCommand(anchorTomlCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
+          
+          const walletLineMatch = anchorTomlContent.match(/wallet\s*=\s*["']([^"']+)["']/);
+          if (walletLineMatch) {
+            const walletPath = walletLineMatch[1];
+            console.log(`[DEPLOY_DEBUG] Found wallet setting in Anchor.toml: ${walletPath}`);
+            
+            if (walletPath.includes('id.json') || walletPath.includes('~')) {
+              console.warn(`[DEPLOY_DEBUG] WARNING: Anchor.toml specifies default wallet: ${walletPath}`);
+              console.warn(`[DEPLOY_DEBUG] This might override command-line flags in some Anchor versions`);
+              
+              try {
+                const modifiedToml = anchorTomlContent.replace(
+                  /wallet\s*=\s*["'][^"']+["']/,
+                  `wallet = "${containerWalletPath}"`
+                );
+                
+                const updateTomlCmd = `docker exec -i ${containerName} bash -c "cat > /usr/src/${rootPath}/Anchor.toml" << 'EOF'\n${modifiedToml}\nEOF`;
+                await runCommand(updateTomlCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
+                console.log(`[DEPLOY_DEBUG] Updated Anchor.toml to use ephemeral key: ${containerWalletPath}`);
+                
+                const verifyTomlCmd = `docker exec ${containerName} bash -c "cat /usr/src/${rootPath}/Anchor.toml | grep wallet"`;
+                const verifyResult = await runCommand(verifyTomlCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
+                console.log(`[DEPLOY_DEBUG] Verified Anchor.toml wallet setting: ${verifyResult.trim()}`);
+              } catch (tomlUpdateErr: any) {
+                console.error(`[DEPLOY_DEBUG] Error updating Anchor.toml: ${tomlUpdateErr.message}`);
+              }
+            }
+          } else {
+            console.log(`[DEPLOY_DEBUG] No wallet setting found in Anchor.toml. Command-line flags should work.`);
+          }
         } catch (verifyErr: any) {
-          console.error(`[EPHEMERAL_DEBUG] Error verifying key in container: ${verifyErr.message}`);
+          console.error(`[DEPLOY_DEBUG] Error during key verification: ${verifyErr.message}`);
         }
         
-        await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && solana config set --keypair ${containerWalletPath}"`, '.', sanitizedTaskId);
+        await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && solana config set --keypair ${containerWalletPath}"`, '.', sanitizedTaskId, { skipSuccessUpdate: true });
       } else {
         walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${creatorId}.json`);
         console.log(`Using creator key for deployment: ${creatorId}`);
         
         containerWalletPath = `/tmp/${creatorId}.json`;
-        await runCommand(`docker cp ${walletPath} ${containerName}:${containerWalletPath}`, '.', sanitizedTaskId);
+        await runCommand(`docker cp ${walletPath} ${containerName}:${containerWalletPath}`, '.', sanitizedTaskId, { skipSuccessUpdate: true });
         
-        await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && solana config set --keypair ${containerWalletPath}"`, '.', sanitizedTaskId);
+        await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && solana config set --keypair ${containerWalletPath}"`, '.', sanitizedTaskId, { skipSuccessUpdate: true });
       }
       
-      await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && solana config set --url devnet"`, '.', sanitizedTaskId);
+      await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && solana config set --url devnet"`, '.', sanitizedTaskId, { skipSuccessUpdate: true });
 
-      // Instead of using ANCHOR_WALLET environment variable, use command-line flags
       const anchorDeployCmd = `anchor deploy \
         --provider.wallet ${containerWalletPath} \
         --provider.cluster devnet`;
       
       console.log(`Running deploy with wallet flag: --provider.wallet ${containerWalletPath}`);
       
-      // Debug: Check Anchor.toml settings
       console.log(`[EPHEMERAL_DEBUG] Checking Anchor.toml configuration...`);
       try {
         const anchorTomlCmd = `docker exec ${containerName} bash -c "cat /usr/src/${rootPath}/Anchor.toml || echo 'ANCHOR_TOML_NOT_FOUND'"`;
         const anchorTomlContent = await runCommand(anchorTomlCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
         
-        // Extract wallet setting from Anchor.toml
         const walletMatch = anchorTomlContent.match(/wallet\s*=\s*["']([^"']+)["']/);
         if (walletMatch) {
           console.log(`[EPHEMERAL_DEBUG] Found wallet in Anchor.toml: ${walletMatch[1]}`);
           
-          // If wallet is set to default id.json, suggest modifying Anchor.toml
           if (walletMatch[1].includes('id.json')) {
             console.warn(`[EPHEMERAL_DEBUG] WARNING: Anchor.toml specifies default wallet: ${walletMatch[1]}`);
             console.warn(`[EPHEMERAL_DEBUG] This might override command-line flags in some Anchor versions`);
@@ -448,17 +474,19 @@ export const startAnchorDeployTask = async (
         console.error(`[EPHEMERAL_DEBUG] Error checking Anchor.toml: ${tomlErr.message}`);
       }
       
-      const result = await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && ${anchorDeployCmd}"`, '.', sanitizedTaskId).catch(async (error: any) => {
+      const deployCmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && anchor deploy --provider.wallet ${containerWalletPath} --provider.cluster devnet 2>&1"`;
+      console.log(`[DEPLOY_DEBUG] Running command: ${deployCmd}`);
+      
+      const result = await runCommand(deployCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true }).catch(async (error: any) => {
         console.error('Error during deployment:', sanitizedTaskId, error);
         
-        // Debug: If the command failed, try a more direct approach with -k flag
         console.log(`[EPHEMERAL_DEBUG] Deployment failed. Trying direct anchor deploy with -k flag...`);
         try {
-          const directDeployCmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && anchor deploy -k ${containerWalletPath} --url devnet"`;
+          const directDeployCmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && anchor deploy -k ${containerWalletPath} --url devnet 2>&1"`;
+          console.log(`[DEPLOY_DEBUG] Running fallback command: ${directDeployCmd}`);
           const fallbackResult = await runCommand(directDeployCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
-          console.log(`[EPHEMERAL_DEBUG] Direct deploy result: ${fallbackResult}`);
+          console.log(`[EPHEMERAL_DEBUG] Direct deploy result (first 1000 chars):\n${fallbackResult.substring(0, 1000)}`);
           
-          // Check if the fallback worked
           if (fallbackResult.includes('Program Id:')) {
             console.log(`[EPHEMERAL_DEBUG] Direct deploy succeeded!`);
             return fallbackResult;
@@ -467,46 +495,115 @@ export const startAnchorDeployTask = async (
           console.error(`[EPHEMERAL_DEBUG] Fallback deploy also failed: ${fallbackErr.message}`);
         }
         
-        await updateTaskStatus(sanitizedTaskId, 'failed', `Error: ${error.message}`);
+        const errorResult = JSON.stringify({
+          status: 'failed',
+          error: error.message
+        });
+        await updateTaskStatus(sanitizedTaskId, 'failed', errorResult);
+        return `Error: ${error.message}`;
       });
+
+      console.log(`[DEPLOY_DEBUG] Full deploy output (first 1000 chars):\n${result?.substring(0, 1000)}`);
 
       if (result && result.startsWith('Error:')) {
         console.error(`Deployment failed for Task ID: ${sanitizedTaskId}. Reason: ${result}`);
-        await updateTaskStatus(sanitizedTaskId, 'failed', result);
+        const errorResult = JSON.stringify({
+          status: 'failed',
+          error: result
+        });
+        await updateTaskStatus(sanitizedTaskId, 'failed', errorResult);
         return;
       }
 
-      // Debug: Check for the "Upgrade authority" line in result
-      const upgradeAuthorityMatch = result?.match(/Upgrade authority: ([^\n]+)/);
-      if (upgradeAuthorityMatch) {
-        console.log(`[EPHEMERAL_DEBUG] Upgrade authority used: ${upgradeAuthorityMatch[1]}`);
-        
-        // Verify it's using our ephemeral key path
-        if (ephemeralPubkey && !upgradeAuthorityMatch[1].includes(ephemeralPubkey) && !upgradeAuthorityMatch[1].includes(containerWalletPath)) {
-          console.warn(`[EPHEMERAL_DEBUG] WARNING: Unexpected upgrade authority! ${upgradeAuthorityMatch[1]}`);
-          console.warn(`[EPHEMERAL_DEBUG] Expected to contain either: ${ephemeralPubkey} or ${containerWalletPath}`);
-        } else {
-          console.log(`[EPHEMERAL_DEBUG] Correct upgrade authority confirmed`);
-        }
+      console.log(`[DEPLOY_DEBUG] Searching for Program Id in output...`);
+      const programIdRegex = /Program Id:\s*([a-zA-Z0-9]{32,44})/;
+      const programIdMatch = result?.match(programIdRegex);
+      
+      if (programIdMatch) {
+        console.log(`[DEPLOY_DEBUG] Found Program Id: ${programIdMatch[1]}`);
+        programId = programIdMatch[1];
       } else {
-        console.log(`[EPHEMERAL_DEBUG] Could not find "Upgrade authority" line in output`);
-        console.log(`[EPHEMERAL_DEBUG] Output preview: ${result?.substring(0, 500)}...`);
+        console.log(`[DEPLOY_DEBUG] WARNING: No Program Id found in output! Searching the entire output for base58-like strings...`);
+        
+        const base58Regex = /\b[1-9A-HJ-NP-Za-km-z]{32,44}\b/g;
+        const potentialIds = result?.match(base58Regex) || [];
+        if (potentialIds.length > 0) {
+          console.log(`[DEPLOY_DEBUG] Found potential base58 program IDs: ${potentialIds.join(', ')}`);
+          
+          if (potentialIds.length > 0) {
+            programId = potentialIds[0] || null;
+            console.log(`[DEPLOY_DEBUG] Using first potential base58 string as Program ID: ${programId}`);
+          }
+        } else {
+          console.log(`[DEPLOY_DEBUG] No base58-like strings found in output!`);
+          const errorResult = JSON.stringify({
+            status: 'failed',
+            error: 'Program ID not found in deploy output'
+          });
+          await updateTaskStatus(sanitizedTaskId, 'failed', errorResult);
+          throw new Error('Program ID not found in deploy output. Deployment may have failed.');
+        }
       }
 
-      const programIdMatch = result?.match(/Program Id:\s+([a-zA-Z0-9]+)/);
-      if (!programIdMatch) throw new Error('Program ID not found in deploy output. Deployment may have failed.');
-
-      programId = programIdMatch[1];
+      console.log(`[DEPLOY_DEBUG] Using Program ID: ${programId}`);
+      
       if (programId) console.log(`Program successfully deployed with ID: ${programId}`);
+      
+      try {
+        if (programId && !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(programId)) {
+          console.error(`[DEPLOY_DEBUG] ERROR: Invalid program ID format: ${programId}`);
+          const errorResult = JSON.stringify({
+            status: 'failed',
+            error: `Invalid program ID format: ${programId}`
+          });
+          await updateTaskStatus(sanitizedTaskId, 'failed', errorResult);
+          throw new Error(`Invalid program ID format: ${programId}`);
+        }
+        
+        if (!programId) {
+          console.error(`[DEPLOY_DEBUG] ERROR: Program ID is null or undefined`);
+          const errorResult = JSON.stringify({
+            status: 'failed',
+            error: 'Program ID is null or undefined'
+          });
+          await updateTaskStatus(sanitizedTaskId, 'failed', errorResult);
+          throw new Error('Program ID is null or undefined');
+        }
+        
+        const checkProgramCmd = `docker exec ${containerName} bash -c "solana program show ${programId} --url devnet || echo 'PROGRAM_NOT_FOUND'"`;
+        const checkProgramResult = await runCommand(checkProgramCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
+        console.log(`[DEPLOY_DEBUG] Program verification: ${checkProgramResult.substring(0, 500)}`);
+        
+        if (checkProgramResult.includes('PROGRAM_NOT_FOUND')) {
+          console.warn(`[DEPLOY_DEBUG] WARNING: Program ${programId} not found on devnet. It may not be deployed properly.`);
+        } else {
+          console.log(`[DEPLOY_DEBUG] Program ${programId} successfully verified on devnet.`);
+        }
+      } catch (verifyProgramErr: any) {
+        console.error(`[DEPLOY_DEBUG] Error verifying program ID: ${verifyProgramErr.message}`);
+      }
+      
+      const successResult = JSON.stringify({
+        status: 'success',
+        programId: programId
+      });
+      
+      console.log(`[DEPLOY_DEBUG] Final program ID to be returned to client: '${programId}'`);
+      console.log(`[DEPLOY_DEBUG] Task result JSON: ${successResult}`);
       
       await updateTaskStatus(
         sanitizedTaskId,
         'succeed',
-        programId
+        successResult
       );
     } catch (error: any) {
       console.error('Error during deployment:', sanitizedTaskId, error);
-      return [sanitizedTaskId, null];
+      const errorResult = JSON.stringify({
+        status: 'failed',
+        error: error.message
+      });
+      await updateTaskStatus(sanitizedTaskId, 'failed', errorResult);
+      return;
     }
   });
 
@@ -708,7 +805,6 @@ export const startCreateProjectDirectoryTask = async (
       console.log(`[DEBUG_CONTAINER] Docker container created: name=${containerName}, about to get host port and update DB`);
 
       try {
-        // Get the randomly assigned host port
         const hostPort = await getContainerHostPort(containerName, 3000, sanitizedTaskId);
         const containerUrl = `http://localhost:${hostPort}`;
         console.log(`[DEBUG_CONTAINER] Setting containerUrl=${containerUrl} for container=${containerName}, projectId=${projectId}`);
@@ -934,17 +1030,6 @@ ${serverGitignoreContent}
 EOF`;
       await runCommand(serverGitignoreCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
 
-      /*
-      await runCommand(`
-        docker exec ${containerName} bash -c "
-          cd /usr/src/${rootPath} &&
-          git init &&
-          git add . &&
-          git commit -m 'Initial scaffold'
-        "
-      `, '.', sanitizedTaskId);
-      */
-      
       console.log("Attempting git initialization to verify filesystem...");
       await runCommand(`
         docker exec ${containerName} bash -c "
@@ -1249,7 +1334,6 @@ async function createNewContainer(
   `;
   await runCommand(startContainerCmd, '.', taskId, { skipSuccessUpdate: true });
   
-  // Get the randomly assigned host port
   const hostPort = await getContainerHostPort(containerName, 3000, taskId);
   const containerUrl = `http://localhost:${hostPort}`;
   
