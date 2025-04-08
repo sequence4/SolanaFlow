@@ -304,7 +304,31 @@ export const handleDeployProgram = async (
           ephemeralPubkey = new PublicKey(ephemeralResp.ephemeralPubkey);
           console.log('Fetched ephemeral pubkey:', ephemeralPubkey.toBase58());
 
-          const lamportsToFund = 0.1 * LAMPORTS_PER_SOL;
+          // Reference the same chunk size used in deployUpgradeableProgram
+          const CHUNK_SIZE = 700; // Must match the chunk size used during deployment
+          
+          // Calculate buffer rent (for the buffer account holding the program)
+          const bufferSpace = 37 + programData.length;
+          const bufferRentNeeded = await connection.getMinimumBalanceForRentExemption(bufferSpace);
+          console.log(`Buffer space: ${bufferSpace} bytes, rent: ${bufferRentNeeded / LAMPORTS_PER_SOL} SOL`);
+
+          // Calculate program data rent (for the upgradeable program data account)
+          const programDataRent = await connection.getMinimumBalanceForRentExemption(36);
+          console.log(`Program data rent: ${programDataRent / LAMPORTS_PER_SOL} SOL`);
+
+          // Estimate transaction fees based on number of chunks
+          const chunkCount = Math.ceil(programData.length / CHUNK_SIZE);
+          const feeEstimate = (chunkCount + 2) * 10000; // 10k lamports each (create buffer, chunk writes, finalize)
+          console.log(`Estimated ${chunkCount + 2} transactions, fees: ${feeEstimate / LAMPORTS_PER_SOL} SOL`);
+
+          // Add safety margin
+          const marginLamports = 0.01 * LAMPORTS_PER_SOL;
+          console.log(`Safety margin: ${marginLamports / LAMPORTS_PER_SOL} SOL`);
+
+          // Calculate total lamports needed
+          const lamportsToFund = bufferRentNeeded + programDataRent + feeEstimate + marginLamports;
+          console.log(`Total funding needed: ${lamportsToFund / LAMPORTS_PER_SOL} SOL`);
+
           const fundIx = SystemProgram.transfer({
             fromPubkey: walletPublicKey,
             toPubkey: ephemeralPubkey,
