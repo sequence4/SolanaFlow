@@ -269,6 +269,16 @@ export const handleDeployProgram = async (
 ) => {
   if (!projectContext.details?.projectState?.fileTree) console.log('no file tree found');
 
+  // Validate wallet connection first
+  if (!walletPublicKey || !(walletPublicKey instanceof PublicKey)) {
+    console.error('Wallet connection error: Invalid or undefined wallet public key');
+    toaster.create({
+      title: 'Wallet not properly connected. Please connect your wallet and try again.',
+      type: 'error',
+    });
+    return;
+  }
+
   try {
     const buildResponse = await projectApi.buildProject(projectContext.id ?? '');
     if (!buildResponse?.taskId) { console.log('no task id returned'); return; }
@@ -300,45 +310,59 @@ export const handleDeployProgram = async (
         
         let ephemeralPubkey: PublicKey | undefined;
         if (deployControlOption === 'delegated') {
-          const ephemeralResp = await projectApi.createEphemeral(projectContext.id ?? '');
-          ephemeralPubkey = new PublicKey(ephemeralResp.ephemeralPubkey);
-          console.log('Fetched ephemeral pubkey:', ephemeralPubkey.toBase58());
-
-          // Reference the same chunk size used in deployUpgradeableProgram
-          const CHUNK_SIZE = 700; // Must match the chunk size used during deployment
-          
-          // Calculate buffer rent (for the buffer account holding the program)
-          const bufferSpace = 37 + programData.length;
-          const bufferRentNeeded = await connection.getMinimumBalanceForRentExemption(bufferSpace);
-          console.log(`Buffer space: ${bufferSpace} bytes, rent: ${bufferRentNeeded / LAMPORTS_PER_SOL} SOL`);
-
-          // Calculate program data rent (for the upgradeable program data account)
-          const programDataRent = await connection.getMinimumBalanceForRentExemption(36);
-          console.log(`Program data rent: ${programDataRent / LAMPORTS_PER_SOL} SOL`);
-
-          // Estimate transaction fees based on number of chunks
-          const chunkCount = Math.ceil(programData.length / CHUNK_SIZE);
-          const feeEstimate = (chunkCount + 2) * 10000; // 10k lamports each (create buffer, chunk writes, finalize)
-          console.log(`Estimated ${chunkCount + 2} transactions, fees: ${feeEstimate / LAMPORTS_PER_SOL} SOL`);
-
-          // Add safety margin
-          const marginLamports = 0.01 * LAMPORTS_PER_SOL;
-          console.log(`Safety margin: ${marginLamports / LAMPORTS_PER_SOL} SOL`);
-
-          // Calculate total lamports needed
-          const lamportsToFund = bufferRentNeeded + programDataRent + feeEstimate + marginLamports;
-          console.log(`Total funding needed: ${lamportsToFund / LAMPORTS_PER_SOL} SOL`);
-
-          const fundIx = SystemProgram.transfer({
-            fromPubkey: walletPublicKey,
-            toPubkey: ephemeralPubkey,
-            lamports: lamportsToFund,
-          });
-          const fundTx = new Transaction().add(fundIx);
-
           try {
+            // Verify wallet is on the correct network (devnet)
+            const walletOnCorrectNetwork = cluster === 'devnet'; // Ideally check with wallet adapter
+            if (!walletOnCorrectNetwork) {
+              console.warn('Wallet may not be on devnet network. Deployment might fail.');
+            }
+            
+            const ephemeralResp = await projectApi.createEphemeral(projectContext.id ?? '');
+            ephemeralPubkey = new PublicKey(ephemeralResp.ephemeralPubkey);
+            console.log('Fetched ephemeral pubkey:', ephemeralPubkey.toBase58());
+
+            // Reference the same chunk size used in deployUpgradeableProgram
+            const CHUNK_SIZE = 700; // Must match the chunk size used during deployment
+            
+            // Calculate buffer rent (for the buffer account holding the program)
+            const bufferSpace = 37 + programData.length;
+            const bufferRentNeeded = await connection.getMinimumBalanceForRentExemption(bufferSpace);
+            console.log(`Buffer space: ${bufferSpace} bytes, rent: ${bufferRentNeeded / LAMPORTS_PER_SOL} SOL`);
+
+            // Calculate program data rent (for the upgradeable program data account)
+            const programDataRent = await connection.getMinimumBalanceForRentExemption(36);
+            console.log(`Program data rent: ${programDataRent / LAMPORTS_PER_SOL} SOL`);
+
+            // Estimate transaction fees based on number of chunks
+            const chunkCount = Math.ceil(programData.length / CHUNK_SIZE);
+            const feeEstimate = (chunkCount + 2) * 10000; // 10k lamports each (create buffer, chunk writes, finalize)
+            console.log(`Estimated ${chunkCount + 2} transactions, fees: ${feeEstimate / LAMPORTS_PER_SOL} SOL`);
+
+            // Add safety margin
+            const marginLamports = 0.02 * LAMPORTS_PER_SOL;
+            console.log(`Safety margin: ${marginLamports / LAMPORTS_PER_SOL} SOL`);
+
+            // Calculate total lamports needed
+            const lamportsToFund = bufferRentNeeded + programDataRent + feeEstimate + marginLamports;
+            console.log(`Total funding needed: ${lamportsToFund / LAMPORTS_PER_SOL} SOL`);
+
+            // Verify wallet has enough balance
+            const walletBalance = await connection.getBalance(walletPublicKey);
+            if (walletBalance < lamportsToFund) {
+              throw new Error(`Insufficient balance. Need ${lamportsToFund / LAMPORTS_PER_SOL} SOL but wallet only has ${walletBalance / LAMPORTS_PER_SOL} SOL`);
+            }
+
+            // Create funding transaction
+            const fundIx = SystemProgram.transfer({
+              fromPubkey: walletPublicKey,
+              toPubkey: ephemeralPubkey,
+              lamports: lamportsToFund,
+            });
+            const fundTx = new Transaction().add(fundIx);
+
+            // Send and confirm the funding transaction
             const signature = await signAndSendTransaction(fundTx);
-            console.log('Ephemeral funded. Transaction Sig:', signature);
+            console.log('Ephemeral funding transaction sent. Sig:', signature);
 
             const latestBlockhash = await connection.getLatestBlockhash();
             await connection.confirmTransaction({
@@ -348,6 +372,15 @@ export const handleDeployProgram = async (
             }, 'confirmed');
             console.log(`Ephemeral successfully funded with ${lamportsToFund / LAMPORTS_PER_SOL} SOL`);
             
+            // Verify ephemeral account received funds
+            const ephemeralBalance = await connection.getBalance(ephemeralPubkey);
+            console.log(`Verified ephemeral balance: ${ephemeralBalance / LAMPORTS_PER_SOL} SOL`);
+            
+            if (ephemeralBalance < lamportsToFund * 0.95) { // Allow 5% tolerance
+              console.warn(`Ephemeral account only has ${ephemeralBalance / LAMPORTS_PER_SOL} SOL, less than expected ${lamportsToFund / LAMPORTS_PER_SOL} SOL`);
+            }
+            
+            // Start server-side ephemeral deployment
             const deployResp = await projectApi.deployProjectEphemeral(
               projectContext.id ?? '', 
               ephemeralResp.ephemeralPubkey
@@ -371,9 +404,33 @@ export const handleDeployProgram = async (
               });
               return;
             }
-          } catch (err) {
-            console.error('Error funding ephemeral or deploying:', err);
-            toaster.create({ title: 'Funding ephemeral key or deployment failed', type: 'error' });
+          } catch (err: any) {
+            // Provide more specific error message based on error type
+            if (err.message?.includes('Invalid public key input')) {
+              console.error('Wallet connection error:', err);
+              toaster.create({ 
+                title: 'Wallet connection issue. Please reconnect your wallet and ensure it\'s on devnet.', 
+                type: 'error' 
+              });
+            } else if (err.message?.includes('User rejected')) {
+              console.error('User rejected transaction:', err);
+              toaster.create({ 
+                title: 'Transaction rejected. Please approve the transaction to fund the deployment.', 
+                type: 'error' 
+              });
+            } else if (err.message?.includes('Insufficient balance')) {
+              console.error('Insufficient wallet balance:', err);
+              toaster.create({ 
+                title: err.message, 
+                type: 'error' 
+              });
+            } else {
+              console.error('Error funding ephemeral or deploying:', err);
+              toaster.create({ 
+                title: 'Funding ephemeral key or deployment failed. See logs for details.', 
+                type: 'error' 
+              });
+            }
             return;
           }
         } else {
