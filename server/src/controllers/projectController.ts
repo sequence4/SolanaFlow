@@ -691,15 +691,6 @@ export const deployProject = async (
       return next(new AppError('Error parsing project details', 500));
     }
 
-    if ((details as any).isLite === true) {
-      console.log('Skipping deployment process for lite project');
-      res.status(200).json({ 
-        message: 'Deployment operation skipped for lite project',
-        isLite: true
-      });
-      return;
-    }
-
     const taskId = await startAnchorDeployTask(id, userId);
 
     res.status(200).json({
@@ -709,6 +700,64 @@ export const deployProject = async (
   } catch (error) {
     console.error('Error in deployProject:', error);
     return next(new AppError('Failed to start deployment process', 500));
+  }
+};
+
+export const deployProjectEphemeral = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  const { id } = req.params;
+  const userId = req.user?.id;
+  const orgId = req.user?.org_id;
+  const { ephemeralPubkey } = req.body;
+
+  if (!userId || !orgId) {
+    return next(new AppError('User information not found', 400));
+  }
+
+  if (!ephemeralPubkey) {
+    return next(new AppError('Ephemeral public key is required', 400));
+  }
+
+  try {
+    const projectCheck = await pool.query(
+      'SELECT details FROM solanaproject WHERE id = $1 AND org_id = $2',
+      [id, orgId]
+    );
+
+    if (projectCheck.rows.length === 0) {
+      return next(
+        new AppError(
+          'Project not found or you do not have permission to deploy it',
+          404
+        )
+      );
+    }
+
+    const { details: detailsStr } = projectCheck.rows[0];
+    let details = {};
+    try {
+      if (typeof detailsStr === 'object' && detailsStr !== null) {
+        details = detailsStr;
+      } else {
+        details = JSON.parse(detailsStr || '{}');
+      }
+    } catch (err) {
+      console.error('Failed to parse details JSON:', err);
+      return next(new AppError('Error parsing project details', 500));
+    }
+
+    const taskId = await startAnchorDeployTask(id, userId, ephemeralPubkey);
+
+    res.status(200).json({
+      message: 'Ephemeral anchor deploy process started',
+      taskId: taskId,
+    });
+  } catch (error) {
+    console.error('Error in deployProjectEphemeral:', error);
+    return next(new AppError('Failed to start ephemeral deployment process', 500));
   }
 };
 
