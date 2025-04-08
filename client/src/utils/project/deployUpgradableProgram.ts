@@ -394,8 +394,26 @@ export const handleDeployProgram = async (
             
             const deployTaskData = await pollTaskStatus3(deployResp.taskId);
             if (deployTaskData.task.status === 'succeed') {
-              console.log('Program deployed successfully with ID:', deployTaskData.task.result);
-              return new PublicKey(deployTaskData.task.result);
+              const deployedProgramId = new PublicKey(deployTaskData.task.result);
+              console.log('Program deployed successfully with ID:', deployedProgramId.toBase58());
+              
+              // Show success message with program ID to the user
+              toaster.create({
+                title: 'Deployment successful',
+                description: `Program ID: ${deployedProgramId.toBase58()}`,
+                type: 'success',
+              });
+              
+              // Store the program ID in project context
+              setProjectContext(prev => ({
+                ...prev,
+                details: prev.details ? {
+                  ...prev.details,
+                  deployedProgramId: deployedProgramId.toBase58(),
+                } : prev.details
+              }));
+              
+              return deployedProgramId;
             } else {
               console.error('Deployment failed:', deployTaskData.task.result);
               toaster.create({
