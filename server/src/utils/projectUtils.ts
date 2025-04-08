@@ -186,11 +186,31 @@ export const getBuildArtifactTask = async (projectId: string): Promise<{ status:
   try {
     const rootPath = await getProjectRootPath(projectId);
     const transformedRootPath = transformRootPath(rootPath);
-    const soPath = path.join(APP_CONFIG.ROOT_FOLDER, rootPath, 'target', 'deploy', `${transformedRootPath}.so`);
-
-    const fileBuffer = fs.readFileSync(soPath);
-    const base64So = fileBuffer.toString('base64');
-
+    
+    // Get the container name for this project
+    const containerName = await getContainerName(projectId);
+    if (!containerName) {
+      throw new Error(`No container found for project ${projectId}`);
+    }
+    
+    // Create a temporary task ID for the command execution
+    const tempTaskId = uuidv4();
+    
+    // Read the .so file directly from inside the container
+    const containerSoPath = `/usr/src/${rootPath}/target/deploy/${transformedRootPath}.so`;
+    
+    // Check if the file exists in the container
+    const fileExistsCmd = `docker exec ${containerName} bash -c "if [ -f '${containerSoPath}' ]; then echo 'exists'; else echo 'not_found'; fi"`;
+    const fileExists = await runCommand(fileExistsCmd, '.', tempTaskId, { skipSuccessUpdate: true });
+    
+    if (fileExists.trim() !== 'exists') {
+      throw new Error(`Built artifact not found in container at path: ${containerSoPath}`);
+    }
+    
+    // Read and encode the file directly from the container
+    const base64Cmd = `docker exec ${containerName} bash -c "cat '${containerSoPath}' | base64 -w 0"`;
+    const base64So = await runCommand(base64Cmd, '.', tempTaskId, { skipSuccessUpdate: true });
+    
     return { status: 'success', base64So };
   } catch (error) {
     console.error('Error retrieving built artifact:', error);
