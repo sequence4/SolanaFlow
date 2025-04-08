@@ -38,7 +38,7 @@ import {
   
         const snakeName = label.toLowerCase().replace(/\s+/g, "_");
   
-        const pascalName = snakeName
+        let pascalName = snakeName
           .split("_")
           .map((part: string) => part.charAt(0).toUpperCase() + part.slice(1))
           .join("");
@@ -287,7 +287,7 @@ import {
           ...incomingEvents
         ];
   
-        return {
+        const instructionDetails = {
           name: snakeName,
           doc_description: instrNode.data?.doc || "",
           context_name: `${pascalName}Context`,
@@ -302,6 +302,14 @@ import {
           params,
           hasState,
         } as InstructionDetail;
+  
+        if (snakeName === "initialize_mint") {
+          instructionDetails.context_name = "InitializeMintContext";
+          instructionDetails.params_name = "InitializeMintParams";
+          instructionDetails.error_enum_name = "InitializeMintError";
+        }
+  
+        return instructionDetails;
       });
   }
   

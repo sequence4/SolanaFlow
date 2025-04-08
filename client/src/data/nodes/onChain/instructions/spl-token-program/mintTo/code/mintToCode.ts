@@ -7,7 +7,32 @@ use anchor_spl::token::{
     MintTo,
 };
 
-pub fn mint_to_handler(ctx: Context<MintToContext>, amount: u64) -> Result<()> {
+#[derive(Accounts)]
+pub struct MintToContext<'info> {
+    #[account(mut)]
+    pub mint_authority: Signer<'info>,
+
+    /// CHECK: This is the mint account
+    #[account(mut)]
+    pub token_mint: AccountInfo<'info>,
+
+    /// CHECK: This is the destination token account
+    #[account(mut)]
+    pub destination_token_account: AccountInfo<'info>,
+
+    #[account(address = spl_token::id())]
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct MintToParams {
+    pub amount: u64,
+}
+
+pub fn mint_to(
+    ctx: Context<MintToContext>,
+    params: MintToParams,
+) -> Result<()> {
     let token_program = &ctx.accounts.token_program;
     let token_mint_info = &ctx.accounts.token_mint;
     let destination_account_info = &ctx.accounts.destination_token_account;
@@ -29,26 +54,21 @@ pub fn mint_to_handler(ctx: Context<MintToContext>, amount: u64) -> Result<()> {
         },
     );
 
-    token::mint_to(cpi_ctx, amount)?;
+    token::mint_to(cpi_ctx, params.amount)?;
+
+    // Optionally emit an event to signal that tokens have been minted
+    emit!(TokensMinted {
+        mint_authority: mint_authority.key(),
+        amount: params.amount,
+    });
 
     Ok(())
 }
 
-#[derive(Accounts)]
-pub struct MintToContext<'info> {
-    #[account(mut)]
-    pub mint_authority: Signer<'info>,
-
-    /// CHECK: This is the mint account
-    #[account(mut)]
-    pub token_mint: AccountInfo<'info>,
-
-    /// CHECK: This is the destination token account
-    #[account(mut)]
-    pub destination_token_account: AccountInfo<'info>,
-
-    #[account(address = spl_token::id())]
-    pub token_program: Program<'info, Token>,
+#[event]
+pub struct TokensMinted {
+    pub mint_authority: Pubkey,
+    pub amount: u64,
 }
 
 #[error_code]

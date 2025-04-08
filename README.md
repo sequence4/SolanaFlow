@@ -116,6 +116,7 @@ FLOWCODE (root)
     PORT=9999
     JWT_SECRET=YOUR_JWT_SECRET
     ROOT_FOLDER=/path/to/projects
+    WALLETS_FOLDER=/path/to/wallets
     DB_USER=YOUR_DB_USER
     DB_HOST=YOUR_DB_HOST
     DB_PORT=5432
