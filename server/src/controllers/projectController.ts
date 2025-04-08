@@ -638,7 +638,7 @@ export const createEphemeralKeypair = async (req: Request, res: Response, next: 
     const ephemeral = Keypair.generate();
     const ephemeralPubkeyString = ephemeral.publicKey.toBase58();
 
-    const ephemeralFilePath = path.join(os.tmpdir(), `${ephemeralPubkeyString}.json`);
+    const ephemeralFilePath = path.join(APP_CONFIG.WALLETS_FOLDER, `${ephemeralPubkeyString}.json`);
     fs.writeFileSync(ephemeralFilePath, JSON.stringify([...ephemeral.secretKey]));
 
     console.log(`Created ephemeral keypair with public key ${ephemeralPubkeyString} and saved to ${ephemeralFilePath}`);
