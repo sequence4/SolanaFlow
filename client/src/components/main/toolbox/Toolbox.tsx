@@ -22,6 +22,7 @@ import { handleGenerateCode } from '@/utils/codeGeneration/handleGenerateCode';
 import { handleDeployProgram } from '@/utils/project/deployUpgradableProgram';
 import { saveProject } from '@/utils/project/saveProject';
 import { handleConfirmNewProject, handleOpenProject, handleSaveClick } from '@/utils/project/projectUtils';
+import { useTaskLogs } from '@/context/logs/useTaskLogs';
 import {
   Search,
   X,
@@ -66,6 +67,7 @@ export const Toolbox = () => {
     
     const signAndSendTx = useSignAndSendTx();
     const { publicKey } = useWallet();
+    const { resetLogs, setSteps, setProgress, setIsVisible, addSystemLog } = useTaskLogs();
     
     const deployModalBg = useColorModeValue('var(--toolbar-deploy-modal-bg-light)', 'var(--toolbar-deploy-modal-bg-dark)');
     const deployModalBorderColor = useColorModeValue('var(--toolbar-deploy-modal-border-light)', 'var(--toolbar-deploy-modal-border-dark)');
@@ -87,6 +89,9 @@ export const Toolbox = () => {
     };
 
     const handleCreateProject = (data: { name: string; description: string; repoUrl?: string }) => {
+        // Reset logs before starting new project creation
+        resetLogs();
+        
         handleConfirmNewProject(
             projectContext, 
             setProjectContext, 
@@ -96,7 +101,8 @@ export const Toolbox = () => {
             setProjectsRefreshCounter, 
             setUxOpenPanel,
             setFileTree,
-            setSelectedFile
+            setSelectedFile,
+            { setSteps, setProgress, setIsVisible, addSystemLog }
         );
         setIsNewProjectModalOpen(false);
     };

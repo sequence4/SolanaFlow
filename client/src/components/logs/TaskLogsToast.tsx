@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Loader2, CheckCircle2, Terminal, Server, Database, Code, Cpu, HardDrive } from "lucide-react";
+import { Loader2, CheckCircle2, Terminal, Server, Database, Code, Cpu, HardDrive, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTaskLogs } from "@/context/logs/useTaskLogs";
 
@@ -11,6 +11,7 @@ const iconMap: Record<string, React.ReactNode> = {
   Code: <Code className="h-4 w-4" />,
   Cpu: <Cpu className="h-4 w-4" />,
   HardDrive: <HardDrive className="h-4 w-4" />,
+  CheckCircle: <Check className="h-4 w-4 text-green-500" />,
 };
 
 export default function TaskLogsToast() {
@@ -31,7 +32,8 @@ export default function TaskLogsToast() {
 
   return (
     <div className="fixed bottom-0 right-120 w-96 bg-[#0A0B10]/95 border border-[#1A1B25] rounded-lg shadow-xl backdrop-blur-sm overflow-hidden">
-      {/* Header with hexagon pattern background */}
+      
+      {/* Header */}
       <div className="relative h-12 bg-gradient-to-r from-[#0E0F17] to-[#151823] flex items-center px-4">
         <div className="absolute inset-0 opacity-10">
           {[...Array(20)].map((_, i) => (
@@ -48,9 +50,13 @@ export default function TaskLogsToast() {
         </div>
         <div className="flex items-center space-x-2 z-10">
           <div className="h-6 w-6 rounded-full bg-[#0A0B10] flex items-center justify-center">
-            <Loader2 className="h-4 w-4 text-blue-400 animate-spin" />
+            {progress === 100 ? (
+                <Check className="h-4 w-4 text-green-500" />
+            ) : (
+                <Loader2 className="h-4 w-4 text-blue-400 animate-spin" />
+            )}
           </div>
-          <h3 className="font-medium text-sm">Project Setup</h3>
+          <h3 className="font-medium text-sm">Loading...</h3>
         </div>
         <div className="ml-auto flex items-center space-x-1 z-10">
           <div className="text-xs font-mono text-blue-300">{Math.round(progress)}%</div>
@@ -74,80 +80,50 @@ export default function TaskLogsToast() {
       {/* Main content */}
       <div className="p-4">
         <div className="text-sm text-gray-300 mb-3">
-          Your project directory is being created. This operation involves multiple steps and may take a moment.
+          This operation involves multiple steps and may take a moment.
         </div>
 
         {/* Status logs */}
         <div className="space-y-2 mb-3">
-          {steps.map((step, index) => (
-            <div
-              key={index}
-              className={cn(
-                "flex items-start gap-3 py-1.5 px-2 rounded transition-colors",
-                index === currentStep ? "bg-[#0E1018]/80" : "",
-                index < currentStep ? "text-gray-400" : "text-gray-500",
-              )}
-            >
-              <div className="mt-0.5">
-                {index < currentStep ? (
-                  <CheckCircle2 className="h-4 w-4 text-green-500" />
-                ) : index === currentStep ? (
-                  <div className="h-4 w-4 flex items-center justify-center">
-                    <div className="h-4 w-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
-                  </div>
-                ) : (
-                  <div className="h-4 w-4 rounded-full border border-gray-600" />
+          {steps.length > 0 ? (
+            steps.map((step, index) => (
+              <div
+                key={index}
+                className={cn(
+                  "flex items-start gap-3 py-1.5 px-2 rounded transition-colors",
+                  progress < 100 && index === currentStep ? "bg-[#0E1018]/80" : "",
+                  progress === 100 || index < currentStep ? "text-gray-300" : "text-gray-500",
                 )}
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center">
-                  {iconMap[step.icon]}
-                  <span className="ml-2 text-xs font-medium">{step.message}</span>
+              >
+                <div className="mt-0.5">
+                  {progress === 100 ? (
+                    <Check className="h-4 w-4 text-green-500" />
+                  ) : index < currentStep ? (
+                    <Check className="h-4 w-4 text-green-500" />
+                  ) : index === currentStep ? (
+                    <div className="h-4 w-4 flex items-center justify-center">
+                      <div className="h-4 w-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
+                    </div>
+                  ) : (
+                    <div className="h-4 w-4 rounded-full border border-gray-600" />
+                  )}
                 </div>
+                <div className="flex-1">
+                  <div className="flex items-center">
+                    <span className="text-xs font-medium">{step.message}</span>
+                  </div>
 
-                {showDetails && index <= currentStep && (
-                  <div className="mt-1 text-xs text-gray-500 pl-6">{step.details}</div>
-                )}
+                  {showDetails && (progress === 100 || index <= currentStep) && (
+                    <div className="mt-1 text-xs text-gray-500 pl-6">{step.details}</div>
+                  )}
+                </div>
               </div>
+            ))
+          ) : (
+            <div className="text-xs text-gray-400 italic text-center py-2">
+              Preparing operation...
             </div>
-          ))}
-        </div>
-
-        {/* Technical details */}
-        <div className="bg-[#050508] rounded border border-[#1A1B25] p-2 mt-3">
-          <div className="flex items-center mb-1">
-            <Terminal className="h-3.5 w-3.5 text-gray-500 mr-1.5" />
-            <span className="text-xs text-gray-400 font-medium">System Log</span>
-          </div>
-          <div className="font-mono text-xs text-gray-500 max-h-20 overflow-y-auto">
-            {systemLogs.map((log, index) => (
-              <div key={index} className="flex">
-                <span className="text-blue-500 mr-2">$</span>
-                {index === systemLogs.length - 1 ? (
-                  <span className="text-gray-400 animate-pulse">
-                    {log} <span className="inline-block w-1 h-3 bg-gray-400 animate-blink"></span>
-                  </span>
-                ) : (
-                  <span>
-                    {log.includes(':') ? (
-                      <>
-                        {log.split(':')[0]}:
-                        <span className={
-                          log.includes('ID') || log.includes('id') ? 'text-green-500' :
-                          log.includes('config') || log.includes('json') ? 'text-yellow-500' : 
-                          log.includes('network') || log.includes('mainnet') ? 'text-purple-500' : ''
-                        }>
-                          {log.split(':').slice(1).join(':')}
-                        </span>
-                      </>
-                    ) : (
-                      log
-                    )}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
+          )}
         </div>
 
         {/* Footer with technical stats */}
