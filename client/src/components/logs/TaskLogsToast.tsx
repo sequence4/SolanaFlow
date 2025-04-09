@@ -127,6 +127,7 @@ export default function TaskLogsToast() {
         </div>
 
         {/* Footer with technical stats */}
+        {/*}
         <div className="mt-3 grid grid-cols-3 gap-2 text-xs border-t border-[#1A1B25] pt-3">
           <div>
             <div className="text-gray-500">Memory</div>
@@ -141,6 +142,7 @@ export default function TaskLogsToast() {
             <div className="font-mono text-gray-300">{nodeVersion}</div>
           </div>
         </div>
+        */}
       </div>
     </div>
   );
