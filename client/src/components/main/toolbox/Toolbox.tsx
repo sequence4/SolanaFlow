@@ -67,7 +67,7 @@ export const Toolbox = () => {
     
     const signAndSendTx = useSignAndSendTx();
     const { publicKey } = useWallet();
-    const { resetLogs, setSteps, setProgress, setIsVisible, addSystemLog } = useTaskLogs();
+    const taskLogs = useTaskLogs();
     
     const deployModalBg = useColorModeValue('var(--toolbar-deploy-modal-bg-light)', 'var(--toolbar-deploy-modal-bg-dark)');
     const deployModalBorderColor = useColorModeValue('var(--toolbar-deploy-modal-border-light)', 'var(--toolbar-deploy-modal-border-dark)');
@@ -90,7 +90,7 @@ export const Toolbox = () => {
 
     const handleCreateProject = (data: { name: string; description: string; repoUrl?: string }) => {
         // Reset logs before starting new project creation
-        resetLogs();
+        taskLogs.resetLogs();
         
         handleConfirmNewProject(
             projectContext, 
@@ -102,7 +102,7 @@ export const Toolbox = () => {
             setUxOpenPanel,
             setFileTree,
             setSelectedFile,
-            { setSteps, setProgress, setIsVisible, addSystemLog }
+            taskLogs
         );
         setIsNewProjectModalOpen(false);
     };
@@ -137,7 +137,8 @@ export const Toolbox = () => {
                 setIsCodeReady,
                 (tab: any) => setActiveTab(tab),
                 setFileTree,
-                setProjectContext
+                setProjectContext,
+                taskLogs
             );
         } catch (error) {
             console.error('Error generating code:', error);

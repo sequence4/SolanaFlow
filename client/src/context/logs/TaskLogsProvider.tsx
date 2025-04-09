@@ -17,16 +17,16 @@ export default function TaskLogsProvider({
   const [systemLogs, setSystemLogs] = useState<string[]>([]);
   
   // Reset when progress reaches 100%
-  // useEffect(() => {
-  //   let timer: NodeJS.Timeout;
-  //   if (progress >= 100) {
-  //     timer = setTimeout(() => {
-  //       // Auto-hide the toast after completion
-  //       setIsVisible(false);
-  //     }, 3000); // 3 seconds after completion
-  //     return () => clearTimeout(timer);
-  //   }
-  // }, [progress]);
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (progress >= 100) {
+      timer = setTimeout(() => {
+        // Auto-hide the toast after completion
+        setIsVisible(false);
+      }, 3000); // 3 seconds after completion
+      return () => clearTimeout(timer);
+    }
+  }, [progress]);
 
   // Update current step based on progress
   useEffect(() => {

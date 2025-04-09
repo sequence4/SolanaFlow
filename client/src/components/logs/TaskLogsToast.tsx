@@ -56,7 +56,13 @@ export default function TaskLogsToast() {
                 <Loader2 className="h-4 w-4 text-blue-400 animate-spin" />
             )}
           </div>
-          <h3 className="font-medium text-sm">Loading...</h3>
+          <h3 className="font-medium text-sm">
+            {progress === 100 
+              ? "Completed" 
+              : (steps.length > 0 && currentStep < steps.length) 
+                  ? steps[currentStep].message 
+                  : "Processing..."}
+          </h3>
         </div>
         <div className="ml-auto flex items-center space-x-1 z-10">
           <div className="text-xs font-mono text-blue-300">{Math.round(progress)}%</div>
@@ -79,9 +85,6 @@ export default function TaskLogsToast() {
 
       {/* Main content */}
       <div className="p-4">
-        <div className="text-sm text-gray-300 mb-3">
-          This operation involves multiple steps and may take a moment.
-        </div>
 
         {/* Status logs */}
         <div className="space-y-2 mb-3">

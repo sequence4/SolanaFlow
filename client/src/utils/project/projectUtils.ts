@@ -353,6 +353,7 @@ interface TaskLogActions {
     setProgress: (progress: number) => void;
     setIsVisible: (isVisible: boolean) => void;
     addSystemLog: (log: string) => void;
+    resetLogs: () => void;
 }
 
 export const handleConfirmNewProject = async (
