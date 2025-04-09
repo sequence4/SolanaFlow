@@ -20,6 +20,7 @@ import { useColorModeValue } from '@/components/ui/color-mode';
 import PulseLoader from "react-spinners/PulseLoader";
 import { handleGenerateCode } from '@/utils/codeGeneration/handleGenerateCode';
 import { handleDeployProgram } from '@/utils/project/deployUpgradableProgram';
+import { handleDeployWithLogs } from '@/utils/project/handleDeployWithLogs';
 import { saveProject } from '@/utils/project/saveProject';
 import { handleConfirmNewProject, handleOpenProject, handleSaveClick } from '@/utils/project/projectUtils';
 import { useTaskLogs } from '@/context/logs/useTaskLogs';
@@ -164,43 +165,24 @@ export const Toolbox = () => {
     const handleDeployClick = async () => {
         if (isDeploying) return;
         setIsDeploying(true);
+        
+        // CLOSE THE POPUP IMMEDIATELY
+        setShowDeployModal(false);
+        
         try {
             if (!publicKey) {
                 throw new Error('No wallet connected');
             }
             
-            const programKeypair = await handleDeployProgram(
-                projectContext, 
-                setProjectContext, 
-                publicKey, 
-                signAndSendTx, 
+            await handleDeployWithLogs(
+                projectContext,
+                setProjectContext,
+                publicKey,
+                signAndSendTx,
                 'devnet',
-                selectedOption === 'user-wallet' ? 'fullWallet' : 'delegated'
+                selectedOption === 'user-wallet' ? 'fullWallet' : 'delegated',
+                taskLogs
             );
-            if (!programKeypair) {
-                toast("Program deployment failed", {
-                    description: "Failed to deploy the program",
-                    style: { backgroundColor: "#f87171", color: "white" }
-                });
-                return;
-            }
-            toast("Program successfully deployed", {
-                description: `Program deployed to: ${programKeypair.toBase58()}`,
-                style: { backgroundColor: "#4ade80", color: "white" }
-            });
-            
-            if (projectContext.details) {
-                setProjectContext({
-                    ...projectContext,
-                    details: {
-                        ...projectContext.details,
-                        projectState: { 
-                            ...projectContext.details.projectState, 
-                            programId: programKeypair.toBase58() 
-                        }
-                    }
-                });
-            }
         } catch (err) {
             console.error('Deployment error:', err);
             toast("Deployment error", {
@@ -209,7 +191,6 @@ export const Toolbox = () => {
             });
         } finally {
             setIsDeploying(false);
-            setShowDeployModal(false);
         }
     };
     
