@@ -40,7 +40,10 @@ import {
   Code,
   Hammer,
   Rocket,
+  ChevronRight,
 } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
 export const Toolbox = () => {
     const [isExpanded] = useState(true);
@@ -63,7 +66,7 @@ export const Toolbox = () => {
     const [isCodeReady, setIsCodeReady] = useState(false);
     const [isDeploying, setIsDeploying] = useState(false);
     const [showDeployModal, setShowDeployModal] = useState(false);
-    const [selectedOption, setSelectedOption] = useState('option1');
+    const [selectedOption, setSelectedOption] = useState('user-wallet');
     
     const signAndSendTx = useSignAndSendTx();
     const { publicKey } = useWallet();
@@ -172,7 +175,7 @@ export const Toolbox = () => {
                 publicKey, 
                 signAndSendTx, 
                 'devnet',
-                selectedOption === 'option1' ? 'fullWallet' : 'delegated'
+                selectedOption === 'user-wallet' ? 'fullWallet' : 'delegated'
             );
             if (!programKeypair) {
                 toast("Program deployment failed", {
@@ -401,7 +404,7 @@ export const Toolbox = () => {
 
                     {searchValue && (
                         <button
-                            className="absolute right-3 top-2.5 text-[#6e6e76] hover:text-white transition-colors"
+                            className="text-[#6e6e76] hover:text-white transition-colors cursor-pointer"
                             onClick={() => setSearchValue("")}
                         >
                             <X className="h-4 w-4" />
@@ -497,62 +500,74 @@ export const Toolbox = () => {
             
             {/* Deploy Modal */}
             {showDeployModal && (
-                <div
-                    className="fixed top-0 left-0 w-[100vw] h-[100vh] z-[2000] flex justify-center items-center text-[14px]"
-                    style={{ backgroundColor: "rgba(0,0,0,0.7)" }}
-                >
-                    <div
-                        className="w-[20vw] h-[35vh] flex flex-col items-center justify-between relative p-[20px] rounded-[10px]"
-                        style={{ backgroundColor: deployModalBg }}
-                    >
-                        <div className="flex flex-col justify-evenly items-center gap-2 h-full w-full">
-                            <span>Select a deployment option:</span>
+                <Dialog open={showDeployModal} onOpenChange={handleDeployCancel}>
+                    <DialogContent className="p-0 sm:max-w-md border border-[#2a2a2a] bg-[#121212] text-gray-200 rounded-md shadow-xl overflow-hidden [&>button]:hidden">
+                        <div className="flex items-center justify-between border-b border-[#2a2a2a] bg-[#151515] px-4 py-2">
+                            <div className="text-sm font-medium text-white">Select a deployment option</div>
+                            <button 
+                                onClick={handleDeployCancel}
+                                className="cursor-pointer h-6 w-6 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-[#252525] transition-colors"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
 
-                            <div>
-                                <div className="flex flex-row gap-[10px]">
-                                    <input
-                                        type="radio"
-                                        name="deployOption"
-                                        value="option1"
-                                        checked={selectedOption === 'option1'}
-                                        onChange={(e) => setSelectedOption(e.target.value)}
-                                    />
-                                    <span>User Wallet Control</span>
+                        <div className="p-4 space-y-3">
+                            <RadioGroup value={selectedOption} onValueChange={setSelectedOption} className="space-y-2">
+                                <div
+                                    className={`flex items-center space-x-3 rounded-md border ${
+                                        selectedOption === "user-wallet" ? "border-[#333333] bg-[#1a1a1a]" : "border-[#222222] bg-[#151515]"
+                                    } p-3`}
+                                >
+                                    <RadioGroupItem value="user-wallet" id="user-wallet" className="border-[#444444]" />
+                                    <Label htmlFor="user-wallet" className="flex flex-col cursor-pointer w-full">
+                                        <div className="flex justify-between w-full">
+                                            <span className="font-medium text-white text-sm">User Wallet Control</span>
+                                            {selectedOption === "user-wallet" && (
+                                                <span className="text-xs px-2 py-0.5 rounded bg-[#3b82f6] text-white">Selected</span>
+                                            )}
+                                        </div>
+                                        <span className="text-xs text-gray-500 mt-1">Deploy with your connected wallet</span>
+                                    </Label>
                                 </div>
 
-                                <div className="flex flex-row gap-[10px]">
-                                    <input
-                                        type="radio"
-                                        name="deployOption"
-                                        value="option2"
-                                        checked={selectedOption === 'option2'}
-                                        onChange={(e) => setSelectedOption(e.target.value)}
-                                    />
-                                    <span>Delegated Control</span>
+                                <div
+                                    className={`flex items-center space-x-3 rounded-md border ${
+                                        selectedOption === "delegated" ? "border-[#333333] bg-[#1a1a1a]" : "border-[#222222] bg-[#151515]"
+                                    } p-3`}
+                                >
+                                    <RadioGroupItem value="delegated" id="delegated" className="border-[#444444]" />
+                                    <Label htmlFor="delegated" className="flex flex-col cursor-pointer w-full">
+                                        <div className="flex justify-between w-full">
+                                            <span className="font-medium text-white text-sm">Delegated Control</span>
+                                            {selectedOption === "delegated" && (
+                                                <span className="text-xs px-2 py-0.5 rounded bg-[#3b82f6] text-white">Selected</span>
+                                            )}
+                                        </div>
+                                        <span className="text-xs text-gray-500 mt-1">Deploy with delegated permissions</span>
+                                    </Label>
+                                </div>
+                            </RadioGroup>
+
+                            <div className="text-xs text-[#6b7280] mt-2 border-t border-[#2a2a2a] pt-3">
+                                <div className="flex items-center">
+                                    <span className="inline-block w-2 h-2 rounded-full bg-[#10b981] mr-2"></span>
+                                    System ready for deployment
                                 </div>
                             </div>
                         </div>
 
-                        <div className="flex flex-row gap-[10px] w-full justify-between">
+                        <div className="flex justify-between border-t border-[#2a2a2a] bg-[#151515] px-4 py-2">
                             <Button
-                                variant="ghost"
+                                variant="outline"
                                 onClick={handleDeployCancel}
-                                className="text-[14px] px-[5px] py-[10px] rounded-md border border-solid"
-                                style={{
-                                    borderColor: deployModalBorderColor,
-                                    color: deployModalTextColor
-                                }}
+                                className="h-8 text-xs border-[#333333] bg-transparent text-gray-300 hover:bg-[#252525] hover:text-white"
                             >
                                 Cancel
                             </Button>
                             <Button
-                                variant="default"
                                 onClick={handleDeployClick}
-                                className="text-[14px] px-[5px] py-[10px] rounded-md border border-solid"
-                                style={{
-                                    borderColor: deployModalBorderColor,
-                                    color: deployModalTextColor
-                                }}
+                                className="h-8 text-xs bg-[#3b82f6] hover:bg-[#2563eb] text-white flex items-center cursor-pointer"
                             >
                                 {isDeploying ? (
                                     <PulseLoader
@@ -561,12 +576,14 @@ export const Toolbox = () => {
                                         cssOverride={{ display: 'inline-block', margin: '0' }}
                                     />
                                 ) : (
-                                    "Confirm Deploy"
+                                    <div className="flex items-center">
+                                        Deploy <ChevronRight className="ml-1 h-3 w-3" />
+                                    </div>
                                 )}
                             </Button>
                         </div>
-                    </div>
-                </div>
+                    </DialogContent>
+                </Dialog>
             )}
         </div>
     );
