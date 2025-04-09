@@ -99,32 +99,56 @@ export const handleAIChat = async (
       ({ role: msg.role, contentPreview: typeof msg.content === 'string' ? msg.content.substring(0, 100) + '...' : '[Content is not a string]' })
     ), null, 2));
 
+    // Add system instruction to guide the model
+    chatMessages.unshift({
+      role: 'system',
+      content: 'You have access to a function getWalletBalance(address). When the user asks about their wallet balance or SOL balance, call this function.'
+    });
+
+    // Add wallet address to system context if available
+    if (userPublicKey) {
+      chatMessages.unshift({
+        role: 'system',
+        content: `The user is connected to a Solana wallet with public key: ${userPublicKey}. 
+                Use this address when calling getWalletBalance without asking the user for it.`
+      });
+    }
+
+    console.log("Calling OpenAI with functionDefs:", JSON.stringify(functionDefs.map(def => def.function)));
+
     const response = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: 'gpt-4-0613',  // Model that supports function calling
       messages: chatMessages,
       temperature: 0.7,
       max_tokens: 1000,
       top_p: 1,
       frequency_penalty: 0,
       presence_penalty: 0,
+      functions: functionDefs.map(def => def.function),  // Extract just the function part
+      function_call: 'auto',  // Let the model decide when to call functions
     });
 
     const msg = response.choices[0].message;
+    console.log("OpenAI response:", JSON.stringify(msg));
 
     if (msg?.function_call) {
+      console.log("Function call detected:", JSON.stringify(msg.function_call));
       const name = msg.function_call.name;
       const argsStr = msg.function_call.arguments;
 
-      if (name) {
-        if (name === 'getWalletBalance') {
-          const args = JSON.parse(argsStr || '{}');
-          args.address = userPublicKey || args.address;
-          const solBalance = await getWalletBalanceSol(args.address);
-          res.status(200).json({
-            response: `Your wallet at address ${args.address} has a balance of ${solBalance} SOL.`,
-          });
-          return;
-        }
+      if (name === 'getWalletBalance') {
+        const args = JSON.parse(argsStr || '{}');
+        console.log("Function args:", args);
+        console.log("User public key:", userPublicKey);
+        args.address = userPublicKey || args.address;
+        
+        const solBalance = await getWalletBalanceSol(args.address);
+        console.log("SOL balance:", solBalance);
+        
+        res.status(200).json({
+          response: `Your wallet at address ${args.address} has a balance of ${solBalance} SOL.`,
+        });
+        return;
       }
     } else {
       const content = msg?.content || '';

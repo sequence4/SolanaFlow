@@ -44,6 +44,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Separator } from "@/components/ui/separator"
 import { Label } from "@/components/ui/label";
 
 export const Toolbox = () => {
@@ -213,7 +214,7 @@ export const Toolbox = () => {
 
     return (
         <div
-            className="app-sidebar w-[20%] flex flex-col h-full bg-[#121214] text-white border-r border-[#2a2a2d] overflow-hidden"
+            className="app-sidebar w-[18%] flex flex-col h-full bg-[#121214] text-white border-r border-[#2a2a2d] overflow-hidden"
         >
             <div className="p-4 border-b border-[#2a2a2d]">
                 <div className="flex justify-between items-center">
@@ -297,32 +298,9 @@ export const Toolbox = () => {
                         </button>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-1 p-0.5 bg-[#1e1e20] rounded-md mb-4">
-                        <button
-                            className={`h-9 rounded-md text-xs font-medium transition-all ${
-                                activeChainTab === "on-chain"
-                                    ? "bg-[#4d7cfe] text-white hover:bg-[#4d7cfe]/90"
-                                    : "bg-transparent text-[#6e6e76] hover:bg-[#2a2a2d] hover:text-white"
-                            }`}
-                            onClick={() => handleTabChange("on-chain")}
-                        >
-                            On-Chain
-                        </button>
-                        <button
-                            className={`h-9 rounded-md text-xs font-medium transition-all ${
-                                activeChainTab === "off-chain"
-                                    ? "bg-[#4d7cfe] text-white hover:bg-[#4d7cfe]/90"
-                                    : "bg-transparent text-[#6e6e76] hover:bg-[#2a2a2d] hover:text-white"
-                            }`}
-                            onClick={() => handleTabChange("off-chain")}
-                        >
-                            Off-Chain
-                        </button>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 gap-2 mb-4">
                         <button 
-                            className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-9 rounded-md text-xs font-medium flex items-center justify-center"
+                            className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center"
                             onClick={fileTree ? handleViewCode : handleGenerateClick}
                             disabled={!canGenerateCode}
                         >
@@ -339,12 +317,8 @@ export const Toolbox = () => {
                             )}
                             <span>Code</span>
                         </button>
-                        <button className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-9 rounded-md text-xs font-medium flex items-center justify-center">
-                            <Hammer className="h-4 w-4 mr-2" />
-                            <span>Build</span>
-                        </button>
                         <button 
-                            className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-9 rounded-md text-xs font-medium flex items-center justify-center"
+                            className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center"
                             onClick={handleOpenDeployModal}
                             disabled={!canDeploy}
                         >
@@ -362,6 +336,34 @@ export const Toolbox = () => {
                             <span>Deploy</span>
                         </button>
                     </div>
+                    {activeTab === 'workflow' && (
+                        <>
+                            <div className="text-xs font-medium text-[#6e6e76] uppercase tracking-wider pb-2">NODE LIBRARY</div>
+                            <Separator />            
+                            <div className="grid grid-cols-2 gap-1 p-0.5 bg-[#1e1e20] rounded-md">
+                                <button
+                                    className={`h-9 rounded-md text-xs font-medium transition-all ${
+                                        activeChainTab === "on-chain"
+                                            ? "bg-[#4d7cfe] text-white hover:bg-[#4d7cfe]/90"
+                                            : "bg-transparent text-[#6e6e76] hover:bg-[#2a2a2d] hover:text-white"
+                                    }`}
+                                    onClick={() => handleTabChange("on-chain")}
+                                >
+                                    On-Chain
+                                </button>
+                                <button
+                                    className={`h-9 rounded-md text-xs font-medium transition-all ${
+                                        activeChainTab === "off-chain"
+                                            ? "bg-[#4d7cfe] text-white hover:bg-[#4d7cfe]/90"
+                                            : "bg-transparent text-[#6e6e76] hover:bg-[#2a2a2d] hover:text-white"
+                                    }`}
+                                    onClick={() => handleTabChange("off-chain")}
+                                >
+                                    Off-Chain
+                                </button>
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -434,6 +436,7 @@ export const Toolbox = () => {
             </div>
 
             {/* Bottom Section */}
+            {/*}
             <div className="p-3 border-t border-[#2a2a2d]">
                 <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium">Documentation</span>
@@ -455,6 +458,7 @@ export const Toolbox = () => {
                     </div>
                 </div>
             </div>
+            */}
 
             {/* New Project Modal */}
             <NewProjectModal

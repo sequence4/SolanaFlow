@@ -77,7 +77,7 @@ export function GroupedInstructionsAccordion() {
                   </div>
                   <span className="font-medium">{group.label}</span>
                 </div>
-                <div className="flex items-center">
+                <div className="flex items-center cursor-pointer">
                   <span className="mr-2 text-xs px-1.5 py-0.5 rounded bg-[#2a2a2d] text-white">{group.items.length}</span>
                   <ChevronDown
                     className="chevron-icon h-4 w-4 text-[#6e6e76] transition-transform duration-200"

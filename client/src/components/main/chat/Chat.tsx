@@ -116,6 +116,11 @@ const Chat: React.FC = () => {
 
     const { publicKey, connected } = useWallet();
 
+    useEffect(() => {
+        console.log('Wallet connection status:', connected);
+        console.log('Wallet public key:', publicKey?.toBase58() || 'Not connected');
+    }, [connected, publicKey]);
+
     const sendMessage = async () => {
         if (input.trim()) {
             const selectedFiles = [selectedFile, ...additionalFiles].filter(
@@ -171,7 +176,7 @@ const Chat: React.FC = () => {
                 );
 
                 const userPublicKeyString = connected && publicKey ? publicKey.toBase58() : '';
-                console.log('userPublicKeyString', userPublicKeyString);
+                console.log('Using wallet public key for AI request:', userPublicKeyString || 'No wallet connected');
 
                 setMessages(prevMessages => 
                     prevMessages.map(msg => 
@@ -334,6 +339,12 @@ const Chat: React.FC = () => {
                                                 ? "bg-[#0066ff] text-white rounded-tr-none"
                                                 : "bg-[#1a1a22] text-gray-100 rounded-tl-none border border-[#2a2a33]"
                                         }`}
+                                        style={{
+                                            whiteSpace: 'pre-wrap',
+                                            wordWrap: 'break-word', 
+                                            overflowWrap: 'break-word',
+                                            overflowX: 'hidden'
+                                        }}
                                     >
                                         <div className="p-3">
                                             <div className="flex items-start gap-2">
@@ -366,7 +377,14 @@ const Chat: React.FC = () => {
                     {/* Typing indicator */}
                     {isTyping && (
                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
-                            <div className="bg-[#1a1a22] text-gray-100 rounded-lg rounded-tl-none border border-[#2a2a33] p-3 max-w-[85%]">
+                            <div className="bg-[#1a1a22] text-gray-100 rounded-lg rounded-tl-none border border-[#2a2a33] p-3 max-w-[85%]"
+                                style={{
+                                    whiteSpace: 'pre-wrap',
+                                    wordWrap: 'break-word', 
+                                    overflowWrap: 'break-word',
+                                    overflowX: 'hidden'
+                                }}
+                            >
                                 <div className="flex items-center gap-2">
                                     <div className="bg-[#232329] p-1 rounded-full">
                                         <Bot size={14} className="text-[#0066ff]" />
