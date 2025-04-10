@@ -279,34 +279,6 @@ export const handleDeployProgram = async (
     return;
   }
   
-  // Test if wallet is working correctly with a tiny self-transfer
-  try {
-    const connection = new Connection('https://tiniest-smart-putty.solana-devnet.quiknode.pro/31fdf5493679b4c1c854289d95c822094900efc2/', 'confirmed');
-    console.log('Testing wallet connection with simple transaction...');
-    
-    const testTx = new Transaction();
-    testTx.add(SystemProgram.transfer({
-      fromPubkey: walletPublicKey,
-      toPubkey: walletPublicKey, // Send to self
-      lamports: 100, // Minimal amount
-    }));
-    
-    const { blockhash } = await connection.getLatestBlockhash();
-    testTx.recentBlockhash = blockhash;
-    testTx.feePayer = walletPublicKey;
-    
-    const testSig = await signAndSendTransaction(testTx);
-    console.log('Wallet test transaction succeeded:', testSig.substring(0, 10) + '...');
-  } catch (testError: any) {
-    console.error('Wallet test transaction failed:', testError);
-    toaster.create({
-      title: 'Wallet connection issue. Please reconnect your wallet and try again.',
-      description: `Error: ${testError.message}`,
-      type: 'error',
-    });
-    return;
-  }
-
   // Verify explicitly that we're connected to devnet with a fresh connection
   try {
     const connection = new Connection('https://api.devnet.solana.com', 'confirmed');
@@ -338,10 +310,7 @@ export const handleDeployProgram = async (
     if (!buildResponse?.taskId) { console.log('no task id returned'); return; }
     console.log('buildResponse', buildResponse);
 
-    toaster.create({
-      title: 'Building project. This may take a few minutes...',
-      type: 'info',
-    });
+    
 
     const connection = new Connection('https://tiniest-smart-putty.solana-devnet.quiknode.pro/31fdf5493679b4c1c854289d95c822094900efc2/', 'confirmed');
     console.log('connection', connection);
@@ -389,8 +358,7 @@ export const handleDeployProgram = async (
         let ephemeralPubkey: PublicKey | undefined;
         if (deployControlOption === 'delegated') {
           try {
-            // Verify wallet is on the correct network (devnet)
-            const walletOnCorrectNetwork = cluster === 'devnet'; // Ideally check with wallet adapter
+            const walletOnCorrectNetwork = cluster === 'devnet';
             if (!walletOnCorrectNetwork) {
               console.warn('Wallet may not be on devnet network. Deployment might fail.');
             }
@@ -595,11 +563,6 @@ export const handleDeployProgram = async (
                   );
                   console.log('Backend ephemeral deploy task started. TaskId:', deployResp.taskId);
                   
-                  toaster.create({
-                    title: 'Deploying program with ephemeral key...',
-                    type: 'info',
-                  });
-                  
                   const deployTaskData = await pollTaskStatus3(deployResp.taskId);
                   console.log('Deploy task completed. Full response:', deployTaskData);
                   console.log('Task status:', deployTaskData.task.status);
@@ -672,18 +635,21 @@ export const handleDeployProgram = async (
                       console.log('Program deployed successfully with ID:', deployedProgramId.toBase58());
                       
                       // Show success message with program ID to the user
+                      /*
                       toaster.create({
                         title: 'Deployment successful',
                         description: `Program ID: ${deployedProgramId.toBase58()}`,
                         type: 'success',
                       });
+                      */
                       
                       // Store the program ID in project context
                       setProjectContext(prev => ({
                         ...prev,
                         details: prev.details ? {
                           ...prev.details,
-                          deployedProgramId: deployedProgramId.toBase58(),
+                          programId: deployedProgramId.toBase58(),
+                          deployed: true
                         } : prev.details
                       }));
                       

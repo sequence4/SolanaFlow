@@ -80,6 +80,7 @@ export const Toolbox = () => {
 
     useEffect(() => {
         setProjectName(projectContext.name || "My Token Project");
+        console.log('projectContext programId', projectContext.details?.projectState?.programId);
     }, [projectContext.name]);
 
     const handleTabChange = (tab: "on-chain" | "off-chain") => {
@@ -310,16 +311,16 @@ export const Toolbox = () => {
                                     size={3}
                                     cssOverride={{ display: 'inline-block', margin: '0' }}
                                 />
-                            ) : fileTree ? (
-                                <Code className="h-4 w-4 mr-2 text-[#9de19f]" />
                             ) : (
-                                <Code className="h-4 w-4 mr-2" />
+                                <>
+                                    <Code className={`h-4 w-4 mr-2 ${fileTree ? "text-[#9de19f]" : ""}`} />
+                                    <span>{fileTree ? "View Code" : "Generate Code"}</span>
+                                </>
                             )}
-                            <span>Code</span>
                         </button>
                         <button 
                             className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center"
-                            onClick={handleOpenDeployModal}
+                            onClick={projectDeployed ? undefined : handleOpenDeployModal}
                             disabled={!canDeploy}
                         >
                             {isDeploying ? (
@@ -328,14 +329,39 @@ export const Toolbox = () => {
                                     size={3}
                                     cssOverride={{ display: 'inline-block', margin: '0' }}
                                 />
-                            ) : projectContext.details?.projectState?.programId ? (
-                                <Rocket className="h-4 w-4 mr-2 text-[#9de19f]" />
                             ) : (
-                                <Rocket className="h-4 w-4 mr-2" />
+                                <>
+                                    <Rocket className={`h-4 w-4 mr-2 ${projectDeployed ? "text-[#9de19f]" : ""}`} />
+                                    <span>{projectDeployed ? "Program Deployed" : "Deploy Program"}</span>
+                                </>
                             )}
-                            <span>Deploy</span>
                         </button>
                     </div>
+                    
+                    {/* Display Program ID with Solana Explorer link if deployed */}
+                    {projectDeployed && projectContext.details?.projectState?.programId && (
+                        <div className="bg-[#1e1e20] border border-[#2a2a2d] rounded-md p-2 mb-4">
+                            <div className="flex items-center text-xs">
+                                <span className="text-[#6e6e76] mr-2">Program ID:</span>
+                                <a 
+                                    href={`https://explorer.solana.com/address/${projectContext.details?.projectState?.programId}?cluster=devnet`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[#4d7cfe] hover:text-[#4d7cfe]/90 truncate"
+                                    title={projectContext.details?.projectState?.programId}
+                                >
+                                    {projectContext.details?.projectState?.programId?.substring(0, 20)}...
+                                </a>
+                                <button 
+                                    onClick={() => window.open(`https://explorer.solana.com/address/${projectContext.details?.projectState?.programId}?cluster=devnet`, '_blank')}
+                                    className="ml-auto p-1 rounded-full hover:bg-[#2a2a2d] text-[#6e6e76] hover:text-white transition-colors"
+                                >
+                                    <ArrowRight className="h-3 w-3" />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                    
                     {activeTab === 'workflow' && (
                         <>
                             <div className="text-xs font-medium text-[#6e6e76] uppercase tracking-wider pb-2">NODE LIBRARY</div>

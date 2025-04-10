@@ -19,17 +19,17 @@ export const codeGenerationSteps: Step[] = [
   },
   {
     icon: "Cpu",
-    message: "Generating files / Amending configs...",
+    message: "Configuring project...",
     details: "Creating UI files or updating Cargo.toml/Anchor.toml as needed.",
   },
   {
     icon: "Database",
-    message: "Merging file tree...",
+    message: "Calling AI endpoints...",
     details: "Fetching and synchronizing project files with the file system.",
   },
   {
     icon: "HardDrive",
-    message: "Finalizing code generation...",
+    message: "Generating project files...",
     details: "Performing final checks and saving updated code assets.",
   },
 ];

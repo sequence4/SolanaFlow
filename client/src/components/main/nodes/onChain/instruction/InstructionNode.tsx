@@ -166,7 +166,7 @@ const AccountSection = ({ account }: { account: Account }) => {
 
           {/* Account Properties */}
           {isSigner && (
-            <span className="text-[8px] bg-[#121218] text-[#36b37e] px-1.5 py-0.5 rounded border border-[#36b37e]">
+            <span className="text-[8px] bg-[#121218] text-[#00a6ed] px-1.5 py-0.5 rounded border border-[#00a6ed]">
               Signer
             </span>
           )}
