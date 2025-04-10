@@ -31,7 +31,7 @@ export default function TaskLogsToast() {
   if (!isVisible) return null;
 
   return (
-    <div className="fixed bottom-0 right-120 w-96 bg-[#0A0B10]/95 border border-[#1A1B25] rounded-lg shadow-xl backdrop-blur-sm overflow-hidden">
+    <div className="z-1000 fixed bottom-0 right-120 w-96 bg-[#0A0B10]/95 border border-[#1A1B25] rounded-lg shadow-xl backdrop-blur-sm overflow-hidden">
       
       {/* Header */}
       <div className="relative h-12 bg-gradient-to-r from-[#0E0F17] to-[#151823] flex items-center px-4">

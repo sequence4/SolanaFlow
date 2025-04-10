@@ -368,7 +368,7 @@ export const Toolbox = () => {
                             <Separator />            
                             <div className="grid grid-cols-2 gap-1 p-0.5 bg-[#1e1e20] rounded-md">
                                 <button
-                                    className={`h-9 rounded-md text-xs font-medium transition-all ${
+                                    className={`h-8 rounded-md text-xs font-medium transition-all ${
                                         activeChainTab === "on-chain"
                                             ? "bg-[#4d7cfe] text-white hover:bg-[#4d7cfe]/90"
                                             : "bg-transparent text-[#6e6e76] hover:bg-[#2a2a2d] hover:text-white"
@@ -378,7 +378,7 @@ export const Toolbox = () => {
                                     On-Chain
                                 </button>
                                 <button
-                                    className={`h-9 rounded-md text-xs font-medium transition-all ${
+                                    className={`h-8 rounded-md text-xs font-medium transition-all ${
                                         activeChainTab === "off-chain"
                                             ? "bg-[#4d7cfe] text-white hover:bg-[#4d7cfe]/90"
                                             : "bg-transparent text-[#6e6e76] hover:bg-[#2a2a2d] hover:text-white"

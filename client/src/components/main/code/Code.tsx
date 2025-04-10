@@ -81,7 +81,7 @@ const Code = () => {
                 <CodeEditor language={getLanguage(selectedFile?.ext)} />
             </div>
             {/* Solana Terminal */}
-            <div className="flex-1" style={{ backgroundColor: '#101521' }}>
+            <div className="flex-1 z-10" style={{ backgroundColor: '#101521' }}>
                 <SolanaTerminal />
             </div>
         </div>
