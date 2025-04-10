@@ -97,6 +97,7 @@ export async function handleDeployWithLogs(
             projectState: {
               ...prev.details.projectState,
               programId: programKeypair.toBase58(),
+              deployed: true,
             },
           },
         };

@@ -648,8 +648,11 @@ export const handleDeployProgram = async (
                         ...prev,
                         details: prev.details ? {
                           ...prev.details,
-                          programId: deployedProgramId.toBase58(),
-                          deployed: true
+                          projectState: {
+                            ...prev.details.projectState,
+                            programId: deployedProgramId.toBase58(),
+                            deployed: true
+                          }
                         } : prev.details
                       }));
                       
@@ -826,7 +829,11 @@ export const handleDeployProgram = async (
                   ...prev,
                   details: prev.details ? {
                     ...prev.details,
-                    deployedProgramId: deployedProgramId.toBase58(),
+                    projectState: {
+                      ...prev.details.projectState,
+                      programId: deployedProgramId.toBase58(),
+                      deployed: true
+                    }
                   } : prev.details
                 }));
                 
@@ -904,6 +911,20 @@ export const handleDeployProgram = async (
             deployControlOption
           );
           console.log('program deployed to:', programKey.toBase58());
+          
+          // Update project context with program ID and deployed flag
+          setProjectContext(prev => ({
+            ...prev,
+            details: prev.details ? {
+              ...prev.details,
+              projectState: {
+                ...prev.details.projectState,
+                programId: programKey.toBase58(),
+                deployed: true
+              }
+            } : prev.details
+          }));
+          
           return programKey;
         }
       } else {

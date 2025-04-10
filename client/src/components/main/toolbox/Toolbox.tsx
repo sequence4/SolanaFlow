@@ -81,7 +81,7 @@ export const Toolbox = () => {
     useEffect(() => {
         setProjectName(projectContext.name || "My Token Project");
         console.log('projectContext programId', projectContext.details?.projectState?.programId);
-    }, [projectContext.name]);
+    }, [projectContext.name, projectContext.details?.projectState?.programId, projectContext.details?.projectState?.deployed]);
 
     const handleTabChange = (tab: "on-chain" | "off-chain") => {
         setActiveChainTab(tab);
