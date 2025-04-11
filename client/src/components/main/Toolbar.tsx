@@ -47,7 +47,7 @@ export const ProjectInfo: React.FC = () => {
             setUxOpenPanel,
             setFileTree,
             setSelectedFile,
-            { setSteps, setProgress, setIsVisible, addSystemLog }
+            { setSteps, setProgress, setIsVisible, addSystemLog, resetLogs }
         );
         setIsNewProjectModalOpen(false);
     };

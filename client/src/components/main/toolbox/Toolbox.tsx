@@ -215,7 +215,7 @@ export const Toolbox = () => {
 
     return (
         <div
-            className="app-sidebar w-[18%] flex flex-col h-full bg-[#121214] text-white border-r border-[#2a2a2d] overflow-hidden"
+            className="app-sidebar w-[20%] flex flex-col h-full bg-[#121214] text-white border-r border-[#2a2a2d] overflow-hidden"
         >
             <div className="p-4 border-b border-[#2a2a2d]">
                 <div className="flex justify-between items-center">
