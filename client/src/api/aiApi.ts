@@ -82,8 +82,13 @@ export const chatAI = async (
 
   console.log('Sending request to AI chat API with message:', message);
   console.log('File contexts included:', fileContexts.length);
+  console.log('User public key provided:', userPublicKey ? 'Yes' : 'No');
+  if (userPublicKey) {
+    console.log('User public key:', userPublicKey);
+  }
 
   try {
+    console.log('Making POST request to /ai/chat');
     const resp = await api.post('/ai/chat', body);
     console.log('AI chat API response:', resp.data);
     return resp.data?.response || 'AI did not return a valid response.';

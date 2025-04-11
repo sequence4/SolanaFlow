@@ -14,6 +14,7 @@ export const logMessages = async (request: any, response: any) => {
       [taskId, request_str, response_str]
     );
   } catch (error) {
+    console.error('Error logging AI request/response:', error);
   } finally {
     client.release();
   }

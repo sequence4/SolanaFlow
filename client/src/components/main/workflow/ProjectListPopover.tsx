@@ -43,10 +43,10 @@ const ProjectListPopover: React.FC<ProjectListPopoverProps> = ({
   }, [isOpen, page, search, refreshTrigger]);
   
   return (
-    <div className="bg-[#111827] text-white w-[460px] max-w-[460px] p-5" style={{border: "none"}}>
+    <div className="bg-[#111827] text-white w-[460px] max-w-[460px] p-1 flex flex-col gap-4">
       <div className="mb-4">
         <h2 className="text-lg font-medium mb-1">
-          <span className="text-blue-500 mr-2">•</span>Select a Project
+          <span className="text-blue-500 mr-2">•</span><span className="text-gray-200 text-md">Open a Project</span>
         </h2>
         <p className="text-gray-400 text-sm">Choose a project to open from your recent projects</p>
       </div>
@@ -115,13 +115,13 @@ const ProjectListPopover: React.FC<ProjectListPopoverProps> = ({
                 );
               }}
             >
-              <LuTrash2 size={16} />
+              <LuTrash2 size={16} className="cursor-pointer"/>
             </button>
           </div>
         ))}
       </div>
 
-      <div className="flex items-center justify-center space-x-1 mr-4">
+      <div className="flex items-center justify-center space-x-3 mr-4">
         <button 
           onClick={() => setPage((p) => Math.max(1, p - 1))}
           disabled={page === 1}
@@ -142,21 +142,21 @@ const ProjectListPopover: React.FC<ProjectListPopoverProps> = ({
       </div>
 
       {/* Footer with pagination and buttons */}
-      <div className="flex justify-center items-center mt-2 w-full">
+      <div className="flex justify-center items-center w-full">
 
-        <div className="flex flex-row items-center gap-2">
+        <div className="w-full flex flex-row items-center justify-between gap-2">
           <button 
-            className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-1.5 rounded-md text-sm transition-colors"
+            className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-1.5 rounded-md text-sm transition-colors cursor-pointer"
             onClick={closePopover}
           >
             Cancel
           </button>
           
           <button 
-            className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded-md text-sm transition-colors flex items-center"
+            className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded-md text-sm transition-colors flex items-center cursor-pointer"
             onClick={closePopover}
           >
-            <span className="mr-1">Open Project</span>
+            <span>Open Project</span>
           </button>
         </div>
       </div>

@@ -8,7 +8,31 @@ import { hasOnChainNodes } from './nodeUtils';
 import { saveProject } from '@/utils/project/saveProject';
 import { insertFrontendUIFiles } from './insertFrontendUIFiles';
 import { fileApi } from '@/api/fileApi';
-import { useTaskLogMonitoring } from '@/utils/logIntegration';
+import { useTaskLogs } from "@/context/logs/useTaskLogs";
+import { Step } from '@/context/logs/TaskLogsContext';
+
+export const codeGenerationSteps: Step[] = [
+  {
+    icon: "Code",
+    message: "Analyzing project nodes...",
+    details: "Identifying on-chain/off-chain nodes and extracting code parts.",
+  },
+  {
+    icon: "Cpu",
+    message: "Configuring project...",
+    details: "Creating UI files or updating Cargo.toml/Anchor.toml as needed.",
+  },
+  {
+    icon: "Database",
+    message: "Calling AI endpoints...",
+    details: "Fetching and synchronizing project files with the file system.",
+  },
+  {
+    icon: "HardDrive",
+    message: "Generating project files...",
+    details: "Performing final checks and saving updated code assets.",
+  },
+];
 
 async function waitForAllTasks(taskIds: string[]): Promise<{ allSucceeded: boolean, failedTasks: string[] }> {
     const validTaskIds = taskIds.filter(id => id && id.trim() !== '');
@@ -59,7 +83,7 @@ async function waitForAllTasks(taskIds: string[]): Promise<{ allSucceeded: boole
     };
 }
 
-let taskLogger: ReturnType<typeof useTaskLogMonitoring> | null = null;
+const CODE_GEN_PROGRESS = [10, 25, 40, 55, 70, 80, 90, 100];
 
 export const handleGenerateCode = async (
     projectContext: ProjectContextType,
@@ -67,40 +91,33 @@ export const handleGenerateCode = async (
     setIsCodeReady: (isCodeReady: boolean) => void,
     setActiveTab: (activeTab: string) => void,
     setFileTree: (tree: FileTreeItemType | null) => void,
-    setProjectContext: React.Dispatch<React.SetStateAction<ProjectContextType>>
+    setProjectContext: React.Dispatch<React.SetStateAction<ProjectContextType>>,
+    taskLogs: ReturnType<typeof useTaskLogs>
 ) => {
     if (!projectContext.id) { console.log('No project ID; cannot generate code.'); return; }
     console.log("[DEBUG_GENERATE_CODE] Starting handleGenerateCode for project:", projectContext.id);
     
-    if (typeof window !== 'undefined') {
-        const w = window as any;
-        if (w.__taskLogger) {
-            taskLogger = w.__taskLogger;
-            if (taskLogger) {
-                taskLogger.startOperation("Code Generation");
-                taskLogger.logMessage(`Starting code generation for project: ${projectContext.name || projectContext.id}`);
-                taskLogger.updateProgress(10);
-            }
-        }
-    }
+    taskLogs.resetLogs();
+    taskLogs.setSteps(codeGenerationSteps);
+    taskLogs.setIsVisible(true);
+    taskLogs.setProgress(CODE_GEN_PROGRESS[0]);
+    taskLogs.addSystemLog(`Starting code generation for project: ${projectContext.name || projectContext.id}`);
     
     setIsGenerating(true);
 
     const isOnChainPresent = hasOnChainNodes(projectContext);
     const allTaskIds: string[] = [];
+    let success = false;
 
     try {
-        if (taskLogger) {
-            taskLogger.logMessage("Analyzing project structure...");
-            taskLogger.updateProgress(20);
-        }
-        
+        taskLogs.addSystemLog("Analyzing project structure...");
+        taskLogs.setProgress(CODE_GEN_PROGRESS[1]);
+        taskLogs.addSystemLog(isOnChainPresent ? "On-chain components detected." : "Off-chain components detected.");
+
         if (!isOnChainPresent) {
             try {
                 console.log("[DEBUG_GENERATE_CODE] Creating off-chain function code...");
-                if (taskLogger) {
-                    taskLogger.logMessage("Creating off-chain function code...");
-                }
+                taskLogs.addSystemLog("Creating off-chain function code...");
                 
                 let functionCode = null;
                 if (projectContext.details?.projectState?.nodes) {
@@ -122,9 +139,7 @@ export const handleGenerateCode = async (
                 } else console.log('No project state nodes found');
             } catch (err) { 
                 console.error('Error extracting function code:', err); 
-                if (taskLogger) {
-                    taskLogger.logMessage("Warning: Error extracting function code");
-                }
+                taskLogs.addSystemLog("Warning: Error extracting function code");
             }
 
             const response = { taskId: '123' };
@@ -133,10 +148,8 @@ export const handleGenerateCode = async (
 
             if (response.taskId) {
                 console.log("[DEBUG_GENERATE_CODE] Starting frontend UI file insertion task");
-                if (taskLogger) {
-                    taskLogger.logMessage("Generating frontend UI files...");
-                    taskLogger.updateProgress(30);
-                }
+                taskLogs.addSystemLog("Generating frontend UI files...");
+                taskLogs.setProgress(CODE_GEN_PROGRESS[2]);
                 
                 const frontendTaskId = await insertFrontendUIFiles(projectContext.id);
                 if (frontendTaskId) {
@@ -148,84 +161,69 @@ export const handleGenerateCode = async (
             }
         } else {
             console.log('[DEBUG_GENERATE_CODE] Starting Anchor project code generation');
-            if (taskLogger) {
-                taskLogger.logMessage("Starting Anchor project code generation...");
-                taskLogger.updateProgress(30);
-            }
+            taskLogs.addSystemLog("Starting Anchor project code generation...");
+            taskLogs.setProgress(CODE_GEN_PROGRESS[2]);
             
             await saveProject(projectContext, setProjectContext);
             
-            if (taskLogger) {
-                taskLogger.logMessage("Updating configuration files...");
-                taskLogger.updateProgress(40);
-            }
+            taskLogs.addSystemLog("Updating configuration files...");
+            taskLogs.setProgress(CODE_GEN_PROGRESS[3]);
             
             const cargoResponse = await amendConfigFile(projectContext.id, 'Cargo.toml', 'Cargo.toml');
             if (cargoResponse && cargoResponse.taskId) {
                 console.log('[DEBUG_GENERATE_CODE] Cargo.toml amendment task started with taskId:', cargoResponse.taskId);
-                if (taskLogger) {
-                    taskLogger.logMessage("Updating Cargo.toml configuration...");
-                }
+                taskLogs.addSystemLog(`Cargo.toml update task submitted (ID: ${cargoResponse.taskId})`);
                 allTaskIds.push(cargoResponse.taskId);
             }
             
             const anchorResponse = await amendConfigFile(projectContext.id, 'Anchor.toml', 'Anchor.toml');
             if (anchorResponse && anchorResponse.taskId) {
                 console.log('[DEBUG_GENERATE_CODE] Anchor.toml amendment task started with taskId:', anchorResponse.taskId);
-                if (taskLogger) {
-                    taskLogger.logMessage("Updating Anchor.toml configuration...");
-                }
+                taskLogs.addSystemLog(`Anchor.toml update task submitted (ID: ${anchorResponse.taskId})`);
                 allTaskIds.push(anchorResponse.taskId);
             }
         }
         
         console.log("[DEBUG_GENERATE_CODE] Waiting for all initial tasks to complete:", allTaskIds.join(", "));
-        if (taskLogger) {
-            taskLogger.logMessage("Processing initial code generation tasks...");
-            taskLogger.updateProgress(50);
-        }
+        taskLogs.addSystemLog("Processing initial code generation tasks...");
+        taskLogs.setProgress(CODE_GEN_PROGRESS[4]);
         
         const initialResults = await waitForAllTasks(allTaskIds);
         
         if (!initialResults.allSucceeded) {
             console.error("[DEBUG_GENERATE_CODE] Some initial tasks failed:", initialResults.failedTasks);
-            if (taskLogger) {
-                taskLogger.logMessage("Warning: Some initial tasks had issues. Continuing with file tree merge...");
-            }
+            taskLogs.addSystemLog(`Warning: Issues detected in initial tasks: ${initialResults.failedTasks.join(', ')}. Attempting to continue...`);
+        } else {
+            taskLogs.addSystemLog("Initial generation tasks completed.");
         }
         
         console.log("[DEBUG_GENERATE_CODE] Initial tasks completed. Waiting for file system to stabilize...");
-        if (taskLogger) {
-            taskLogger.logMessage("Initial tasks completed. Preparing for file tree merge...");
-            taskLogger.updateProgress(60);
-        }
+        taskLogs.addSystemLog("Initial tasks completed. Preparing for file tree merge...");
+        taskLogs.setProgress(CODE_GEN_PROGRESS[5]);
         
         await new Promise(resolve => setTimeout(resolve, 3000));
         
         console.log("[DEBUG_GENERATE_CODE] Merging file tree after initial tasks completed");
-        if (taskLogger) {
-            taskLogger.logMessage("Merging file tree...");
-            taskLogger.updateProgress(70);
-        }
+        taskLogs.addSystemLog("Merging file tree...");
+        taskLogs.setProgress(CODE_GEN_PROGRESS[6]);
         
         const fileTreeTaskIds = await mergeFileTree(projectContext, setFileTree, setProjectContext, true);
         console.log("[DEBUG_GENERATE_CODE] File tree merge completed, collected additional task IDs:", fileTreeTaskIds);
         
         if (fileTreeTaskIds.length > 0) {
             console.log("[DEBUG_GENERATE_CODE] Waiting for all file reading tasks to complete:", fileTreeTaskIds.join(", "));
-            if (taskLogger) {
-                taskLogger.logMessage("Processing file tree operations...");
-                taskLogger.updateProgress(80);
-            }
+            taskLogs.addSystemLog(`Processing file tree updates (Tasks: ${fileTreeTaskIds.join(', ')})...`);
             
             const fileTreeResults = await waitForAllTasks(fileTreeTaskIds);
             
             if (!fileTreeResults.allSucceeded) {
                 console.warn("[DEBUG_GENERATE_CODE] Some file reading tasks failed:", fileTreeResults.failedTasks);
-                if (taskLogger) {
-                    taskLogger.logMessage("Warning: Some file reading tasks had issues. Continuing...");
-                }
+                taskLogs.addSystemLog(`Warning: Issues during file tree synchronization: ${fileTreeResults.failedTasks.join(', ')}.`);
+            } else {
+                taskLogs.addSystemLog("File tree synchronization complete.");
             }
+        } else {
+            taskLogs.addSystemLog("File tree synchronization completed (no background tasks).");
         }
         
         try {
@@ -246,33 +244,41 @@ export const handleGenerateCode = async (
             const instructionFiles = allPaths.filter(path => path.includes('/instructions/') && path.endsWith('.rs'));
             console.log("[DEBUG_GENERATE_CODE] Final check - instruction files found:", instructionFiles);
             
-            if (taskLogger && instructionFiles.length > 0) {
-                taskLogger.logMessage(`Found ${instructionFiles.length} Rust instruction files`);
+            if (instructionFiles.length > 0) {
+                taskLogs.addSystemLog(`Verification: Found ${instructionFiles.length} Rust instruction files.`);
+            } else if (isOnChainPresent) {
+                taskLogs.addSystemLog("Warning: No Rust instruction files found in final check for Anchor project.");
             }
         } catch (error) {
-            console.error("[DEBUG_GENERATE_CODE] Error checking for instruction files:", error);
+            console.error("[DEBUG_GENERATE_CODE] Error during final file tree check:", error);
+            taskLogs.addSystemLog(`Warning: Error during final verification: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
         
         console.log("[DEBUG_GENERATE_CODE] All tasks and file tree operations completed");
         
-        if (taskLogger) {
-            taskLogger.logMessage("Code generation completed successfully!");
-            taskLogger.updateProgress(90);
-            taskLogger.logMessage("Switching to code tab...");
-            setTimeout(() => {
-                if (taskLogger) {
-                    taskLogger.completeOperation("Code generation complete");
-                }
-            }, 1000);
-        }
+        taskLogs.addSystemLog("Code generation completed successfully!");
+        taskLogs.setProgress(CODE_GEN_PROGRESS[7]);
+        taskLogs.addSystemLog("Switching to code tab...");
+        setTimeout(() => {
+            taskLogs.addSystemLog("Code generation complete");
+        }, 1000);
         
         setIsGenerating(false);
         setIsCodeReady(true);
         setActiveTab('code');
         
+        success = true;
+
     } catch (err) {
         console.error('[DEBUG_GENERATE_CODE] Error in handleGenerateCode:', err);
-        if (taskLogger) taskLogger.logError(`Code generation failed: ${err}`);
+        taskLogs.addSystemLog(`Error: Code generation failed - ${err instanceof Error ? err.message : 'Unknown error'}`);
+        
+        setIsGenerating(false);
+        success = false;
+    } finally {
+        console.log(`[DEBUG_GENERATE_CODE] Finalizing. Success: ${success}`);
+        await new Promise(resolve => setTimeout(resolve, success ? 3000 : 5000));
+        taskLogs.setIsVisible(false);
         
         setIsGenerating(false);
     }

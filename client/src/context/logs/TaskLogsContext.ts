@@ -5,16 +5,18 @@ export interface TaskLog {
   timestamp: number;
 }
 
+export interface Step {
+  icon: string;
+  message: string;
+  details: string;
+}
+
 export interface TaskLogsContextType {
   logs: TaskLog[];
   isVisible: boolean;
   progress: number;
   currentStep: number;
-  steps: {
-    icon: string;
-    message: string;
-    details: string;
-  }[];
+  steps: Step[];
   showDetails: boolean;
   systemLogs: string[];
   memoryStats: string;
@@ -28,42 +30,15 @@ export interface TaskLogsContextType {
   setShowDetails: (showDetails: boolean) => void;
   addSystemLog: (log: string) => void;
   resetLogs: () => void;
+  setSteps: (steps: Step[]) => void;
 }
-
-const defaultSteps = [
-  {
-    icon: 'Server',
-    message: "Initializing project environment...",
-    details: "Setting up project directory structure and configuration files",
-  },
-  {
-    icon: 'Database',
-    message: "Configuring blockchain connections...",
-    details: "Establishing secure connections to the blockchain network",
-  },
-  {
-    icon: 'Code',
-    message: "Generating smart contract templates...",
-    details: "Creating optimized contract templates with security best practices",
-  },
-  {
-    icon: 'Cpu',
-    message: "Initializing virtual machine...",
-    details: "Setting up EVM compatibility layer for contract testing",
-  },
-  {
-    icon: 'HardDrive',
-    message: "Syncing with latest blockchain state...",
-    details: "Downloading and verifying latest block headers",
-  }
-];
 
 const TaskLogsContext = createContext<TaskLogsContextType>({
   logs: [],
   isVisible: false,
   progress: 0,
   currentStep: 0,
-  steps: defaultSteps,
+  steps: [],
   showDetails: false,
   systemLogs: [],
   memoryStats: "128MB / 512MB",
@@ -77,7 +52,7 @@ const TaskLogsContext = createContext<TaskLogsContextType>({
   setShowDetails: () => {},
   addSystemLog: () => {},
   resetLogs: () => {},
+  setSteps: () => {},
 });
 
-export { defaultSteps };
 export default TaskLogsContext; 

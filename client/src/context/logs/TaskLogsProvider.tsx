@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import TaskLogsContext, { TaskLog, defaultSteps } from "./TaskLogsContext";
+import React, { useState, useEffect, useCallback } from "react";
+import TaskLogsContext, { TaskLog, Step } from "./TaskLogsContext";
 
 export default function TaskLogsProvider({
   children,
@@ -12,18 +12,15 @@ export default function TaskLogsProvider({
   const [isVisible, setIsVisible] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
+  const [steps, setSteps] = useState<Step[]>([]);
   const [showDetails, setShowDetails] = useState(false);
-  const [systemLogs, setSystemLogs] = useState<string[]>([
-    'Initializing project with ID: 0x7F9A2C5B',
-    'Loading configuration from blockchain.config.json',
-    'Connecting to network: mainnet',
-    'Processing...'
-  ]);
+  const [systemLogs, setSystemLogs] = useState<string[]>([]);
   
   // Reset when progress reaches 100%
   useEffect(() => {
+    let timer: NodeJS.Timeout;
     if (progress >= 100) {
-      const timer = setTimeout(() => {
+      timer = setTimeout(() => {
         // Auto-hide the toast after completion
         setIsVisible(false);
       }, 3000); // 3 seconds after completion
@@ -33,12 +30,23 @@ export default function TaskLogsProvider({
 
   // Update current step based on progress
   useEffect(() => {
-    // Calculate which step we're on based on progress (5 steps)
-    const stepIndex = Math.min(Math.floor(progress / 20), defaultSteps.length - 1);
-    setCurrentStep(stepIndex);
-  }, [progress]);
+    // Calculate which step we're on based on progress and the number of steps
+    if (steps.length > 0 && progress > 0) {
+      const stepIndex = Math.min(
+        Math.floor((progress / 100) * steps.length),
+        steps.length - 1
+      );
+      // Only update if the step actually changes
+      if (stepIndex !== currentStep) {
+        setCurrentStep(stepIndex);
+      }
+    } else {
+      // If no steps or progress is 0, reset to step 0
+      setCurrentStep(0);
+    }
+  }, [progress, steps, currentStep]);
 
-  const addLog = (message: string) => {
+  const addLog = useCallback((message: string) => {
     setLogs((prevLogs) => [
       ...prevLogs,
       { message, timestamp: Date.now() },
@@ -48,23 +56,35 @@ export default function TaskLogsProvider({
     if (!isVisible) {
       setIsVisible(true);
     }
-  };
+  }, [isVisible]);
 
-  const addSystemLog = (log: string) => {
+  const addSystemLog = useCallback((log: string) => {
     setSystemLogs((prev) => [...prev, log]);
-  };
+    
+    // Also make the toast visible when system logs are added
+    if (!isVisible) {
+      setIsVisible(true);
+    }
+  }, [isVisible]);
 
-  const resetLogs = () => {
+  const handleSetSteps = useCallback((newSteps: Step[]) => {
+    setSteps(newSteps);
+    
+    // Make the toast visible when steps are set
+    if (newSteps.length > 0 && !isVisible) {
+      setIsVisible(true);
+    }
+  }, [isVisible]);
+
+  const resetLogs = useCallback(() => {
     setLogs([]);
     setProgress(0);
     setCurrentStep(0);
-    setSystemLogs([
-      'Initializing project with ID: 0x7F9A2C5B',
-      'Loading configuration from blockchain.config.json',
-      'Connecting to network: mainnet',
-      'Processing...'
-    ]);
-  };
+    setSystemLogs([]);
+    // Keep steps until a new task explicitly sets them
+    // setSteps([]); 
+    setShowDetails(false); // Reset details view as well
+  }, []);
 
   return (
     <TaskLogsContext.Provider
@@ -73,7 +93,7 @@ export default function TaskLogsProvider({
         isVisible,
         progress,
         currentStep,
-        steps: defaultSteps,
+        steps,
         showDetails,
         systemLogs,
         memoryStats: "128MB / 512MB",
@@ -87,6 +107,7 @@ export default function TaskLogsProvider({
         setShowDetails,
         addSystemLog,
         resetLogs,
+        setSteps: handleSetSteps,
       }}
     >
       {children}

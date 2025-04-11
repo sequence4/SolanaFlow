@@ -3,6 +3,7 @@ import ProjectContext from '@/context/project/ProjectContext';
 import FileContext from '@/context/file/FileContext';
 import UxContext from '@/context/ux/UxContext';
 import { handleConfirmNewProject, handleOpenProject, handleSaveClick } from '@/utils/project/projectUtils';
+import { useTaskLogs } from '@/context/logs/useTaskLogs';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ export const ProjectInfo: React.FC = () => {
     const [projectsRefreshCounter, setProjectsRefreshCounter] = useState(0);
     const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
     const [isProjectListModalOpen, setIsProjectListModalOpen] = useState(false);
+    const { resetLogs, setSteps, setProgress, setIsVisible, addSystemLog } = useTaskLogs();
 
     const buttonTextColor = useColorModeValue('var(--toolbar-button-text-light)', 'var(--toolbar-button-text-dark)');
 
@@ -32,6 +34,9 @@ export const ProjectInfo: React.FC = () => {
     };
 
     const handleCreateProject = (data: { name: string; description: string; repoUrl?: string }) => {
+        // Reset logs before starting new project creation
+        resetLogs();
+        
         handleConfirmNewProject(
             projectContext, 
             setProjectContext, 
@@ -41,7 +46,8 @@ export const ProjectInfo: React.FC = () => {
             setProjectsRefreshCounter, 
             setUxOpenPanel,
             setFileTree,
-            setSelectedFile
+            setSelectedFile,
+            { setSteps, setProgress, setIsVisible, addSystemLog, resetLogs }
         );
         setIsNewProjectModalOpen(false);
     };
