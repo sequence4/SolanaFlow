@@ -36,7 +36,7 @@ export function NewProjectModal({ open, onOpenChange, onSubmit }: NewProjectModa
           <DialogHeader className="px-7 pt-7 pb-3">
             <div className="flex items-center space-x-2">
               <div className="h-3 w-3 rounded-full bg-blue-500"></div>
-              <DialogTitle className="text-xl font-medium text-slate-100 tracking-tight">
+              <DialogTitle className="text-lg text-gray-200 font-normal tracking-tight">
                 Create a New Project
               </DialogTitle>
             </div>
@@ -87,6 +87,7 @@ export function NewProjectModal({ open, onOpenChange, onSubmit }: NewProjectModa
                 </div>
               </div>
 
+              {/*
               <div className="space-y-2.5">
                 <div className="flex items-center">
                   <div className="h-2 w-2 rounded-full bg-blue-500 mr-2.5"></div>
@@ -110,23 +111,23 @@ export function NewProjectModal({ open, onOpenChange, onSubmit }: NewProjectModa
                 </div>
                 <p className="text-xs text-slate-500 ml-5">Optional: Link an existing GitHub repository</p>
               </div>
+              */}
             </div>
           </div>
 
-          <DialogFooter className="bg-[#0c111d] border-t border-[#1f2937] px-7 py-4 flex items-center justify-between">
-            <div className="text-xs text-slate-500">All fields marked with a blue dot are required</div>
-            <div className="flex items-center gap-3">
+          <DialogFooter className="bg-[#0c111d] border-t border-[#1f2937] px-8 py-6 flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3 w-full">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                className="border-[#2d3748] text-slate-300 hover:bg-[#1a2236] hover:text-slate-100 h-10 px-4 transition-all duration-200"
+                className="cursor-pointer border-[#2d3748] text-slate-300 hover:bg-[#1a2236] hover:text-slate-100 h-10 px-4 transition-all duration-200"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
-                className="bg-blue-600 hover:bg-blue-700 text-white h-10 px-5 flex items-center gap-2 shadow-md shadow-blue-900/30 transition-all duration-200"
+                className="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white h-10 px-5 flex items-center gap-2 shadow-md shadow-blue-900/30 transition-all duration-200"
               >
                 <Upload className="h-4 w-4" />
                 Create Project

@@ -11,6 +11,7 @@ const eventsData = mintToEvents.data.events || [];
 
 export const mintToFlow = {
   name: "Mint To Flow",
+  description: "Mint a new token to a specified address",
   nodes: [
     {
       id: "mint-to-instruction",
@@ -18,6 +19,8 @@ export const mintToFlow = {
       position: { x: 0, y: 0 },
       data: {
         ...mintTo.data,
+        label: "Mint To",
+        description: "Mint a new token to a specified address",
         accounts: contextData,
         parameters: inputsData,
         errorCodes: errorCodesData,

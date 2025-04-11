@@ -16,8 +16,13 @@ const CodeSnippet: React.FC<{ children?: React.ReactNode }> = ({ children }) => 
 
   return (
     <div
-      className="relative p-[10px] my-[10px] text-[0.8rem] whitespace-pre-wrap overflow-x-auto"
+      className="relative p-[10px] my-[10px] text-[0.8rem]"
       style={{
+        maxWidth: "100%",
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-word",
+        overflowWrap: "break-word",
+        overflowX: "hidden",
         backgroundColor: codeSnippetBgColor,
         color: codeSnippetTextColor,
         border: "1px solid rgb(54, 65, 92)",
