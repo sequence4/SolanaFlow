@@ -194,6 +194,8 @@ pnpm test --filter server
 
 ## License
 
-*Licensing will be added in the future.*
+Copyright © 2025 ChainLabs Technologies. All rights reserved.
+
+This code is provided for personal or non-commercial use only. You may not reproduce, redistribute, or use it for commercial purposes without explicit written permission from the author(s). The code is provided “as is,” without warranty of any kind.
 
 
