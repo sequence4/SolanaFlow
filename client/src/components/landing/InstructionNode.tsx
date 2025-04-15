@@ -35,20 +35,12 @@ const InstructionNode: React.FC<InstructionNodeProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between p-3 border-b border-[#333] bg-[#1a1a24]">
         <div className="flex items-center space-x-2">
-          <div className="p-1 rounded bg-[#1a1a24] border border-[#333]">
-            <svg className="w-4 h-4 text-[#5d5dff]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M20 4L3 11L10 14L13 21L20 4Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
+      
           <div>
             <h3 className="text-white font-medium text-xs">{name}</h3>
-            <p className="text-[#888] text-[10px]">{description}</p>
           </div>
         </div>
         <div className="flex items-center space-x-1">
-          <div className="px-1.5 py-0.5 text-[10px] bg-[#121218] rounded border border-[#333] text-white">
-            ID: {id}
-          </div>
           <div className="flex items-center px-1.5 py-0.5 text-[10px] bg-[#121218] rounded border border-[#333]">
             <span className="w-1 h-1 rounded-full bg-green-400 mr-1"></span>
             <span className="text-white">{status}</span>

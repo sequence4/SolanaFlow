@@ -6,18 +6,424 @@ import { ArrowRight, Code, Cpu, Layers } from "lucide-react"
 import { BsTelegram } from "react-icons/bs";
 import { BsTwitterX } from "react-icons/bs";
 import { BsYoutube } from "react-icons/bs";
-import { useEffect, useState } from "react"
-import InstructionNode from "@/components/landing/InstructionNode"
-import { mockInstructions } from "@/data/mockInstructions/instructions"
+import { useEffect, useState, useRef } from "react"
+import InstructionFlow from "@/components/landing/InstructionFlow"
+
+const TypewriterCode = () => {
+  const [displayText, setDisplayText] = useState("")
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [loopNum, setLoopNum] = useState(0)
+  const [typingSpeed, setTypingSpeed] = useState(30)
+  const [aiProgress, setAiProgress] = useState(0)
+  const [aiStatus, setAiStatus] = useState("Analyzing token structure...")
+  const [showCursor, setShowCursor] = useState(true)
+  const [activeTokens, setActiveTokens] = useState([false, false, false, false, false, false])
+  const [currentFileIndex, setCurrentFileIndex] = useState(0)
+  
+  const terminalRef = useRef<HTMLDivElement>(null)
+  
+  const maxVisibleLines = 18 
+
+  const codeFiles = [
+    // Initialize Mint
+    `use anchor_lang::prelude::*;
+use anchor_spl::token::{self, spl_token, InitializeMint, Token};
+
+#[derive(Accounts)]
+pub struct InitializeMintContext<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    
+    #[account(mut)]
+    pub token_mint: AccountInfo<'info>,
+    
+    #[account(address = spl_token::id())]
+    pub token_program: Program<'info, Token>,
+    
+    pub rent: Sysvar<'info, Rent>,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct InitializeMintParams {
+    pub decimals: u8,
+    pub mint_authority: Pubkey,
+}`,
+
+    // Initialize Mint Implementation
+    `pub fn initialize_mint(
+      ctx: Context<InitializeMintContext>,
+      params: InitializeMintParams,
+    ) -> Result<()> {
+      let payer = &ctx.accounts.payer;
+      let token_mint_info = &ctx.accounts.token_mint;
+      let token_program = &ctx.accounts.token_program;
+      let rent = &ctx.accounts.rent;
+
+      let mint_len = spl_token::state::Mint::LEN;
+      let lamports = rent.minimum_balance(mint_len);
+      
+      let cpi_ctx = CpiContext::new(
+          token_program.to_account_info(),
+          InitializeMint {
+              mint: token_mint_info.clone(),
+              rent: rent.to_account_info(),
+          },
+      );
+
+      token::initialize_mint(cpi_ctx, params.decimals, 
+                            &params.mint_authority, None)?;
+
+      emit!(MintInitialized {
+          mint_authority: params.mint_authority,
+          amount: 0,
+      });
+
+      Ok(())
+    }`,
+
+    // MintTo Context
+    `use anchor_lang::prelude::*;
+use anchor_spl::token::{self, Token, MintTo};
+
+#[derive(Accounts)]
+pub struct MintToContext<'info> {
+    #[account(mut)]
+    pub mint_authority: Signer<'info>,
+    
+    #[account(mut)]
+    pub token_mint: AccountInfo<'info>,
+    
+    #[account(mut)]
+    pub destination: AccountInfo<'info>,
+    
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct MintToParams {
+    pub amount: u64,
+}`,
+
+    // MintTo Implementation
+    `pub fn mint_to(
+      ctx: Context<MintToContext>,
+      params: MintToParams,
+    ) -> Result<()> {
+      let token_program = &ctx.accounts.token_program;
+      let token_mint = &ctx.accounts.token_mint;
+      let destination = &ctx.accounts.destination;
+      let authority = &ctx.accounts.mint_authority;
+
+      if token_mint.owner != &spl_token::id() {
+          return err!(MintToError::MintNotOwnedByTokenProgram);
+      }
+
+      let cpi_ctx = CpiContext::new(
+          token_program.to_account_info(),
+          MintTo {
+              mint: token_mint.clone(),
+              to: destination.clone(),
+              authority: authority.to_account_info(),
+          },
+      );
+
+      token::mint_to(cpi_ctx, params.amount)?;
+
+      emit!(TokensMinted {
+          mint_authority: authority.key(),
+          amount: params.amount,
+      });
+
+      Ok(())
+    }`,
+
+    // Transfer Context
+    `use anchor_lang::prelude::*;
+use anchor_spl::token::{self, Transfer, Token, TokenAccount};
+
+#[derive(Accounts)]
+pub struct TransferContext<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    
+    #[account(mut)]
+    pub source: Account<'info, TokenAccount>,
+    
+    #[account(mut)]
+    pub destination: Account<'info, TokenAccount>,
+    
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct TransferParams {
+    pub amount: u64,
+}`,
+
+    // Transfer Implementation
+    `pub fn transfer_tokens(
+      ctx: Context<TransferContext>,
+      params: TransferParams,
+    ) -> Result<()> {
+      let authority = &ctx.accounts.authority;
+      let source = &ctx.accounts.source;
+      let destination = &ctx.accounts.destination;
+      let token_program = &ctx.accounts.token_program;
+
+      let cpi_ctx = CpiContext::new(
+          token_program.to_account_info(),
+          Transfer {
+              from: source.to_account_info(),
+              to: destination.to_account_info(),
+              authority: authority.to_account_info(),
+          },
+      );
+
+      token::transfer(cpi_ctx, params.amount)?;
+
+      emit!(TransferCompleted {
+          source: source.key(),
+          destination: destination.key(),
+          amount: params.amount,
+      });
+
+      Ok(())
+    }`
+  ]
+
+  const currentCode = codeFiles[currentFileIndex]
+
+  const fileNames = [
+    "init_mint_context.rs",
+    "initialize_mint.rs",
+    "mint_to_context.rs",
+    "mint_to.rs",
+    "transfer_context.rs",
+    "transfer_tokens.rs"
+  ]
+
+  const shouldStartDeleting = (text: string) => {
+    const lines = text.split('\n');
+    return lines.length >= maxVisibleLines;
+  }
+
+  useEffect(() => {
+    const progress = Math.min(100, Math.round((displayText.length / currentCode.length) * 100))
+    setAiProgress(progress)
+
+    const statusInterval = setInterval(() => {
+      if (displayText.length > 0) {
+        const statuses = [
+          "Analyzing token structure...",
+          "Optimizing gas efficiency...",
+          "Validating security patterns...",
+          "Checking Anchor compliance...",
+          "Scanning for vulnerabilities...",
+          "Verifying program logic...",
+        ]
+        setAiStatus(statuses[Math.floor(Math.random() * statuses.length)])
+      }
+    }, 3000)
+
+    const tokenInterval = setInterval(() => {
+      setActiveTokens(activeTokens.map(() => Math.random() > 0.7))
+    }, 800)
+
+    return () => {
+      clearInterval(statusInterval)
+      clearInterval(tokenInterval)
+    }
+  }, [displayText, currentCode.length, activeTokens, currentCode])
+
+  useEffect(() => {
+    let timeout: NodeJS.Timeout
+    const cursorInterval = setInterval(() => {
+      setShowCursor((prev) => !prev)
+    }, 530)
+
+    if (!isDeleting && shouldStartDeleting(displayText)) {
+      timeout = setTimeout(() => {
+        setIsDeleting(true)
+        setTypingSpeed(5) 
+      }, 1000)
+    }
+    else if (!isDeleting && displayText === currentCode) {
+      timeout = setTimeout(() => {
+        setIsDeleting(true)
+        setTypingSpeed(5) 
+      }, 2000)
+    }
+    else if (isDeleting && displayText === "") {
+      setIsDeleting(false)
+      setLoopNum(loopNum + 1)
+      setTypingSpeed(5) 
+      setCurrentFileIndex((currentFileIndex + 1) % codeFiles.length)
+    }
+    else if (!isDeleting) {
+      const nextChar = currentCode.substring(0, displayText.length + 1)
+      timeout = setTimeout(() => {
+        setDisplayText(nextChar)
+      }, typingSpeed)
+    }
+    else {
+      const nextChar = currentCode.substring(0, displayText.length - 1)
+      timeout = setTimeout(() => {
+        setDisplayText(nextChar)
+      }, typingSpeed)
+    }
+
+    return () => {
+      clearTimeout(timeout)
+      clearInterval(cursorInterval)
+    }
+  }, [displayText, isDeleting, loopNum, typingSpeed, currentCode, currentFileIndex, codeFiles.length])
+
+  const renderCodeWithHighlighting = () => {
+    const lines = displayText.split('\n');
+    
+    return lines.map((line, lineIndex) => {
+      if (!line.trim()) return <div key={`line-${lineIndex}`}>&nbsp;</div>;
+      
+      let highlightedLine = line;
+      
+      highlightedLine = highlightedLine
+        .replace(/\b(use|pub|mod|fn|super|let|const|if|else|for|while|return|struct|enum|trait|impl|type|where|async|await|mut|static|ref|self|Self|match|in|as|unsafe|extern|crate)\b/g, 
+                 '<span style="color: #81a1c1;">$1</span>');
+      
+      highlightedLine = highlightedLine
+        .replace(/\b(Context|Result|Option|String|Vec|u8|u16|u32|u64|u128|i8|i16|i32|i64|i128|f32|f64|bool|char|str|Box|Arc|Rc|Mutex|RwLock|RefCell|Cell)\b/g, 
+                 '<span style="color: #b48ead;">$1</span>');
+      
+      highlightedLine = highlightedLine
+        .replace(/\b(InitializeMint|MintToParams|InitializeMintParams|MintTo|Transfer|TransferContext|MintToContext|InitializeMintContext|TokenAccount|instructions)\b/g, 
+                 '<span style="color: #a3be8c;">$1</span>');
+      
+      highlightedLine = highlightedLine
+        .replace(/\b(initialize_mint|mint_to|transfer|transfer_tokens|burn|freeze_account|thaw_account|close_account|set_authority)\b/g, 
+                 '<span style="color: #ebcb8b;">$1</span>');
+      
+      highlightedLine = highlightedLine
+        .replace(/(\#\[[a-zA-Z_]+\])/g, '<span style="color: #81a1c1;">$1</span>');
+      
+      highlightedLine = highlightedLine
+        .replace(/(::|->)/g, '<span style="color: #eceff4;">$1</span>');
+      
+      return (
+        <div 
+          key={`line-${lineIndex}`} 
+          dangerouslySetInnerHTML={{ __html: highlightedLine }}
+        />
+      );
+    });
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Main content area with code and analysis side by side */}
+      <div className="flex flex-1">
+        {/* Code area - takes most of the space */}
+        <div className="flex-1 p-2 overflow-hidden relative">
+          <div 
+            ref={terminalRef}
+            className="relative font-mono text-gray-300 text-xs" 
+            style={{ 
+              height: '100%', 
+              maxHeight: '100%', 
+              overflow: 'hidden' 
+            }}
+          >
+            <div className="whitespace-pre overflow-hidden">
+              {renderCodeWithHighlighting()}
+              <span 
+                className="text-[#1cf6a0] animate-pulse inline-block"
+                style={{ 
+                  position: 'relative',
+                  marginLeft: '1px',
+                  display: showCursor ? 'inline-block' : 'none'
+                }}
+              >▋</span>
+            </div>
+          </div>
+        </div>
+
+        {/* AI Analysis sidebar - minimal and futuristic */}
+        <div className="w-[60px] border-l border-[#1e2033] flex flex-col items-center py-2 opacity-80">
+          {/* Vertical progress bar */}
+          <div className="w-1 h-full bg-[#1e2033] rounded-full overflow-hidden relative mx-auto my-2">
+            <div
+              className="absolute bottom-0 w-full bg-gradient-to-t from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
+              style={{
+                height: `${aiProgress}%`,
+                transition: "height 0.2s ease-out",
+              }}
+            ></div>
+          </div>
+
+          {/* Analysis indicators - minimal dots */}
+          <div className="space-y-4 mt-2">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <div
+                key={i}
+                className={`w-1.5 h-1.5 rounded-full ${activeTokens[i] ? "bg-[#1cf6a0]" : "bg-[#1e2033]"}`}
+                style={{
+                  transition: "background-color 0.3s ease",
+                  boxShadow: activeTokens[i] ? "0 0 6px rgba(28, 246, 160, 0.6)" : "none",
+                }}
+              ></div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom status bar - always visible */}
+      <div className="h-6 border-t border-[#1e2033] flex items-center justify-between px-3 text-xs text-[#1cf6a0] bg-[#0a0b14]/80">
+        <div className="flex items-center space-x-2">
+          <div className="flex space-x-1">
+            {[...Array(3)].map((_, i) => (
+              <div
+                key={i}
+                className="w-1 h-1 rounded-full bg-[#1cf6a0]"
+                style={{
+                  animation: `aiPulse 1s ease-in-out ${i * 0.2}s infinite`,
+                }}
+              ></div>
+            ))}
+          </div>
+          <span className="text-[10px] font-mono">{aiStatus}</span>
+        </div>
+
+        {/* File name display */}
+        <div className="text-[10px] font-mono opacity-70">
+          {fileNames[currentFileIndex]}
+        </div>
+
+        {/* Neural network visualization - minimal version */}
+        <div className="flex space-x-1">
+          {[...Array(8)].map((_, i) => {
+            const isActive = Math.random() > 0.7
+            return (
+              <div
+                key={i}
+                className={`w-2 h-px ${isActive ? "bg-[#1cf6a0]" : "bg-[#1e2033]"}`}
+                style={{
+                  opacity: isActive ? 0.8 : 0.3,
+                  animation: isActive ? `aiFlicker 1.5s ease-in-out ${Math.random() * 2}s infinite` : "",
+                }}
+              ></div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function LandingPage() {
-  // State for animated elements
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
 
-    // Clean up animation frames on unmount
     return () => {
       setMounted(false)
     }
@@ -28,26 +434,35 @@ export default function LandingPage() {
       {/* Matrix-like background effect */}
       <div className="fixed inset-0 z-0 opacity-15 overflow-hidden pointer-events-none">
         <div className="absolute inset-0">
-          {Array.from({ length: 100 }).map((_, i) => (
-            <div
-              key={i}
-              className="absolute text-[#00ff41] text-sm"
-              style={{
-                top: `${Math.random() * 100}%`,
-                left: `${Math.random() * 100}%`,
-                animation: `fall ${5 + Math.random() * 15}s linear infinite`,
-                animationDelay: `${Math.random() * 5}s`,
-              }}
-            >
-              {String.fromCharCode(33 + Math.floor(Math.random() * 94))}
-            </div>
-          ))}
+          {Array.from({ length: 100 }).map((_, i) => {
+            // Define gradient colors
+            const gradientColors = ['#5f88dc', '#1cf6a0', '#9945ff'];
+            const randomColor = gradientColors[Math.floor(Math.random() * gradientColors.length)];
+            
+            return (
+              <div
+                key={i}
+                style={{
+                  position: 'absolute',
+                  top: `${Math.random() * 100}%`,
+                  left: `${Math.random() * 100}%`,
+                  animation: `fall ${5 + Math.random() * 15}s linear infinite`,
+                  animationDelay: `${Math.random() * 5}s`,
+                  color: randomColor,
+                  textShadow: `0 0 5px ${randomColor}`,
+                  fontSize: '0.875rem',
+                }}
+              >
+                {String.fromCharCode(33 + Math.floor(Math.random() * 94))}
+              </div>
+            );
+          })}
         </div>
       </div>
 
       {/* Navbar */}
       <nav className="relative z-10 border-b border-[#1e2033] bg-[#0a0b14]/50 backdrop-blur-md">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <div className="w-8 h-8 relative">
               <img src="/assets/logo.png" alt="FlowCode Logo" className="w-full h-full" />
@@ -60,8 +475,8 @@ export default function LandingPage() {
                   backgroundSize: "300% 300%",
                   animation: "gradientFlow 3s ease infinite"
                 }}>FlowCode</span>
-          </span>
-        </div>
+            </span>
+          </div>
 
           <div className="hidden md:flex items-center space-x-12">
             <Link href="#features" className="text-gray-400 hover:text-[#5580ff] transition-colors text-sm">
@@ -78,24 +493,26 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="flex justify-center relative w-screen h-[100vh] py-4 sm:py-6 md:py-10 lg:py-12 overflow-hidden">
+      <section className="flex justify-center relative w-screen h-[100vh] py-4 sm:py-4 md:py-8 lg:py-10 overflow-hidden">
         <div className="w-full h-full container relative z-10 px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col w-full h-full md:flex-row items-start py-16 sm:py-20 md:py-25">
             {/* Left side content */}
-            <div className="w-full md:w-2/5 lg:w-2/5 mb-12 md:mb-0 pr-0 md:pr-4 lg:pr-8">
-              <div className="inline-block px-2 sm:px-3 py-1 mb-4 sm:mb-6 rounded-full bg-[#1e2033] border border-[#2a2d4a] text-xs text-[#5580ff]">
-                <span className="mr-2">●</span> Visual AI Developer Tool for Solana
-              </div>
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 sm:mb-6 leading-tight tracking-tight">
-                <span className="block">Build Solana dApps</span>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]" 
-                  style={{
-                    backgroundSize: "300% 300%",
-                    animation: "gradientFlow 3s ease infinite"
-                  }}>
-                  Without Code
+            <div className="flex flex-col justify-evenly gap-2 h-full w-full md:w-2/5 lg:w-2/5 mb-12 md:mb-0 pr-0 md:pr-4 lg:pr-8">
+              <div className="flex flex-col gap-0 justify-start">
+                <div className="w-fit inline-block px-2 sm:px-3 py-1 mb-4 sm:mb-6 rounded-full bg-[#1e2033] border border-[#2a2d4a] text-xs text-[#5580ff]">
+                  <span className="mr-2">●</span> Visual AI Developer Tool for Solana
+                </div>
+                <h1 className="text-3xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 leading-tight tracking-tight">
+                  <span className="block">Build Solana dApps</span>
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]" 
+                style={{
+                      backgroundSize: "300% 300%",
+                      animation: "gradientFlow 3s ease infinite"
+                    }}>
+                    Without Code
                 </span>
-              </h1>
+                </h1>
+              </div>
               <p className="text-gray-400 mb-6 sm:mb-8 max-w-lg text-xs sm:text-sm leading-relaxed">
                 <ul className="list-disc list-inside">
                   <li><span className="text-white font-semibold">FlowCode</span> transforms English into Solana programs.</li>
@@ -105,221 +522,39 @@ export default function LandingPage() {
               </p>
               <div className="flex flex-col sm:flex-row justify-start gap-2">
                 <Button size="lg" className="bg-[#5580ff] hover:bg-[#4466cc] text-white p-2 rounded whitespace-nowrap">
-                  <span className="mr-2 text-xs sm:text-sm">Join the Waitlist</span> <ArrowRight className="h-4 w-4" />
+                  <span className="cursor-pointer text-xs sm:text-sm">Join the Waitlist</span>
                 </Button>
                 <div className="flex items-center justify-center gap-2 hover:bg-none mt-2 sm:mt-0">
                     <Button size="icon" variant="ghost"><BsTelegram className="h-4 w-4 sm:h-5 sm:w-5 text-[#5580ff] cursor-pointer hover:bg-none" /></Button>
                     <Button size="icon" variant="ghost"><BsTwitterX className="h-4 w-4 sm:h-5 sm:w-5 text-[#5580ff] cursor-pointer hover:bg-none" /></Button>
                     <Button size="icon" variant="ghost"><BsYoutube className="h-4 w-4 sm:h-5 sm:w-5 text-[#5580ff] cursor-pointer hover:bg-none" /></Button>
                 </div>
-              </div>
+          </div>
+        </div>
+
+            {/* Right side - Flow diagram and code snippet */}
+            <div className="w-full h-full md:w-3/5 flex flex-col lg:flex-row mt-8 md:mt-0">
+              {/* Flow Diagram */}
+              <div className="w-full lg:w-3/5 relative">
+                <div className="h-[600px]">
+                  {mounted && <InstructionFlow />}
             </div>
+          </div>
 
-            {/* Right side - split into instruction nodes and code snippet */}
-            <div className="w-full h-full md:w-3/5 flex flex-col md:flex-row mt-8 md:mt-0">
-              {/* Instruction Nodes */}
-              <div className="w-full md:w-1/2 relative h-[400px] sm:h-[500px] md:h-[600px]">
-                {/* Initialize Mint - Top left position */}
-                <div 
-                  className={`absolute transition-all duration-1000 ${mounted ? "opacity-100" : "opacity-0"}`}
-                  style={{
-                    top: "5%",
-                    left: "-6%",
-                    width: "55%",
-                    maxWidth: "300px",
-                    zIndex: 3,
-                    animation: mounted ? "floatNodes 15s ease-in-out infinite" : "none",
-                  }}
-                >
-                  <div className="relative">
-                    {/* Animated border */}
-                    <div 
-                      className="absolute -top-0.5 -left-0.5 -right-0.5 -bottom-0.5 rounded-xl z-0"
-                      style={{
-                        background: "linear-gradient(90deg, #5f88dc, #1cf6a0, #9945ff, #5f88dc)",
-                        backgroundSize: "300% 300%",
-                        animation: "border-gradient 3s ease infinite"
-                      }}
-                    ></div>
-                    
-                    {/* Instruction Node Content */}
-                    <div className="relative z-10">
-                      <InstructionNode 
-                        id={mockInstructions.initializeMint.id}
-                        name={mockInstructions.initializeMint.name}
-                        description={mockInstructions.initializeMint.description}
-                        status={mockInstructions.initializeMint.status}
-                        accounts={mockInstructions.initializeMint.accounts}
-                        inputs={mockInstructions.initializeMint.inputs}
-                        codePreview={mockInstructions.initializeMint.codePreview}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Mint To - Middle left position */}
-                <div 
-                  className={`absolute transition-all duration-1000 ${mounted ? "opacity-100" : "opacity-0"}`}
-                  style={{
-                    top: "30%",
-                    left: "35%",
-                    width: "50%",
-                    maxWidth: "280px",
-                    zIndex: 2,
-                    animation: mounted ? "floatNodes2 12s ease-in-out infinite 1s" : "none",
-                  }}
-                >
-                  <div className="relative">
-                    {/* Animated border */}
-                    <div 
-                      className="absolute -top-0.5 -left-0.5 -right-0.5 -bottom-0.5 rounded-xl z-0"
-                      style={{
-                        background: "linear-gradient(90deg, #5f88dc, #1cf6a0, #9945ff, #5f88dc)",
-                        backgroundSize: "300% 300%",
-                        animation: "border-gradient 3s ease infinite 0.5s"
-                      }}
-                    ></div>
-                    
-                    {/* Instruction Node Content */}
-                    <div className="relative z-10">
-                      <InstructionNode 
-                        id={mockInstructions.mintTo.id}
-                        name={mockInstructions.mintTo.name}
-                        description={mockInstructions.mintTo.description}
-                        status={mockInstructions.mintTo.status}
-                        accounts={mockInstructions.mintTo.accounts}
-                        inputs={mockInstructions.mintTo.inputs}
-                        codePreview={mockInstructions.mintTo.codePreview}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Transfer - Bottom left position */}
-                <div 
-                  className={`absolute transition-all duration-1000 ${mounted ? "opacity-100" : "opacity-0"}`}
-                  style={{
-                    top: "40%",
-                    left: "5%",
-                    width: "50%",
-                    maxWidth: "290px",
-                    height: "90%",
-                    zIndex: 1,
-                    animation: mounted ? "floatNodes3 14s ease-in-out infinite 0.5s" : "none",
-                  }}
-                >
-                  <div className="relative">
-                    {/* Animated border */}
-                    <div 
-                      className="absolute -top-0.5 -left-0.5 -right-0.5 -bottom-0.5 rounded-xl z-0"
-                      style={{
-                        background: "linear-gradient(90deg, #5f88dc, #1cf6a0, #9945ff, #5f88dc)",
-                        backgroundSize: "300% 300%",
-                        animation: "border-gradient 3s ease infinite 1s"
-                      }}
-                    ></div>
-                    
-                    {/* Instruction Node Content */}
-                    <div className="relative z-10">
-                      <InstructionNode 
-                        id={mockInstructions.transfer.id}
-                        name={mockInstructions.transfer.name}
-                        description={mockInstructions.transfer.description}
-                        status={mockInstructions.transfer.status}
-                        accounts={mockInstructions.transfer.accounts}
-                        inputs={mockInstructions.transfer.inputs}
-                        codePreview={mockInstructions.transfer.codePreview}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Decorative elements */}
-                <div className="absolute inset-0 z-0">
-                  {/* Grid lines */}
-                  <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAwIDEwIEwgNDAgMTAgTSAxMCAwIEwgMTAgNDAgTSAwIDIwIEwgNDAgMjAgTSAyMCAwIEwgMjAgNDAgTSAwIDMwIEwgNDAgMzAgTSAzMCAwIEwgMzAgNDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzFmMjA0MCIgb3BhY2l0eT0iMC4yIiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')]"></div>
-
-                  {/* Glowing orbs */}
-                  <div className="absolute top-1/4 left-1/4 w-40 h-40 rounded-full bg-[#5580ff]/5 blur-3xl"></div>
-                  <div className="absolute bottom-1/3 right-1/3 w-60 h-60 rounded-full bg-[#a855f7]/5 blur-3xl"></div>
-                </div>
-              </div>
-
-              {/* Code Terminal on right side */}
-              <div className="w-[100%] sm:w-[100%] h-[100%] sm:h-[100%] md:w-1/2 md:h-full flex items-center justify-center relative">
-                <div className="mt-4 sm:mt-8 md:mt-0 rounded-lg overflow-hidden border border-[#2a2d4a] bg-[#0d0e1a] w-full md:w-[110%] h-[90%] absolute md:static md:transform md:translate-x-0 top-0 left-0">
+              {/* Code Terminal */}
+              <div className="w-full lg:w-2/5 flex items-center justify-center relative">
+                <div className="mt-8 lg:mt-0 rounded-lg overflow-hidden border border-[#2a2d4a] bg-[#0d0e1a] w-full h-[90%] absolute top-[5%] left-0 right-0">
                   <div className="flex items-center px-4 py-2 bg-[#1e2033] border-b border-[#2a2d4a]">
                     <div className="flex space-x-2">
                       <div className="w-2 h-2 rounded-full bg-[#ff5f57]"></div>
                       <div className="w-2 h-2 rounded-full bg-[#febc2e]"></div>
                       <div className="w-2 h-2 rounded-full bg-[#28c840]"></div>
                     </div>
-                    <div className="ml-4 text-[10px] sm:text-xs md:text-sm text-gray-400">token_minting_program.rs</div>
+                    <div className="ml-4 text-sm text-gray-400">token_minting_program.rs</div>
                   </div>
-                  <pre className="p-2 sm:p-3 md:p-4 text-[10px] sm:text-xs md:text-sm overflow-x-auto overflow-y-auto text-gray-300">
-                    <code>
-                      {`use anchor_lang::prelude::*;
-
-#[program]
-pub mod token_minting_program {
-    use super::*;
-    
-    pub fn initialize_mint(
-        ctx: Context<InitializeMint>,
-        params: InitializeMintParams
-    ) -> Result<()> {
-        instructions::initialize_mint(ctx, params)
-    }
-    
-    pub fn mint_to(
-        ctx: Context<MintTo>,
-        params: MintToParams
-    ) -> Result<()> {
-        instructions::mint_to(ctx, params)
-    }
-
-    pub fn transfer(
-        ctx: Context<Transfer>,
-        amount: u64
-    ) -> Result<()> {
-        instructions::transfer(ctx, amount)
-    }
-
-    pub fn burn(
-        ctx: Context<Burn>,
-        amount: u64
-    ) -> Result<()> {
-        instructions::burn(ctx, amount)
-    }
-
-    pub fn freeze_account(
-        ctx: Context<FreezeAccount>,
-    ) -> Result<()> {
-        instructions::freeze_account(ctx)
-    }
-
-    pub fn thaw_account(
-        ctx: Context<ThawAccount>,
-    ) -> Result<()> {
-        instructions::thaw_account(ctx)
-    }
-
-    pub fn close_account(
-        ctx: Context<CloseAccount>,
-    ) -> Result<()> {
-        instructions::close_account(ctx)
-    }
-
-    pub fn set_authority(
-        ctx: Context<SetAuthority>,
-        authority_type: AuthorityType,
-        new_authority: Option<Pubkey>,
-    ) -> Result<()> {
-        instructions::set_authority(ctx, authority_type, new_authority)
-    }
-}`}
-                    </code>
-                  </pre>
+                  <div className="h-full">
+                    <TypewriterCode />
+                  </div>
                 </div>
               </div>
             </div>
@@ -803,6 +1038,16 @@ pub mod token_minting_program {
           0% { background-position: 0% 50%; }
           50% { background-position: 100% 50%; }
           100% { background-position: 0% 50%; }
+        }
+
+        @keyframes aiPulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(0.8); }
+        }
+
+        @keyframes aiFlicker {
+          0%, 100% { opacity: 0.3; }
+          50% { opacity: 0.8; }
         }
       `}</style>
     </div>
