@@ -158,7 +158,7 @@ Ok(())
           id: transformedInitMintData.id,
           type: "instructionGroupNode",
           data: transformedInitMintData,
-          position: { x: 100, y: 80 },
+          position: { x: 100, y: -200 },
           sourcePosition: Position.Right,
           targetPosition: Position.Left,
           draggable: true,
@@ -167,7 +167,7 @@ Ok(())
           id: transformedMintToData.id,
           type: "instructionGroupNode",
           data: transformedMintToData,
-          position: { x: 500, y: 80 },
+          position: { x: 500, y: 0 },
           sourcePosition: Position.Right,
           targetPosition: Position.Left,
           draggable: true,
@@ -176,7 +176,7 @@ Ok(())
           id: mockTransferData.id,
           type: "instructionGroupNode",
           data: transformedTransferData,
-          position: { x: 900, y: 80 },
+          position: { x: 900, y: 200 },
           sourcePosition: Position.Right,
           targetPosition: Position.Left,
           draggable: true,
@@ -232,7 +232,7 @@ Ok(())
         onNodesChange={onNodesChange}
         fitView
         defaultViewport={{ x: 0, y: 0, zoom: 0.75 }}
-        minZoom={0.5}
+        minZoom={0.55}
         maxZoom={1.5}
         connectionLineType={ConnectionLineType.SmoothStep}
         proOptions={{ hideAttribution: true }}
@@ -271,7 +271,7 @@ Ok(())
         <Controls 
           showInteractive={false}
           showZoom={true}
-          position="bottom-right"
+          position="bottom-left"
         />
       </ReactFlow>
       
