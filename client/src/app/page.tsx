@@ -379,7 +379,11 @@ export default function LandingPage() {
               <span className="mr-2">▶</span> Demo
             </div>
             <h2 className="text-3xl md:text-4xl font-bold mb-4 tracking-tight">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5580ff] to-[#a855f7]">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
+                  style={{
+                    backgroundSize: "300% 300%",
+                    animation: "gradientFlow 3s ease infinite"
+                  }}>
                 See FlowCode in Action
               </span>
             </h2>
@@ -388,10 +392,18 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="max-w-4xl mx-auto">
+          {/* Video */}
+          <div className="max-w-6xl mx-auto">
             <div className="relative aspect-video rounded-xl overflow-hidden border border-[#2a2d4a] shadow-2xl">
               <div className="absolute inset-0 bg-gradient-to-br from-[#0d0e1a] to-[#0a0b14] flex flex-col items-center justify-center">
-              <img src="/assets/flowcode-demo.gif" alt="Solana FlowCode beta demo" className="w-full h-full" />
+              <video 
+                src="/assets/flowcode-demo.mp4" 
+                autoPlay 
+                muted 
+                loop 
+                playsInline
+                className="w-full h-full object-cover" 
+              />
               </div>
             </div>
 
@@ -447,7 +459,15 @@ export default function LandingPage() {
             </div>
 
             <div className="relative z-10 text-center">
-              <h2 className="text-2xl md:text-3xl font-bold mb-4 tracking-tight">Ready to Build Effortlessly on Solana?</h2>
+              <h2 className="text-2xl md:text-3xl font-bold mb-4 tracking-tight">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
+                    style={{
+                      backgroundSize: "300% 300%",
+                      animation: "gradientFlow 3s ease infinite"
+                    }}>
+                  Ready to Build Effortlessly on Solana?
+                </span>
+              </h2>
               <p className="text-gray-400 mb-8 max-w-2xl mx-auto text-sm">
                 Join hundreds of other people on our waitlist to be informed when we launch.
               </p>
@@ -494,7 +514,11 @@ export default function LandingPage() {
                 <div className="absolute inset-0 bg-[#5580ff]/20 blur-xl rounded-full"></div>
               </div>
               <span className="text-lg font-bold tracking-tighter" style={{ fontFamily: '"DM Sans", sans-serif' }}>
-                <span className="text-white">Solana</span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
+                    style={{
+                      backgroundSize: "300% 300%",
+                      animation: "gradientFlow 3s ease infinite"
+                    }}>Solana</span>
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]" 
                   style={{
                     backgroundSize: "300% 300%",
