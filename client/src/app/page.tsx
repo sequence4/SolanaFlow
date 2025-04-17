@@ -38,33 +38,35 @@ export default function LandingPage() {
       </Head>
 
       {/* Matrix-like background effect */}
-      <div className="fixed inset-0 z-0 opacity-15 overflow-hidden pointer-events-none">
-        <div className="absolute inset-0">
-          {Array.from({ length: 100 }).map((_, i) => {
-            // Define gradient colors
-            const gradientColors = ['#5f88dc', '#1cf6a0', '#9945ff'];
-            const randomColor = gradientColors[Math.floor(Math.random() * gradientColors.length)];
-            
-            return (
-              <div
-                key={i}
-                style={{
-                  position: 'absolute',
-                  top: `${Math.random() * 100}%`,
-                  left: `${Math.random() * 100}%`,
-                  animation: `fall ${5 + Math.random() * 15}s linear infinite`,
-                  animationDelay: `${Math.random() * 5}s`,
-                  color: randomColor,
-                  textShadow: `0 0 5px ${randomColor}`,
-                  fontSize: '1rem',
-                }}
-              >
-                {String.fromCharCode(33 + Math.floor(Math.random() * 94))}
-              </div>
-            );
-          })}
+      {mounted && (
+        <div className="fixed inset-0 z-0 opacity-15 overflow-hidden pointer-events-none">
+          <div className="absolute inset-0">
+            {Array.from({ length: 100 }).map((_, i) => {
+              // Define gradient colors
+              const gradientColors = ['#5f88dc', '#1cf6a0', '#9945ff'];
+              const randomColor = gradientColors[Math.floor(Math.random() * gradientColors.length)];
+              
+              return (
+                <div
+                  key={i}
+                  style={{
+                    position: 'absolute',
+                    top: `${Math.random() * 100}%`,
+                    left: `${Math.random() * 100}%`,
+                    animation: `fall ${5 + Math.random() * 15}s linear infinite`,
+                    animationDelay: `${Math.random() * 5}s`,
+                    color: randomColor,
+                    textShadow: `0 0 5px ${randomColor}`,
+                    fontSize: '1rem',
+                  }}
+                >
+                  {String.fromCharCode(33 + Math.floor(Math.random() * 94))}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Navbar */}
       <nav className="relative z-10 border-b border-[#1e2033] bg-[#0a0b14]/50 backdrop-blur-md">
@@ -119,13 +121,13 @@ export default function LandingPage() {
                   </span>
                 </h1>
               </div>
-              <p className="text-gray-400 mb-6 sm:mb-8 max-w-lg text-xs sm:text-sm leading-relaxed">
+              <div className="text-gray-400 mb-6 sm:mb-8 max-w-lg text-xs sm:text-sm leading-relaxed">
                 <ul className="list-disc list-inside">
                   <li><span className="text-white font-semibold">FlowCode</span> transforms English into Solana programs.</li>
                   <li>Design, build, and deploy decentralized applications with our visual workflow builder and
                   specialized Solana IDE.</li>
                 </ul>
-              </p>
+              </div>
               <div className="flex flex-col sm:flex-row justify-start gap-2">
                 <Button size="lg" className="bg-[#5580ff] hover:bg-[#4466cc] text-white p-2 rounded whitespace-nowrap">
                   <span className="cursor-pointer text-xs sm:text-sm">Join the Waitlist</span>
@@ -159,7 +161,7 @@ export default function LandingPage() {
                     <div className="ml-4 text-sm text-gray-400">token_minting_program.rs</div>
                   </div>
                   <div className="h-full">
-                    <TypewriterCode />
+                    {mounted && <TypewriterCode />}
                   </div>
                 </div>
               </div>
