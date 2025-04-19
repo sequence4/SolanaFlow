@@ -1,0 +1,601 @@
+"use client";
+
+import React, { useContext, useState, useRef, useEffect } from 'react';
+import '~/styles/toolbox/toolboxStyle.css';
+import { NodeItems } from '~/components/main/toolbox/workflowToolbox/NodeItems';
+import FileTree from '~/components/main/toolbox/codeToolbox/Filetree';
+import ProjectContext from '~/context/project/ProjectContext';
+import FileContext from '~/context/file/FileContext';
+import UxContext from '~/context/ux/UxContext';
+import SimpleBar from 'simplebar-react';
+import 'simplebar-react/dist/simplebar.min.css';
+import { Dialog, DialogContent } from "~/components/ui/dialog";
+import { Button } from "~/components/ui/button";
+import { NewProjectModal } from '~/components/ui/new-project-modal';
+import ProjectListPopover from '../workflow/ProjectListPopover';
+import { useSignAndSendTx } from '~/hooks/useSignAndSendTx';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { toast } from "sonner";
+import { useColorModeValue } from '~/components/ui/color-mode';
+import PulseLoader from "react-spinners/PulseLoader";
+import { handleGenerateCode } from '~/utils/codeGeneration/handleGenerateCode';
+import { handleDeployProgram } from '~/utils/project/deployUpgradableProgram';
+import { handleDeployWithLogs } from '~/utils/project/handleDeployWithLogs';
+import { saveProject } from '~/utils/project/saveProject';
+import { handleConfirmNewProject, handleOpenProject, handleSaveClick } from '~/utils/project/projectUtils';
+import { useTaskLogs } from '~/context/logs/useTaskLogs';
+import {
+  Search,
+  X,
+  Filter,
+  Settings,
+  Clock,
+  BookOpen,
+  Edit3,
+  ArrowRight,
+  Info,
+  Tag,
+  FolderOpen,
+  Save,
+  Plus,
+  Code,
+  Hammer,
+  Rocket,
+  ChevronRight,
+} from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
+import { Separator } from "~/components/ui/separator"
+import { Label } from "~/components/ui/label";
+
+export const Toolbox = () => {
+    const [isExpanded] = useState(true);
+    const { projectContext, setProjectContext } = useContext(ProjectContext);
+    const { fileTree, setFileTree, setSelectedFile } = useContext(FileContext);
+    const { activeTab, setActiveTab, setUxOpenPanel } = useContext(UxContext);
+    const [activeChainTab, setActiveChainTab] = useState<"on-chain" | "off-chain">("on-chain");
+    const [projectName, setProjectName] = useState(projectContext.name || "My Token Project");
+    const [isEditing, setIsEditing] = useState(false);
+    const [searchValue, setSearchValue] = useState("");
+    const [isFocused, setIsFocused] = useState(false);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const nodeItemsRef = useRef<any>(null);
+    
+    const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
+    const [isProjectListModalOpen, setIsProjectListModalOpen] = useState(false);
+    const [projectsRefreshCounter, setProjectsRefreshCounter] = useState(0);
+    
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [isCodeReady, setIsCodeReady] = useState(false);
+    const [isDeploying, setIsDeploying] = useState(false);
+    const [showDeployModal, setShowDeployModal] = useState(false);
+    const [selectedOption, setSelectedOption] = useState('user-wallet');
+    
+    const signAndSendTx = useSignAndSendTx();
+    const { publicKey } = useWallet();
+    const taskLogs = useTaskLogs();
+    
+    const deployModalBg = useColorModeValue('var(--toolbar-deploy-modal-bg-light)', 'var(--toolbar-deploy-modal-bg-dark)');
+    const deployModalBorderColor = useColorModeValue('var(--toolbar-deploy-modal-border-light)', 'var(--toolbar-deploy-modal-border-dark)');
+    const deployModalTextColor = useColorModeValue('var(--toolbar-deploy-modal-text-light)', 'var(--toolbar-deploy-modal-text-dark)');
+
+    useEffect(() => {
+        setProjectName(projectContext.name || "My Token Project");
+        console.log('projectContext programId', projectContext.details?.projectState?.programId);
+    }, [projectContext.name, projectContext.details?.projectState?.programId, projectContext.details?.projectState?.deployed]);
+
+    const handleTabChange = (tab: "on-chain" | "off-chain") => {
+        setActiveChainTab(tab);
+        if (nodeItemsRef.current) {
+            nodeItemsRef.current.setActiveChainTab(tab === "on-chain" ? "onChain" : "offChain");
+        }
+    };
+
+    const handleNewProject = () => {
+        setIsNewProjectModalOpen(true);
+    };
+
+    const handleCreateProject = (data: { name: string; description: string; repoUrl?: string }) => {
+        // Reset logs before starting new project creation
+        taskLogs.resetLogs();
+        
+        handleConfirmNewProject(
+            projectContext, 
+            setProjectContext, 
+            data.name, 
+            data.description, 
+            projectsRefreshCounter, 
+            setProjectsRefreshCounter, 
+            setUxOpenPanel,
+            setFileTree,
+            setSelectedFile,
+            taskLogs
+        );
+        setIsNewProjectModalOpen(false);
+    };
+
+    const handleOpenProjectClick = () => {
+        setIsProjectListModalOpen(true);
+    };
+    
+    const handleSaveProject = () => {
+        handleSaveClick(
+            projectContext, 
+            setProjectContext, 
+            projectsRefreshCounter, 
+            setProjectsRefreshCounter
+        );
+    };
+    
+    const handleGenerateClick = async () => {
+        if (isGenerating) return;
+        try {
+            const saveResp = await saveProject(projectContext, setProjectContext);
+            if (!saveResp) {
+                console.log('No saveResp, cannot generate code');
+                return;
+            }
+            const projectId = saveResp.project?.id;  
+            setIsGenerating(true);
+            
+            await handleGenerateCode(
+                { ...projectContext, id: projectId },
+                setIsGenerating,
+                setIsCodeReady,
+                (tab: any) => setActiveTab(tab),
+                setFileTree,
+                setProjectContext,
+                taskLogs
+            );
+        } catch (error) {
+            console.error('Error generating code:', error);
+            setIsGenerating(false);
+        }
+    };
+    
+    const handleViewCode = () => { 
+        setActiveTab('code'); 
+    };
+    
+    const handleOpenDeployModal = () => {
+        setShowDeployModal(true);
+    };
+
+    const handleDeployCancel = () => {
+        setShowDeployModal(false);
+    };
+    
+    const handleDeployClick = async () => {
+        if (isDeploying) return;
+        setIsDeploying(true);
+        
+        // CLOSE THE POPUP IMMEDIATELY
+        setShowDeployModal(false);
+        
+        try {
+            if (!publicKey) {
+                throw new Error('No wallet connected');
+            }
+            
+            await handleDeployWithLogs(
+                projectContext,
+                setProjectContext,
+                publicKey,
+                signAndSendTx,
+                'devnet',
+                selectedOption === 'user-wallet' ? 'fullWallet' : 'delegated',
+                taskLogs
+            );
+        } catch (err) {
+            console.error('Deployment error:', err);
+            toast("Deployment error", {
+                description: String(err),
+                style: { backgroundColor: "#f87171", color: "white" }
+            });
+        } finally {
+            setIsDeploying(false);
+        }
+    };
+    
+    const nodesCount = projectContext?.details?.projectState?.nodes?.length || 0;
+    const projectDeployed = !!projectContext?.details?.projectState?.deployed;
+    const canGenerateCode = nodesCount > 0;
+    const canDeploy = fileTree !== null || projectDeployed;
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+                e.preventDefault();
+                inputRef.current?.focus();
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, []);
+
+    return (
+        <div
+            className="app-sidebar w-[20%] flex flex-col h-full bg-[#121214] text-white border-r border-[#2a2a2d] overflow-hidden"
+        >
+            <div className="p-4 border-b border-[#2a2a2d]">
+                <div className="flex justify-between items-center">
+                    <div className="text-xs font-medium text-[#6e6e76] uppercase tracking-wider">PROJECT</div>
+                    <div className="flex items-center space-x-2">
+                        <button title='button' className="p-1 h-7 w-7 rounded-full hover:bg-[#2a2a2d] text-[#6e6e76] hover:text-white transition-colors">
+                            <Info className="h-3.5 w-3.5" />
+                        </button>
+                        <button title='button' className="p-1 h-7 w-7 rounded-full hover:bg-[#2a2a2d] text-[#6e6e76] hover:text-white transition-colors">
+                            <Settings className="h-3.5 w-3.5" />
+                        </button>
+                    </div>
+                </div>
+
+                <div className="mt-3">
+                    <div className="flex items-center">
+                        {isEditing ? (
+                            <input title='button'
+                                type="text"
+                                value={projectName}
+                                onChange={(e) => setProjectName(e.target.value)}
+                                className="bg-[#1e1e20] border border-[#2a2a2d] rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#4d7cfe] w-full"
+                                autoFocus
+                                onBlur={() => {
+                                    setIsEditing(false);
+                                    setProjectContext((prev) => ({
+                                        ...prev,
+                                        name: projectName
+                                    }));
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                        setIsEditing(false);
+                                        setProjectContext((prev) => ({
+                                            ...prev,
+                                            name: projectName
+                                        }));
+                                    }
+                                }}
+                            />
+                        ) : (
+                            <div className="flex items-center justify-between w-full">
+                                <h3 className="text-lg font-semibold text-white">{projectName}</h3>
+                                <button title='button'
+                                    onClick={() => setIsEditing(true)}
+                                    className="p-1 rounded-full hover:bg-[#2a2a2d] text-[#6e6e76] hover:text-white transition-colors"
+                                >
+                                    <Edit3 className="h-3.5 w-3.5" />
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex items-center mt-2 space-x-2 text-[#6e6e76] mb-4">
+                        <span className="w-2 h-2 rounded-full bg-[#4d7cfe]"></span>
+                        <span className="text-xs">Token • Mint • Transfer</span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 mb-4">
+                        <button 
+                            className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-9 rounded-md text-xs font-medium flex items-center justify-center"
+                            onClick={handleOpenProjectClick}
+                        >
+                            <FolderOpen className="h-4 w-4 mr-2" />
+                            <span className="flex items-center">Open</span>
+                        </button>
+                        <button 
+                            className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-9 rounded-md text-xs font-medium flex items-center justify-center"
+                            onClick={handleSaveProject}
+                            disabled={!projectContext.id}
+                        >
+                            <Save className="h-4 w-4 mr-2" />
+                            <span className="flex items-center">Save</span>
+                        </button>
+                        <button 
+                            className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-9 rounded-md text-xs font-medium flex items-center justify-center"
+                            onClick={handleNewProject}
+                        >
+                            <Plus className="h-4 w-4 mr-2" />
+                            <span className="flex items-center">New</span>
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 mb-4">
+                        <button 
+                            className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center"
+                            onClick={fileTree ? handleViewCode : handleGenerateClick}
+                            disabled={!canGenerateCode}
+                        >
+                            {isGenerating ? (
+                                <PulseLoader
+                                    color="#80a3ff"
+                                    size={3}
+                                    cssOverride={{ display: 'inline-block', margin: '0' }}
+                                />
+                            ) : (
+                                <>
+                                    <Code className={`h-4 w-4 mr-2 ${fileTree ? "text-[#9de19f]" : ""}`} />
+                                    <span>{fileTree ? "View Code" : "Generate Code"}</span>
+                                </>
+                            )}
+                        </button>
+                        <button 
+                            className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center"
+                            onClick={projectDeployed ? undefined : handleOpenDeployModal}
+                            disabled={!canDeploy}
+                        >
+                            {isDeploying ? (
+                                <PulseLoader
+                                    color="#80a3ff"
+                                    size={3}
+                                    cssOverride={{ display: 'inline-block', margin: '0' }}
+                                />
+                            ) : (
+                                <>
+                                    <Rocket className={`h-4 w-4 mr-2 ${projectDeployed ? "text-[#9de19f]" : ""}`} />
+                                    <span>{projectDeployed ? "Program Deployed" : "Deploy Program"}</span>
+                                </>
+                            )}
+                        </button>
+                    </div>
+                    
+                    {/* Display Program ID with Solana Explorer link if deployed */}
+                    {projectDeployed && projectContext.details?.projectState?.programId && (
+                        <div className="bg-[#1e1e20] border border-[#2a2a2d] rounded-md p-2 mb-4">
+                            <div className="flex items-center text-xs">
+                                <span className="text-[#6e6e76] mr-2">Program ID:</span>
+                                <a 
+                                    href={`https://explorer.solana.com/address/${projectContext.details?.projectState?.programId}?cluster=devnet`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[#4d7cfe] hover:text-[#4d7cfe]/90 truncate"
+                                    title={projectContext.details?.projectState?.programId}
+                                >
+                                    {projectContext.details?.projectState?.programId?.substring(0, 20)}...
+                                </a>
+                                <button  title='button'
+                                    onClick={() => window.open(`https://explorer.solana.com/address/${projectContext.details?.projectState?.programId}?cluster=devnet`, '_blank')}
+                                    className="ml-auto p-1 rounded-full hover:bg-[#2a2a2d] text-[#6e6e76] hover:text-white transition-colors"
+                                >
+                                    <ArrowRight className="h-3 w-3" />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {activeTab === 'workflow' && (
+                        <>
+                            <div className="text-xs font-medium text-[#6e6e76] uppercase tracking-wider pb-2">NODE LIBRARY</div>
+                            <Separator />            
+                            <div className="grid grid-cols-2 gap-1 p-0.5 bg-[#1e1e20] rounded-md">
+                                <button
+                                    className={`h-8 rounded-md text-xs font-medium transition-all ${
+                                        activeChainTab === "on-chain"
+                                            ? "bg-[#4d7cfe] text-white hover:bg-[#4d7cfe]/90"
+                                            : "bg-transparent text-[#6e6e76] hover:bg-[#2a2a2d] hover:text-white"
+                                    }`}
+                                    onClick={() => handleTabChange("on-chain")}
+                                >
+                                    On-Chain
+                                </button>
+                                <button
+                                    className={`h-8 rounded-md text-xs font-medium transition-all ${
+                                        activeChainTab === "off-chain"
+                                            ? "bg-[#4d7cfe] text-white hover:bg-[#4d7cfe]/90"
+                                            : "bg-transparent text-[#6e6e76] hover:bg-[#2a2a2d] hover:text-white"
+                                    }`}
+                                    onClick={() => handleTabChange("off-chain")}
+                                >
+                                    Off-Chain
+                                </button>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
+
+            {/* Search Bar */}
+            <div className="p-4 border-b border-[#2a2a2d]">
+                <div className="relative">
+                    <Search
+                        className="absolute left-4 top-2 mt-[0.4px] h-3 w-3 text-[#6e6e76]"
+                    />
+
+                    <input
+                        ref={inputRef}
+                        type="text"
+                        value={searchValue}
+                        onChange={(e) => setSearchValue(e.target.value)}
+                        placeholder="Search instructions..."
+                        className="w-full h-8 bg-[#1e1e20] border border-[#2a2a2d] rounded-lg pl-10 pr-10 py-2 text-xs text-gray-300 placeholder-[#6e6e76] focus:outline-none focus:ring-[#4d7cfe]"
+                        onFocus={() => setIsFocused(true)}
+                        onBlur={() => setIsFocused(false)}
+                    />
+
+                    {searchValue && (
+                        <button title='button'
+                            className="text-[#6e6e76] hover:text-white transition-colors cursor-pointer"
+                            onClick={() => setSearchValue("")}
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    )}
+
+                    {!searchValue && !isFocused && (
+                        <div className="absolute right-3 top-2.5 text-[10px] text-[#6e6e76]">
+                            Ctrl+F
+                        </div>
+                    )}
+                </div>
+
+                {isFocused && (
+                    <div className="flex items-center justify-between mt-2 px-1 text-xs text-[#6e6e76]">
+                        <div className="flex items-center space-x-2">
+                            <button className="flex items-center space-x-1 hover:text-white transition-colors">
+                                <Filter className="h-3 w-3" />
+                                <span>Filters</span>
+                            </button>
+                            <button className="flex items-center space-x-1 hover:text-white transition-colors">
+                                <Clock className="h-3 w-3" />
+                                <span>Recent</span>
+                            </button>
+                        </div>
+                        <button className="hover:text-white transition-colors">Advanced</button>
+                    </div>
+                )}
+            </div>
+
+            {/* Main Content */}
+            <div className="flex-1 overflow-hidden">
+                {isExpanded && activeTab === 'workflow' && (
+                    <NodeItems 
+                        ref={nodeItemsRef}
+                        activeChainTab={activeChainTab === "on-chain" ? "onChain" : "offChain"}
+                    />
+                )}
+                {activeTab === 'interface' && (
+                    <div className="p-4 text-[#6e6e76]">
+                        {/* Interface-specific Toolbox content */}
+                        <p>Interface Tab Toolbox Placeholder</p>
+                    </div>
+                )}
+                {activeTab === 'code' && <FileTree />}
+            </div>
+
+            {/* Bottom Section */}
+            {/*}
+            <div className="p-3 border-t border-[#2a2a2d]">
+                <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">Documentation</span>
+                    <button className="text-xs text-[#4d7cfe] hover:text-[#4d7cfe]/90 transition-colors">View All</button>
+                </div>
+                <div className="bg-[#1e1e20] border border-[#2a2a2d] rounded-md p-3 hover:border-[#2a2a2d] transition-all cursor-pointer group">
+                    <div className="flex items-center">
+                        <BookOpen className="h-4 w-4 text-[#4d7cfe] mr-2" />
+                        <span className="text-xs font-medium text-white group-hover:text-white transition-colors">
+                            Token Program Guide
+                        </span>
+                    </div>
+                    <p className="mt-1 text-xs text-[#6e6e76] group-hover:text-[#6e6e76] transition-colors">
+                        Learn how to create and manage tokens
+                    </p>
+                    <div className="mt-2 flex items-center text-xs text-[#4d7cfe] group-hover:text-[#4d7cfe]/90 transition-colors">
+                        <span>Read more</span>
+                        <ArrowRight className="h-3 w-3 ml-1" />
+                    </div>
+                </div>
+            </div>
+            */}
+
+            {/* New Project Modal */}
+            <NewProjectModal
+                open={isNewProjectModalOpen}
+                onOpenChange={setIsNewProjectModalOpen}
+                onSubmit={handleCreateProject}
+            />
+
+            {/* Project List Modal */}
+            <Dialog open={isProjectListModalOpen} onOpenChange={(open) => setIsProjectListModalOpen(open)}>
+                <DialogContent className="bg-[#111827] text-slate-100" 
+                style={{width: "fit-content", border: "1px solid rgb(36, 45, 68)"}}>
+                    <ProjectListPopover
+                        modalIsOpen={isProjectListModalOpen}
+                        refreshTrigger={projectsRefreshCounter}
+                        onProjectClick={(projectId, projectName) => {
+                            handleOpenProject(projectId, projectContext, setProjectContext, setFileTree);
+                            setIsProjectListModalOpen(false);
+                        }}
+                        closePopover={() => setIsProjectListModalOpen(false)}
+                    />
+                </DialogContent>
+            </Dialog>
+            
+            {/* Deploy Modal */}
+            {showDeployModal && (
+                <Dialog open={showDeployModal} onOpenChange={handleDeployCancel}>
+                    <DialogContent className="p-0 sm:max-w-md border border-[#2a2a2a] bg-[#121212] text-gray-200 rounded-md shadow-xl overflow-hidden [&>button]:hidden">
+                        <div className="flex items-center justify-between border-b border-[#2a2a2a] bg-[#151515] px-4 py-2">
+                            <div className="text-sm font-medium text-white">Select a deployment option</div>
+                            <button  title='button'
+                                onClick={handleDeployCancel}
+                                className="cursor-pointer h-6 w-6 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-[#252525] transition-colors"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        <div className="p-4 space-y-3">
+                            <RadioGroup value={selectedOption} onValueChange={setSelectedOption} className="space-y-2">
+                                <div
+                                    className={`flex items-center space-x-3 rounded-md border ${
+                                        selectedOption === "user-wallet" ? "border-[#333333] bg-[#1a1a1a]" : "border-[#222222] bg-[#151515]"
+                                    } p-3`}
+                                >
+                                    <RadioGroupItem value="user-wallet" id="user-wallet" className="border-[#444444]" />
+                                    <Label htmlFor="user-wallet" className="flex flex-col cursor-pointer w-full">
+                                        <div className="flex justify-between w-full">
+                                            <span className="font-medium text-white text-sm">User Wallet Control</span>
+                                            {selectedOption === "user-wallet" && (
+                                                <span className="text-xs px-2 py-0.5 rounded bg-[#3b82f6] text-white">Selected</span>
+                                            )}
+                                        </div>
+                                        <span className="text-xs text-gray-500 mt-1">Deploy with your connected wallet</span>
+                                    </Label>
+                                </div>
+
+                                <div
+                                    className={`flex items-center space-x-3 rounded-md border ${
+                                        selectedOption === "delegated" ? "border-[#333333] bg-[#1a1a1a]" : "border-[#222222] bg-[#151515]"
+                                    } p-3`}
+                                >
+                                    <RadioGroupItem value="delegated" id="delegated" className="border-[#444444]" />
+                                    <Label htmlFor="delegated" className="flex flex-col cursor-pointer w-full">
+                                        <div className="flex justify-between w-full">
+                                            <span className="font-medium text-white text-sm">Delegated Control</span>
+                                            {selectedOption === "delegated" && (
+                                                <span className="text-xs px-2 py-0.5 rounded bg-[#3b82f6] text-white">Selected</span>
+                                            )}
+                                        </div>
+                                        <span className="text-xs text-gray-500 mt-1">Deploy with delegated permissions</span>
+                                    </Label>
+                                </div>
+                            </RadioGroup>
+
+                            <div className="text-xs text-[#6b7280] mt-2 border-t border-[#2a2a2a] pt-3">
+                                <div className="flex items-center">
+                                    <span className="inline-block w-2 h-2 rounded-full bg-[#10b981] mr-2"></span>
+                                    System ready for deployment
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-between border-t border-[#2a2a2a] bg-[#151515] px-4 py-2">
+                            <Button
+                                variant="outline"
+                                onClick={handleDeployCancel}
+                                className="h-8 text-xs border-[#333333] bg-transparent text-gray-300 hover:bg-[#252525] hover:text-white"
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={handleDeployClick}
+                                className="h-8 text-xs bg-[#3b82f6] hover:bg-[#2563eb] text-white flex items-center cursor-pointer"
+                            >
+                                {isDeploying ? (
+                                    <PulseLoader
+                                        color="#fff"
+                                        size={6}
+                                        cssOverride={{ display: 'inline-block', margin: '0' }}
+                                    />
+                                ) : (
+                                    <div className="flex items-center">
+                                        Deploy <ChevronRight className="ml-1 h-3 w-3" />
+                                    </div>
+                                )}
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            )}
+        </div>
+    );
+};
