@@ -1,0 +1,9 @@
+{
+  "extends": "../client/tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": { "@/*": ["src/*"] }
+  },
+  "include": ["pages", "src"],
+  "exclude": ["node_modules"]
+}
