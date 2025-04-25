@@ -32,7 +32,7 @@ Please note that all contributors are expected to uphold our standards of conduc
 1. **Clone the Repository**  
    Make sure you have the correct access and URL to this private repository, then clone it locally:
    ```bash
-   git clone https://github.com/ChainLabs-Technologies/solana-flowcode.git
+   git clone https://github.com/sequence4/SolanaFlow
    ```
 
 2. **Install Dependencies**  
