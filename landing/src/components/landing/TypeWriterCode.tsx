@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from "react"
-import { codeFiles } from "./data/mock-code-files"
+import { useEffect, useRef, useState, useLayoutEffect } from "react"
+import { initMintCode } from "@/data/initializeMint/code/initMintCode"
+import { mintToCode } from "@/data/mintTo/code/mintToCode"
 
 export default function TypewriterCode() {
+    const codeFiles = [initMintCode, mintToCode];
     const [displayText, setDisplayText] = useState("")
     const [isDeleting, setIsDeleting] = useState(false)
     const [loopNum, setLoopNum] = useState(0)
@@ -14,7 +16,24 @@ export default function TypewriterCode() {
     
     const terminalRef = useRef<HTMLDivElement>(null)
     
-    const maxVisibleLines = 18   
+    const [maxVisibleLines, setMaxVisibleLines] = useState(0)
+    
+    // Compute how many lines really fit, update on resize
+    useLayoutEffect(() => {
+      if (!terminalRef.current) return
+      
+      const calc = () => {
+        const h = Math.max(1, terminalRef.current!.clientHeight)   // never 0
+        const lh = parseFloat(getComputedStyle(terminalRef.current!).lineHeight || "16")  // px per line
+        setMaxVisibleLines(Math.max(1, Math.floor(h / lh) - 1))
+      }
+      
+      calc()                                   // initial
+      const obs = new ResizeObserver(calc)     // on resize
+      obs.observe(terminalRef.current!)
+      return () => obs.disconnect()
+    }, [])
+    
     const currentCode = codeFiles[currentFileIndex]
   
     const fileNames = [
@@ -28,12 +47,16 @@ export default function TypewriterCode() {
   
     const shouldStartDeleting = (text: string) => {
       const lines = text.split('\n');
-      return lines.length >= maxVisibleLines;
+      return lines.length >= maxVisibleLines && maxVisibleLines > 0;
     }
   
     useEffect(() => {
-      const progress = Math.min(100, Math.round((displayText.length / currentCode.length) * 100))
-      setAiProgress(progress)
+      // Progress based on visible lines
+      if (maxVisibleLines > 0) {
+        const currentLines = displayText.split("\n").length
+        const progressLines = Math.min(currentLines, maxVisibleLines)
+        setAiProgress(Math.round((progressLines / maxVisibleLines) * 100))
+      }
   
       const statusInterval = setInterval(() => {
         if (displayText.length > 0) {
@@ -57,7 +80,7 @@ export default function TypewriterCode() {
         clearInterval(statusInterval)
         clearInterval(tokenInterval)
       }
-    }, [displayText, currentCode.length, activeTokens, currentCode])
+    }, [displayText, maxVisibleLines, activeTokens])
   
     useEffect(() => {
       let timeout: NodeJS.Timeout
@@ -87,6 +110,10 @@ export default function TypewriterCode() {
         const nextChar = currentCode.substring(0, displayText.length + 1)
         timeout = setTimeout(() => {
           setDisplayText(nextChar)
+          // Keep cursor visible by scrolling to bottom
+          if (terminalRef.current) {
+            terminalRef.current.scrollTop = terminalRef.current.scrollHeight
+          }
         }, typingSpeed)
       }
       else {
@@ -100,7 +127,7 @@ export default function TypewriterCode() {
         clearTimeout(timeout)
         clearInterval(cursorInterval)
       }
-    }, [displayText, isDeleting, loopNum, typingSpeed, currentCode, currentFileIndex, codeFiles.length])
+    }, [displayText, isDeleting, loopNum, typingSpeed, currentCode, currentFileIndex, codeFiles.length, maxVisibleLines])
   
     const renderCodeWithHighlighting = () => {
       const lines = displayText.split('\n');
@@ -142,37 +169,26 @@ export default function TypewriterCode() {
     };
   
     return (
-      <div className="flex flex-col h-full">
-        {/* Main content area with code and analysis side by side */}
-        <div className="flex flex-1">
-          {/* Code area - takes most of the space */}
-          <div className="flex-1 p-2 overflow-hidden relative">
+      <div className="flex flex-col h-full min-h-0">
+        <div className="flex flex-1 overflow-hidden min-h-0">
+          <div className="flex-1 px-4 overflow-y-auto relative min-h-0">
             <div 
               ref={terminalRef}
-              className="relative font-mono text-gray-300 text-xs" 
-              style={{ 
-                height: '100%', 
-                maxHeight: '100%', 
-                overflow: 'hidden' 
-              }}
+              className="relative h-full font-mono text-gray-300 text-xs whitespace-pre"
             >
-              <div className="whitespace-pre overflow-hidden">
-                {renderCodeWithHighlighting()}
-                <span 
-                  className="text-[#1cf6a0] animate-pulse inline-block"
-                  style={{ 
-                    position: 'relative',
-                    marginLeft: '1px',
-                    display: showCursor ? 'inline-block' : 'none'
-                  }}
-                >▋</span>
-              </div>
+              {renderCodeWithHighlighting()}
+              <span 
+                className="text-[#1cf6a0] animate-pulse inline-block"
+                style={{ 
+                  position: 'relative',
+                  marginLeft: '1px',
+                  display: showCursor ? 'inline-block' : 'none'
+                }}
+              >▋</span>
             </div>
           </div>
   
-          {/* AI Analysis sidebar - minimal and futuristic */}
-          <div className="w-[60px] border-l border-[#1e2033] flex flex-col items-center py-2 opacity-80">
-            {/* Vertical progress bar */}
+          <div className="w-[60px] border-l border-[#1e2033] flex flex-col items-center py-2 opacity-80 h-full flex-shrink-0">
             <div className="w-1 h-full bg-[#1e2033] rounded-full overflow-hidden relative mx-auto my-2">
               <div
                 className="absolute bottom-0 w-full bg-gradient-to-t from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
@@ -183,7 +199,6 @@ export default function TypewriterCode() {
               ></div>
             </div>
   
-            {/* Analysis indicators - minimal dots */}
             <div className="space-y-4 mt-2">
               {[0, 1, 2, 3, 4, 5].map((i) => (
                 <div
@@ -199,8 +214,7 @@ export default function TypewriterCode() {
           </div>
         </div>
   
-        {/* Bottom status bar - always visible */}
-        <div className="h-6 border-t border-[#1e2033] flex items-center justify-between px-3 text-xs text-[#1cf6a0] bg-[#0a0b14]/80">
+        <div className="h-10 border-t border-[#1e2033] flex items-center justify-between px-3 text-xs text-[#1cf6a0] bg-[#0a0b14]/80">
           <div className="flex items-center space-x-2">
             <div className="flex space-x-1">
               {[...Array(3)].map((_, i) => (

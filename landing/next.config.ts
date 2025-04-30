@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
     domains: []
   },
   output: 'export',
+  compiler: {
+    styledJsx: true
+  }
 }
 
 export default nextConfig

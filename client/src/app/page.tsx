@@ -82,7 +82,7 @@ export default function LandingPage() {
                 style={{
                   backgroundSize: "300% 300%",
                   animation: "gradientFlow 3s ease infinite"
-                }}>FlowCode</span>
+                }}>Flow</span>
           </span>
         </div>
 
