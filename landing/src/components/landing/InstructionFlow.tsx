@@ -16,6 +16,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { initMintFlow } from '@/data/initializeMint/initMintFlow';
 import { mintToFlow } from '@/data/mintTo/mintToFlow';
+import { transferFlow } from '@/data/transfer/transferFlow';
 import InstructionNode from './InstructionNode';
 
 const ReactFlow = dynamic(() => import('@xyflow/react').then((module) => module.ReactFlow), {
@@ -54,15 +55,17 @@ const InstructionNodeWrapper = ({ data }: any) => {
   const outerRef = useRef<HTMLDivElement>(null);
   const updateNodeInternals = useUpdateNodeInternals();
 
-  /* Reset width/height → ask React-Flow to re-measure → box now matches content */
+  const FIXED_W = 260;
+
   useLayoutEffect(() => {
     if (!outerRef.current) return;
-    outerRef.current.style.width = 'auto';
+    outerRef.current.style.width  = `${FIXED_W}px`;
+    outerRef.current.style.minWidth = `${FIXED_W}px`;
+    outerRef.current.style.maxWidth = `${FIXED_W}px`;
     outerRef.current.style.height = 'auto';
-    updateNodeInternals(data.id);
-  });
+    updateNodeInternals(data.id); 
+  }, [data.id, updateNodeInternals]);
 
-  /* Future-proof: if the card is resized for any reason, update again */
   useLayoutEffect(() => {
     if (!outerRef.current) return;
     const ro = new ResizeObserver(() => updateNodeInternals(data.id));
@@ -145,43 +148,8 @@ const InstructionFlow = () => {
       const mintToNode = mintToFlow.nodes[0];
       const transformedMintToData = transformInstructionData(mintToNode);
       
-      const mockTransferData = {
-        id: "transfer-instruction",
-        type: "instructionGroupNode",
-        data: {
-          label: "Transfer",
-          description: "Transfers tokens from one account to another",
-          code: `pub fn transfer(
-            ctx: Context<Transfer>,
-            amount: u64
-            ) -> Result<()> {
-            let cpi_accounts = Transfer {
-              from: ctx.accounts.source.to_account_info(),
-              to: ctx.accounts.destination.to_account_info(),
-              authority: ctx.accounts.authority.to_account_info(),
-            };
-
-            token::transfer(
-              CpiContext::new(
-                ctx.accounts.token_program.to_account_info(),
-                cpi_accounts
-              ),
-              amount
-            )?;
-
-          Ok(())
-          }`,
-          accounts: [
-            { label: "Source", type: "Pubkey", description: "The source token account" },
-            { label: "Destination", type: "Pubkey", description: "The destination token account" },
-            { label: "Authority", type: "Pubkey", description: "The account owner" }
-          ],
-          parameters: [
-            { label: "Amount", type: "u64", value: "500000000" }
-          ]
-        }
-      };
-      const transformedTransferData = transformInstructionData(mockTransferData);
+      const transferNode = transferFlow.nodes[0];
+      const transformedTransferData = transformInstructionData(transferNode);
 
       const initialNodes: Node[] = [
         {
@@ -205,7 +173,7 @@ const InstructionFlow = () => {
           dragHandle: '.node-draggable',
         },
         {
-          id: mockTransferData.id,
+          id: transformedTransferData.id,
           type: "instructionGroupNode",
           data: transformedTransferData,
           position: { x: 900, y: 200 },
@@ -235,7 +203,7 @@ const InstructionFlow = () => {
         {
           id: 'mintTo->transfer',
           source: transformedMintToData.id,
-          target: mockTransferData.id,
+          target: transformedTransferData.id,
           type: 'smoothstep',
           animated: true,
           style: { strokeWidth: 3, strokeDasharray: '5,5' },

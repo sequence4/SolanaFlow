@@ -3,7 +3,7 @@
 import React, { useEffect, useRef } from "react"
 import { motion } from "framer-motion"
 import ScrollReveal from "./ScrollReveal"
-import { Code } from "lucide-react"
+import { Blocks, Code, Component, FileText, Waypoints } from "lucide-react"
 
 export default function FeaturesSection() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -159,27 +159,13 @@ export default function FeaturesSection() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Feature 1 - Workflow */}
           <ScrollReveal delay={0}>
-            <div className="relative group">
+            <div className="relative group h-[100%]">
               <div className="absolute inset-0 bg-gradient-to-r from-[#5580ff]/20 to-transparent rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <div className="relative bg-[#0a0b14]/80 backdrop-blur-sm border border-[#1e2033] rounded-2xl p-8 h-full transition-all duration-300 group-hover:border-[#5580ff]/50 group-hover:translate-y-[-4px]">
-                <div className="w-14 h-14 rounded-xl bg-[#5580ff]/10 flex items-center justify-center mb-6 group-hover:bg-[#5580ff]/20 transition-colors">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="w-6 h-6 text-[#5580ff]"
-                  >
-                    <rect width="7" height="7" x="3" y="3" rx="1" />
-                    <rect width="7" height="7" x="14" y="3" rx="1" />
-                    <rect width="7" height="7" x="14" y="14" rx="1" />
-                    <rect width="7" height="7" x="3" y="14" rx="1" />
-                  </svg>
+              <div className="relative bg-gradient-to-b from-[#5580ff]/10 to-[#5580ff]/5 backdrop-blur-sm border border-[#5580ff]/20 rounded-2xl p-8 h-full transition-all duration-300 group-hover:border-[#5580ff]/50 group-hover:translate-y-[-3px] shadow-[0_0_10px_rgba(85,128,255,0.2)]">
+                <div className="flex items-center justify-center w-full mb-6">
+                  <div className="w-14 h-14 rounded-xl bg-[#5580ff]/10 flex items-center justify-center group-hover:bg-[#5580ff]/20 transition-colors">
+                    <Waypoints className="w-6 h-6 text-[#5580ff]"/>
+                  </div>
                 </div>
                 <div className="flex items-center mb-3">
                   <h3 className="text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
@@ -199,8 +185,8 @@ export default function FeaturesSection() {
                   {["Pre-configured & verified components", "Smart contract templates", "Intuitive flow connections"].map(
                     (item, index) => (
                       <li key={index} className="flex items-start">
-                        <div className="w-5 h-5 rounded-full bg-[#5580ff]/10 flex items-center justify-center mr-3 mt-0.5">
-                          <div className="w-1.5 h-1.5 rounded-full bg-[#5580ff]" />
+                        <div className="w-5 h-5 rounded-full bg-[#0a0b14] border border-[#5580ff]/20 flex items-center justify-center mr-3 mt-0.5">
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#5580ff] animate-pulse" />
                         </div>
                         {item}
                       </li>
@@ -213,11 +199,13 @@ export default function FeaturesSection() {
 
           {/* Feature 2 - Code */}
           <ScrollReveal delay={200}>
-            <div className="relative group">
+            <div className="relative group h-[100%]">
               <div className="absolute inset-0 bg-gradient-to-r from-[#a855f7]/20 to-transparent rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <div className="relative bg-[#0a0b14]/80 backdrop-blur-sm border border-[#1e2033] rounded-2xl p-8 h-full transition-all duration-300 group-hover:border-[#a855f7]/50 group-hover:translate-y-[-4px]">
-                <div className="w-14 h-14 rounded-xl bg-[#a855f7]/10 flex items-center justify-center mb-6 group-hover:bg-[#a855f7]/20 transition-colors">
-                  <Code className="w-6 h-6 text-[#a855f7]" />
+              <div className="relative bg-gradient-to-b from-[#a855f7]/10 to-[#a855f7]/5 backdrop-blur-sm border border-[#a855f7]/20 rounded-2xl p-8 h-full transition-all duration-300 group-hover:border-[#a855f7]/50 group-hover:translate-y-[-4px] shadow-[0_0_10px_rgba(168,85,247,0.2)]">
+                <div className="flex items-center justify-center w-full mb-6">
+                  <div className="w-14 h-14 rounded-xl bg-[#a855f7]/10 flex items-center justify-center group-hover:bg-[#a855f7]/20 transition-colors">
+                    <Code className="w-6 h-6 text-[#a855f7]" />
+                  </div>
                 </div>
                 <div className="flex items-center mb-3">
                   <h3 className="text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
@@ -237,8 +225,8 @@ export default function FeaturesSection() {
                   {["Rust and TypeScript support", "Real-time error checking", "Integrated testing tools"].map(
                     (item, index) => (
                       <li key={index} className="flex items-start">
-                        <div className="w-5 h-5 rounded-full bg-[#a855f7]/10 flex items-center justify-center mr-3 mt-0.5">
-                          <div className="w-1.5 h-1.5 rounded-full bg-[#a855f7]" />
+                        <div className="w-5 h-5 rounded-full bg-[#0a0b14] border border-[#a855f7]/20 flex items-center justify-center mr-3 mt-0.5">
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#a855f7] animate-pulse" />
                         </div>
                         {item}
                       </li>
@@ -251,26 +239,13 @@ export default function FeaturesSection() {
 
           {/* Feature 3 - Interface */}
           <ScrollReveal delay={400}>
-            <div className="relative group">
-              <div className="absolute inset-0 bg-gradient-to-r from-[#00c2ff]/20 to-transparent rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <div className="relative bg-[#0a0b14]/80 backdrop-blur-sm border border-[#1e2033] rounded-2xl p-8 h-full transition-all duration-300 group-hover:border-[#00c2ff]/50 group-hover:translate-y-[-4px]">
-                <div className="w-14 h-14 rounded-xl bg-[#00c2ff]/10 flex items-center justify-center mb-6 group-hover:bg-[#00c2ff]/20 transition-colors">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="w-6 h-6 text-[#00c2ff]"
-                  >
-                    <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
-                    <line x1="3" x2="21" y1="9" y2="9" />
-                    <line x1="9" x2="9" y1="21" y2="9" />
-                  </svg>
+            <div className="relative group h-[100%]">
+              <div className="absolute inset-0 bg-gradient-to-r from-[#0ea5e9]/20 to-transparent rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="relative bg-gradient-to-b from-[#0ea5e9]/10 to-[#0ea5e9]/5 backdrop-blur-sm border border-[#0ea5e9]/20 rounded-2xl p-8 h-full transition-all duration-300 group-hover:border-[#0ea5e9]/50 group-hover:translate-y-[-4px] shadow-[0_0_10px_rgba(14,165,233,0.2)]">
+                <div className="flex items-center justify-center w-full mb-6">
+                  <div className="w-14 h-14 rounded-xl bg-[#0ea5e9]/10 flex items-center justify-center group-hover:bg-[#0ea5e9]/20 transition-colors">
+                    <Blocks className="w-6 h-6 text-[#0ea5e9]" />
+                  </div>
                 </div>
                 <div className="flex items-center mb-3">
                   <h3 className="text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
@@ -278,7 +253,7 @@ export default function FeaturesSection() {
                         backgroundSize: "300% 300%",
                         animation: "gradientFlow 3s ease infinite"
                       }}>Interactive UI Builder</h3>
-                  <span className="ml-2 px-2 py-0.5 rounded-full bg-[#1e2033]/80 text-[#00c2ff] text-xs font-medium">
+                  <span className="ml-2 px-2 py-0.5 rounded-full bg-[#1e2033]/80 text-[#0ea5e9] text-xs font-medium">
                     interface
                   </span>
                 </div>
@@ -288,8 +263,8 @@ export default function FeaturesSection() {
                 <ul className="text-gray-400 space-y-3 text-sm">
                   {["Live UI previews", "Wallet integration testing", "Responsive design tools"].map((item, index) => (
                     <li key={index} className="flex items-start">
-                      <div className="w-5 h-5 rounded-full bg-[#00c2ff]/10 flex items-center justify-center mr-3 mt-0.5">
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#00c2ff]" />
+                      <div className="w-5 h-5 rounded-full bg-[#0a0b14] border border-[#0ea5e9]/20 flex items-center justify-center mr-3 mt-0.5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-[#0ea5e9] animate-pulse" />
                       </div>
                       {item}
                     </li>

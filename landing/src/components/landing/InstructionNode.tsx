@@ -1,6 +1,12 @@
-// Instruction Node component for landing page
-import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import React, { useState, useRef, useLayoutEffect } from 'react';
 import { useUpdateNodeInternals } from '@xyflow/react';
+
+const Bullet = ({ color = '#e53e3e' }) => (
+  <div
+    className="mr-2 w-2 h-2 flex-shrink-0 flex-grow-0 rounded-full"
+    style={{ backgroundColor: color }}
+  />
+);
 
 type InstructionNodeProps = {
   id: string;
@@ -43,8 +49,17 @@ const InstructionNode: React.FC<InstructionNodeProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'Context' | 'Inputs' | 'Errors' | 'Events'>('Context');
 
+  const tabColors = {
+    Context: '#5d5dff',
+    Inputs: '#36b37e',
+    Errors: '#e53e3e',
+    Events: '#d69e2e'
+  };
+
   const updateNodeInternals = useUpdateNodeInternals();
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  const CARD_W = 260;
   
   useLayoutEffect(() => {
     updateNodeInternals(id);
@@ -58,7 +73,11 @@ const InstructionNode: React.FC<InstructionNodeProps> = ({
   }, [id, updateNodeInternals]);
 
   return (
-    <div ref={containerRef} className="node-draggable w-full bg-[#121218] rounded-xl border border-[#333] overflow-hidden shadow-lg">
+    <div 
+      ref={containerRef} 
+      style={{ width: CARD_W }}
+      className="node-draggable bg-[#121218] rounded-xl border border-[#333] overflow-hidden shadow-lg"
+    >
       <div className="flex items-center justify-between p-3 border-b border-[#333] bg-[#1a1a24]">
         <div className="flex items-center space-x-2">
       
@@ -116,12 +135,15 @@ const InstructionNode: React.FC<InstructionNodeProps> = ({
 
             <div className="p-2 bg-[#121218]">
               {accounts.map((account, index) => (
-                <div key={index} className="mb-2 last:mb-0">
-                  <div className="flex justify-between">
-                    <div className="text-[#e1e2e6] text-[10px] font-medium">{account.name}</div>
-                    <div className="text-[#888] text-[10px]">{account.type}</div>
+                <div key={index} className="mb-2 last:mb-0 flex items-start text-[10px]">
+                  <Bullet color={tabColors.Context} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between">
+                      <span className="text-white font-medium">{account.name}</span>
+                      <span className="text-[#888]">{account.type}</span>
+                    </div>
+                    <p className="text-[#888] mt-0.5">{account.description}</p>
                   </div>
-                  <div className="text-[#888] text-[10px] mt-0.5">{account.description}</div>
                 </div>
               ))}
             </div>
@@ -139,12 +161,15 @@ const InstructionNode: React.FC<InstructionNodeProps> = ({
 
             <div className="p-2 bg-[#121218]">
               {inputs.map((input, index) => (
-                <div key={index} className="mb-2 last:mb-0">
-                  <div className="flex justify-between">
-                    <div className="text-[#e1e2e6] text-[10px] font-medium">{input.name}</div>
-                    <div className="text-[#888] text-[10px]">{input.type}</div>
+                <div key={index} className="mb-2 last:mb-0 flex items-start text-[10px]">
+                  <Bullet color={tabColors.Inputs} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between">
+                      <span className="text-white font-medium">{input.name}</span>
+                      <span className="text-[#888]">{input.type}</span>
+                    </div>
+                    <p className="text-[#888] mt-0.5">Value: {input.value}</p>
                   </div>
-                  <div className="text-[#888] text-[10px] mt-0.5">Value: {input.value}</div>
                 </div>
               ))}
             </div>
@@ -163,12 +188,15 @@ const InstructionNode: React.FC<InstructionNodeProps> = ({
             <div className="p-2 bg-[#121218]">
               {errorCodes.length > 0 ? (
                 errorCodes.map((errorCode, index) => (
-                  <div key={index} className="mb-2 last:mb-0">
-                    <div className="flex justify-between">
-                      <div className="text-[#e53e3e] text-xs font-medium">{errorCode.name}</div>
-                      <div className="text-[#888] text-[10px]">#{errorCode.code}</div>
+                  <div key={index} className="mb-2 last:mb-0 flex items-start text-[10px]">
+                    <Bullet color={tabColors.Errors} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between">
+                        <span className="text-white font-medium">{errorCode.name}</span>
+                        <span className="text-[#888]">{errorCode.code}</span>
+                      </div>
+                      <p className="text-[#888] mt-0.5">{errorCode.msg}</p>
                     </div>
-                    <div className="text-[#888] text-[10px] mt-0.5">{errorCode.msg}</div>
                   </div>
                 ))
               ) : (
@@ -191,11 +219,14 @@ const InstructionNode: React.FC<InstructionNodeProps> = ({
               {events.length > 0 ? (
                 events.map((event, index) => (
                   <div key={index} className="mb-3 last:mb-0">
-                    <div className="text-[#d69e2e] text-xs font-medium">{event.name}</div>
-                    <ul className="mt-1 pl-3 list-disc">
+                    <span className="text-white text-xs font-medium">{event.name}</span>
+                    <ul className="mt-1 pl-0">
                       {event.fields.map((field, idx) => (
-                        <li key={idx} className="text-[#888] text-[10px]">
-                          {field.name}: {field.type}
+                        <li key={idx} className="flex items-start text-[10px] mt-1">
+                          <Bullet color={tabColors.Events} />
+                          <span className="text-[#888]">
+                            {field.name}: {field.type}
+                          </span>
                         </li>
                       ))}
                     </ul>
