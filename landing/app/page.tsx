@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Code } from "lucide-react"
+import { ArrowRight } from "lucide-react"
 import { BsTelegram } from "react-icons/bs";
 import { BsTwitterX } from "react-icons/bs";
 import { BsYoutube } from "react-icons/bs";
@@ -11,7 +11,6 @@ import InstructionFlow from "@/components/landing/InstructionFlow"
 import Head from "next/head"
 import TypewriterCode from "@/components/landing/TypeWriterCode"
 import LandingStyles from "@/components/landing/style"
-import ScrollReveal from "@/components/landing/ScrollReveal"
 import dynamic from "next/dynamic"
 import UserMessageBox from "@/components/landing/UserMessageBox"
 import FeaturesSection from "@/components/landing/FeaturesSection"
@@ -37,7 +36,6 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white font-mono overflow-x-hidden">
-      {/* Waitlist Modal */}
       {mounted && (
         <WaitlistModal 
           isOpen={isWaitlistModalOpen} 
@@ -45,7 +43,6 @@ export default function LandingPage() {
         />
       )}
       
-      {/* Google Fonts Integration */}
       <Head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -55,12 +52,10 @@ export default function LandingPage() {
         />
       </Head>
 
-      {/* Matrix-like background effect */}
       {mounted && (
         <div className="fixed inset-0 z-0 opacity-15 overflow-hidden pointer-events-none">
           <div className="absolute inset-0">
             {Array.from({ length: 100 }).map((_, i) => {
-              // Define gradient colors
               const gradientColors = ['#5f88dc', '#1cf6a0', '#9945ff'];
               const randomColor = gradientColors[Math.floor(Math.random() * gradientColors.length)];
               
@@ -86,7 +81,6 @@ export default function LandingPage() {
         </div>
       )}
 
-      {/* Navbar */}
       <nav className="relative z-10 border-b border-[#1e2033] bg-[#0a0b14]/50 backdrop-blur-md">
         <div className="container mx-auto px-0 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -118,11 +112,9 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero Section */}
       <section className="flex justify-center px-[8%] pt-[5%] pb-[8%] w-full h-[100vh] overflow-hidden">
         <div className="w-full h-full z-10">
             <div className="flex flex-col w-full h-full md:flex-row items-start">
-                {/* Left side content */}
                 <div className="flex flex-col justify-center gap-2 sm:gap-0 lg:gap-0 max-lg:gap-4 h-full w-full sm:w-2/5 md:w-3/5 lg:w-2/5 mb-12 md:mb-0 pr-0 md:pr-4 lg:pr-8">
                     <div className="flex flex-col gap-0 justify-start">
                         <div className="w-fit inline-block px-2 sm:px-3 py-1 mb-4 sm:mb-6 rounded-full bg-[#1e2033] border border-[#2a2d4a] text-xs text-[#5580ff]">
@@ -223,16 +215,13 @@ export default function LandingPage() {
                     </div>
                 </div>
 
-                {/* Right side - Flow diagram and code snippet */}
                 <div className="w-full h-full flex flex-col lg:flex-row mt-8 md:mt-0">
-                {/* Flow Diagram */}
                 <div className="w-full relative isolate overflow-hidden">
                   <div className="h-full w-full overflow-hidden overscroll-x-none overflow-y-none">
                     {mounted && <InstructionFlow />}
                   </div>
                 </div>
 
-              {/* Code Terminal */}
               <div className="w-full h-full flex flex-col min-w-[320px] max-w-[500px] flex-shrink-0">
                 <div className="w-full h-full rounded-xl">
                   <div className="w-full h-full rounded-xl overflow-hidden border border-[#2a2d4a] bg-[#0d0e1a] relative flex flex-col min-h-0">
@@ -249,7 +238,6 @@ export default function LandingPage() {
                   </div>
                 </div>
                 
-                {/* User Message Box */}
                 <div className="w-full mt-4 rounded-xl">
                   <div className="w-full rounded-xl overflow-hidden border border-[#2a2d4a] relative">
                     {mounted && <UserMessageBox 
@@ -277,9 +265,7 @@ export default function LandingPage() {
     </div>
       </section>
 
-      {/* Features Section */}
       <section id="features" className="relative py-20 px-10 bg-[#050508] overflow-hidden">
-        {/* Animated background grid */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute inset-0 grid grid-cols-12 gap-1">
             {Array.from({ length: 12 }).map((_, i) => (
@@ -299,7 +285,6 @@ export default function LandingPage() {
         <FeaturesSection />
       </section>
 
-      {/* Demo Video Section */}
       <section id="demo" className="py-20 bg-[#0a0b14]">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
@@ -320,7 +305,6 @@ export default function LandingPage() {
             </p>
           </div>
 
-          {/* Video */}
           <div className="max-w-6xl mx-auto">
             <div className="relative aspect-video rounded-xl overflow-hidden border border-[#2a2d4a] shadow-2xl">
               <div className="absolute inset-0 bg-gradient-to-br from-[#0d0e1a] to-[#0a0b14] flex flex-col items-center justify-center">
@@ -376,11 +360,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* CTA Section */}
       <section className="py-20">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto bg-[#0d0e1a] border border-[#2a2d4a] rounded-2xl p-8 md:p-12 relative overflow-hidden">
-            {/* Background effect */}
             <div className="absolute inset-0 opacity-30">
               <div className="absolute top-0 right-0 w-64 h-64 bg-[#5580ff] rounded-full blur-3xl opacity-10 -translate-y-1/2 translate-x-1/2"></div>
               <div className="absolute bottom-0 left-0 w-64 h-64 bg-[#a855f7] rounded-full blur-3xl opacity-10 translate-y-1/2 -translate-x-1/2"></div>
@@ -412,7 +394,6 @@ export default function LandingPage() {
                 </Button>
               </div>
 
-              {/* Terminal-like element */}
               <div className="mt-8 max-w-md mx-auto rounded-lg overflow-hidden border border-[#2a2d4a] text-left">
                 <div className="bg-[#1e2033] px-4 py-2 flex items-center">
                   <div className="flex space-x-2 mr-2">
@@ -437,7 +418,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="bg-[#0a0b14] border-t border-[#1e2033] py-12 mt-20">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center">
@@ -486,12 +466,10 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="mt-8 pt-8 border-t border-[#1e2033] text-center text-gray-500 text-xs">
-            © {new Date().getFullYear()} Solana FlowCode. All rights reserved.
+            © {new Date().getFullYear()} Sequence4 Ltd. All rights reserved.
           </div>
         </div>
       </footer>
-
-      {/* Add global styles for animations and fonts */}
       <LandingStyles />
     </div>
   )

@@ -240,6 +240,11 @@ export default function LandingStyles() {
           marker-end: url(#gradient-arrow);
         }
 
+        /* Prevent overscroll behavior in the react-flow canvas */
+        .react-flow {
+          overscroll-behavior: none;
+        }
+
         @keyframes dashdraw {
           0% {
             stroke-dashoffset: 10;

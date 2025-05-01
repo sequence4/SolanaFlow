@@ -11,7 +11,8 @@ import {
   NodeTypes,
   applyNodeChanges,
   Handle,
-  useUpdateNodeInternals
+  useUpdateNodeInternals,
+  ReactFlowInstance
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { initMintFlow } from '@/data/initializeMint/initMintFlow';
@@ -129,6 +130,7 @@ const InstructionFlow = () => {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [rf, setRf] = useState<ReactFlowInstance | null>(null);
 
   const nodeTypes: NodeTypes = {
     instructionGroupNode: InstructionNodeWrapper,
@@ -137,6 +139,17 @@ const InstructionFlow = () => {
   const onNodesChange = useCallback((changes: any) => {
     setNodes((nds) => applyNodeChanges(changes, nds));
   }, []);
+
+  const onInit = useCallback((inst: ReactFlowInstance) => {
+    setRf(inst);
+    inst.fitView({ padding: 0.2 });   // first paint
+  }, []);
+
+  useEffect(() => {
+    const h = () => rf?.fitView({ padding: 0.2 });
+    window.addEventListener('resize', h);
+    return () => window.removeEventListener('resize', h);
+  }, [rf]);
 
   useEffect(() => {
     if (!mounted) {
@@ -225,12 +238,13 @@ const InstructionFlow = () => {
   if (!mounted) return null;
 
   return (
-    <div className="w-full h-full overflow-auto">
+    <div className="w-full h-full overflow-hidden relative">
       <ReactFlow
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
+        onInit={onInit}
         fitView
         defaultViewport={{ x: 0, y: 0, zoom: 0.75 }}
         minZoom={0.55}
@@ -280,6 +294,10 @@ const InstructionFlow = () => {
           .flow-canvas .react-flow__edge-path,
           .flow-canvas .react-flow__edge-path-selector {
             pointer-events: none;
+          }
+          
+          .react-flow {
+            overscroll-behavior: none;
           }
         `}</style>
       </ReactFlow>

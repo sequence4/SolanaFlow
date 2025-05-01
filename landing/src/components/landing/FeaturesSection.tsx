@@ -3,7 +3,7 @@
 import React, { useEffect, useRef } from "react"
 import { motion } from "framer-motion"
 import ScrollReveal from "./ScrollReveal"
-import { Blocks, Code, Component, FileText, Waypoints } from "lucide-react"
+import { Blocks, Code, Waypoints } from "lucide-react"
 
 export default function FeaturesSection() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -157,11 +157,10 @@ export default function FeaturesSection() {
         </motion.p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Feature 1 - Workflow */}
           <ScrollReveal delay={0}>
             <div className="relative group h-[100%]">
               <div className="absolute inset-0 bg-gradient-to-r from-[#5580ff]/20 to-transparent rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <div className="relative bg-gradient-to-b from-[#5580ff]/10 to-[#5580ff]/5 backdrop-blur-sm border border-[#5580ff]/20 rounded-2xl p-8 h-full transition-all duration-300 group-hover:border-[#5580ff]/50 group-hover:translate-y-[-3px] shadow-[0_0_10px_rgba(85,128,255,0.2)]">
+              <div className="relative bg-gradient-to-b from-[#5580ff]/5 to-[#5580ff]/5 backdrop-blur-sm border border-[#5580ff]/20 rounded-2xl p-8 h-full transition-all duration-300 group-hover:border-[#5580ff]/50 group-hover:translate-y-[-3px] shadow-[0_0_10px_rgba(85,128,255,0.2)]">
                 <div className="flex items-center justify-center w-full mb-6">
                   <div className="w-14 h-14 rounded-xl bg-[#5580ff]/10 flex items-center justify-center group-hover:bg-[#5580ff]/20 transition-colors">
                     <Waypoints className="w-6 h-6 text-[#5580ff]"/>
@@ -197,11 +196,10 @@ export default function FeaturesSection() {
             </div>
           </ScrollReveal>
 
-          {/* Feature 2 - Code */}
           <ScrollReveal delay={200}>
             <div className="relative group h-[100%]">
               <div className="absolute inset-0 bg-gradient-to-r from-[#a855f7]/20 to-transparent rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <div className="relative bg-gradient-to-b from-[#a855f7]/10 to-[#a855f7]/5 backdrop-blur-sm border border-[#a855f7]/20 rounded-2xl p-8 h-full transition-all duration-300 group-hover:border-[#a855f7]/50 group-hover:translate-y-[-4px] shadow-[0_0_10px_rgba(168,85,247,0.2)]">
+              <div className="relative bg-gradient-to-b from-[#a855f7]/5 to-[#a855f7]/5 backdrop-blur-sm border border-[#a855f7]/20 rounded-2xl p-8 h-full transition-all duration-300 group-hover:border-[#a855f7]/50 group-hover:translate-y-[-4px] shadow-[0_0_10px_rgba(168,85,247,0.2)]">
                 <div className="flex items-center justify-center w-full mb-6">
                   <div className="w-14 h-14 rounded-xl bg-[#a855f7]/10 flex items-center justify-center group-hover:bg-[#a855f7]/20 transition-colors">
                     <Code className="w-6 h-6 text-[#a855f7]" />
@@ -237,11 +235,10 @@ export default function FeaturesSection() {
             </div>
           </ScrollReveal>
 
-          {/* Feature 3 - Interface */}
           <ScrollReveal delay={400}>
             <div className="relative group h-[100%]">
               <div className="absolute inset-0 bg-gradient-to-r from-[#0ea5e9]/20 to-transparent rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <div className="relative bg-gradient-to-b from-[#0ea5e9]/10 to-[#0ea5e9]/5 backdrop-blur-sm border border-[#0ea5e9]/20 rounded-2xl p-8 h-full transition-all duration-300 group-hover:border-[#0ea5e9]/50 group-hover:translate-y-[-4px] shadow-[0_0_10px_rgba(14,165,233,0.2)]">
+              <div className="relative bg-gradient-to-b from-[#0ea5e9]/5 to-[#0ea5e9]/5 backdrop-blur-sm border border-[#0ea5e9]/20 rounded-2xl p-8 h-full transition-all duration-300 group-hover:border-[#0ea5e9]/50 group-hover:translate-y-[-4px] shadow-[0_0_10px_rgba(14,165,233,0.2)]">
                 <div className="flex items-center justify-center w-full mb-6">
                   <div className="w-14 h-14 rounded-xl bg-[#0ea5e9]/10 flex items-center justify-center group-hover:bg-[#0ea5e9]/20 transition-colors">
                     <Blocks className="w-6 h-6 text-[#0ea5e9]" />
