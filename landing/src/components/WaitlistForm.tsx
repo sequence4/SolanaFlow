@@ -7,24 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { ArrowRight, Loader2, X, CheckCircle } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { AnimatePresence, motion } from "framer-motion"
-import dynamic from "next/dynamic"
 import confetti from "canvas-confetti"
-
-const gradientAnimationStyles = `
-@keyframes gradientFlow {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
-`;
 
 interface WaitlistFormProps {
   onClose?: () => void;
@@ -102,15 +85,12 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
     return value.slice(0, maxLength)
   }
 
-  // Function to trigger confetti with the specified colors
   const triggerConfetti = () => {
     const colors = ["#5f88dc", "#1cf6a0", "#9945ff"]
 
-    // Create a sequence of confetti bursts
     const duration = 3000
     const animationEnd = Date.now() + duration
 
-    // First wave - from top
     confetti({
       particleCount: 100,
       spread: 70,
@@ -121,7 +101,6 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
       disableForReducedMotion: true,
     })
 
-    // Second wave - from sides
     setTimeout(() => {
       confetti({
         particleCount: 50,
@@ -244,17 +223,16 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
   }
 
   return (
-    <div className="gradient-border w-full relative"
+    <div className="gradient-border overflow-hidden w-full relative"
          style={{
-           borderRadius: '1.5rem'
+           borderRadius: '0rem'
          }}>
       <style jsx global>{`
-         /* Gradient border animation using pseudo-element */
          .gradient-border {
            position: relative;
            z-index: 0;
-           border-radius: 1.5rem;
-           padding: 2px; /* This creates the border thickness */
+           border-radius: 1rem;
+           padding: 1px;
          }
          
          .gradient-border::before {
@@ -263,7 +241,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
            z-index: -1;
            inset: 0;
            border-radius: inherit;
-           padding: 2px;
+           padding: 1px;
            background: linear-gradient(to right, #5f88dc, #1cf6a0, #9945ff);
            background-size: 300% 300%;
            animation: gradientFlow 3s ease infinite;
@@ -286,44 +264,35 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
            }
          }
 
-         /* Hide scrollbar by default */
          .content-scroll {
            scrollbar-width: thin;
-           -ms-overflow-style: none; /* IE and Edge */
+           scrollbar-color: #1e293b transparent; 
+           -ms-overflow-style: none;
            position: relative;
          }
          
          .content-scroll::-webkit-scrollbar {
-           width: 8px; /* slightly wider */
-           background-color: rgba(3, 7, 18, 0.8); /* very dark background */
-           display: none;
-         }
-         
-         /* Show scrollbar on hover and when scrolling */
-         .content-scroll:hover::-webkit-scrollbar,
-         .content-scroll:focus::-webkit-scrollbar,
-         .content-scroll:active::-webkit-scrollbar,
-         .content-scroll.scrolling::-webkit-scrollbar {
-           display: block;
-         }
-         
-         .content-scroll::-webkit-scrollbar-thumb {
-           background-color: rgba(30, 41, 59, 0.8); /* darker blue-gray with transparency */
-           border-radius: 10px !important;
-           border: 2px solid rgba(15, 23, 42, 0.9); /* dark border */
-           background-clip: padding-box;
-         }
-         
-         .content-scroll::-webkit-scrollbar-thumb:hover {
-           background-color: rgba(45, 55, 72, 0.8); /* slightly lighter on hover */
+           width: 6px;
+           height: 6px;
          }
          
          .content-scroll::-webkit-scrollbar-track {
-           background-color: rgba(15, 23, 42, 0.5); /* very dark blue track */
-           border-radius: 10px;
+           background: transparent;
+         }
+         
+         .content-scroll::-webkit-scrollbar-thumb {
+           background: #1e293b;
+           border-radius: 2px;
+           border: 2px solid transparent;
+           background-clip: padding-box;
+           transition: background 0.2s ease;
+         }
+         
+         .content-scroll:hover::-webkit-scrollbar-thumb,
+         .content-scroll.scrolling::-webkit-scrollbar-thumb {
+           background: #334155;
          }
 
-         /* Custom input styles */
          .custom-input {
            border-radius: 0.5rem !important;
            padding: 0.7rem !important;
@@ -349,11 +318,9 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
          }
        `}</style>
       
-      <div className="w-full bg-[#050810] bg-opacity-95 backdrop-blur-lg rounded-[1.4rem] overflow-hidden">
-        {/* Scrollable content container */}
+      <div className="w-full bg-[#050810] bg-opacity-95 backdrop-blur-lg">
         <div className="content-scroll max-h-[80vh] overflow-y-auto p-8 space-y-6" ref={contentRef}>
           
-          {/* Close button */}
           {onClose && (
             <button
               onClick={onClose}
@@ -363,10 +330,8 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
             </button>
           )}
 
-          {/* Grid pattern background */}
           <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiMxZTI5M2IiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRjMC0yLjIgMS44LTQgNC00czQgMS44IDQgNC0xLjggNC00IDQtNC0xLjgtNC00eiIvPjwvZz48L2c+PC9zdmc+')] opacity-10 rounded-[1.4rem]"></div>
 
-          {/* Hexagon pattern */}
           <div
             className="absolute inset-0 opacity-[0.03] rounded-[1.4rem]"
             style={{
@@ -376,13 +341,17 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
 
           {isSuccess ? (
             <div className="pt-8 flex flex-col items-center justify-center h-[400px] relative z-10">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-r from-[#4d7cfe] to-[#22d3ee] flex items-center justify-center mb-6">
-                <CheckCircle className="h-8 w-8 text-white" />
-              </div>
-              <h2 className="text-3xl font-bold bg-gradient-to-r from-[#4d7cfe] via-[#38bdf8] to-[#22d3ee] bg-clip-text text-transparent mb-4">
-                You're on the list!
+              <img src="/assets/logo.png" alt="Logo" className="h-16 w-16 opacity-70 mb-4" />
+              <h2 className="text-3xl font-bold mb-4">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
+                  style={{
+                    backgroundSize: "300% 300%",
+                    animation: "gradientFlow 3s ease infinite"
+                  }}>
+                  Stay Tuned!
+                </span>
               </h2>
-              <p className="text-gray-400 text-center mb-8 max-w-sm">
+              <p className="text-gray-600 text-center mb-8 max-w-sm font-mono" style={{ fontFamily: '"IBM Plex Mono", monospace' }}>
                 Thanks for joining the SolanaFlow waitlist. We'll keep you updated on our launch and progress.
               </p>
               <button
@@ -394,7 +363,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                     console.log("No onClose handler provided to WaitlistForm");
                   }
                 }}
-                className="relative py-2 px-6 rounded bg-gradient-to-r from-[#4d7cfe] to-[#22d3ee] text-white font-medium hover:opacity-90 transition-opacity cursor-pointer"
+                className="relative py-2 px-6 rounded bg-[#1e2033] text-white font-medium hover:opacity-90 transition-opacity cursor-pointer"
                 style={{ zIndex: 100 }}
               >
                 Close

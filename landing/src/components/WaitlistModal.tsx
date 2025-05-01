@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { X } from "lucide-react"
 import WaitlistForm from "./WaitlistForm"
 
 interface WaitlistModalProps {
@@ -12,7 +11,6 @@ interface WaitlistModalProps {
 export default function WaitlistModal({ isOpen, onClose }: WaitlistModalProps) {
   const [isMounted, setIsMounted] = useState(false)
 
-  // Handle ESC key press
   useEffect(() => {
     setIsMounted(true)
     
@@ -22,7 +20,6 @@ export default function WaitlistModal({ isOpen, onClose }: WaitlistModalProps) {
     
     if (isOpen) {
       document.addEventListener("keydown", handleEsc)
-      // Prevent scrolling when modal is open
       document.body.style.overflow = "hidden"
     }
     
@@ -36,7 +33,6 @@ export default function WaitlistModal({ isOpen, onClose }: WaitlistModalProps) {
 
   if (!isOpen) return null
 
-  // Handle click outside to close
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
       onClose()

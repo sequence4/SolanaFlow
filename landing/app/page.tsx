@@ -99,15 +99,21 @@ export default function LandingPage() {
         </div>
 
           <div className="hidden md:flex items-center space-x-12">
-            <Link href="#about" className="text-gray-400 hover:text-[#5580ff] transition-colors text-sm">
-                About
-            </Link>
             <Link href="#features" className="text-gray-400 hover:text-[#5580ff] transition-colors text-sm">
                 Features
             </Link>
             <Link href="#demo" className="text-gray-400 hover:text-[#5580ff] transition-colors text-sm">
                 Demo
             </Link>
+            <Button 
+              size="sm" 
+              className="relative z-0 text-white font-medium rounded whitespace-nowrap" 
+              style={{ border: 'none', backgroundColor: 'transparent' }}
+              onClick={openWaitlistModal}
+            >
+              <span className="relative z-10 cursor-pointer text-sm font-bold sm:text-sm gradient-text">Join the Waitlist</span>
+            </Button>
+
           </div>
         </div>
       </nav>
@@ -528,9 +534,6 @@ export default function LandingPage() {
               </Link>
               <Link href="#" className="text-gray-400 hover:text-white transition-colors text-sm">
                 Contact
-              </Link>
-              <Link href="#" className="text-gray-400 hover:text-white transition-colors text-sm">
-                About
               </Link>
             </div>
             <div className="flex space-x-4">
