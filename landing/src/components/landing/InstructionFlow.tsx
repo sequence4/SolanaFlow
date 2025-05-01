@@ -48,10 +48,6 @@ const transformInstructionData = (instructionNode: any) => {
 };
 
 const InstructionNodeWrapper = ({ data }: any) => {
-  const handleWheel = (e: React.WheelEvent) => {
-    e.stopPropagation();
-  };
-
   return (
     <div className="instruction-wrapper">
       <div className="instruction-border relative">
@@ -86,7 +82,7 @@ const InstructionNodeWrapper = ({ data }: any) => {
           }}
         />
 
-        <div className="instruction-content" onWheel={handleWheel}>
+        <div className="instruction-content">
           <InstructionNode
             id={data.id}
             name={data.name}

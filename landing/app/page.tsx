@@ -14,6 +14,7 @@ import LandingStyles from "@/components/landing/style"
 import ScrollReveal from "@/components/landing/ScrollReveal"
 import dynamic from "next/dynamic"
 import UserMessageBox from "@/components/landing/UserMessageBox"
+import FeaturesSection from "@/components/landing/FeaturesSection"
 
 const WaitlistModal = dynamic(() => import("@/components/WaitlistModal"), {
   ssr: false,
@@ -277,7 +278,7 @@ export default function LandingPage() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="relative py-24 bg-[#050508] overflow-hidden">
+      <section id="features" className="relative py-20 px-10 bg-[#050508] overflow-hidden">
         {/* Animated background grid */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute inset-0 grid grid-cols-12 gap-1">
@@ -292,189 +293,10 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Glow effects */}
         <div className="absolute top-1/4 -left-20 w-72 h-72 bg-[#5580ff]/20 rounded-full blur-[120px]" />
         <div className="absolute bottom-1/4 -right-20 w-72 h-72 bg-[#a855f7]/20 rounded-full blur-[120px]" />
 
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="text-center mb-20">
-            <ScrollReveal>
-              <div className="inline-flex items-center px-3 py-1 mb-4 rounded-full bg-[#1a1b2e]/60 border border-[#2a2d4a]/60 text-xs font-medium backdrop-blur-sm">
-                <div className="w-2 h-2 rounded-full bg-[#5580ff] mr-2 animate-pulse" />
-                <span className="bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff] bg-clip-text text-transparent"
-                    style={{
-                      backgroundSize: "300% 300%",
-                      animation: "gradientFlow 3s ease infinite"
-                    }}>
-                  POWERFUL DEVELOPMENT TOOLS
-                </span>
-              </div>
-            </ScrollReveal>
-            
-            <ScrollReveal delay={100}>
-              <h2 className="text-4xl md:text-5xl font-bold mb-6 tracking-tight">
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
-                    style={{
-                      backgroundSize: "300% 300%",
-                      animation: "gradientFlow 3s ease infinite"
-                    }}>
-                  Build. Deploy. Scale.
-                </span>
-              </h2>
-            </ScrollReveal>
-            
-            <ScrollReveal delay={200}>
-              <p className="text-gray-400 max-w-2xl mx-auto text-base leading-relaxed">
-                Our platform combines cutting-edge technologies to provide a secure, intelligent, and decentralized
-                development experience for Solana.
-              </p>
-            </ScrollReveal>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Feature 1 - Workflow */}
-            <ScrollReveal delay={0}>
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-r from-[#5580ff]/20 to-transparent rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                <div className="relative bg-[#0a0b14]/80 backdrop-blur-sm border border-[#1e2033] rounded-2xl p-8 h-full transition-all duration-300 group-hover:border-[#5580ff]/50 group-hover:translate-y-[-4px]">
-                  <div className="w-14 h-14 rounded-xl bg-[#5580ff]/10 flex items-center justify-center mb-6 group-hover:bg-[#5580ff]/20 transition-colors">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="w-6 h-6 text-[#5580ff]"
-                    >
-                      <rect width="7" height="7" x="3" y="3" rx="1" />
-                      <rect width="7" height="7" x="14" y="3" rx="1" />
-                      <rect width="7" height="7" x="14" y="14" rx="1" />
-                      <rect width="7" height="7" x="3" y="14" rx="1" />
-                    </svg>
-                  </div>
-                  <div className="flex items-center mb-3">
-                    <h3 className="text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
-                        style={{
-                          backgroundSize: "300% 300%",
-                          animation: "gradientFlow 3s ease infinite"
-                        }}>Visual Workflow Builder</h3>
-                    <span className="ml-2 px-2 py-0.5 rounded-full bg-[#1e2033]/80 text-[#5580ff] text-xs font-medium">
-                      workflow
-                    </span>
-                  </div>
-                  <p className="text-gray-400 mb-5 text-sm leading-relaxed">
-                    Drag and drop Solana plugins to visually design your dApp architecture without writing a single line of
-                    code.
-                  </p>
-                  <ul className="text-gray-400 space-y-3 text-sm">
-                    {["Pre-configured & verified components", "Smart contract templates", "Intuitive flow connections"].map(
-                      (item, index) => (
-                        <li key={index} className="flex items-start">
-                          <div className="w-5 h-5 rounded-full bg-[#5580ff]/10 flex items-center justify-center mr-3 mt-0.5">
-                            <div className="w-1.5 h-1.5 rounded-full bg-[#5580ff]" />
-                          </div>
-                          {item}
-                        </li>
-                      ),
-                    )}
-                  </ul>
-                </div>
-              </div>
-            </ScrollReveal>
-
-            {/* Feature 2 - Code */}
-            <ScrollReveal delay={200}>
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-r from-[#a855f7]/20 to-transparent rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                <div className="relative bg-[#0a0b14]/80 backdrop-blur-sm border border-[#1e2033] rounded-2xl p-8 h-full transition-all duration-300 group-hover:border-[#a855f7]/50 group-hover:translate-y-[-4px]">
-                  <div className="w-14 h-14 rounded-xl bg-[#a855f7]/10 flex items-center justify-center mb-6 group-hover:bg-[#a855f7]/20 transition-colors">
-                    <Code className="w-6 h-6 text-[#a855f7]" />
-                  </div>
-                  <div className="flex items-center mb-3">
-                    <h3 className="text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
-                        style={{
-                          backgroundSize: "300% 300%",
-                          animation: "gradientFlow 3s ease infinite"
-                        }}>Solana-Specific IDE</h3>
-                    <span className="ml-2 px-2 py-0.5 rounded-full bg-[#1e2033]/80 text-[#a855f7] text-xs font-medium">
-                      code
-                    </span>
-                  </div>
-                  <p className="text-gray-400 mb-5 text-sm leading-relaxed">
-                    A powerful code editor tailored specifically for Solana development with intelligent autocompletion and
-                    debugging.
-                  </p>
-                  <ul className="text-gray-400 space-y-3 text-sm">
-                    {["Rust and TypeScript support", "Real-time error checking", "Integrated testing tools"].map(
-                      (item, index) => (
-                        <li key={index} className="flex items-start">
-                          <div className="w-5 h-5 rounded-full bg-[#a855f7]/10 flex items-center justify-center mr-3 mt-0.5">
-                            <div className="w-1.5 h-1.5 rounded-full bg-[#a855f7]" />
-                          </div>
-                          {item}
-                        </li>
-                      ),
-                    )}
-                  </ul>
-                </div>
-              </div>
-            </ScrollReveal>
-
-            {/* Feature 3 - Interface */}
-            <ScrollReveal delay={400}>
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-r from-[#00c2ff]/20 to-transparent rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                <div className="relative bg-[#0a0b14]/80 backdrop-blur-sm border border-[#1e2033] rounded-2xl p-8 h-full transition-all duration-300 group-hover:border-[#00c2ff]/50 group-hover:translate-y-[-4px]">
-                  <div className="w-14 h-14 rounded-xl bg-[#00c2ff]/10 flex items-center justify-center mb-6 group-hover:bg-[#00c2ff]/20 transition-colors">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="w-6 h-6 text-[#00c2ff]"
-                    >
-                      <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
-                      <line x1="3" x2="21" y1="9" y2="9" />
-                      <line x1="9" x2="9" y1="21" y2="9" />
-                    </svg>
-                  </div>
-                  <div className="flex items-center mb-3">
-                    <h3 className="text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
-                        style={{
-                          backgroundSize: "300% 300%",
-                          animation: "gradientFlow 3s ease infinite"
-                        }}>Interactive UI Builder</h3>
-                    <span className="ml-2 px-2 py-0.5 rounded-full bg-[#1e2033]/80 text-[#00c2ff] text-xs font-medium">
-                      interface
-                    </span>
-                  </div>
-                  <p className="text-gray-400 mb-5 text-sm leading-relaxed">
-                    Preview and interact with your generated dApp UI in real-time as you build your Solana application.
-                  </p>
-                  <ul className="text-gray-400 space-y-3 text-sm">
-                    {["Live UI previews", "Wallet integration testing", "Responsive design tools"].map((item, index) => (
-                      <li key={index} className="flex items-start">
-                        <div className="w-5 h-5 rounded-full bg-[#00c2ff]/10 flex items-center justify-center mr-3 mt-0.5">
-                          <div className="w-1.5 h-1.5 rounded-full bg-[#00c2ff]" />
-                        </div>
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </ScrollReveal>
-          </div>
-        </div>
+        <FeaturesSection />
       </section>
 
       {/* Demo Video Section */}

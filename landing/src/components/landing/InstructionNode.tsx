@@ -1,5 +1,6 @@
 // Instruction Node component for landing page
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useUpdateNodeInternals } from '@xyflow/react';
 
 type InstructionNodeProps = {
   id: string;
@@ -27,6 +28,15 @@ const InstructionNode: React.FC<InstructionNodeProps> = ({
   inputs,
 }) => {
   const [activeTab, setActiveTab] = useState<'Context' | 'Inputs' | 'Errors' | 'Events'>('Context');
+
+  /* ────────────────────────────────────────────────────────────
+     Ensure React-Flow recalculates this node's width/height once
+     the real DOM exists, so the hit-box matches what the user sees
+  ──────────────────────────────────────────────────────────── */
+  const updateNodeInternals = useUpdateNodeInternals();
+  useEffect(() => {
+    updateNodeInternals(id);
+  }, [id, updateNodeInternals]);
 
   return (
     <div className="node-draggable w-full h-full bg-[#121218] rounded-xl border border-[#333] overflow-hidden shadow-lg">
@@ -74,8 +84,11 @@ const InstructionNode: React.FC<InstructionNodeProps> = ({
         </button>
       </div>
 
-      {/* Content */}
-      <div className="p-3 overflow-auto max-h-[230px]">
+      {/* Content – stop wheel from bubbling so list scrolls instead of canvas zooming */}
+      <div 
+        className="p-3 overflow-auto max-h-[230px]"
+        onWheel={e => e.stopPropagation()}
+      >
         {activeTab === 'Context' && (
           <div className="border border-[#333] rounded-lg overflow-hidden bg-[#1a1a24] shadow-[0_0_10px_rgba(93,93,255,0.05)] mb-3">
             <div className="p-1.5 flex items-center justify-between bg-[#1a1a24] border-b border-[#333]">
