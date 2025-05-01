@@ -140,11 +140,23 @@ export default function LandingPage() {
                         </h1>
                     </div>
                     <div className="text-gray-400 mb-6 sm:mb-8 max-w-lg text-xs sm:text-sm leading-relaxed">
-                        <ul className="list-disc list-inside">
-                        <li><span className="text-white font-semibold">SolanaFlow</span> transforms English into Solana programs.</li>
-                        <li>Design, build, and deploy decentralized applications with our visual workflow builder and
-                        specialized Solana IDE.</li>
-                        </ul>
+                    <ul className="list-disc list-outside ml-6 space-y-4">
+                      <li className="pl-2">
+                        <span className="text-white font-semibold">AI&nbsp;Powered&nbsp;Development</span> – Turn ideas into secure Solana dApps with natural-language instructions.
+                      </li>
+                      <li className="pl-2">
+                        <span className="text-white font-semibold">Visual&nbsp;Workflow&nbsp;Builder</span> – Drag-and-drop pre-audited Solana modules for fast, reliable builds.
+                      </li>
+                      <li className="pl-2">
+                        <span className="text-white font-semibold">Instant&nbsp;Deployment</span> – Ship to devnet or mainnet in a single click.
+                      </li>
+                      <li className="pl-2">
+                        <span className="text-white font-semibold">Live&nbsp;Iterations</span> – Update logic and push upgrades in real time.
+                      </li>
+                      <li className="pl-2">
+                        <span className="text-white font-semibold">Collaborative&nbsp;Workspace</span> – Real-time co-editing with built-in version control.
+                      </li>
+                    </ul>
                     </div>
                     <div className="flex flex-col sm:flex-row justify-start gap-2">
                         <Button 
