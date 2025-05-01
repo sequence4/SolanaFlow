@@ -119,7 +119,7 @@ export default function FeaturesSection() {
         </div>
       </ScrollReveal>
       <div className="relative flex flex-col justify-between items-center">
-        <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-2">
+        <h1 className="text-4xl md:text-4xl font-bold tracking-tight mb-2">
           <motion.span
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
