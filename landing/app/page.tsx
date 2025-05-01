@@ -519,10 +519,10 @@ export default function LandingPage() {
                   <div className="w-8 h-8 rounded-full bg-[#5580ff]/20 flex items-center justify-center mr-3">
                     <span className="text-[#5580ff] font-bold">1</span>
                   </div>
-                  <h3 className="font-semibold text-sm">Design Your Workflow</h3>
+                  <h3 className="font-semibold text-sm">Intuitive Workflow Designer</h3>
                 </div>
                 <p className="text-gray-400 text-xs">
-                  Drag and drop components to create your dApp architecture visually.
+                  Visually assemble your dApp architecture effortlessly using drag-and-drop components.
                 </p>
               </div>
 
@@ -531,10 +531,10 @@ export default function LandingPage() {
                   <div className="w-8 h-8 rounded-full bg-[#a855f7]/20 flex items-center justify-center mr-3">
                     <span className="text-[#a855f7] font-bold">2</span>
                   </div>
-                  <h3 className="font-semibold text-sm">Customize Your Code</h3>
+                  <h3 className="font-semibold text-sm">Advanced Code Customization</h3>
                 </div>
                 <p className="text-gray-400 text-xs">
-                  Fine-tune your smart contracts and frontend code in our specialized IDE.
+                  Easily fine-tune smart contracts and frontend logic within our powerful integrated IDE.
                 </p>
               </div>
 
@@ -543,10 +543,10 @@ export default function LandingPage() {
                   <div className="w-8 h-8 rounded-full bg-[#00c2ff]/20 flex items-center justify-center mr-3">
                     <span className="text-[#00c2ff] font-bold">3</span>
                   </div>
-                  <h3 className="font-semibold text-sm">Deploy & Monitor</h3>
+                  <h3 className="font-semibold text-sm">Streamlined Deployment & Monitoring</h3>
                 </div>
                 <p className="text-gray-400 text-xs">
-                  Launch your dApp to testnet or mainnet with one click and track performance.
+                  Deploy instantly to Solana testnet or mainnet, then monitor and optimize your dApp's performance in real-time.
                 </p>
               </div>
             </div>
