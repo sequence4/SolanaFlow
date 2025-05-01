@@ -1,1 +1,0 @@
-self.__REACT_LOADABLE_MANIFEST="{\"app/page.tsx -> ../src/components/WaitlistModal\":{\"id\":\"app/page.tsx -> ../src/components/WaitlistModal\",\"files\":[\"static/chunks/_app-pages-browser_src_components_WaitlistModal_tsx.js\"]},\"src/components/landing/InstructionFlow.tsx -> @xyflow/react\":{\"id\":\"src/components/landing/InstructionFlow.tsx -> @xyflow/react\",\"files\":[]}}"

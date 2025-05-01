@@ -45,11 +45,11 @@ export default function WaitlistModal({ isOpen, onClose }: WaitlistModalProps) {
 
   return (
     <div 
-      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center"
       onClick={handleBackdropClick}
     >
       <div 
-        className="relative w-full max-w-4xl mx-auto overflow-hidden"
+        className="relative inline-block w-[30%]"
         onClick={(e) => e.stopPropagation()}
       >
         <WaitlistForm onClose={onClose} />

@@ -21,7 +21,7 @@ const oxygenMono = Oxygen_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Solana FlowCode - Build Solana dApps Without Code",
+  title: "SolanaFlow",
   description: "Visual AI developer tool for building and deploying Solana blockchain applications without writing code",
 };
 
