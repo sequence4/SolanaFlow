@@ -16,7 +16,6 @@ type InstructionNodeProps = {
     type: string;
     value: string;
   }>;
-  codePreview: string;
 };
 
 const InstructionNode: React.FC<InstructionNodeProps> = ({
@@ -26,12 +25,11 @@ const InstructionNode: React.FC<InstructionNodeProps> = ({
   status,
   accounts,
   inputs,
-  codePreview
 }) => {
   const [activeTab, setActiveTab] = useState<'Context' | 'Inputs' | 'Errors' | 'Events'>('Context');
 
   return (
-    <div className="w-full h-full bg-[#121218] rounded-xl border border-[#333] overflow-hidden shadow-lg">
+    <div className="node-draggable w-full h-full bg-[#121218] rounded-xl border border-[#333] overflow-hidden shadow-lg">
       {/* Header */}
       <div className="flex items-center justify-between p-3 border-b border-[#333] bg-[#1a1a24]">
         <div className="flex items-center space-x-2">
@@ -135,15 +133,6 @@ const InstructionNode: React.FC<InstructionNodeProps> = ({
             <div className="text-[#888] text-[10px]">No events defined</div>
           </div>
         )}
-        
-        <div className="bg-[#1a1a24] rounded-lg p-2 border border-[#333]">
-          <div className="mb-1 text-[10px] text-[#888]">Code Preview:</div>
-          <pre className="text-[9px] text-gray-300 bg-[#0a0b14] p-2 rounded border border-[#2a2d4a] overflow-x-auto">
-            <code>
-              {codePreview}
-            </code>
-          </pre>
-        </div>
       </div>
     </div>
   );

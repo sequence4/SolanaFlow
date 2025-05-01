@@ -13,7 +13,6 @@ import {
   Handle
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { JSX } from 'react/jsx-runtime';
 import { initMintFlow } from '@/data/initializeMint/initMintFlow';
 import { mintTo } from '@/data/mintTo/mintTo';
 import InstructionNode from './InstructionNode';
@@ -55,27 +54,38 @@ const InstructionNodeWrapper = ({ data }: any) => {
 
   return (
     <div className="instruction-wrapper">
-      <Handle 
-        type="source" 
-        position={Position.Right} 
-        style={{ 
-          background: '#5d5dff',
-          width: '8px',
-          height: '8px',
-          border: '1px solid #333' 
-        }} 
-      />
-      <Handle 
-        type="target" 
-        position={Position.Left} 
-        style={{ 
-          background: '#5d5dff',
-          width: '8px',
-          height: '8px',
-          border: '1px solid #333' 
-        }} 
-      />
-      <div className="instruction-border">
+      <div className="instruction-border relative">
+
+        {/* Right-side (source) handle — centre-aligned */}
+        <Handle
+          type="source"
+          position={Position.Right}
+          style={{
+            right: -4,              // sit flush with node edge
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: 8,
+            height: 8,
+            background: '#5d5dff',
+            border: '1px solid #333',
+          }}
+        />
+
+        {/* Left-side (target) handle — mirror */}
+        <Handle
+          type="target"
+          position={Position.Left}
+          style={{
+            left: -4,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: 8,
+            height: 8,
+            background: '#5d5dff',
+            border: '1px solid #333',
+          }}
+        />
+
         <div className="instruction-content" onWheel={handleWheel}>
           <InstructionNode
             id={data.id}
@@ -84,7 +94,6 @@ const InstructionNodeWrapper = ({ data }: any) => {
             status={data.status}
             accounts={data.accounts}
             inputs={data.inputs}
-            codePreview={data.codePreview}
           />
         </div>
       </div>
@@ -161,6 +170,7 @@ Ok(())
           sourcePosition: Position.Right,
           targetPosition: Position.Left,
           draggable: true,
+          dragHandle: '.node-draggable',
         },
         {
           id: transformedMintToData.id,
@@ -170,6 +180,7 @@ Ok(())
           sourcePosition: Position.Right,
           targetPosition: Position.Left,
           draggable: true,
+          dragHandle: '.node-draggable',
         },
         {
           id: mockTransferData.id,
@@ -179,6 +190,7 @@ Ok(())
           sourcePosition: Position.Right,
           targetPosition: Position.Left,
           draggable: true,
+          dragHandle: '.node-draggable',
         },
       ];
 
