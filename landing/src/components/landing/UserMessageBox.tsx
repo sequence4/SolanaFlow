@@ -71,17 +71,55 @@ export default function UserMessageBox({
   }, [])
 
   return (
-    <div className={`bg-[#0a0b14] rounded-lg p-4 ${className} relative`}>
-      {/* Flowing gradient effect */}
-      <div 
-        className="absolute inset-0 rounded-lg opacity-15" 
-        style={{
-          background: 'linear-gradient(60deg, rgba(10, 91, 255, 0.5), rgba(28,246,160,0.5), rgba(121, 11, 255, 0.5))',
-          backgroundSize: '300% 300%',
-          animation: 'gradientFlow 5s ease infinite',
-          zIndex: 0
-        }}
-      />
+    <div className={`bg-[#0a0b14] rounded-lg p-4 ${className} relative overflow-hidden`}>
+      {/* Animated background orbs */}
+      <div className="absolute inset-0 z-0" style={{ overflow: 'hidden' }}>
+        {/* Blue orb */}
+        <div 
+          className="absolute w-32 h-32 rounded-full opacity-5"
+          style={{
+            background: 'radial-gradient(circle, #5f88dc 0%, rgba(95,136,220,0) 70%)',
+            filter: 'blur(8px)',
+            top: '10%',
+            left: '10%',
+            animation: 'floatOrb1 15s ease-in-out infinite, pulseOrb 8s ease-in-out infinite'
+          }}
+        />
+        
+        {/* Green orb */}
+        <div 
+          className="absolute w-40 h-40 rounded-full opacity-5"
+          style={{
+            background: 'radial-gradient(circle, #1cf6a0 0%, rgba(28,246,160,0) 70%)',
+            filter: 'blur(8px)',
+            bottom: '10%',
+            right: '15%',
+            animation: 'floatOrb2 18s ease-in-out infinite, pulseOrb 6s ease-in-out infinite'
+          }}
+        />
+        
+        {/* Purple orb */}
+        <div 
+          className="absolute w-36 h-36 rounded-full opacity-5"
+          style={{
+            background: 'radial-gradient(circle, #9945ff 0%, rgba(153,69,255,0) 70%)',
+            filter: 'blur(8px)',
+            bottom: '20%',
+            left: '40%',
+            animation: 'floatOrb3 12s ease-in-out infinite, pulseOrb 10s ease-in-out infinite'
+          }}
+        />
+        
+        {/* Flowing gradient background for additional effect */}
+        <div 
+          className="absolute inset-0 opacity-10" 
+          style={{
+            background: 'linear-gradient(60deg, #5f88dc, #1cf6a0, #9945ff)',
+            backgroundSize: '300% 300%',
+            animation: 'gradientFlow 5s ease infinite',
+          }}
+        />
+      </div>
       
       <style jsx>{`
         @keyframes gradientFlow {
@@ -95,21 +133,50 @@ export default function UserMessageBox({
             background-position: 0% 50%;
           }
         }
+        
+        @keyframes floatOrb1 {
+          0% { transform: translate(0, 0); }
+          25% { transform: translate(100%, 50%); }
+          50% { transform: translate(80%, 100%); }
+          75% { transform: translate(-50%, 50%); }
+          100% { transform: translate(0, 0); }
+        }
+        
+        @keyframes floatOrb2 {
+          0% { transform: translate(0, 0); }
+          25% { transform: translate(-70%, -30%); }
+          50% { transform: translate(-20%, -80%); }
+          75% { transform: translate(50%, -40%); }
+          100% { transform: translate(0, 0); }
+        }
+        
+        @keyframes floatOrb3 {
+          0% { transform: translate(0, 0); }
+          33% { transform: translate(50%, -30%); }
+          66% { transform: translate(-30%, -50%); }
+          100% { transform: translate(0, 0); }
+        }
+        
+        @keyframes pulseOrb {
+          0% { opacity: 0.1; }
+          50% { opacity: 0.3; }
+          100% { opacity: 0.1; }
+        }
       `}</style>
 
       <div className="relative z-10">
-        <div className="flex items-end">
-          <div className="flex-1 bg-[#1a1b29] rounded-2xl rounded-br-none p-4 shadow-sm">
-            <div className="min-h-[24px] text-gray-400 text-xs">
+        <div className="flex justify-between items-center">
+          <div className="h-[5rem] flex-1 bg-[#0d0e1a] border border-[#2a2d4a] rounded-xl p-4 shadow-sm">
+            <div className="min-h-[24px] text-gray-400 text-sm" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
               {displayedText}
-              {showCursor && <span className="inline-block w-2 h-4 bg-gray-400 ml-0.5">&nbsp;</span>}
+              {showCursor && <span className="inline-block w-2 h-4 bg-[#5580ff] ml-0.5">&nbsp;</span>}
             </div>
           </div>
           <button
-            className="ml-2 p-2 bg-blue-600 cursor-default text-white rounded-full flex items-center justify-center"
+            className="ml-2 p-2 bg-[#161726] border border-[#2a2d4a] cursor-default text-white rounded-full flex items-center justify-center"
             aria-label="Send message"
           >
-            <Send size={14} />
+            <Send size={14} className="text-[#5580ff]"/>
           </button>
         </div>
       </div>

@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Code, Cpu, Layers } from "lucide-react"
+import { ArrowRight, Code } from "lucide-react"
 import { BsTelegram } from "react-icons/bs";
 import { BsTwitterX } from "react-icons/bs";
 import { BsYoutube } from "react-icons/bs";
@@ -15,8 +15,7 @@ import ScrollReveal from "@/components/landing/ScrollReveal"
 import dynamic from "next/dynamic"
 import UserMessageBox from "@/components/landing/UserMessageBox"
 
-// Dynamically import the WaitlistModal to avoid server-side rendering issues
-const WaitlistModal = dynamic(() => import("../src/components/WaitlistModal"), {
+const WaitlistModal = dynamic(() => import("@/components/WaitlistModal"), {
   ssr: false,
 })
 
@@ -50,7 +49,7 @@ export default function LandingPage() {
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link 
-          href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap"
+          href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=IBM+Plex+Mono:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&display=swap"
           rel="stylesheet" 
         />
       </Head>
@@ -88,13 +87,13 @@ export default function LandingPage() {
 
       {/* Navbar */}
       <nav className="relative z-10 border-b border-[#1e2033] bg-[#0a0b14]/50 backdrop-blur-md">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="container mx-auto px-0 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <div className="w-8 h-8 relative">
               <img src="/assets/logo.png" alt="FlowCode Logo" className="w-full h-full" />
               <div className="absolute inset-0 bg-[#5580ff]/20 blur-xl rounded-full"></div>
             </div>
-            <span className="text-xl font-bold tracking-tighter" style={{ fontFamily: '"DM Sans", sans-serif' }}>
+            <span className="text-2xl font-bold tracking-tighter" style={{ fontFamily: '"DM Sans", sans-serif' }}>
               <span className="text-white">Solana</span>
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]" 
                 style={{
@@ -119,7 +118,7 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="flex justify-center px-10 pl-[10%] py-[5%] w-full h-[100vh] overflow-hidden">
+      <section className="flex justify-center px-[8%] pt-[5%] pb-[8%] w-full h-[100vh] overflow-hidden">
         <div className="w-full h-full z-10">
             <div className="flex flex-col w-full h-full md:flex-row items-start">
                 {/* Left side content */}
@@ -158,18 +157,67 @@ export default function LandingPage() {
                       </li>
                     </ul>
                     </div>
-                    <div className="flex flex-col sm:flex-row justify-start gap-2">
+                    <div className="flex flex-col sm:flex-row justify-start gap-8">
                         <Button 
-                          size="lg" 
-                          className="bg-[#5580ff] hover:bg-[#4466cc] text-white p-2 rounded whitespace-nowrap"
+                          size="default" 
+                          className="relative z-0 text-white font-medium rounded whitespace-nowrap gradient-border-button" 
+                          style={{ borderRadius: '4px', backgroundColor: '#0d0e1a' }}
                           onClick={openWaitlistModal}
                         >
-                          <span className="cursor-pointer text-xs sm:text-sm">Join the Waitlist</span>
+                          <span className="relative z-10 cursor-pointer text-xs font-bold sm:text-sm gradient-text">Join the Waitlist</span>
                         </Button>
-                        <div className="flex items-center justify-center gap-2 hover:bg-none mt-2 sm:mt-0">
-                            <Button size="icon" variant="ghost"><BsTelegram className="h-4 w-4 sm:h-5 sm:w-5 text-[#5580ff] cursor-pointer hover:bg-none" /></Button>
-                            <Button size="icon" variant="ghost"><BsTwitterX className="h-4 w-4 sm:h-5 sm:w-5 text-[#5580ff] cursor-pointer hover:bg-none" /></Button>
-                            <Button size="icon" variant="ghost"><BsYoutube className="h-4 w-4 sm:h-5 sm:w-5 text-[#5580ff] cursor-pointer hover:bg-none" /></Button>
+
+                        <style jsx global>{`
+                          .gradient-border-button {
+                            position: relative;
+                            z-index: 0;
+                            padding: 8px 16px;
+                            border: none;
+                            overflow: hidden;
+                          }
+                          
+                          .gradient-border-button::before {
+                            content: '';
+                            position: absolute;
+                            z-index: -2;
+                            inset: 0;
+                            padding: 2px;
+                            border-radius: inherit;
+                            background: linear-gradient(60deg, #5f88dc, #1cf6a0, #9945ff);
+                            background-size: 300% 300%;
+                            animation: gradientBorderFlow 3s ease infinite;
+                            -webkit-mask: 
+                              linear-gradient(#fff 0 0) content-box, 
+                              linear-gradient(#fff 0 0);
+                            -webkit-mask-composite: xor;
+                            mask-composite: exclude;
+                          }
+                          
+                          .gradient-text {
+                            background: linear-gradient(60deg, #5f88dc, #1cf6a0, #9945ff);
+                            background-size: 300% 300%;
+                            animation: gradientBorderFlow 3s ease infinite;
+                            -webkit-background-clip: text;
+                            background-clip: text;
+                            color: transparent;
+                          }
+                          
+                          @keyframes gradientBorderFlow {
+                            0% {
+                              background-position: 0% 50%;
+                            }
+                            50% {
+                              background-position: 100% 50%;
+                            }
+                            100% {
+                              background-position: 0% 50%;
+                            }
+                          }
+                        `}</style>
+
+                        <div className="flex items-center justify-between gap-2 hover:bg-none mt-2 sm:mt-0">
+                            <Button size="icon" variant="ghost"><BsTwitterX className="h-4 w-4 sm:h-5 sm:w-5 text-[#cfd2d3] cursor-pointer hover:bg-none" /></Button>
+                            <Button size="icon" variant="ghost"><BsTelegram className="h-4 w-4 sm:h-5 sm:w-5 text-[#cfd2d3] cursor-pointer hover:bg-none" /></Button>
                         </div>
                     </div>
                 </div>
@@ -443,7 +491,7 @@ export default function LandingPage() {
                     backgroundSize: "300% 300%",
                     animation: "gradientFlow 3s ease infinite"
                   }}>
-                See FlowCode in Action
+                See SolanFlow beta in Action
               </span>
             </h2>
             <p className="text-gray-400 max-w-2xl mx-auto text-sm">
@@ -533,10 +581,11 @@ export default function LandingPage() {
               <div className="flex flex-col sm:flex-row justify-center gap-4">
                 <Button 
                   size="lg" 
-                  className="bg-[#5580ff] hover:bg-[#4466cc] text-white px-8 rounded"
+                  className="relative z-0 font-bold px-8 rounded-lg gradient-border-button" 
+                  style={{ borderRadius: '4px', backgroundColor: '#0d0e1a' }}
                   onClick={openWaitlistModal}
                 >
-                  <span className="flex items-center justify-center">
+                  <span className="relative z-10 flex items-center justify-center gradient-text">
                     Join The Waitlist <ArrowRight className="ml-2 h-4 w-4" />
                   </span>
                 </Button>
