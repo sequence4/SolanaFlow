@@ -1,4 +1,4 @@
-import { mintTo } from "./mintTo";
+import { mintToCode } from "./code/mintToCode";
 import { mintToContext } from "./mintToContext";
 import { mintToInput } from "./mintToInput";
 import { mintToErrorCodes } from "./mintToErrorCodes";
@@ -18,9 +18,9 @@ export const mintToFlow = {
       type: "instructionGroupNode",
       position: { x: 0, y: 0 },
       data: {
-        ...mintTo.data,
         label: "Mint To",
         description: "Mint a new token to a specified address",
+        code: mintToCode,
         accounts: contextData,
         parameters: inputsData,
         errorCodes: errorCodesData,

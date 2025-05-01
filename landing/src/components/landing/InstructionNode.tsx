@@ -17,6 +17,18 @@ type InstructionNodeProps = {
     type: string;
     value: string;
   }>;
+  errorCodes: Array<{
+    code: number;
+    name: string;
+    msg: string;
+  }>;
+  events: Array<{
+    name: string;
+    fields: Array<{
+      name: string;
+      type: string;
+    }>;
+  }>;
 };
 
 const InstructionNode: React.FC<InstructionNodeProps> = ({
@@ -26,6 +38,8 @@ const InstructionNode: React.FC<InstructionNodeProps> = ({
   status,
   accounts,
   inputs,
+  errorCodes = [],
+  events = [],
 }) => {
   const [activeTab, setActiveTab] = useState<'Context' | 'Inputs' | 'Errors' | 'Events'>('Context');
 
@@ -34,7 +48,7 @@ const InstructionNode: React.FC<InstructionNodeProps> = ({
   
   useLayoutEffect(() => {
     updateNodeInternals(id);
-  }, [id, activeTab, accounts.length, inputs.length, updateNodeInternals]);
+  }, [id, activeTab, accounts.length, inputs.length, errorCodes.length, events.length, updateNodeInternals]);
 
   useLayoutEffect(() => {
     if (!containerRef.current) return;
@@ -138,14 +152,59 @@ const InstructionNode: React.FC<InstructionNodeProps> = ({
         )}
 
         {activeTab === 'Errors' && (
-          <div className="flex items-center justify-center p-4">
-            <div className="text-[#888] text-[10px]">No error codes defined</div>
+          <div className="border border-[#333] rounded-lg overflow-hidden bg-[#1a1a24] shadow-[0_0_10px_rgba(229,62,62,0.05)] mb-3">
+            <div className="p-1.5 flex items-center justify-between bg-[#1a1a24] border-b border-[#333]">
+              <div className="flex items-center">
+                <div className="w-1 h-5 bg-[#e53e3e] rounded-sm mr-2"></div>
+                <h4 className="text-[10px] font-medium tracking-tight text-white">Error Codes</h4>
+              </div>
+            </div>
+
+            <div className="p-2 bg-[#121218]">
+              {errorCodes.length > 0 ? (
+                errorCodes.map((errorCode, index) => (
+                  <div key={index} className="mb-2 last:mb-0">
+                    <div className="flex justify-between">
+                      <div className="text-[#e53e3e] text-xs font-medium">{errorCode.name}</div>
+                      <div className="text-[#888] text-[10px]">#{errorCode.code}</div>
+                    </div>
+                    <div className="text-[#888] text-[10px] mt-0.5">{errorCode.msg}</div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-[#888] text-[10px] text-center">No error codes defined</div>
+              )}
+            </div>
           </div>
         )}
 
         {activeTab === 'Events' && (
-          <div className="flex items-center justify-center p-4">
-            <div className="text-[#888] text-[10px]">No events defined</div>
+          <div className="border border-[#333] rounded-lg overflow-hidden bg-[#1a1a24] shadow-[0_0_10px_rgba(214,158,46,0.05)] mb-3">
+            <div className="p-1.5 flex items-center justify-between bg-[#1a1a24] border-b border-[#333]">
+              <div className="flex items-center">
+                <div className="w-1 h-5 bg-[#d69e2e] rounded-sm mr-2"></div>
+                <h4 className="text-[10px] font-medium tracking-tight text-white">Events</h4>
+              </div>
+            </div>
+
+            <div className="p-2 bg-[#121218]">
+              {events.length > 0 ? (
+                events.map((event, index) => (
+                  <div key={index} className="mb-3 last:mb-0">
+                    <div className="text-[#d69e2e] text-xs font-medium">{event.name}</div>
+                    <ul className="mt-1 pl-3 list-disc">
+                      {event.fields.map((field, idx) => (
+                        <li key={idx} className="text-[#888] text-[10px]">
+                          {field.name}: {field.type}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))
+              ) : (
+                <div className="text-[#888] text-[10px] text-center">No events defined</div>
+              )}
+            </div>
           </div>
         )}
       </div>

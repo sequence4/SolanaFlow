@@ -15,7 +15,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { initMintFlow } from '@/data/initializeMint/initMintFlow';
-import { mintTo } from '@/data/mintTo/mintTo';
+import { mintToFlow } from '@/data/mintTo/mintToFlow';
 import InstructionNode from './InstructionNode';
 
 const ReactFlow = dynamic(() => import('@xyflow/react').then((module) => module.ReactFlow), {
@@ -44,6 +44,8 @@ const transformInstructionData = (instructionNode: any) => {
       type: param.type,
       value: param.value || "",
     })),
+    errorCodes: data.errorCodes || [],
+    events: data.events || [],
     codePreview: data.code || "",
   };
 };
@@ -111,6 +113,8 @@ const InstructionNodeWrapper = ({ data }: any) => {
             status={data.status}
             accounts={data.accounts}
             inputs={data.inputs}
+            errorCodes={data.errorCodes}
+            events={data.events}
           />
         </div>
       </div>
@@ -138,7 +142,8 @@ const InstructionFlow = () => {
       const initMintNode = initMintFlow.nodes[0];
       const transformedInitMintData = transformInstructionData(initMintNode);
       
-      const transformedMintToData = transformInstructionData(mintTo);
+      const mintToNode = mintToFlow.nodes[0];
+      const transformedMintToData = transformInstructionData(mintToNode);
       
       const mockTransferData = {
         id: "transfer-instruction",
