@@ -13,6 +13,7 @@ import TypewriterCode from "@/components/landing/TypeWriterCode"
 import LandingStyles from "@/components/landing/style"
 import ScrollReveal from "@/components/landing/ScrollReveal"
 import dynamic from "next/dynamic"
+import UserMessageBox from "@/components/landing/UserMessageBox"
 
 // Dynamically import the WaitlistModal to avoid server-side rendering issues
 const WaitlistModal = dynamic(() => import("../src/components/WaitlistModal"), {
@@ -171,18 +172,43 @@ export default function LandingPage() {
                 </div>
 
               {/* Code Terminal */}
-              <div className="w-full h-full rounded-xl">
-                <div className="w-full h-full rounded-xl overflow-hidden border border-[#2a2d4a] bg-[#0d0e1a] relative flex flex-col min-h-0">
-                  <div className="flex items-center px-4 py-2 bg-[#1e2033] border-b border-[#2a2d4a] rounded-lg ">
-                    <div className="flex space-x-2 rounded-lg">
-                      <div className="w-2 h-2 rounded-full bg-[#ff5f57]"></div>
-                      <div className="w-2 h-2 rounded-full bg-[#febc2e]"></div>
-                      <div className="w-2 h-2 rounded-full bg-[#28c840]"></div>
+              <div className="w-full h-full flex flex-col">
+                <div className="w-full h-full rounded-xl">
+                  <div className="w-full h-full rounded-xl overflow-hidden border border-[#2a2d4a] bg-[#0d0e1a] relative flex flex-col min-h-0">
+                    <div className="flex items-center px-4 py-2 bg-[#1e2033] border-b border-[#2a2d4a] rounded-lg ">
+                      <div className="flex space-x-2 rounded-lg">
+                        <div className="w-2 h-2 rounded-full bg-[#ff5f57]"></div>
+                        <div className="w-2 h-2 rounded-full bg-[#febc2e]"></div>
+                        <div className="w-2 h-2 rounded-full bg-[#28c840]"></div>
+                      </div>
+                      <div className="ml-4 text-sm text-gray-400">token_minting_program.rs</div>
                     </div>
-                    <div className="ml-4 text-sm text-gray-400">token_minting_program.rs</div>
+                    <div className="flex-1 w-full min-h-0">
+                      {mounted && <TypewriterCode />}
+                    </div>
                   </div>
-                  <div className="flex-1 w-full min-h-0">
-                    {mounted && <TypewriterCode />}
+                </div>
+                
+                {/* User Message Box */}
+                <div className="w-full mt-4 rounded-xl">
+                  <div className="w-full rounded-xl overflow-hidden border border-[#2a2d4a] relative">
+                    {mounted && <UserMessageBox 
+                      messages={[
+                        "Generate a Solana wallet dApp that connects Phantom, shows balances, and lets users send SOL",
+                        "Deploy a fixed-supply SPL token and create a simple web mint/burn interface",
+                        "Create an NFT mint site using Candy Machine v3 for a 1,000-item collection",
+                        "Build a token-swap dApp with Jupiter to trade SOL ↔ USDC",
+                        "Set up a staking dashboard and contract for my SPL token with reward claims",
+                        "Launch a DAO dApp with on-chain proposal creation and token-weighted voting",
+                        "Spin up a crowdfunding platform that releases funds only if the goal is reached",
+                        "Create a monthly USDC subscription billing dApp with automatic charges",
+                        "Generate a weekly raffle contract that picks random winners and pays out SOL",
+                        "Build a simple arcade game smart contract that rewards top scores in SOL"
+                      ]}
+                      typingSpeed={50}
+                      delayBetweenMessages={3000}
+                      className="w-full"
+                    />}
                   </div>
                 </div>
               </div>
