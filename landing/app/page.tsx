@@ -12,10 +12,19 @@ import Head from "next/head"
 import TypewriterCode from "@/components/landing/TypeWriterCode"
 import LandingStyles from "@/components/landing/style"
 import ScrollReveal from "@/components/landing/ScrollReveal"
+import dynamic from "next/dynamic"
 
+// Dynamically import the WaitlistModal to avoid server-side rendering issues
+const WaitlistModal = dynamic(() => import("../src/components/WaitlistModal"), {
+  ssr: false,
+})
 
 export default function LandingPage() {
   const [mounted, setMounted] = useState(false)
+  const [isWaitlistModalOpen, setIsWaitlistModalOpen] = useState(false)
+
+  const openWaitlistModal = () => setIsWaitlistModalOpen(true)
+  const closeWaitlistModal = () => setIsWaitlistModalOpen(false)
 
   useEffect(() => {
     setMounted(true)
@@ -27,6 +36,14 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white font-mono overflow-x-hidden">
+      {/* Waitlist Modal */}
+      {mounted && (
+        <WaitlistModal 
+          isOpen={isWaitlistModalOpen} 
+          onClose={closeWaitlistModal} 
+        />
+      )}
+      
       {/* Google Fonts Integration */}
       <Head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -129,8 +146,12 @@ export default function LandingPage() {
                         </ul>
                     </div>
                     <div className="flex flex-col sm:flex-row justify-start gap-2">
-                        <Button size="lg" className="bg-[#5580ff] hover:bg-[#4466cc] text-white p-2 rounded whitespace-nowrap">
-                        <span className="cursor-pointer text-xs sm:text-sm">Join the Waitlist</span>
+                        <Button 
+                          size="lg" 
+                          className="bg-[#5580ff] hover:bg-[#4466cc] text-white p-2 rounded whitespace-nowrap"
+                          onClick={openWaitlistModal}
+                        >
+                          <span className="cursor-pointer text-xs sm:text-sm">Join the Waitlist</span>
                         </Button>
                         <div className="flex items-center justify-center gap-2 hover:bg-none mt-2 sm:mt-0">
                             <Button size="icon" variant="ghost"><BsTelegram className="h-4 w-4 sm:h-5 sm:w-5 text-[#5580ff] cursor-pointer hover:bg-none" /></Button>
@@ -472,7 +493,11 @@ export default function LandingPage() {
                 Join hundreds of other people on our waitlist to be informed when we launch.
               </p>
               <div className="flex flex-col sm:flex-row justify-center gap-4">
-                <Button size="lg" className="bg-[#5580ff] hover:bg-[#4466cc] text-white px-8 rounded">
+                <Button 
+                  size="lg" 
+                  className="bg-[#5580ff] hover:bg-[#4466cc] text-white px-8 rounded"
+                  onClick={openWaitlistModal}
+                >
                   <span className="flex items-center justify-center">
                     Join The Waitlist <ArrowRight className="ml-2 h-4 w-4" />
                   </span>

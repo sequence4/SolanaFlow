@@ -6,14 +6,17 @@
     "dev": "next dev",
     "build": "next build",
     "export": "next export -o out",
-    "start": "next start"
+    "start": "next start",
+    "lint": "next lint"
   },
   "dependencies": {
+    "@radix-ui/react-label": "^2.0.2",
     "@xyflow/react": "^12.4.4",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
     "lucide-react": "^0.479.0",
     "next": "^15.2.3",
+    "pg": "^8.13.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-icons": "^5.5.0",
@@ -23,6 +26,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.15",
+    "@types/pg": "^8.11.11",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.4.21",
