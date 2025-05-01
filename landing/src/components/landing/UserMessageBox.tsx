@@ -167,7 +167,7 @@ export default function UserMessageBox({
       <div className="relative z-10">
         <div className="flex justify-between items-center">
           <div className="h-[5rem] flex-1 bg-[#0d0e1a] border border-[#2a2d4a] rounded-xl p-4 shadow-sm">
-            <div className="min-h-[24px] text-gray-400 text-sm" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
+            <div className="min-h-[24px] text-gray-400 text-sm sm:text-xs" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
               {displayedText}
               {showCursor && <span className="inline-block w-2 h-4 bg-[#5580ff] ml-0.5">&nbsp;</span>}
             </div>

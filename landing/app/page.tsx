@@ -118,44 +118,44 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="flex justify-center px-[8%] pt-[5%] pb-[8%] w-full h-[100vh] overflow-hidden">
-        <div className="w-full h-full z-10">
-            <div className="flex flex-col w-full h-full md:flex-row items-start">
+      <section className="w-full h-screen overflow-hidden">
+        <div className="mx-auto w-full px-6 max-w-screen-lg xl:max-w-screen-xl 2xl:max-w-screen-2xl z-10">
+            <div className="grid h-full grid-cols-1 lg:grid-cols-[1fr_auto] gap-10 items-center">
                 {/* Left side content */}
-                <div className="flex flex-col justify-evenly gap-2 h-full w-full md:w-2/5 lg:w-2/5 mb-12 md:mb-0 pr-0 md:pr-4 lg:pr-8">
+                <div className="flex flex-col justify-center gap-6">
                     <div className="flex flex-col gap-0 justify-start">
-                        <div className="w-fit inline-block px-2 sm:px-3 py-1 mb-4 sm:mb-6 rounded-full bg-[#1e2033] border border-[#2a2d4a] text-xs text-[#5580ff]">
-                        <span className="mr-2">●</span> Visual AI Developer Tool for Solana
+                        <div className="w-fit inline-block px-2 sm:px-3 py-1 mb-4 rounded-full bg-[#1e2033] border border-[#2a2d4a] text-xs text-[#5580ff]">
+                          <span className="mr-2">●</span> Visual AI Developer Tool for Solana
                         </div>
-                        <h1 className="text-3xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 leading-tight tracking-tight" style={{ fontFamily: '"DM Sans", sans-serif' }}>
-                        <span className="block">Build Solana dApps</span>
-                        <span className="text-4xl sm:text-4xl md:text-5xl lg:text-6xl text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]" 
+                        <h1 className="font-bold leading-tight" style={{ fontFamily: '"DM Sans", sans-serif' }}>
+                          <span className="block text-[clamp(1.75rem,4vw+0.5rem,3.5rem)]">Deploy Solana dApps</span>
+                          <span className="block text-[clamp(2.25rem,5vw+0.75rem,4.5rem)] text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]" 
                             style={{
-                            backgroundSize: "300% 300%",
-                            animation: "gradientFlow 3s ease infinite"
+                              backgroundSize: "300% 300%",
+                              animation: "gradientFlow 3s ease infinite"
                             }}>
                             Without Code
-                        </span>
+                          </span>
                         </h1>
                     </div>
-                    <div className="text-gray-400 mb-6 sm:mb-8 max-w-lg text-xs sm:text-sm leading-relaxed">
-                    <ul className="list-disc list-outside ml-6 space-y-4">
-                      <li className="pl-2">
-                        <span className="text-white font-semibold">AI&nbsp;Powered&nbsp;Development</span> – Turn ideas into secure Solana dApps with natural-language instructions.
-                      </li>
-                      <li className="pl-2">
-                        <span className="text-white font-semibold">Visual&nbsp;Workflow&nbsp;Builder</span> – Drag-and-drop pre-audited Solana modules for fast, reliable builds.
-                      </li>
-                      <li className="pl-2">
-                        <span className="text-white font-semibold">Instant&nbsp;Deployment</span> – Ship to devnet or mainnet in a single click.
-                      </li>
-                      <li className="pl-2">
-                        <span className="text-white font-semibold">Live&nbsp;Iterations</span> – Update logic and push upgrades in real time.
-                      </li>
-                      <li className="pl-2">
-                        <span className="text-white font-semibold">Collaborative&nbsp;Workspace</span> – Real-time co-editing with built-in version control.
-                      </li>
-                    </ul>
+                    <div className="text-gray-400 w-full">
+                      <ul className="space-y-4 pl-6 text-sm md:text-[15px] xl:text-base">
+                        <li className="pl-2">
+                          <span className="text-white font-semibold">AI&nbsp;Powered&nbsp;Development</span> – Turn ideas into secure Solana dApps with natural-language instructions.
+                        </li>
+                        <li className="pl-2">
+                          <span className="text-white font-semibold">Visual&nbsp;Workflow&nbsp;Builder</span> – Drag-and-drop pre-audited Solana modules for fast, reliable builds.
+                        </li>
+                        <li className="pl-2">
+                          <span className="text-white font-semibold">Instant&nbsp;Deployment</span> – Ship to devnet or mainnet in a single click.
+                        </li>
+                        <li className="pl-2">
+                          <span className="text-white font-semibold">Live&nbsp;Iterations</span> – Update logic and push upgrades in real time.
+                        </li>
+                        <li className="pl-2">
+                          <span className="text-white font-semibold">Collaborative&nbsp;Workspace</span> – Real-time co-editing with built-in version control.
+                        </li>
+                      </ul>
                     </div>
                     <div className="flex flex-col sm:flex-row justify-start gap-8">
                         <Button 
@@ -223,58 +223,58 @@ export default function LandingPage() {
                 </div>
 
                 {/* Right side - Flow diagram and code snippet */}
-                <div className="w-full h-full flex flex-col lg:flex-row mt-8 md:mt-0">
-                {/* Flow Diagram */}
-                <div className="w-full relative isolate overflow-hidden">
-                  <div className="h-full w-full overflow-hidden overscroll-x-none overflow-y-none">
-                    {mounted && <InstructionFlow />}
+                <div className="flex flex-col h-full min-w-[18rem] md:min-w-[22rem] xl:min-w-[26rem] 2xl:min-w-[32rem] max-w-full">
+                  {/* Flow Diagram */}
+                  <div className="w-full relative isolate overflow-hidden">
+                    <div className="h-full w-full overflow-hidden overscroll-x-none overflow-y-none">
+                      {mounted && <InstructionFlow />}
+                    </div>
                   </div>
-                </div>
 
-              {/* Code Terminal */}
-              <div className="w-full h-full flex flex-col">
-                <div className="w-full h-full rounded-xl">
-                  <div className="w-full h-full rounded-xl overflow-hidden border border-[#2a2d4a] bg-[#0d0e1a] relative flex flex-col min-h-0">
-                    <div className="flex items-center px-4 py-2 bg-[#1e2033] border-b border-[#2a2d4a] rounded-lg ">
-                      <div className="flex space-x-2 rounded-lg">
-                        <div className="w-2 h-2 rounded-full bg-[#ff5f57]"></div>
-                        <div className="w-2 h-2 rounded-full bg-[#febc2e]"></div>
-                        <div className="w-2 h-2 rounded-full bg-[#28c840]"></div>
+                  {/* Code Terminal */}
+                  <div className="w-full flex flex-col">
+                    <div className="w-full rounded-xl">
+                      <div className="w-full rounded-xl overflow-hidden border border-[#2a2d4a] bg-[#0d0e1a] relative flex flex-col min-h-0">
+                        <div className="flex items-center px-4 py-2 bg-[#1e2033] border-b border-[#2a2d4a] rounded-lg">
+                          <div className="flex space-x-2 rounded-lg">
+                            <div className="w-2 h-2 rounded-full bg-[#ff5f57]"></div>
+                            <div className="w-2 h-2 rounded-full bg-[#febc2e]"></div>
+                            <div className="w-2 h-2 rounded-full bg-[#28c840]"></div>
+                          </div>
+                          <div className="ml-4 text-sm text-gray-400">token_minting_program.rs</div>
+                        </div>
+                        <div className="flex-1 w-full min-h-0 overflow-x-auto">
+                          {mounted && <TypewriterCode />}
+                        </div>
                       </div>
-                      <div className="ml-4 text-sm text-gray-400">token_minting_program.rs</div>
                     </div>
-                    <div className="flex-1 w-full min-h-0">
-                      {mounted && <TypewriterCode />}
+                    
+                    {/* User Message Box */}
+                    <div className="w-full mt-4 rounded-xl">
+                      <div className="w-full rounded-xl overflow-hidden border border-[#2a2d4a] relative">
+                        {mounted && <UserMessageBox 
+                          messages={[
+                            "Generate a Solana wallet dApp that connects Phantom, shows balances, and lets users send SOL",
+                            "Deploy a fixed-supply SPL token and create a simple web mint/burn interface",
+                            "Create an NFT mint site using Candy Machine v3 for a 1,000-item collection",
+                            "Build a token-swap dApp with Jupiter to trade SOL ↔ USDC",
+                            "Set up a staking dashboard and contract for my SPL token with reward claims",
+                            "Launch a DAO dApp with on-chain proposal creation and token-weighted voting",
+                            "Spin up a crowdfunding platform that releases funds only if the goal is reached",
+                            "Create a monthly USDC subscription billing dApp with automatic charges",
+                            "Generate a weekly raffle contract that picks random winners and pays out SOL",
+                            "Build a simple arcade game smart contract that rewards top scores in SOL"
+                          ]}
+                          typingSpeed={50}
+                          delayBetweenMessages={3000}
+                          className="w-full"
+                        />}
+                      </div>
                     </div>
                   </div>
                 </div>
-                
-                {/* User Message Box */}
-                <div className="w-full mt-4 rounded-xl">
-                  <div className="w-full rounded-xl overflow-hidden border border-[#2a2d4a] relative">
-                    {mounted && <UserMessageBox 
-                      messages={[
-                        "Generate a Solana wallet dApp that connects Phantom, shows balances, and lets users send SOL",
-                        "Deploy a fixed-supply SPL token and create a simple web mint/burn interface",
-                        "Create an NFT mint site using Candy Machine v3 for a 1,000-item collection",
-                        "Build a token-swap dApp with Jupiter to trade SOL ↔ USDC",
-                        "Set up a staking dashboard and contract for my SPL token with reward claims",
-                        "Launch a DAO dApp with on-chain proposal creation and token-weighted voting",
-                        "Spin up a crowdfunding platform that releases funds only if the goal is reached",
-                        "Create a monthly USDC subscription billing dApp with automatic charges",
-                        "Generate a weekly raffle contract that picks random winners and pays out SOL",
-                        "Build a simple arcade game smart contract that rewards top scores in SOL"
-                      ]}
-                      typingSpeed={50}
-                      delayBetweenMessages={3000}
-                      className="w-full"
-                    />}
-                  </div>
-                </div>
-              </div>
             </div>
         </div>
-    </div>
       </section>
 
       {/* Features Section */}

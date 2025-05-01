@@ -18,18 +18,17 @@ export default function TypewriterCode() {
     
     const [maxVisibleLines, setMaxVisibleLines] = useState(0)
     
-    // Compute how many lines really fit, update on resize
     useLayoutEffect(() => {
       if (!terminalRef.current) return
       
       const calc = () => {
-        const h = Math.max(1, terminalRef.current!.clientHeight)   // never 0
-        const lh = parseFloat(getComputedStyle(terminalRef.current!).lineHeight || "16")  // px per line
+        const h = Math.max(1, terminalRef.current!.clientHeight)
+        const lh = parseFloat(getComputedStyle(terminalRef.current!).lineHeight || "16")
         setMaxVisibleLines(Math.max(1, Math.floor(h / lh) - 1))
       }
       
-      calc()                                   // initial
-      const obs = new ResizeObserver(calc)     // on resize
+      calc() 
+      const obs = new ResizeObserver(calc)
       obs.observe(terminalRef.current!)
       return () => obs.disconnect()
     }, [])
@@ -51,7 +50,6 @@ export default function TypewriterCode() {
     }
   
     useEffect(() => {
-      // Progress based on visible lines
       if (maxVisibleLines > 0) {
         const currentLines = displayText.split("\n").length
         const progressLines = Math.min(currentLines, maxVisibleLines)
@@ -110,7 +108,6 @@ export default function TypewriterCode() {
         const nextChar = currentCode.substring(0, displayText.length + 1)
         timeout = setTimeout(() => {
           setDisplayText(nextChar)
-          // Keep cursor visible by scrolling to bottom
           if (terminalRef.current) {
             terminalRef.current.scrollTop = terminalRef.current.scrollHeight
           }
@@ -230,12 +227,10 @@ export default function TypewriterCode() {
             <span className="text-[10px] font-mono">{aiStatus}</span>
           </div>
   
-          {/* File name display */}
           <div className="text-[10px] font-mono opacity-70">
             {fileNames[currentFileIndex]}
           </div>
   
-          {/* Neural network visualization - minimal version */}
           <div className="flex space-x-1">
             {[...Array(8)].map((_, i) => {
               const isActive = Math.random() > 0.7
