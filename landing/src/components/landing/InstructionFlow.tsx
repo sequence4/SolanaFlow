@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useLayoutEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { 
   Node, 
@@ -10,7 +10,8 @@ import {
   ConnectionLineType,
   NodeTypes,
   applyNodeChanges,
-  Handle
+  Handle,
+  useUpdateNodeInternals
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { initMintFlow } from '@/data/initializeMint/initMintFlow';
@@ -48,16 +49,37 @@ const transformInstructionData = (instructionNode: any) => {
 };
 
 const InstructionNodeWrapper = ({ data }: any) => {
+  const outerRef = useRef<HTMLDivElement>(null);
+  const updateNodeInternals = useUpdateNodeInternals();
+
+  /* Reset width/height → ask React-Flow to re-measure → box now matches content */
+  useLayoutEffect(() => {
+    if (!outerRef.current) return;
+    outerRef.current.style.width = 'auto';
+    outerRef.current.style.height = 'auto';
+    updateNodeInternals(data.id);
+  });
+
+  /* Future-proof: if the card is resized for any reason, update again */
+  useLayoutEffect(() => {
+    if (!outerRef.current) return;
+    const ro = new ResizeObserver(() => updateNodeInternals(data.id));
+    ro.observe(outerRef.current);
+    return () => ro.disconnect();
+  }, [data.id, updateNodeInternals]);
+
   return (
-    <div className="instruction-wrapper">
+    <div 
+      ref={outerRef}
+      className="instruction-wrapper inline-block"
+    >
       <div className="instruction-border relative">
 
-        {/* Right-side (source) handle — centre-aligned */}
         <Handle
           type="source"
           position={Position.Right}
           style={{
-            right: -4,              // sit flush with node edge
+            right: -4,
             top: '50%',
             transform: 'translateY(-50%)',
             width: 8,
@@ -67,7 +89,6 @@ const InstructionNodeWrapper = ({ data }: any) => {
           }}
         />
 
-        {/* Left-side (target) handle — mirror */}
         <Handle
           type="target"
           position={Position.Left}
@@ -126,25 +147,25 @@ const InstructionFlow = () => {
           label: "Transfer",
           description: "Transfers tokens from one account to another",
           code: `pub fn transfer(
-ctx: Context<Transfer>,
-amount: u64
-) -> Result<()> {
-let cpi_accounts = Transfer {
-  from: ctx.accounts.source.to_account_info(),
-  to: ctx.accounts.destination.to_account_info(),
-  authority: ctx.accounts.authority.to_account_info(),
-};
+            ctx: Context<Transfer>,
+            amount: u64
+            ) -> Result<()> {
+            let cpi_accounts = Transfer {
+              from: ctx.accounts.source.to_account_info(),
+              to: ctx.accounts.destination.to_account_info(),
+              authority: ctx.accounts.authority.to_account_info(),
+            };
 
-token::transfer(
-  CpiContext::new(
-    ctx.accounts.token_program.to_account_info(),
-    cpi_accounts
-  ),
-  amount
-)?;
+            token::transfer(
+              CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                cpi_accounts
+              ),
+              amount
+            )?;
 
-Ok(())
-}`,
+          Ok(())
+          }`,
           accounts: [
             { label: "Source", type: "Pubkey", description: "The source token account" },
             { label: "Destination", type: "Pubkey", description: "The destination token account" },
@@ -252,7 +273,6 @@ Ok(())
         panOnScroll={false}
         panOnDrag={true}
       >
-        {/* Define SVG gradient for edges */}
         <svg width="0" height="0">
           <defs>
             <linearGradient id="edge-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -280,6 +300,15 @@ Ok(())
           showZoom={true}
           position="bottom-left"
         />
+
+        <style jsx global>{`
+          /* disable pointer events on both the visible edge and its
+             invisible, thicker selection overlay */
+          .flow-canvas .react-flow__edge-path,
+          .flow-canvas .react-flow__edge-path-selector {
+            pointer-events: none;
+          }
+        `}</style>
       </ReactFlow>
     </div>
   );

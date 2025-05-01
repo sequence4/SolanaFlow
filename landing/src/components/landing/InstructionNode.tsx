@@ -1,5 +1,5 @@
 // Instruction Node component for landing page
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { useUpdateNodeInternals } from '@xyflow/react';
 
 type InstructionNodeProps = {
@@ -29,18 +29,22 @@ const InstructionNode: React.FC<InstructionNodeProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'Context' | 'Inputs' | 'Errors' | 'Events'>('Context');
 
-  /* ────────────────────────────────────────────────────────────
-     Ensure React-Flow recalculates this node's width/height once
-     the real DOM exists, so the hit-box matches what the user sees
-  ──────────────────────────────────────────────────────────── */
   const updateNodeInternals = useUpdateNodeInternals();
-  useEffect(() => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  useLayoutEffect(() => {
     updateNodeInternals(id);
+  }, [id, activeTab, accounts.length, inputs.length, updateNodeInternals]);
+
+  useLayoutEffect(() => {
+    if (!containerRef.current) return;
+    const obs = new ResizeObserver(() => updateNodeInternals(id));
+    obs.observe(containerRef.current);
+    return () => obs.disconnect();
   }, [id, updateNodeInternals]);
 
   return (
-    <div className="node-draggable w-full h-full bg-[#121218] rounded-xl border border-[#333] overflow-hidden shadow-lg">
-      {/* Header */}
+    <div ref={containerRef} className="node-draggable w-full bg-[#121218] rounded-xl border border-[#333] overflow-hidden shadow-lg">
       <div className="flex items-center justify-between p-3 border-b border-[#333] bg-[#1a1a24]">
         <div className="flex items-center space-x-2">
       
@@ -56,7 +60,6 @@ const InstructionNode: React.FC<InstructionNodeProps> = ({
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="flex border-b border-[#333] bg-[#121218]">
         <button 
           className={`cursor-pointer px-3 py-1.5 text-[10px] ${activeTab === 'Context' ? 'text-[#5d5dff] border-b-2 border-[#5d5dff]' : 'text-[#888] hover:text-white'}`}
@@ -84,7 +87,6 @@ const InstructionNode: React.FC<InstructionNodeProps> = ({
         </button>
       </div>
 
-      {/* Content – stop wheel from bubbling so list scrolls instead of canvas zooming */}
       <div 
         className="p-3 overflow-auto max-h-[230px]"
         onWheel={e => e.stopPropagation()}
