@@ -67,7 +67,7 @@ jobs:
           NODE_ENV: test
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps
+        run: pnpm --filter landing exec playwright install --with-deps
 
       - name: Playwright E2E
         run: pnpm --filter landing test:e2e
