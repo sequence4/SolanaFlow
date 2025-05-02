@@ -1,6 +1,7 @@
-import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers/postgresql';
+import { PostgreSqlContainer } from '@testcontainers/postgresql';
+import { initDb } from './__mocks__/@/lib/db';
 
-let container: StartedPostgreSqlContainer;
+let container: Awaited<ReturnType<PostgreSqlContainer['start']>>;
 
 beforeAll(async () => {
   container = await new PostgreSqlContainer('postgres:15')
@@ -9,32 +10,31 @@ beforeAll(async () => {
     .withPassword('test')
     .start();
 
-  process.env.DATABASE_URL = container.getConnectionUri();
-  process.env.TEST_ENV = 'test';
-  process.env.NEXT_TELEMETRY_DISABLED = '1';
-  
-  // We'll manually set up the database schema here if needed
-  // For now, we'll just assume the tests will create tables as needed
-});
+  const uri = container.getConnectionUri();
+  process.env.DATABASE_URL = uri;
+  initDb(uri);
+
+  const { db } = await import('@/lib/db');
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS waitlist (
+      id SERIAL PRIMARY KEY,
+      email TEXT UNIQUE,
+      wallet_address TEXT,
+      full_name TEXT,
+      telegram_handle TEXT,
+      twitter_handle TEXT,
+      discord_username TEXT,
+      referred_by TEXT,
+      source TEXT,
+      signup_ip TEXT,
+      meta JSONB,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+}, 30000);
 
 afterAll(async () => {
-  // Import without relying on path mapping
-  try {
-    // Only attempt to close db connection if the module can be loaded
-    let dbModule: any;
-    try {
-      dbModule = require('../../../lib/db');
-      const db = dbModule.db;
-      if (db && typeof db.end === 'function') {
-        await db.end();
-      }
-    } catch (error) {
-      // Just ignore the error - the module might not be available in tests
-    }
-  } finally {
-    // Always stop the container
-    if (container) {
-      await container.stop();
-    }
-  }
+  const { db } = await import('@/lib/db');
+  await db.end();
+  await container.stop();
 }); 

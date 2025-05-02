@@ -6,9 +6,9 @@ const config: Config = {
   testEnvironment: 'node',
   testMatch: ['<rootDir>/src/__tests__/**/*.test.ts?(x)'],
   moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/$1',
+    '^@/lib/db$': '<rootDir>/src/__tests__/api/__mocks__/@/lib/db.ts',
     '^@/app/(.*)$': '<rootDir>/app/$1',
-    '^@/lib/(.*)$': '<rootDir>/lib/$1'
+    '^@/(.*)$': '<rootDir>/src/$1'
   },
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/api/jest.setup.ts'],
   detectOpenHandles: true,
