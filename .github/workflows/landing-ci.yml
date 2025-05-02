@@ -22,25 +22,35 @@ jobs:
     env:
       CI: true
       TZ: UTC
+      ACT: ''
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
           run_install: false
 
-      - name: Setup Node 20
+      - name: Setup Node 20 (GH)
+        if: ${{ env.ACT == '' }}
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
-          cache-dependency-path: '**/pnpm-lock.yaml'
+          cache-dependency-path: pnpm-lock.yaml
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Setup Node 20 (act)
+        if: ${{ env.ACT != '' }}
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.6.5 --activate
+          node -v
+          pnpm -v
+
+      - name: Install deps
+        run: pnpm install --no-frozen-lockfile
 
       - name: Type-check landing
         run: pnpm --filter ./landing run type-check
