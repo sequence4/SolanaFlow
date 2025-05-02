@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 
+export const dynamic = 'force-static';
+
 export async function GET() {
   // Generate a random token
   const token = crypto.randomBytes(32).toString('hex');

@@ -12,11 +12,5 @@ export default defineConfig({
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     { name: 'webkit',   use: { ...devices['Desktop Safari'] } },
-  ],
-  webServer: {
-    command: 'pnpm dlx serve -l 3000 out',
-    cwd: 'landing',
-    timeout: 120_000,
-    reuseExistingServer: !process.env.CI,
-  },
+  ]
 }); 

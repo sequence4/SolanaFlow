@@ -5,15 +5,16 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:prod": "next build && next export",
+    "build:prod": "next build",
     "export": "next export -o out",
     "start": "next start",
+    "start:prod": "next start -p 3000",
     "type-check": "tsc --noEmit",
     "lint": "next lint",
     "test": "jest",
     "test:watch": "jest --watchAll",
     "test:api": "cross-env NODE_ENV=test jest src/__tests__/api/",
-    "test:e2e": "pnpm run build:prod && playwright test",
+    "test:e2e": "pnpm run build:prod && PLAYWRIGHT_SERVER=1 pnpm run start:prod & wait-on http://127.0.0.1:3000 && playwright test && pkill -f \"next start -p 3000\"",
     "test:cov": "jest --coverage --coverageThreshold '{\"global\":{\"branches\":80,\"lines\":80}}'",
     "ci": "pnpm type-check && pnpm lint && pnpm test"
   },

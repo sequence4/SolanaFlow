@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
+export const dynamic = 'force-static';
+
 const n = (v?: string | null) => {
   if (typeof v !== 'string') return null;
   const trimmed = v.trim();

@@ -5,7 +5,6 @@ const nextConfig: NextConfig = {
   images: {
     domains: []
   },
-  output: 'standalone',
   compiler: {
     styledJsx: true
   }
