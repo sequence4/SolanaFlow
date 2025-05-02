@@ -6,20 +6,12 @@
 # Error details
 
 ```
-Error: browserType.launch: 
-╔══════════════════════════════════════════════════════╗
-║ Host system is missing dependencies to run browsers. ║
-║ Please install them with the following command:      ║
-║                                                      ║
-║     sudo pnpm exec playwright install-deps           ║
-║                                                      ║
-║ Alternatively, use apt:                              ║
-║     sudo apt-get install libnss3\                    ║
-║         libnspr4\                                    ║
-║         libasound2                                   ║
-║                                                      ║
-║ <3 Playwright Team                                   ║
-╚══════════════════════════════════════════════════════╝
+Error: page.fill: Test timeout of 90000ms exceeded.
+Call log:
+  - waiting for locator('input[aria-label="E-mail"]')
+    - waiting for" http://localhost:3000/" navigation to finish...
+
+    at /home/fox/projects/flowcode/landing/e2e/waitlist.spec.ts:6:14
 ```
 
 # Test source
@@ -27,11 +19,11 @@ Error: browserType.launch:
 ```ts
   1 | import { test, expect } from '@playwright/test';
   2 |
-> 3 | test('user can join the wait-list', async ({ page }) => {
-    |     ^ Error: browserType.launch: 
+  3 | test('user can join the wait-list', async ({ page }) => {
   4 |   test.slow();
   5 |   await page.goto('http://localhost:3000');
-  6 |   await page.fill('input[aria-label="E-mail"]', 'alice@example.com');
+> 6 |   await page.fill('input[aria-label="E-mail"]', 'alice@example.com');
+    |              ^ Error: page.fill: Test timeout of 90000ms exceeded.
   7 |   await page.click('button:has-text("Join the list")');
   8 |   await expect(page.getByText(/stay tuned/i)).toBeVisible();
   9 | }); 
