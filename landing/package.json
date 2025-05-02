@@ -14,7 +14,8 @@
     "test": "jest",
     "test:watch": "jest --watchAll",
     "test:api": "cross-env NODE_ENV=test jest src/__tests__/api/",
-    "test:e2e": "pnpm run build:prod && PLAYWRIGHT_SERVER=1 pnpm run start:prod & wait-on http://127.0.0.1:3000 && playwright test && pkill -f \"next start -p 3000\"",
+    "test:e2e": "pnpm run build:prod && (npm_config_yes=true pnpm --dir ./ landing:start-bg) && wait-on http://127.0.0.1:3000 && playwright test && pkill -f \"__landing_next_prod\"",
+    "landing:start-bg": "NODE_ENV=production PORT=3000 CROSS_ENV=1 nohup bash -c 'exec -a __landing_next_prod pnpm run start:prod' &",
     "test:cov": "jest --coverage --coverageThreshold '{\"global\":{\"branches\":80,\"lines\":80}}'",
     "lighthouse:test": "wait-on http://127.0.0.1:3000 && npx lhci autorun --config=./lighthouserc.js",
     "ci": "pnpm type-check && pnpm lint && pnpm test"
