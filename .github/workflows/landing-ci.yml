@@ -39,7 +39,7 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
+          cache-dependency-path: '**/pnpm-lock.yaml'
 
       - name: Setup Node 20 (act)
         if: ${{ env.ACT != '' }}
