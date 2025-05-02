@@ -32,4 +32,15 @@ describe('POST /api/waitlist', () => {
     
     expect(res.body.error).toBe('email or wallet required');
   }, 10000);
+  
+  it('409 on duplicate email', async () => {
+    const email = 'dup@example.com';
+    await db.query('INSERT INTO waitlist (email) VALUES ($1)', [email]);
+
+    await agent
+      .post('/api/waitlist')
+      .send({ email })
+      .set('Content-Type', 'application/json')
+      .expect(409);
+  });
 }); 

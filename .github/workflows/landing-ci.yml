@@ -50,6 +50,14 @@ jobs:
       - name: Install deps
         run: pnpm install --no-frozen-lockfile
 
+      - name: Pull postgres image once
+        run: docker pull postgres:15
+
+      - name: Run API integration tests
+        run: pnpm --filter ./landing test:api
+        env:
+          NODE_ENV: test
+
       - name: Type-check landing
         run: pnpm --filter ./landing run type-check
 
@@ -58,6 +66,8 @@ jobs:
 
       - name: Test landing
         run: pnpm --filter ./landing run test
+        env:
+          CI: true
 
       - name: Build landing
         run: pnpm --filter ./landing run build
