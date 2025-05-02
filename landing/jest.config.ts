@@ -1,17 +1,18 @@
-import nextJest from 'next/jest.js';
+import type { Config } from 'jest';
+import { join } from 'path';
 
-const createJestConfig = nextJest({ dir: './' });
-
-const custom = {
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
-  testEnvironment: 'jest-environment-jsdom',
+const config: Config = {
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  testMatch: ['<rootDir>/src/__tests__/**/*.test.ts?(x)'],
   moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/src/$1',
-    '^.+\\.(css|scss)$': 'identity-obj-proxy',
+    '^@/(.*)$': '<rootDir>/$1',
+    '^@/app/(.*)$': '<rootDir>/app/$1',
+    '^@/lib/(.*)$': '<rootDir>/lib/$1'
   },
-  transformIgnorePatterns: [
-    '/node_modules/(?!(lucide-react)/)'
-  ],
+  setupFilesAfterEnv: ['<rootDir>/src/__tests__/api/jest.setup.ts'],
+  detectOpenHandles: true,
+  modulePaths: [join(__dirname, './')],
 };
 
-export default createJestConfig(custom); 
+export default config; 

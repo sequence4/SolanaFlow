@@ -23,13 +23,14 @@ export async function POST(req: NextRequest) {
     null;
 
   try {
-    await db.query(
+    const insert = await db.query(
       `INSERT INTO waitlist
          (email, wallet_address, full_name,
           telegram_handle, twitter_handle, discord_username,
           referred_by, source, signup_ip, meta)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-       ON CONFLICT (email) DO NOTHING`,
+       ON CONFLICT (email) DO NOTHING
+       RETURNING id`,
       [
         n(body.email),
         n(body.wallet_address),
@@ -43,6 +44,14 @@ export async function POST(req: NextRequest) {
         req.headers   
       ]
     );
+
+    // Check if a row was inserted
+    if (insert.rowCount === 0) {
+      return NextResponse.json(
+        { error: 'duplicate' },
+        { status: 409 }
+      );
+    }
 
     return new NextResponse(null, { status: 201 });
   } catch (err) {
