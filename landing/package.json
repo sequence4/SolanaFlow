@@ -16,6 +16,7 @@
     "test:api": "cross-env NODE_ENV=test jest src/__tests__/api/",
     "test:e2e": "pnpm run build:prod && PLAYWRIGHT_SERVER=1 pnpm run start:prod & wait-on http://127.0.0.1:3000 && playwright test && pkill -f \"next start -p 3000\"",
     "test:cov": "jest --coverage --coverageThreshold '{\"global\":{\"branches\":80,\"lines\":80}}'",
+    "lighthouse:test": "wait-on http://127.0.0.1:3000 && npx lhci autorun --config=./lighthouserc.js",
     "ci": "pnpm type-check && pnpm lint && pnpm test"
   },
   "dependencies": {
@@ -36,6 +37,7 @@
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
+    "@lhci/cli": "^0.14.0",
     "@playwright/test": "^1.41.1",
     "@tailwindcss/postcss": "^4.0.15",
     "@testcontainers/postgresql": "^10.25.0",
@@ -54,6 +56,8 @@
     "jest": "^29.7.0",
     "jest-axe": "^8.0.0",
     "jest-environment-jsdom": "^29.7.0",
+    "lighthouse": "^12.6.0",
+    "lighthouse-ci": "^1.13.1",
     "playwright": "^1.52.0",
     "postcss": "^8.5.3",
     "serve": "^14.2.4",
@@ -62,6 +66,7 @@
     "tailwindcss-animate": "^1.0.7",
     "ts-jest": "^29.1.2",
     "ts-node": "10.9.1",
+    "wait-on": "^8.0.3",
     "whatwg-fetch": "^3.6.20"
   }
 }

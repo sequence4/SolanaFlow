@@ -73,7 +73,10 @@ jobs:
         run: pnpm --filter landing test:e2e
         env:
           CI: true
-
+          
+      - name: Performance budget (Lighthouse)
+        run: pnpm --filter landing lighthouse:test
+        
       - name: Unit + smoke tests
         run: pnpm --filter landing test
 
