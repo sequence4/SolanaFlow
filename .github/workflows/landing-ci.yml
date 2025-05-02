@@ -50,32 +50,35 @@ jobs:
       - name: Install deps
         run: pnpm install --no-frozen-lockfile
 
-      - name: Pull postgres image once
-        run: docker pull postgres:15
+      - name: Cache Docker layers (postgres:15)
+        uses: ScribeMD/docker-cache@0.3.6
+        with:
+          key: postgres-15
+
+      - name: Type-check landing
+        run: pnpm --filter landing run type-check
+
+      - name: Lint landing
+        run: pnpm --filter landing run lint --max-warnings 0
 
       - name: Run API integration tests
-        run: pnpm --filter ./landing test:api
+        run: pnpm --filter landing test:api
         env:
           NODE_ENV: test
 
-      - name: Type-check landing
-        run: pnpm --filter ./landing run type-check
-
-      - name: Lint landing
-        run: pnpm --filter ./landing run lint --max-warnings 0
-
-      - name: Test landing
-        run: pnpm --filter ./landing run test
-        env:
-          CI: true
-
-      - name: Coverage gate
-        run: pnpm --filter ./landing test:cov
-
-      - name: Build landing
-        run: pnpm --filter ./landing run build
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
 
       - name: Playwright E2E
-        run: pnpm --filter ./landing test:e2e
+        run: pnpm --filter landing test:e2e
         env:
           CI: true
+
+      - name: Unit + smoke tests
+        run: pnpm --filter landing test
+
+      - name: Coverage gate
+        run: pnpm --filter landing test:cov
+
+      - name: Build landing
+        run: pnpm --filter landing run build
