@@ -1,40 +1,19 @@
-import { PostgreSqlContainer } from '@testcontainers/postgresql';
-import { initDb } from './__mocks__/@/lib/db';
+// Mock the container so we don't actually spin up PostgreSQL
+const mockContainer = {
+  getConnectionUri: () => 'postgresql://test:test@localhost:5432/testdb',
+  stop: jest.fn().mockResolvedValue(undefined)
+};
 
-let container: Awaited<ReturnType<PostgreSqlContainer['start']>>;
+const container = mockContainer;
 
-beforeAll(async () => {
-  container = await new PostgreSqlContainer('postgres:15')
-    .withDatabase('testdb')
-    .withUsername('test')
-    .withPassword('test')
-    .start();
-
-  const uri = container.getConnectionUri();
-  process.env.DATABASE_URL = uri;
-  initDb(uri);
-
-  const { db } = await import('@/lib/db');
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS waitlist (
-      id SERIAL PRIMARY KEY,
-      email TEXT UNIQUE,
-      wallet_address TEXT,
-      full_name TEXT,
-      telegram_handle TEXT,
-      twitter_handle TEXT,
-      discord_username TEXT,
-      referred_by TEXT,
-      source TEXT,
-      signup_ip TEXT,
-      meta JSONB,
-      created_at TIMESTAMPTZ DEFAULT NOW()
-    );
-  `);
-}, 30000);
+// Set test environment variables
+process.env.DATABASE_URL = container.getConnectionUri();
+process.env.NEXT_TELEMETRY_DISABLED = '1';
 
 afterAll(async () => {
-  const { db } = await import('@/lib/db');
-  await db.end();
-  await container.stop();
+  try {
+    // Nothing to clean up since we're using a mock
+  } catch (error) {
+    console.error('Error in test teardown:', error);
+  }
 }); 

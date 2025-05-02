@@ -69,5 +69,13 @@ jobs:
         env:
           CI: true
 
+      - name: Coverage gate
+        run: pnpm --filter ./landing test:cov
+
       - name: Build landing
         run: pnpm --filter ./landing run build
+
+      - name: Playwright E2E
+        run: pnpm --filter ./landing test:e2e
+        env:
+          CI: true

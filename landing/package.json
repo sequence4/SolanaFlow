@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:prod": "next build && next export",
     "export": "next export -o out",
     "start": "next start",
     "type-check": "tsc --noEmit",
@@ -12,7 +13,8 @@
     "test": "jest",
     "test:watch": "jest --watchAll",
     "test:api": "cross-env NODE_ENV=test jest src/__tests__/api/",
-    "test:e2e": "playwright test",
+    "test:e2e": "pnpm run build:prod && playwright test",
+    "test:cov": "jest --coverage --coverageThreshold '{\"global\":{\"branches\":80,\"lines\":80}}'",
     "ci": "pnpm type-check && pnpm lint && pnpm test"
   },
   "dependencies": {
