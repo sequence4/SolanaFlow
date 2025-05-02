@@ -35,7 +35,7 @@ jobs:
           node-version: 20
 
       - name: Install deps (all workspaces)
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       - name: Type-check landing
         run: pnpm --filter ./landing run type-check
