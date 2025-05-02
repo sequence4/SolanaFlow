@@ -19,23 +19,28 @@ on:
 jobs:
   landing-ci:
     runs-on: ubuntu-latest
+    env:
+      CI: true
+      TZ: UTC
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4.2.2
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Setup Node 20 & pnpm
+      - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 8
           run_install: false
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: pnpm
+          cache-dependency-path: '**/pnpm-lock.yaml'
 
-      - name: Install deps (all workspaces)
-        run: pnpm install --no-frozen-lockfile
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Type-check landing
         run: pnpm --filter ./landing run type-check
@@ -47,4 +52,4 @@ jobs:
         run: pnpm --filter ./landing run test
 
       - name: Build landing
-        run: pnpm --filter ./landing run build 
+        run: pnpm --filter ./landing run build
