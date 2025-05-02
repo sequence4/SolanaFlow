@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
-/** Helper – turn "", "   ", undefined → null (keeps valid strings) */
 const n = (v?: string | null) => {
   if (typeof v !== 'string') return null;
   const trimmed = v.trim();
@@ -11,7 +10,6 @@ const n = (v?: string | null) => {
 export async function POST(req: NextRequest) {
   const body = await req.json();
 
-  /* 1 ─ basic validation */
   if (!n(body.email) && !n(body.wallet_address)) {
     return NextResponse.json(
       { error: 'email or wallet required' },
@@ -19,14 +17,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  /* 2 ─ best-effort client IP */
   const clientIp =
     req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
     req.headers.get('x-real-ip') ||
     null;
 
   try {
-    /* 3 ─ insert row */
     await db.query(
       `INSERT INTO waitlist
          (email, wallet_address, full_name,
@@ -41,10 +37,10 @@ export async function POST(req: NextRequest) {
         n(body.telegram_handle),
         n(body.twitter_handle),
         n(body.discord_username),
-        n(body.referred_by),   // now NULL when no ?ref=
+        n(body.referred_by),
         n(body.source),
         clientIp,
-        req.headers           // meta JSONB
+        req.headers   
       ]
     );
 

@@ -6,8 +6,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { ArrowRight, Loader2, X, CheckCircle } from "lucide-react"
+import { ArrowRight, Loader2, X } from "lucide-react"
 import confetti from "canvas-confetti"
+import {
+  isEmail,
+  isSolPubkey,
+  isHandle,
+  isDiscordHandle
+} from "@/utils/validators";
 
 interface WaitlistFormProps {
   onClose?: () => void;
@@ -25,6 +31,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({})
   const [isSuccess, setIsSuccess] = useState(false)
+  const [csrf, setCsrf] = useState<string>("");
   const { toast } = useToast()
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -66,19 +73,34 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
     }
   }, [])
 
+  useEffect(() => {
+    fetch("/api/csrf-token")
+      .then(r => r.json())
+      .then(d => setCsrf(d.token))
+      .catch(() => console.error("could not get CSRF token"));
+  }, []);
+
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
   const validateForm = () => {
-    const errors: { [key: string]: string } = {}
+    const errors: Record<string,string> = {};
 
+    /* At least one unique identifier */
     if (!email && !walletAddress) {
-      errors.form = "Please provide either an email or wallet address"
+      errors.form = "Please provide either an email or wallet address";
     }
 
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      errors.email = "Please enter a valid email address"
-    }
+    if (email && !isEmail(email))               errors.email   = "Invalid email";
+    if (walletAddress && !isSolPubkey(walletAddress)) errors.wallet = "Invalid wallet";
+    if (telegramHandle && !isHandle(telegramHandle))   errors.telegram = "Invalid Telegram handle";
+    if (twitterHandle  && !isHandle(twitterHandle))    errors.twitter  = "Invalid Twitter handle";
+    if (discordUsername && !isDiscordHandle(discordUsername)) errors.discord = "Invalid Discord handle";
 
-    setFormErrors(errors)
-    return Object.keys(errors).length === 0
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
   }
 
   const truncateField = (value: string, maxLength: number) => {
@@ -157,6 +179,10 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    const honeypot = (e.target as HTMLFormElement).website?.value;
+    if (honeypot) return;
+    
     if (!validateForm()) {
       return
     }
@@ -173,6 +199,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "x-csrf-token": csrf,
         },
         body: JSON.stringify({
           email,
@@ -412,6 +439,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                     <Input
                       id="email"
                       type="email"
+                      maxLength={254}
                       value={email}
                       onChange={(e) => {
                         setEmail(e.target.value)
@@ -444,6 +472,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                     <Input
                       id="wallet"
                       type="text"
+                      maxLength={44}
                       value={walletAddress}
                       onChange={(e) => {
                         setWalletAddress(e.target.value)
@@ -457,6 +486,11 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                       placeholder="Your Solana wallet address"
                     />
                   </div>
+                  {formErrors.wallet && (
+                    <p className="text-red-500 text-xs font-mono" aria-live="polite">
+                      {formErrors.wallet}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -468,6 +502,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                     <Input
                       id="fullName"
                       type="text"
+                      maxLength={80}
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       className="custom-input w-full"
@@ -485,12 +520,18 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                     <Input
                       id="telegram"
                       type="text"
+                      maxLength={32}
                       value={telegramHandle}
                       onChange={(e) => setTelegramHandle(e.target.value)}
                       className="custom-input w-full"
                       placeholder="@username"
                     />
                   </div>
+                  {formErrors.telegram && (
+                    <p className="text-red-500 text-xs font-mono" aria-live="polite">
+                      {formErrors.telegram}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -502,12 +543,18 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                     <Input
                       id="twitter"
                       type="text"
+                      maxLength={32}
                       value={twitterHandle}
                       onChange={(e) => setTwitterHandle(e.target.value)}
                       className="custom-input w-full"
                       placeholder="@handle"
                     />
                   </div>
+                  {formErrors.twitter && (
+                    <p className="text-red-500 text-xs font-mono" aria-live="polite">
+                      {formErrors.twitter}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -519,12 +566,32 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                     <Input
                       id="discord"
                       type="text"
+                      maxLength={37}
                       value={discordUsername}
                       onChange={(e) => setDiscordUsername(e.target.value)}
                       className="custom-input w-full"
                       placeholder="username#0000"
                     />
                   </div>
+                  {formErrors.discord && (
+                    <p className="text-red-500 text-xs font-mono" aria-live="polite">
+                      {formErrors.discord}
+                    </p>
+                  )}
+                </div>
+
+                {/* Honeypot – will be hidden with CSS */}
+                <div className="hidden" aria-hidden="true">
+                  <Label htmlFor="website">Leave blank</Label>
+                  <input
+                    id="website"
+                    name="website"
+                    type="text"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    className="opacity-0 w-0 h-0"
+                    onChange={() => { /* no-op */ }}
+                  />
                 </div>
 
                 <div className="pt-4">
