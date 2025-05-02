@@ -11,6 +11,9 @@ module.exports = {
         'cumulative-layout-shift':  ['warn',  { maxNumericValue: 0.1 }],
       }
     },
-    upload: { target: 'temporary-public-storage' }
+    upload: {
+      target: 'filesystem',
+      outputDir: './.lhci-reports'
+    }
   }
 }; 

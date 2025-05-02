@@ -77,6 +77,12 @@ jobs:
       - name: Performance budget (Lighthouse)
         run: pnpm --filter landing lighthouse:test
         
+      - name: Upload Lighthouse report
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-report
+          path: landing/.lhci-reports
+        
       - name: Unit + smoke tests
         run: pnpm --filter landing test
 
