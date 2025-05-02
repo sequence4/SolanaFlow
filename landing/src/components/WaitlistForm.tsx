@@ -108,55 +108,54 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
   }
 
   const triggerConfetti = () => {
-    const colors = ["#5f88dc", "#1cf6a0", "#9945ff"]
-
-    const duration = 3000
-    const animationEnd = Date.now() + duration
-
+    const colors = ["#5f88dc", "#1cf6a0", "#9945ff"];
+    const duration = 3_000;
+    const animationEnd = Date.now() + duration;
+  
     confetti({
       particleCount: 100,
       spread: 70,
-      origin: { y: 0, x: 0.5 },
-      colors: colors,
+      origin: { x: 0.5, y: 0 },
+      colors,
       shapes: ["square", "circle"],
       scalar: 1.2,
       disableForReducedMotion: true,
-    })
-
+    });
+  
     setTimeout(() => {
       confetti({
         particleCount: 50,
         angle: 60,
         spread: 55,
         origin: { x: 0, y: 0.5 },
-        colors: colors,
+        colors,
         shapes: ["square"],
         scalar: 1,
         disableForReducedMotion: true,
-      })
-
+      });
+  
       confetti({
         particleCount: 50,
         angle: 120,
         spread: 55,
         origin: { x: 1, y: 0.5 },
-        colors: colors,
+        colors,
         shapes: ["circle"],
         scalar: 1,
         disableForReducedMotion: true,
-      })
-    }, 250)
-
+      });
+    }, 250);
+  
     setTimeout(() => {
-      const interval = setInterval(() => {
-        const timeLeft = animationEnd - Date.now()
-
+      const intervalId = setInterval(() => {
+        const timeLeft = animationEnd - Date.now();
         if (timeLeft <= 0) {
-          return clearInterval(interval)
+          clearInterval(intervalId);
+          return;
         }
-
-        const particleCount = Math.floor((timeLeft / duration) * 30)
-
+  
+        const particleCount = Math.floor((timeLeft / duration) * 30);
+  
         confetti({
           particleCount,
           startVelocity: 30,
@@ -166,16 +165,18 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
             x: Math.random(),
             y: Math.random() - 0.2,
           },
-          colors: colors,
+          colors,
           shapes: ["square"],
           scalar: 0.8,
           gravity: 1.2,
           drift: 0,
           disableForReducedMotion: true,
-        })
-      }, 250)
-    }, 500)
-  }
+        });
+      }, 250);
+    }, 500);
+  };
+  
+  
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -216,7 +217,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
       if (response.status === 201) {
         toast({
           title: "You're in!",
-          description: "We'll keep you updated.",
+          description: "We&apos;ll keep you updated.",
           className: "bg-gradient-to-r from-[#4d7cfe] to-[#22d3ee] text-white border-none",
         })
         
@@ -231,14 +232,15 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
         setTwitterHandle("")
         setDiscordUsername("")
       } else {
-        const data = await response.json()
+        const { error: apiError } = await response.json()
         toast({
           title: "Something went wrong",
-          description: data.error || "Please try again later.",
+          description: apiError ?? "Please try again later.",
           variant: "destructive",
         })
       }
-    } catch (error) {
+    } catch (err) {
+      console.error(err);
       toast({
         title: "Connection error",
         description: "Please check your internet connection and try again.",
@@ -379,7 +381,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                 </span>
               </h2>
               <p className="text-gray-600 text-center mb-8 max-w-sm font-mono" style={{ fontFamily: '"IBM Plex Mono", monospace' }}>
-                Thanks for joining the SolanaFlow waitlist. We'll keep you updated on our launch and progress.
+                Thanks for joining the SolanaFlow waitlist. We&apos;ll keep you updated on our launch and progress.
               </p>
               <button
                 onClick={() => {
@@ -413,7 +415,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                   </span>
                 </h2>
                 <p className="text-gray-400 text-sm">
-                  Be the first to know when we launch.
+                  Be the first to know when&nbsp;we&nbsp;launch.
                 </p>
               </div>
 
@@ -619,7 +621,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                 </div>
 
                 <div className="flex items-center justify-center space-x-1 text-xs text-center text-gray-500 pt-1">
-                  <p>We'll only contact you about launch updates</p>
+                  <p>We&apos;ll only contact you about launch updates</p>
                 </div>
               </form>
             </div>

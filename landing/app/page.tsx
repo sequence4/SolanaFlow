@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState, useRef } from "react"
+import React, { useEffect, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ArrowRight } from "lucide-react"
@@ -420,7 +420,7 @@ export default function LandingPage() {
                   </span>
                   </h3>
                   <p className="text-gray-400 text-xs">
-                    Deploy instantly to Solana testnet or mainnet, then monitor and optimize your dApp's performance in real-time.
+                    Deploy instantly to Solana testnet or mainnet, then monitor and optimize your dApp&#39;s performance in real-time.
                   </p>
                 </div>
                 <div className="absolute bottom-0 right-0 w-16 h-16 opacity-10">

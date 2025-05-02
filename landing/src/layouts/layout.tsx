@@ -1,37 +1,36 @@
+import React from "react";
+import Head from "next/head";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Oxygen_Mono } from 'next/font/google';
+import { Oxygen_Mono } from "next/font/google";
 import "@/styles/globals.css";
 
 const geistSans = Geist({
-  variable: "--font-geist-sans",
   subsets: ["latin"],
+  variable: "--font-geist-sans"
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
   subsets: ["latin"],
+  variable: "--font-geist-mono"
 });
 
 const oxygenMono = Oxygen_Mono({
-  variable: "--font-oxygen-mono",
+  weight: "400",
   subsets: ["latin"],
-  weight: ["400"],
+  variable: "--font-oxygen-mono"
 });
 
 export const metadata: Metadata = {
-  title: "Solana FlowCode - Build Solana dApps Without Code",
-  description: "Visual AI developer tool for building and deploying Solana blockchain applications without writing code",
+  title: "Solana Flow",
+  description: "Visual AI Developer Tool for Solana",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <head>
+      <Head>
+        {/* Meta tags, title, etc. */}
         {/* Script to apply theme before hydration */}
         <script
           dangerouslySetInnerHTML={{
@@ -50,7 +49,7 @@ export default function RootLayout({
             `
           }}
         />
-      </head>
+      </Head>
       <body className={`${geistSans.variable} ${geistMono.variable} ${oxygenMono.variable} antialiased`}>
         {children}
       </body>

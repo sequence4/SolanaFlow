@@ -12,13 +12,15 @@ import {
   applyNodeChanges,
   Handle,
   useUpdateNodeInternals,
-  ReactFlowInstance
+  ReactFlowInstance,
+  NodeChange
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { initMintFlow } from '@/data/initializeMint/initMintFlow';
 import { mintToFlow } from '@/data/mintTo/mintToFlow';
 import { transferFlow } from '@/data/transfer/transferFlow';
 import InstructionNode from './InstructionNode';
+import { TransformedInstruction, Account as _Account, Input as _Input, ErrorCode, Event } from '@/types/instruction';
 
 const ReactFlow = dynamic(() => import('@xyflow/react').then((module) => module.ReactFlow), {
   ssr: false,
@@ -28,31 +30,45 @@ const Controls = dynamic(() => import('@xyflow/react').then((module) => module.C
   ssr: false,
 });
 
-const transformInstructionData = (instructionNode: any) => {
-  const data = instructionNode.data || {};
+const transformInstructionData = (instructionNode: Record<string, unknown>): TransformedInstruction => {
+  const data = (instructionNode.data as Record<string, unknown>) || {};
   
   return {
-    id: instructionNode.id || "unknown",
-    name: data.label || "Unnamed",
-    description: data.description || "",
+    id: (instructionNode.id as string) || "unknown",
+    name: (data.label as string) || "Unnamed",
+    description: (data.description as string) || "",
     status: "Active",
-    accounts: (data.accounts || []).map((acc: any) => ({
-      name: acc.label,
-      type: acc.type,
-      description: acc.description || "",
+    accounts: ((data.accounts as Array<Record<string, unknown>>) || []).map((acc) => ({
+      name: (acc.label as string),
+      type: (acc.type as string),
+      description: (acc.description as string) || "",
     })),
-    inputs: (data.parameters || []).map((param: any) => ({
-      name: param.label,
-      type: param.type,
-      value: param.value || "",
+    inputs: ((data.parameters as Array<Record<string, unknown>>) || []).map((param) => ({
+      name: (param.label as string),
+      type: (param.type as string),
+      value: (param.value as string) || "",
     })),
-    errorCodes: data.errorCodes || [],
-    events: data.events || [],
-    codePreview: data.code || "",
+    errorCodes: ((data.errorCodes as Array<Record<string, unknown>>) || []).map((code) => ({
+      code: (code.code as number) || 0,
+      name: (code.name as string) || "",
+      msg: (code.msg as string) || ""
+    })) as ErrorCode[],
+    events: ((data.events as Array<Record<string, unknown>>) || []).map((event) => ({
+      name: (event.name as string) || "",
+      fields: ((event.fields as Array<Record<string, unknown>>) || []).map((field) => ({
+        name: (field.name as string) || "",
+        type: (field.type as string) || ""
+      }))
+    })) as Event[],
+    codePreview: (data.code as string) || "",
   };
 };
 
-const InstructionNodeWrapper = ({ data }: any) => {
+interface InstructionNodeWrapperProps {
+  data: TransformedInstruction;
+}
+
+const InstructionNodeWrapper = ({ data }: InstructionNodeWrapperProps) => {
   const outerRef = useRef<HTMLDivElement>(null);
   const updateNodeInternals = useUpdateNodeInternals();
 
@@ -113,7 +129,6 @@ const InstructionNodeWrapper = ({ data }: any) => {
           <InstructionNode
             id={data.id}
             name={data.name}
-            description={data.description}
             status={data.status}
             accounts={data.accounts}
             inputs={data.inputs}
@@ -136,7 +151,7 @@ const InstructionFlow = () => {
     instructionGroupNode: InstructionNodeWrapper,
   };
 
-  const onNodesChange = useCallback((changes: any) => {
+  const onNodesChange = useCallback((changes: NodeChange[]) => {
     setNodes((nds) => applyNodeChanges(changes, nds));
   }, []);
 
@@ -156,19 +171,19 @@ const InstructionFlow = () => {
       setMounted(true);
       
       const initMintNode = initMintFlow.nodes[0];
-      const transformedInitMintData = transformInstructionData(initMintNode);
+      const transformedInitMintData = transformInstructionData(initMintNode as Record<string, unknown>);
       
       const mintToNode = mintToFlow.nodes[0];
-      const transformedMintToData = transformInstructionData(mintToNode);
+      const transformedMintToData = transformInstructionData(mintToNode as Record<string, unknown>);
       
       const transferNode = transferFlow.nodes[0];
-      const transformedTransferData = transformInstructionData(transferNode);
+      const transformedTransferData = transformInstructionData(transferNode as Record<string, unknown>);
 
       const initialNodes: Node[] = [
         {
           id: transformedInitMintData.id,
           type: "instructionGroupNode",
-          data: transformedInitMintData,
+          data: transformedInitMintData as unknown as Record<string, unknown>,
           position: { x: 100, y: -200 },
           sourcePosition: Position.Right,
           targetPosition: Position.Left,
@@ -178,7 +193,7 @@ const InstructionFlow = () => {
         {
           id: transformedMintToData.id,
           type: "instructionGroupNode",
-          data: transformedMintToData,
+          data: transformedMintToData as unknown as Record<string, unknown>,
           position: { x: 500, y: 0 },
           sourcePosition: Position.Right,
           targetPosition: Position.Left,
@@ -188,7 +203,7 @@ const InstructionFlow = () => {
         {
           id: transformedTransferData.id,
           type: "instructionGroupNode",
-          data: transformedTransferData,
+          data: transformedTransferData as unknown as Record<string, unknown>,
           position: { x: 900, y: 200 },
           sourcePosition: Position.Right,
           targetPosition: Position.Left,

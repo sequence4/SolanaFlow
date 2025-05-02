@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useLayoutEffect } from "react"
+import { useEffect, useRef, useState, useLayoutEffect, useCallback } from "react"
 import { initMintCode } from "@/data/initializeMint/code/initMintCode"
 import { mintToCode } from "@/data/mintTo/code/mintToCode"
 
@@ -44,10 +44,10 @@ export default function TypewriterCode() {
       "transfer_tokens.rs"
     ]
   
-    const shouldStartDeleting = (text: string) => {
+    const shouldStartDeleting = useCallback((text: string) => {
       const lines = text.split('\n');
       return lines.length >= maxVisibleLines && maxVisibleLines > 0;
-    }
+    }, [maxVisibleLines]);
   
     useEffect(() => {
       if (maxVisibleLines > 0) {
@@ -124,7 +124,7 @@ export default function TypewriterCode() {
         clearTimeout(timeout)
         clearInterval(cursorInterval)
       }
-    }, [displayText, isDeleting, loopNum, typingSpeed, currentCode, currentFileIndex, codeFiles.length, maxVisibleLines])
+    }, [displayText, isDeleting, loopNum, typingSpeed, currentCode, currentFileIndex, codeFiles.length, maxVisibleLines, shouldStartDeleting])
   
     const renderCodeWithHighlighting = () => {
       const lines = displayText.split('\n');

@@ -11,7 +11,6 @@ const Bullet = ({ color = '#e53e3e' }) => (
 type InstructionNodeProps = {
   id: string;
   name: string;
-  description: string;
   status: string;
   accounts: Array<{
     name: string;
@@ -40,7 +39,6 @@ type InstructionNodeProps = {
 const InstructionNode: React.FC<InstructionNodeProps> = ({
   id,
   name,
-  description,
   status,
   accounts,
   inputs,
