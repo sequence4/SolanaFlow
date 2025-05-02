@@ -1,6 +1,10 @@
 {
   "extends": [
     "next/core-web-vitals",
-    "next/typescript"
-  ]
+    "plugin:@typescript-eslint/recommended"
+  ],
+  "plugins": ["@typescript-eslint"],
+  "rules": {
+    // project-specific overrides here
+  }
 }

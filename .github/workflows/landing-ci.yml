@@ -1,0 +1,51 @@
+name: Landing package CI
+
+on:
+  push:
+    paths:
+      - 'landing/**'
+      - '.github/workflows/landing-ci.yml'
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  pull_request:
+    paths:
+      - 'landing/**'
+      - '.github/workflows/landing-ci.yml'
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+
+jobs:
+  landing-ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup Node 20 & pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install deps (all workspaces)
+        run: pnpm install --frozen-lockfile
+
+      - name: Type-check landing
+        run: pnpm --filter ./landing run type-check
+
+      - name: Lint landing
+        run: pnpm --filter ./landing run lint --max-warnings 0
+
+      - name: Test landing
+        run: pnpm --filter ./landing run test
+
+      - name: Build landing
+        run: pnpm --filter ./landing run build 

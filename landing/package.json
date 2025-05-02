@@ -7,9 +7,11 @@
     "build": "next build",
     "export": "next export -o out",
     "start": "next start",
+    "type-check": "tsc --noEmit",
     "lint": "next lint",
     "test": "jest",
-    "test:watch": "jest --watchAll"
+    "test:watch": "jest --watchAll",
+    "ci": "pnpm type-check && pnpm lint && pnpm test"
   },
   "dependencies": {
     "@jest/globals": "^29.7.0",
@@ -36,8 +38,10 @@
     "@types/canvas-confetti": "^1.9.0",
     "@types/jest": "^29.5.12",
     "@types/pg": "^8.11.11",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "^8.29.0",
+    "@typescript-eslint/parser": "^8.29.0",
     "autoprefixer": "^10.4.21",
     "canvas-confetti": "^1.9.3",
     "identity-obj-proxy": "^3.0.0",
