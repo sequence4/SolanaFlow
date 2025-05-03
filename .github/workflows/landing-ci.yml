@@ -55,11 +55,6 @@ jobs:
         with:
           key: postgres-15
 
-      - name: Install lsof
-        run: |
-          apt-get update -y
-          apt-get install -y lsof
-
       - name: Type-check landing
         run: pnpm --filter landing run type-check
 
