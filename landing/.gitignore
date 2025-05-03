@@ -21,4 +21,5 @@ landing/**/lighthouse.*/
 *.report.json
 
 # Playwright/Lighthouse browser-profile junk
+**/C:\Users*/Local/lighthouse.*/
 lighthouse.*/Default/
