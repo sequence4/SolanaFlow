@@ -21,6 +21,6 @@ export default defineConfig({
     command: 'E2E=1 pnpm --filter landing run build && E2E=1 pnpm --filter landing run start:prod',
     port: 3000,
     timeout: 120_000,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true,
   },
 }); 

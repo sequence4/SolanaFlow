@@ -19,3 +19,6 @@ landing/**/lighthouse.*/
 **/lighthouse.*/
 *.report.html
 *.report.json
+
+# Playwright/Lighthouse browser-profile junk
+lighthouse.*/Default/

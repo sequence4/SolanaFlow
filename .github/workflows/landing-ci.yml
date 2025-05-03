@@ -55,6 +55,11 @@ jobs:
         with:
           key: postgres-15
 
+      - name: Install lsof
+        run: |
+          apt-get update -y
+          apt-get install -y lsof
+
       - name: Type-check landing
         run: pnpm --filter landing run type-check
 
@@ -70,13 +75,16 @@ jobs:
         run: pnpm --filter landing exec playwright install --with-deps
 
       - name: Playwright E2E
-        run: pnpm --filter landing test:e2e
+        run: pnpm --filter landing run test:e2e
         env:
           CI: true
-          
+          E2E: 1
+
       - name: Performance budget (Lighthouse)
         run: pnpm --filter landing lighthouse:test
-        
+        env:
+          E2E: 1
+
       - name: Upload Lighthouse report
         uses: actions/upload-artifact@v4
         with:
