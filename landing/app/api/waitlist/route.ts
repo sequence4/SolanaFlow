@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { WaitlistSchema } from '@/lib/waitlistSchema';
+import type { z } from 'zod';
 
 export const dynamic = 'force-static';
 
@@ -10,13 +12,11 @@ const n = (v?: string | null) => {
 };
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-
-  if (!n(body.email) && !n(body.wallet_address)) {
-    return NextResponse.json(
-      { error: 'email or wallet required' },
-      { status: 400 }
-    );
+  let data: z.infer<typeof WaitlistSchema>;
+  try {
+    data = WaitlistSchema.parse(await req.json());
+  } catch {
+    return NextResponse.json({ error: 'invalid input' }, { status: 400 });
   }
 
   const clientIp =
@@ -34,20 +34,19 @@ export async function POST(req: NextRequest) {
        ON CONFLICT (email) DO NOTHING
        RETURNING id`,
       [
-        n(body.email),
-        n(body.wallet_address),
-        n(body.full_name),
-        n(body.telegram_handle),
-        n(body.twitter_handle),
-        n(body.discord_username),
-        n(body.referred_by),
-        n(body.source),
+        n(data.email),
+        n(data.wallet_address),
+        n(data.full_name),
+        n(data.telegram_handle),
+        n(data.twitter_handle),
+        n(data.discord_username),
+        n(data.referred_by),
+        n(data.source),
         clientIp,
         req.headers   
       ]
     );
 
-    // Check if a row was inserted
     if (insert.rowCount === 0) {
       return NextResponse.json(
         { error: 'duplicate' },

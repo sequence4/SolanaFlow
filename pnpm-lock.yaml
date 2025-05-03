@@ -373,6 +373,9 @@ importers:
       tailwindcss-animate:
         specifier: ^1.0.7
         version: 1.0.7(tailwindcss@3.4.17(ts-node@10.9.1(@types/node@20.17.32)(typescript@5.8.3)))
+      zod:
+        specifier: ^3.24.3
+        version: 3.24.3
     devDependencies:
       '@lhci/cli':
         specifier: ^0.14.0

@@ -30,8 +30,28 @@ describe('POST /api/waitlist', () => {
       .set('Content-Type', 'application/json')
       .expect(400);
     
-    expect(res.body.error).toBe('email or wallet required');
+    expect(res.body.error).toBe('invalid input');
   }, 10000);
+  
+  it('400 when invalid wallet address is supplied', async () => {
+    const res = await agent
+      .post('/api/waitlist')
+      .send({ wallet_address: 'invalid-wallet-address' })
+      .set('Content-Type', 'application/json')
+      .expect(400);
+    
+    expect(res.body.error).toBe('invalid input');
+  });
+
+  it('400 when invalid email is supplied', async () => {
+    const res = await agent
+      .post('/api/waitlist')
+      .send({ email: 'not-an-email' })
+      .set('Content-Type', 'application/json')
+      .expect(400);
+    
+    expect(res.body.error).toBe('invalid input');
+  });
   
   it('409 on duplicate email', async () => {
     const email = 'dup@example.com';
