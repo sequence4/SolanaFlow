@@ -1,14 +1,26 @@
 import { test, expect } from '@playwright/test';
 
-test('user can join the wait-list', async ({ page }) => {
-  test.slow();
-  await page.goto('http://localhost:3000');
+test('user can join the wait-list', async ({ page, browserName }) => {
+  await page.route('**/api/csrf-token', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"token":"test-csrf"}' }));
+  await page.route('**/api/waitlist', r => r.fulfill({ status: 201, contentType: 'application/json', body: '{}' }));
+
+  if (browserName === 'webkit') {
+    await page.addInitScript(() => {
+      (window as any).confetti = () => Promise.resolve();
+    });
+  }
+
+  await page.goto('/', { waitUntil: 'networkidle' });
   
-  const submitButton = page.locator('button:has-text("Join the list")');
-  await submitButton.waitFor({ state: 'visible', timeout: 10000 });
+  await page.getByTestId('open-waitlist-form').first().click();
   
-  const field = submitButton.locator('xpath=ancestor::form//input[@id="email" or @id="wallet"]').first();
-  await field.fill('alice@example.com');
+  const submitButton = page.getByTestId('join-waitlist-btn');
+  await submitButton.waitFor();
+  
+  await submitButton
+    .locator('xpath=ancestor::form//input[@id="email" or @id="wallet"]')
+    .first()
+    .fill('alice@example.com');
   
   await submitButton.click();
   await expect(page.getByText(/stay tuned/i)).toBeVisible();

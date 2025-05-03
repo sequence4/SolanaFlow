@@ -106,6 +106,7 @@ export default function LandingPage() {
                 Demo
             </Link>
             <Button 
+              data-testid="open-waitlist-form"
               size="sm" 
               className="relative z-0 text-white font-medium rounded whitespace-nowrap" 
               style={{ border: 'none', backgroundColor: 'transparent' }}
@@ -158,6 +159,7 @@ export default function LandingPage() {
                     </div>
                     <div className="flex flex-col sm:flex-row justify-start gap-8">
                         <Button 
+                          data-testid="open-waitlist-form"
                           size="default" 
                           className="relative z-0 text-white font-medium rounded whitespace-nowrap gradient-border-button" 
                           style={{ borderRadius: '4px', backgroundColor: '#0d0e1a' }}

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { ArrowRight, Loader2, X } from "lucide-react"
 import confetti from "canvas-confetti"
+import type { Options } from "canvas-confetti"
 import {
   isEmail,
   isSolPubkey,
@@ -107,12 +108,23 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
     return value.slice(0, maxLength)
   }
 
+  const safeConfetti = (opts: Options = {}): void => {
+    try {
+      const config = { ...opts } as Options & { useWorker: boolean };
+      config.useWorker = false;
+      confetti(config);
+    } catch (err: unknown) {
+      /* eslint-disable-next-line no-console */
+      console.warn('Confetti disabled:', err);
+    }
+  };
+
   const triggerConfetti = () => {
     const colors = ["#5f88dc", "#1cf6a0", "#9945ff"];
     const duration = 3_000;
     const animationEnd = Date.now() + duration;
   
-    confetti({
+    safeConfetti({
       particleCount: 100,
       spread: 70,
       origin: { x: 0.5, y: 0 },
@@ -123,7 +135,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
     });
   
     setTimeout(() => {
-      confetti({
+      safeConfetti({
         particleCount: 50,
         angle: 60,
         spread: 55,
@@ -134,7 +146,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
         disableForReducedMotion: true,
       });
   
-      confetti({
+      safeConfetti({
         particleCount: 50,
         angle: 120,
         spread: 55,
@@ -156,7 +168,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
   
         const particleCount = Math.floor((timeLeft / duration) * 30);
   
-        confetti({
+        safeConfetti({
           particleCount,
           startVelocity: 30,
           spread: 360,
@@ -600,6 +612,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                   <Button
                     type="submit"
                     disabled={isSubmitting}
+                    data-testid="join-waitlist-btn"
                     className="w-full py-3 bg-gradient-to-r from-[#4d7cfe] to-[#22d3ee] hover:opacity-90 text-white font-medium relative overflow-hidden group rounded-xl"
                   >
                     <span className="relative z-10 flex items-center justify-center">
@@ -610,7 +623,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                         </>
                       ) : (
                         <>
-                          Join the list
+                          Join the waitlist
                           <ArrowRight className="ml-2 w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
                         </>
                       )}
