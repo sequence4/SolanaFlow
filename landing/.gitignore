@@ -5,3 +5,10 @@ pnpm-lock.yaml
 test-results
 nohup.out
 tsconfig.tsbuildinfo
+
+# Lighthouse artefacts
+landing/.lhci-reports/
+landing/.lighthouseci/
+landing/**/lighthouse.*/
+*.report.html
+*.report.json

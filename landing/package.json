@@ -9,6 +9,8 @@
     "export": "next export -o out",
     "start": "next start",
     "start:prod": "next start -p 3000",
+    "serve:prod": "PORT=3000 pnpm run start:prod",
+    "free3000": "bash -c 'P=$(lsof -ti :3000 || true); [ -n \"$P\" ] && kill $P || true'",
     "type-check": "tsc --noEmit",
     "lint": "next lint",
     "test": "jest",
@@ -18,6 +20,8 @@
     "landing:start-bg": "NODE_ENV=production PORT=3000 CROSS_ENV=1 nohup bash -c 'exec -a __landing_next_prod pnpm run start:prod' &",
     "test:cov": "jest --coverage --coverageThreshold '{\"global\":{\"branches\":80,\"lines\":80}}'",
     "lighthouse:test": "wait-on http://127.0.0.1:3000 && npx lhci autorun --config=./lighthouserc.js",
+    "lhci:quick": "LHCI_DEV=1 NUMBER_OF_RUNS=1 pnpm dlx wait-on http://127.0.0.1:3000 && lhci autorun --quiet",
+    "lighthouse:quick": "pnpm run build:prod && pnpm run free3000 && run-p serve:prod lhci:quick",
     "ci": "pnpm type-check && pnpm lint && pnpm test"
   },
   "dependencies": {
@@ -60,6 +64,7 @@
     "jest-environment-jsdom": "^29.7.0",
     "lighthouse": "^12.6.0",
     "lighthouse-ci": "^1.13.1",
+    "npm-run-all": "^4.1.5",
     "playwright": "^1.52.0",
     "postcss": "^8.5.3",
     "process": "^0.11.10",
