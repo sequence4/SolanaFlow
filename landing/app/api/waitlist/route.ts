@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { WaitlistSchema } from '@/lib/waitlistSchema';
+import { waitlistLimit } from '@/lib/rateLimit';
 import type { z } from 'zod';
 
 export const dynamic = 'force-static';
@@ -12,6 +13,21 @@ const n = (v?: string | null) => {
 };
 
 export async function POST(req: NextRequest) {
+  const ip = req.headers
+    .get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    req.headers.get('x-real-ip') || '127.0.0.1';
+
+  const { success, reset } = await waitlistLimit.limit(ip);
+  if (!success) {
+    return NextResponse.json(
+      { error: 'rate-limit exceeded' },
+      {
+        status: 429,
+        headers: { 'Retry-After': reset.toString() },
+      },
+    );
+  }
+
   let data: z.infer<typeof WaitlistSchema>;
   try {
     data = WaitlistSchema.parse(await req.json());

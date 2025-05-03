@@ -63,4 +63,16 @@ describe('POST /api/waitlist', () => {
       .set('Content-Type', 'application/json')
       .expect(409);
   });
+
+  it('returns 429 on 6th request in a minute', async () => {
+    for (let i = 0; i < 5; i++) {
+      await agent.post('/api/waitlist').send({
+        wallet_address: `6z7CD8WuEg3DKoaUYpoa5Dhx3XJRoXnUjYQeUo78noH${i}`
+      });
+    }
+    await agent
+      .post('/api/waitlist')
+      .send({ wallet_address: '6z7CD8WuEg3DKoaUYpoa5Dhx3XJRoXnUjYQeUo78noHF' })
+      .expect(429);
+  });
 }); 
