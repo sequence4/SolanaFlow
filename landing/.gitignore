@@ -1,4 +1,7 @@
 .next
-node_modules
 .env.*
+node_modules
 pnpm-lock.yaml
+test-results
+nohup.out
+tsconfig.tsbuildinfo
