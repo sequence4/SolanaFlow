@@ -42,3 +42,7 @@ landing/C:\\Users*\\AppData\\Local\\lighthouse.*/
 .idea/
 .DS_Store
 Thumbs.db
+
+**/.next/
+landing/pnpm-lock.yaml
+wallets/

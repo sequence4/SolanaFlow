@@ -6,7 +6,7 @@ module.exports = {
       numberOfRuns: process.env.NUMBER_OF_RUNS || 3,
       chromePath: process.env.CHROME_PATH || '/snap/bin/chromium',
       chromeFlags:
-        '--headless=new --no-sandbox --disable-dev-shm-usage --disable-gpu',
+        '--headless=new --no-sandbox --disable-dev-shm-usage --disable-gpu --user-data-dir=./.lighthouseci/tmp',
       settings: { preset: 'desktop', throttlingMethod: 'provided' }
     },
     assert: {
