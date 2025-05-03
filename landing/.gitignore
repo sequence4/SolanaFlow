@@ -12,3 +12,10 @@ landing/.lighthouseci/
 landing/**/lighthouse.*/
 *.report.html
 *.report.json
+
+# --- Lighthouse artefacts ---
+.lhci-reports/
+.lighthouseci/
+**/lighthouse.*/
+*.report.html
+*.report.json

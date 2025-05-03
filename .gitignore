@@ -3,3 +3,10 @@ projects
 wallets
 .env
 pnpm-lock.yaml
+
+# --- Lighthouse artefacts ---
+.lhci-reports/
+.lighthouseci/
+**/lighthouse.*/
+*.report.html
+*.report.json
