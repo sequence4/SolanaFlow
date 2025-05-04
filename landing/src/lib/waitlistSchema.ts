@@ -25,6 +25,7 @@ export const WaitlistSchema = z
     referred_by: z.string().max(64).optional(),
     source: z.string().max(256).optional(),
   })
+  .strict()
   .refine((d) => d.email || d.wallet_address, {
     message: 'email or wallet required',
     path: [],

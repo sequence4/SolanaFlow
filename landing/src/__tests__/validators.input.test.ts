@@ -21,4 +21,13 @@ describe('WaitlistSchema', () => {
       }),
     ).toThrow();
   });
+
+  it('rejects unknown keys', () => {
+    expect(() =>
+      WaitlistSchema.parse({
+        email: 'a@b.com',
+        evil: 'hacker',
+      }),
+    ).toThrow(/unrecognized key/i);
+  });
 }); 
