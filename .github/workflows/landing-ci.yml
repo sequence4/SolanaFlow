@@ -2,21 +2,7 @@ name: Landing package CI
 
 on:
   push:
-    paths:
-      - 'landing/**'
-      - '.github/workflows/landing-ci.yml'
-      - 'pnpm-workspace.yaml'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
   pull_request:
-    branches: [ feat/landing-page, main ]
-    types: [ opened, synchronize, reopened, labeled ]
-    paths:
-      - 'landing/**'
-      - '.github/workflows/landing-ci.yml'
-      - 'pnpm-workspace.yaml'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
 
 jobs:
   landing-ci:
