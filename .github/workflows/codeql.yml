@@ -1,8 +1,9 @@
 name: CodeQL
 
 on:
-  push:
   pull_request:
+  push:
+    branches: [ main ]
   schedule:
     - cron: '0 5 * * 1'
 
@@ -10,6 +11,10 @@ permissions:
   contents: read
   security-events: write
   actions: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   analyze:
