@@ -21,6 +21,9 @@ on:
 jobs:
   landing-ci:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: landing
     env:
       CI: true
       TZ: UTC
@@ -50,7 +53,7 @@ jobs:
           pnpm -v
 
       - name: Install deps
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install -F . --no-frozen-lockfile
 
       - name: Cache Docker layers (postgres:15)
         uses: ScribeMD/docker-cache@0.3.6
@@ -58,50 +61,48 @@ jobs:
           key: postgres-15
 
       - name: Type-check landing
-        run: pnpm --filter landing run type-check
+        run: pnpm run type-check
 
       - name: Lint landing
-        run: pnpm --filter landing run lint --max-warnings 0
+        run: pnpm run lint --max-warnings 0
 
       - name: Run API integration tests
-        run: pnpm --filter landing test:api
+        run: pnpm test:api
         env:
           NODE_ENV: test
 
       - name: Install Playwright browsers
-        run: pnpm --filter landing exec playwright install --with-deps
+        run: pnpm exec playwright install --with-deps
 
       - name: Playwright E2E
-        run: pnpm --filter landing run test:e2e
+        run: pnpm run test:e2e
         env:
           CI: true
           E2E: 1
 
       - name: Performance budget (Lighthouse)
-        run: pnpm --filter landing lighthouse:test
+        run: pnpm lighthouse:test
         env:
           E2E: 1
-
-      - name: Build landing
-        run: pnpm --filter landing run build
-
-      - name: gitleaks scan
-        if: env.ACT == ''
-        uses: gitleaks/gitleaks-action@v1.6.0
-        with:
-          args: "--no-git --verbose"
 
       - name: Upload Lighthouse report
         uses: actions/upload-artifact@v4
         with:
           name: lighthouse-report
-          path: landing/.lighthouseci
+          path: .lighthouseci
         
       - name: Unit + smoke tests
-        run: pnpm --filter landing test
+        run: pnpm test
 
       - name: Coverage gate
-        run: pnpm --filter landing test:cov
+        run: pnpm test:cov
+
+      - name: Build landing
+        run: pnpm run build
+
+      - name: gitleaks scan
+        if: env.ACT == ''
+        uses: gitleaks/gitleaks-action@v1.6.0
 
   security-audit:
     runs-on: ubuntu-latest
