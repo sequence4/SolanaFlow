@@ -1,73 +1,62 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { NextResponse } from 'next/server';
 import { WaitlistSchema } from '@/lib/waitlistSchema';
+import { parseOrThrow } from '@/lib/parseOrThrow';
 import { waitlistLimit } from '@/lib/rateLimit';
-import type { z } from 'zod';
+import { db } from '@/lib/db';
 
 export const dynamic = 'force-static';
 
-const n = (v?: string | null) => {
-  if (typeof v !== 'string') return null;
-  const trimmed = v.trim();
-  return trimmed === '' ? null : trimmed;
-};
-
-export async function POST(req: NextRequest) {
-  const ip = req.headers
-    .get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    req.headers.get('x-real-ip') || '127.0.0.1';
+export async function POST(req: Request) {
+  const ip =
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    req.headers.get('x-real-ip') ??
+    '127.0.0.1';
 
   const { success, reset } = await waitlistLimit.limit(ip);
   if (!success) {
     return NextResponse.json(
       { error: 'rate-limit exceeded' },
-      {
-        status: 429,
-        headers: { 'Retry-After': reset.toString() },
-      },
+      { status: 429, headers: { 'Retry-After': reset.toString() } },
     );
   }
 
-  let data: z.infer<typeof WaitlistSchema>;
-  try {
-    data = WaitlistSchema.parse(await req.json());
-  } catch {
-    return NextResponse.json({ error: 'invalid input' }, { status: 400 });
-  }
+  const parsedOr400 = await parseOrThrow(req, WaitlistSchema);
+  if (parsedOr400 instanceof NextResponse) return parsedOr400;
+  const { parsed } = parsedOr400;
 
-  const clientIp =
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    req.headers.get('x-real-ip') ||
-    null;
+  const n = (v?: string | null) =>
+    typeof v === 'string' && v.trim() !== '' ? v.trim() : null;
 
   try {
+    const clientIp =
+      req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+      req.headers.get('x-real-ip') ??
+      null;
+
     const insert = await db.query(
       `INSERT INTO waitlist
-         (email, wallet_address, full_name,
-          telegram_handle, twitter_handle, discord_username,
-          referred_by, source, signup_ip, meta)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-       ON CONFLICT (email) DO NOTHING
-       RETURNING id`,
+           (email, wallet_address, full_name,
+            telegram_handle, twitter_handle, discord_username,
+            referred_by, source, signup_ip, meta)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         ON CONFLICT (email) DO NOTHING
+         RETURNING id`,
       [
-        n(data.email),
-        n(data.wallet_address),
-        n(data.full_name),
-        n(data.telegram_handle),
-        n(data.twitter_handle),
-        n(data.discord_username),
-        n(data.referred_by),
-        n(data.source),
+        n(parsed.email),
+        n(parsed.wallet_address),
+        n(parsed.full_name),
+        n(parsed.telegram_handle),
+        n(parsed.twitter_handle),
+        n(parsed.discord_username),
+        n(parsed.referred_by),
+        n(parsed.source),
         clientIp,
-        req.headers   
-      ]
+        req.headers,
+      ],
     );
 
     if (insert.rowCount === 0) {
-      return NextResponse.json(
-        { error: 'duplicate' },
-        { status: 409 }
-      );
+      return NextResponse.json({ error: 'duplicate' }, { status: 409 });
     }
 
     return new NextResponse(null, { status: 201 });
@@ -75,7 +64,7 @@ export async function POST(req: NextRequest) {
     console.error('waitlist insert failed:', err);
     return NextResponse.json(
       { error: 'db insert failed' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
