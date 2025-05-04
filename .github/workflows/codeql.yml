@@ -1,0 +1,44 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: '0 5 * * 1'
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  analyze:
+    name: Analyze JS / TS
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: pnpm
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+          run_install: true
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          config-file: .github/codeql/config.yml
+
+      - uses: github/codeql-action/autobuild@v3
+
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript" 
