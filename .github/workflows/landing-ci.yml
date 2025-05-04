@@ -9,6 +9,8 @@ on:
       - 'package.json'
       - 'pnpm-lock.yaml'
   pull_request:
+    branches: [ feat/landing-page, main ]
+    types: [ opened, synchronize, reopened, labeled ]
     paths:
       - 'landing/**'
       - '.github/workflows/landing-ci.yml'
@@ -94,3 +96,22 @@ jobs:
 
       - name: Build landing
         run: pnpm --filter landing run build
+
+      - name: gitleaks scan
+        if: env.ACT == ''
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          fail: true
+
+  security-audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run: 
+        working-directory: landing
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: 
+          version: 8
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --prod

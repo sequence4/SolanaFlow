@@ -1,1 +1,31 @@
-/.env* 
+###############################################################################
+# 1. Environment files
+###############################################################################
+# Ignore every env file in landing …
+.env*
+!.env.example
+!.env.test
+
+###############################################################################
+# 2. Build / export artefacts
+###############################################################################
+.next/          # Next.js build output
+out/            # `next export`
+dist/           # any ad-hoc build folder
+
+###############################################################################
+# 3. Test & performance artefacts
+###############################################################################
+coverage/       # Jest / Istanbul
+test-results/   # junit / reporters
+.lhci-reports/  # Lighthouse CI HTML & JSON
+.lighthouseci/
+**/lighthouse.*/        # temp Chrome profiles
+
+###############################################################################
+# 4. Misc IDE / OS chatter
+###############################################################################
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

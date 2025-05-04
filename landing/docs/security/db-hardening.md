@@ -45,4 +45,12 @@ If access via the `waitlist_writer` role is lost:
    SELECT * FROM pg_roles WHERE rolname = 'waitlist_writer';
    ```
 3. Reset the password using the ALTER ROLE command above.
-4. If the role needs to be recreated, execute the script in `landing/ops/sql/hardening/waitlist_writer.sql`. 
+4. If the role needs to be recreated, execute the script in `landing/ops/sql/hardening/waitlist_writer.sql`.
+
+## Automated dependency security
+
+| Tool            | Frequency | Location                          |
+|-----------------|-----------|-----------------------------------|
+| Dependabot PRs  | Weekly    | .github/dependabot.yml            |
+| pnpm audit      | Each CI   | landing-ci.yml > security-audit   |
+| gitleaks        | Each CI   | landing-ci.yml > gitleaks scan    | 

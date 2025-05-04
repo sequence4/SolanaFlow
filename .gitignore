@@ -16,7 +16,8 @@ nohup.out
 # Env & secrets
 ###############################################################################
 .env*
-!.env.example                 # keep a sample
+!.env.example
+!landing/.env.test 
 
 ###############################################################################
 # Tests & coverage
@@ -48,3 +49,4 @@ landing/pnpm-lock.yaml
 wallets/landing/coverage/
 coverage/
 wallets/
+/landing/.env.production
