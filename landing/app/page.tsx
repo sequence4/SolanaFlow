@@ -14,6 +14,7 @@ import LandingStyles from "@/components/landing/style"
 import dynamic from "next/dynamic"
 import UserMessageBox from "@/components/landing/UserMessageBox"
 import FeaturesSection from "@/components/landing/FeaturesSection"
+import GaPageviewTracker from "@/components/GaPageviewTracker"
 
 const WaitlistModal = dynamic(() => import("@/components/WaitlistModal"), {
   ssr: false,
@@ -36,6 +37,9 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0b14] text-white font-mono overflow-x-hidden">
+      {/* GA4 page-view tracker (wrapped in Suspense internally) */}
+      <GaPageviewTracker />
+      
       {mounted && (
         <WaitlistModal 
           isOpen={isWaitlistModalOpen} 
