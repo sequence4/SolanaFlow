@@ -10,6 +10,7 @@
     "start": "next start",
     "start:prod": "next start -p 3000",
     "serve:prod": "PORT=3000 pnpm run start:prod",
+    "db:smoke": "bash landing/scripts/smoke/db-writer-only.sh",
     "type-check": "tsc --noEmit",
     "lint": "next lint",
     "test": "jest",
