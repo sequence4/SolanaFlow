@@ -44,7 +44,9 @@ echo "🔑  Secret scan (gitleaks)…"
 if command -v gitleaks &>/dev/null; then
   pnpm --filter landing run security:scan || true   # don’t fail local CI
 else
-  echo "🟡  gitleaks not installed – skipping secret scan locally"
+  echo "🟡  gitleaks not installed – running via pnpm dlx"
+  # One-shot download of the latest binary into a temp dir, then scan repo root
+  pnpm dlx --package=gitleaks gitleaks detect --source . --verbose || true
 fi
 
 ###############################################################################
