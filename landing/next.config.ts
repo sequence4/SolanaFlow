@@ -23,7 +23,15 @@ const nextConfig: NextConfig = {
       'https://www.google-analytics.com',
     ].join(' ');
 
-    const csp = `default-src 'self'; script-src ${scriptSrc}; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://www.google-analytics.com; connect-src 'self' https://www.google-analytics.com https://www.googletagmanager.com;`;
+    const csp = [
+      "default-src 'self'",
+      `script-src ${scriptSrc}`,
+      "worker-src 'self' blob:",          // enable Web Workers & blob:
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com",
+      "img-src 'self' data: https://www.google-analytics.com",
+      "connect-src 'self' https://www.google-analytics.com https://www.googletagmanager.com"
+    ].join('; ');
 
     return [
       {
