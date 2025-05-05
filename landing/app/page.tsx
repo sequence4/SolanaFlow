@@ -83,7 +83,7 @@ export default function LandingPage() {
       )}
 
       <nav className="relative z-10 border-b border-[#1e2033] bg-[#0a0b14]/50 backdrop-blur-md">
-        <div className="container mx-auto px-0 py-4 flex items-center justify-between">
+        <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-5 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <div className="w-8 h-8 relative">
               <img src="/assets/logo.png" alt="FlowCode Logo" className="w-full h-full" />
@@ -120,37 +120,41 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      <section className="flex justify-center px-[8%] pt-[5%] pb-[8%] w-full h-[100vh] overflow-hidden">
+      <section className="flex justify-center px-2 sm:px-8 md:px-[8%] sm:pt-[10%] xl:pt-[5%] pb-[8%] w-full h-[100vh] overflow-hidden">
         <div className="w-full h-full z-10">
             <div className="flex flex-col w-full h-full md:flex-row items-start">
-                <div className="flex flex-col justify-center gap-2 sm:gap-0 lg:gap-0 max-lg:gap-4 h-full w-full sm:w-2/5 md:w-3/5 lg:w-2/5 mb-12 md:mb-0 pr-0 md:pr-4 lg:pr-8">
+                <div className="flex flex-col justify-center gap-4 sm:gap-6 md:gap-2 lg:gap-0 h-full w-full md:w-3/5 lg:w-2/5 mb-12 sm:mb-16 md:mb-0 pr-0 md:pr-4 lg:pr-8">
                     <div className="flex flex-col gap-0 justify-start">
-                        <div className="w-fit inline-block px-2 sm:px-3 py-1 mb-4 sm:mb-6 rounded-full bg-[#1e2033] border border-[#2a2d4a] text-xs text-[#5580ff]">
+                        <div className="w-fit inline-block px-2 xs:text-red-500 xs:px-1 sm:px-3 py-1 mb-4 sm:mb-6 rounded-full bg-[#1e2033] border border-[#2a2d4a] text-xs text-[#5580ff] mx-auto sm:mx-auto md:mx-0">
                         <span className="mr-2">●</span> Visual AI Developer Tool for Solana
                         </div>
-                        <h1 className="text-lg sm:text-lg md:text-xl lg:text-2xl font-bold mb-4 sm:mb-6 leading-tight tracking-tight" style={{ fontFamily: '"DM Sans", sans-serif' }}>
-                        <span className="block">Deploy Solana dApps</span>
-                        <span className="text-2xl sm:text-2xl md:text-3xl lg:text-4xl max-lg:text-6xl text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]" 
-                            style={{
-                            backgroundSize: "300% 300%",
-                            animation: "gradientFlow 3s ease infinite"
-                            }}>
-                            Without Code
-                        </span>
-                        </h1>
+                        <div className="flex flex-col gap-2 sm:gap-4">
+                          <h1 className="text-base sm:text-[26px] md:text-xl lg:text-2xl xl:text-3xl font-bold leading-tight tracking-tight text-center sm:text-center md:text-left" style={{ fontFamily: '"DM Sans", sans-serif' }}>
+                          <span className="block">Deploy Solana dApps</span>
+                          </h1>
+                          <h1 className="text-base sm:text-[26px] md:text-xl lg:text-2xl xl:text-3xl font-bold mb-4 sm:mb-6 leading-tight tracking-tight text-center sm:text-center md:text-left" style={{ fontFamily: '"DM Sans", sans-serif' }}>
+                          <span className="text-2xl sm:text-[50px] md:text-3xl lg:text-4xl xl:text-5xl text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]" 
+                              style={{
+                              backgroundSize: "300% 300%",
+                              animation: "gradientFlow 3s ease infinite"
+                              }}>
+                              Without Code
+                          </span>
+                          </h1>
+                        </div>
                     </div>
-                    <div className="text-gray-400 mb-6 sm:mb-8 w-full text-sm sm:text-xs md:text-xs lg:text-[13px] max-lg:text-sm leading-relaxed py-2 px-4">
+                    <div className="text-gray-400 mb-6 sm:mb-2 w-full md:text-xs lg:text-[13px] leading-relaxed py-2 px-4">
                       <FeatureListRefined />
                     </div>
-                    <div className="flex flex-col sm:flex-row justify-start gap-8">
+                    <div className="flex flex-col sm:flex-row justify-center sm:justify-center md:justify-start gap-6 sm:gap-8">
                         <Button 
                           data-testid="open-waitlist-form"
                           size="default" 
-                          className="relative z-0 text-white font-medium rounded whitespace-nowrap gradient-border-button" 
+                          className="relative z-0 text-white font-medium rounded whitespace-nowrap gradient-border-button mx-auto sm:mx-0 md:mx-0" 
                           style={{ borderRadius: '4px', backgroundColor: '#0d0e1a' }}
                           onClick={openWaitlistModal}
                         >
-                          <span className="relative z-10 cursor-pointer text-xs font-bold sm:text-sm gradient-text">Join the Waitlist</span>
+                          <span className="relative z-10 cursor-pointer text-sm font-bold sm:text-base gradient-text">Join the Waitlist</span>
                         </Button>
 
                         <style jsx global>{`
@@ -201,7 +205,7 @@ export default function LandingPage() {
                           }
                         `}</style>
 
-                        <div className="flex items-center justify-between gap-2 hover:bg-none mt-2 sm:mt-0">
+                        <div className="flex items-center justify-center sm:justify-center md:justify-between gap-2 hover:bg-none mt-2 sm:mt-0">
                             <Button size="icon" variant="ghost"><BsTwitterX className="h-4 w-4 sm:h-5 sm:w-5 text-[#cfd2d3] cursor-pointer hover:bg-none" /></Button>
                             <Button size="icon" variant="ghost"><BsTelegram className="h-4 w-4 sm:h-5 sm:w-5 text-[#cfd2d3] cursor-pointer hover:bg-none" /></Button>
                         </div>
@@ -209,14 +213,14 @@ export default function LandingPage() {
                 </div>
 
                 <div className="w-full h-full flex flex-col lg:flex-row mt-8 md:mt-0">
-                <div className="w-full relative isolate overflow-hidden">
+                <div className="w-full relative isolate overflow-hidden h-[220px] sm:h-[500px] md:h-full">
                   <div className="h-full w-full overflow-hidden overscroll-x-none overflow-y-none">
                     {mounted && <InstructionFlow />}
                   </div>
                 </div>
 
-              <div className="w-full h-full flex flex-col min-w-[320px] max-w-[500px] flex-shrink-0">
-                <div className="w-full h-full rounded-xl">
+              <div className="w-full h-full flex flex-col sm:flex-col md:flex-col gap-4 sm:gap-6 md:gap-0">
+                <div className="w-full md:w-full h-[200px] sm:h-[400px] md:h-full rounded-xl">
                   <div className="w-full h-full rounded-xl overflow-hidden border border-[#2a2d4a] bg-[#0d0e1a] relative flex flex-col min-h-0">
                     <div className="flex items-center px-4 py-2 bg-[#1e2033] border-b border-[#2a2d4a] rounded-lg ">
                       <div className="flex space-x-2 rounded-lg">
@@ -231,8 +235,8 @@ export default function LandingPage() {
                   </div>
                 </div>
                 
-                <div className="w-full mt-4 rounded-xl">
-                  <div className="w-full rounded-xl overflow-hidden border border-[#2a2d4a] relative">
+                <div className="w-full md:w-full h-[150px] sm:h-[7rem] md:h-auto mt-4 sm:mt-0 md:mt-4 rounded-xl mx-auto">
+                  <div className="w-full h-full rounded-xl overflow-hidden border border-[#2a2d4a] relative">
                     {mounted && <UserMessageBox 
                       messages={[
                         "Generate a Solana wallet dApp that connects Phantom, shows balances, and lets users send SOL",
@@ -248,7 +252,7 @@ export default function LandingPage() {
                       ]}
                       typingSpeed={50}
                       delayBetweenMessages={3000}
-                      className="w-full"
+                      className="w-full h-full"
                     />}
                   </div>
                 </div>
@@ -258,7 +262,7 @@ export default function LandingPage() {
     </div>
       </section>
 
-      <section id="features" className="relative py-20 px-10 bg-[#050508] overflow-hidden">
+      <section id="features" className="relative py-[5%] px-10 bg-[#050508] overflow-hidden">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute inset-0 grid grid-cols-12 gap-1">
             {Array.from({ length: 12 }).map((_, i) => (
@@ -278,9 +282,9 @@ export default function LandingPage() {
         <FeaturesSection />
       </section>
 
-      <section id="demo" className="py-20 bg-[#0a0b14]">
+      <section id="demo" className="py-20 sm:pb-2 md:py-20 bg-[#0a0b14]">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
+          <div className="text-center mb-16 sm:mb-10 md:mb-16">
             <div className="inline-block px-3 py-1 mb-4 rounded-full bg-[#1e2033] border border-[#2a2d4a] text-xs text-[#5580ff]">
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
                   style={{
@@ -320,12 +324,12 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4 ">
-              <div className="relative group bg-[#0a0b14]/80 backdrop-blur-sm border border-[#2a2d4a] rounded-[5px] p-4 overflow-hidden transition-all duration-300 hover:translate-y-[-4px] hover:border-[#5580ff]">
+            <div className="mt-8 grid grid-cols-1 sm:flex sm:flex-row md:grid md:grid-cols-3 gap-4 sm:mb-2 md:mb-8">
+              <div className="flex flex-col justify-center items-center relative group bg-[#0a0b14]/80 backdrop-blur-sm border border-[#2a2d4a] rounded-[5px] p-4 sm:p-3 md:p-4 overflow-hidden transition-all duration-300 hover:translate-y-[-4px] hover:border-[#5580ff] sm:flex-1">
                 <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[#5580ff] to-transparent opacity-50"></div>
                 <div className="absolute top-0 left-0 w-[1px] h-full bg-gradient-to-b from-[#5580ff] via-transparent to-transparent opacity-50"></div>
-                <div className="flex flex-col pt-2">
-                  <h3 className="font-semibold text-sm mb-2 bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80">
+                <div className="flex flex-col pt-2 sm:pt-1 md:pt-2 h-full items-center text-center">
+                  <h3 className="font-semibold text-sm mb-2 sm:mb-1 md:mb-2 bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80 text-center">
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
                     style={{
                       backgroundSize: "300% 300%",
@@ -334,7 +338,7 @@ export default function LandingPage() {
                       Intuitive Workflow Designer
                     </span> 
                   </h3>
-                  <p className="text-gray-400 text-xs">
+                  <p className="text-gray-400 text-xs sm:text-[10px] md:text-xs items-center text-center">
                     Visually assemble your dApp architecture effortlessly using drag-and-drop components.
                   </p>
                 </div>
@@ -357,11 +361,11 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              <div className="relative group bg-[#0a0b14]/80 backdrop-blur-sm border border-[#2a2d4a] rounded-[5px] p-4 overflow-hidden transition-all duration-300 hover:translate-y-[-4px] hover:border-[#a855f7]">
+              <div className="relative group bg-[#0a0b14]/80 backdrop-blur-sm border border-[#2a2d4a] rounded-[5px] p-4 sm:p-3 md:p-4 overflow-hidden transition-all duration-300 hover:translate-y-[-4px] hover:border-[#a855f7] sm:flex-1">
                 <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[#a855f7] to-transparent opacity-50"></div>
                 <div className="absolute top-0 left-0 w-[1px] h-full bg-gradient-to-b from-[#a855f7] via-transparent to-transparent opacity-50"></div>
-                <div className="flex flex-col pt-2">
-                  <h3 className="font-semibold text-sm mb-2 bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80">
+                <div className="flex flex-col pt-2 sm:pt-1 md:pt-2 h-full">
+                  <h3 className="font-semibold text-sm mb-2 sm:mb-1 md:mb-2 bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80 text-center">
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
                     style={{
                       backgroundSize: "300% 300%",
@@ -370,7 +374,7 @@ export default function LandingPage() {
                     Advanced Code Customization
                   </span>
                   </h3>
-                  <p className="text-gray-400 text-xs">
+                  <p className="text-gray-400 text-xs sm:text-[10px] md:text-xs items-center text-center">
                     Easily fine-tune smart contracts and frontend logic within our powerful integrated IDE.
                   </p>
                 </div>
@@ -393,21 +397,21 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              <div className="relative group bg-[#0a0b14]/80 backdrop-blur-sm border border-[#2a2d4a] rounded-[5px] p-5 overflow-hidden transition-all duration-300 hover:translate-y-[-4px] hover:border-[#00c2ff]">
+              <div className="relative group bg-[#0a0b14]/80 backdrop-blur-sm border border-[#2a2d4a] rounded-[5px] p-4 sm:p-3 md:p-4 overflow-hidden transition-all duration-300 hover:translate-y-[-4px] hover:border-[#00c2ff] sm:flex-1">
                 <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[#00c2ff] to-transparent opacity-50"></div>
                 <div className="absolute top-0 left-0 w-[1px] h-full bg-gradient-to-b from-[#00c2ff] via-transparent to-transparent opacity-50"></div>
-                <div className="flex flex-col">
-                  <h3 className="font-semibold text-sm mb-2 bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80">
+                <div className="flex flex-col sm:pt-1 md:pt-2 h-full">
+                  <h3 className="font-semibold text-sm mb-2 sm:mb-1 md:mb-2 bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80 text-center">
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
                     style={{
                       backgroundSize: "300% 300%",
                       animation: "gradientFlow 3s ease infinite"
                     }}>
-                    Streamlined Deployment & Monitoring
+                    Streamlined Deployment
                   </span>
                   </h3>
-                  <p className="text-gray-400 text-xs">
-                    Deploy instantly to Solana testnet or mainnet, then monitor and optimize your dApp&#39;s performance in real-time.
+                  <p className="text-gray-400 text-xs sm:text-[10px] md:text-xs items-center text-center">
+                    Deploy instantly to Solana testnet or mainnet, then monitor and optimize your dApp&#39;s performance.
                   </p>
                 </div>
                 <div className="absolute bottom-0 right-0 w-16 h-16 opacity-10">
