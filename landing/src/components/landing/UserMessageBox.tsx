@@ -71,12 +71,12 @@ export default function UserMessageBox({
   }, [])
 
   return (
-    <div className={`bg-[#0a0b14] rounded-lg p-4 ${className} relative overflow-hidden`}>
+    <div className={`bg-[#0a0b14] rounded-lg p-2 xs:p-3 sm:p-4 ${className} relative overflow-hidden`}>
       {/* Animated background orbs */}
       <div className="absolute inset-0 z-0" style={{ overflow: 'hidden' }}>
         {/* Blue orb */}
         <div 
-          className="absolute w-32 h-32 rounded-full opacity-5 hidden sm:block"
+          className="absolute w-20 h-20 xs:w-24 xs:h-24 sm:w-32 sm:h-32 rounded-full opacity-5 hidden xs:block sm:block"
           style={{
             background: 'radial-gradient(circle, #5f88dc 0%, rgba(95,136,220,0) 70%)',
             filter: 'blur(8px)',
@@ -88,7 +88,7 @@ export default function UserMessageBox({
         
         {/* Green orb */}
         <div 
-          className="absolute w-40 h-40 rounded-full opacity-5 hidden sm:block"
+          className="absolute w-24 h-24 xs:w-32 xs:h-32 sm:w-40 sm:h-40 rounded-full opacity-5 hidden xs:block sm:block"
           style={{
             background: 'radial-gradient(circle, #1cf6a0 0%, rgba(28,246,160,0) 70%)',
             filter: 'blur(8px)',
@@ -100,7 +100,7 @@ export default function UserMessageBox({
         
         {/* Purple orb */}
         <div 
-          className="absolute w-36 h-36 rounded-full opacity-5 hidden sm:block"
+          className="absolute w-20 h-20 xs:w-28 xs:h-28 sm:w-36 sm:h-36 rounded-full opacity-5 hidden xs:block sm:block"
           style={{
             background: 'radial-gradient(circle, #9945ff 0%, rgba(153,69,255,0) 70%)',
             filter: 'blur(8px)',
@@ -112,7 +112,7 @@ export default function UserMessageBox({
         
         {/* Flowing gradient background for additional effect */}
         <div 
-          className="absolute inset-0 opacity-10 hidden sm:block" 
+          className="absolute inset-0 opacity-10 hidden xs:block sm:block" 
           style={{
             background: 'linear-gradient(60deg, #5f88dc, #1cf6a0, #9945ff)',
             backgroundSize: '300% 300%',
@@ -166,17 +166,17 @@ export default function UserMessageBox({
 
       <div className="relative z-10">
         <div className="flex justify-between items-center">
-          <div className="h-[3rem] sm:h-[5rem] flex-1 bg-[#0d0e1a] border border-[#2a2d4a] rounded-xl p-2 sm:p-4 shadow-sm">
-            <div className="min-h-[24px] text-gray-400 text-sm sm:text-xs" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
+          <div className="h-[2.5rem] xs:h-[3rem] sm:h-[5rem] flex-1 bg-[#0d0e1a] border border-[#2a2d4a] rounded-xl p-1.5 xs:p-2 sm:p-4 shadow-sm">
+            <div className="min-h-[20px] xs:min-h-[24px] text-gray-400 text-[10px] xs:text-xs sm:text-xs" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
               {displayedText}
-              {showCursor && <span className="inline-block w-2 h-4 bg-[#5580ff] ml-0.5">&nbsp;</span>}
+              {showCursor && <span className="inline-block w-1.5 xs:w-2 h-3 xs:h-4 bg-[#5580ff] ml-0.5">&nbsp;</span>}
             </div>
           </div>
           <button
-            className="ml-2 p-2 bg-[#161726] border border-[#2a2d4a] cursor-default text-white rounded-full flex items-center justify-center"
+            className="ml-2 p-1.5 xs:p-2 bg-[#161726] border border-[#2a2d4a] cursor-default text-white rounded-full flex items-center justify-center"
             aria-label="Send message"
           >
-            <Send size={14} className="text-[#5580ff]"/>
+            <Send size={12} className="text-[#5580ff] xs:w-3.5 xs:h-3.5 sm:w-4 sm:h-4"/>
           </button>
         </div>
       </div>

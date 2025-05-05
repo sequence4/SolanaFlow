@@ -306,7 +306,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
          .gradient-border {
            position: relative;
            z-index: 0;
-           border-radius: 1rem;
+           border-radius: 0.5rem;
            padding: 1px;
          }
          
@@ -347,8 +347,8 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
          }
          
          .content-scroll::-webkit-scrollbar {
-           width: 6px;
-           height: 6px;
+           width: 4px;
+           height: 4px;
          }
          
          .content-scroll::-webkit-scrollbar-track {
@@ -358,7 +358,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
          .content-scroll::-webkit-scrollbar-thumb {
            background: #1e293b;
            border-radius: 2px;
-           border: 2px solid transparent;
+           border: 1px solid transparent;
            background-clip: padding-box;
            transition: background 0.2s ease;
          }
@@ -370,7 +370,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
 
          .custom-input {
            border-radius: 0.5rem !important;
-           padding: 0.7rem !important;
+           padding: 0.6rem !important;
            height: auto !important;
            background-color: rgba(12, 18, 33, 0.6) !important;
            border: 1px solid #1e293b !important;
@@ -390,18 +390,19 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
 
          .custom-input::placeholder {
            color: rgba(156, 163, 175, 0.5) !important;
+           font-size: 13px !important;
          }
        `}</style>
       
       <div className="w-full bg-[#050810] bg-opacity-95 backdrop-blur-lg">
-        <div className="content-scroll max-h-[80vh] overflow-y-auto p-8 space-y-6" ref={contentRef}>
+        <div className="content-scroll max-h-[80vh] overflow-y-auto p-4 sm:p-6 space-y-4" ref={contentRef}>
           
           {onClose && (
             <button
               onClick={onClose}
-              className="absolute top-4 right-4 z-50 bg-none hover:bg-[#2a3749] text-gray-400 hover:text-white rounded-full p-2 transition-colors"
+              className="absolute top-3 right-3 z-50 bg-none hover:bg-[#2a3749] text-gray-400 hover:text-white rounded-full p-2 transition-colors"
             >
-              <X size={16} />
+              <X size={14} />
             </button>
           )}
 
@@ -415,9 +416,9 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
           ></div>
 
           {isSuccess ? (
-            <div className="pt-8 flex flex-col items-center justify-center h-[400px] relative z-10">
-              <img src="/assets/logo.png" alt="Logo" className="h-16 w-16 opacity-70 mb-4" />
-              <h2 className="text-3xl font-bold mb-4">
+            <div className="pt-6 flex flex-col items-center justify-center h-[350px] relative z-10">
+              <img src="/assets/logo.png" alt="Logo" className="h-12 w-12 opacity-70 mb-3" />
+              <h2 className="text-[24px] font-bold mb-3">
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
                   style={{
                     backgroundSize: "300% 300%",
@@ -426,7 +427,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                   Stay Tuned!
                 </span>
               </h2>
-              <p className="text-gray-600 text-center mb-8 max-w-sm font-mono" style={{ fontFamily: '"IBM Plex Mono", monospace' }}>
+              <p className="text-gray-600 text-center mb-6 max-w-sm font-mono text-[13px]" style={{ fontFamily: '"IBM Plex Mono", monospace' }}>
                 Thanks for joining the SolanaFlow waitlist. We&apos;ll keep you updated on our launch and progress.
               </p>
               <button
@@ -438,7 +439,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                     console.log("No onClose handler provided to WaitlistForm");
                   }
                 }}
-                className="relative py-2 px-6 rounded bg-[#1e2033] text-white font-medium hover:opacity-90 transition-opacity cursor-pointer"
+                className="relative py-2 px-5 rounded bg-[#1e2033] text-white text-[14px] font-medium hover:opacity-90 transition-opacity cursor-pointer"
                 style={{ zIndex: 100 }}
               >
                 Close
@@ -450,7 +451,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                 <div className="flex justify-center items-center mb-2">
                   
                 </div>
-                <h2 className="text-3xl font-bold">
+                <h2 className="text-[24px] md:text-[30px] font-bold">
                   <span className="text-white">Join the </span>
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
                     style={{
@@ -460,12 +461,12 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                     Waitlist
                   </span>
                 </h2>
-                <p className="text-gray-400 text-sm">
+                <p className="text-gray-400 text-[13px]">
                   Be the first to know when&nbsp;we&nbsp;launch.
                 </p>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-5 pt-2 w-full">
+              <form onSubmit={handleSubmit} className="space-y-4 pt-2 w-full">
                 <input type="hidden" name="referred_by" value={referredBy} />
                 <input type="hidden" name="source" value={source} />
 
@@ -480,7 +481,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-gray-300 font-mono text-sm flex items-center">
+                  <Label htmlFor="email" className="text-gray-300 font-mono text-[12px] flex items-center">
                     Email
                   </Label>
                   <div className="relative">
@@ -501,19 +502,19 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                         }
                       }}
                       aria-invalid={!!formErrors.email}
-                      className="custom-input w-full"
+                      className="custom-input w-full text-[14px]"
                       placeholder="youremail@example.com"
                     />
                   </div>
                   {formErrors.email && (
-                    <p className="text-red-500 text-xs font-mono" aria-live="polite">
+                    <p className="text-red-500 text-[10px] font-mono" aria-live="polite">
                       {formErrors.email}
                     </p>
                   )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="wallet" className="text-gray-300 font-mono text-sm flex items-center">
+                  <Label htmlFor="wallet" className="text-gray-300 font-mono text-[12px] flex items-center">
                     Wallet (Solana)
                   </Label>
                   <div className="relative">
@@ -530,19 +531,19 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                           setFormErrors(newErrors)
                         }
                       }}
-                      className="custom-input w-full"
+                      className="custom-input w-full text-[14px]"
                       placeholder="Your Solana wallet address"
                     />
                   </div>
                   {formErrors.wallet && (
-                    <p className="text-red-500 text-xs font-mono" aria-live="polite">
+                    <p className="text-red-500 text-[10px] font-mono" aria-live="polite">
                       {formErrors.wallet}
                     </p>
                   )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="fullName" className="text-gray-300 font-mono text-sm flex items-center">
+                  <Label htmlFor="fullName" className="text-gray-300 font-mono text-[12px] flex items-center">
                     Name{" "}
                     <span className="text-gray-500 ml-1">(optional)</span>
                   </Label>
@@ -553,14 +554,14 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                       maxLength={80}
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      className="custom-input w-full"
+                      className="custom-input w-full text-[14px]"
                       placeholder="Your full name"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="telegram" className="text-gray-300 font-mono text-sm flex items-center">
+                  <Label htmlFor="telegram" className="text-gray-300 font-mono text-[12px] flex items-center">
                     Telegram{" "}
                     <span className="text-gray-500 ml-1">(optional)</span>
                   </Label>
@@ -571,19 +572,19 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                       maxLength={32}
                       value={telegramHandle}
                       onChange={(e) => setTelegramHandle(e.target.value)}
-                      className="custom-input w-full"
+                      className="custom-input w-full text-[14px]"
                       placeholder="@username"
                     />
                   </div>
                   {formErrors.telegram && (
-                    <p className="text-red-500 text-xs font-mono" aria-live="polite">
+                    <p className="text-red-500 text-[10px] font-mono" aria-live="polite">
                       {formErrors.telegram}
                     </p>
                   )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="twitter" className="text-gray-300 font-mono text-sm flex items-center">
+                  <Label htmlFor="twitter" className="text-gray-300 font-mono text-[12px] flex items-center">
                     Twitter{" "}
                     <span className="text-gray-500 ml-1">(optional)</span>
                   </Label>
@@ -594,19 +595,19 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                       maxLength={32}
                       value={twitterHandle}
                       onChange={(e) => setTwitterHandle(e.target.value)}
-                      className="custom-input w-full"
+                      className="custom-input w-full text-[14px]"
                       placeholder="@handle"
                     />
                   </div>
                   {formErrors.twitter && (
-                    <p className="text-red-500 text-xs font-mono" aria-live="polite">
+                    <p className="text-red-500 text-[10px] font-mono" aria-live="polite">
                       {formErrors.twitter}
                     </p>
                   )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="discord" className="text-gray-300 font-mono text-sm flex items-center">
+                  <Label htmlFor="discord" className="text-gray-300 font-mono text-[12px] flex items-center">
                     Discord{" "}
                     <span className="text-gray-500 ml-1">(optional)</span>
                   </Label>
@@ -617,12 +618,12 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                       maxLength={37}
                       value={discordUsername}
                       onChange={(e) => setDiscordUsername(e.target.value)}
-                      className="custom-input w-full"
+                      className="custom-input w-full text-[14px]"
                       placeholder="username#0000"
                     />
                   </div>
                   {formErrors.discord && (
-                    <p className="text-red-500 text-xs font-mono" aria-live="polite">
+                    <p className="text-red-500 text-[10px] font-mono" aria-live="polite">
                       {formErrors.discord}
                     </p>
                   )}
@@ -636,12 +637,12 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                     onChange={(e) => setConsent(e.target.checked)}
                     className="mt-1 h-4 w-4 rounded text-[#4d7cfe] border-gray-600 focus:ring-0"
                   />
-                  <Label htmlFor="consent" className="text-gray-300 text-xs">
+                  <Label htmlFor="consent" className="text-gray-300 text-[11px]">
                     I agree to receive email updates about SolanaFlow&rsquo;s launch and related product news.
                   </Label>
                 </div>
                 {formErrors.consent && (
-                  <p className="text-red-500 text-xs font-mono" aria-live="polite">
+                  <p className="text-red-500 text-[10px] font-mono" aria-live="polite">
                     {formErrors.consent}
                   </p>
                 )}
@@ -665,9 +666,9 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                     type="submit"
                     disabled={isSubmitting}
                     data-testid="join-waitlist-btn"
-                    className="w-full py-3 bg-gradient-to-r from-[#4d7cfe] to-[#22d3ee] hover:opacity-90 text-white font-medium relative overflow-hidden group rounded-xl"
+                    className="w-full py-2 bg-gradient-to-r from-[#4d7cfe] to-[#22d3ee] hover:opacity-90 text-white font-medium relative overflow-hidden group rounded-xl"
                   >
-                    <span className="relative z-10 flex items-center justify-center">
+                    <span className="relative z-10 flex items-center justify-center text-[14px]">
                       {isSubmitting ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -685,7 +686,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                   </Button>
                 </div>
 
-                <div className="flex items-center justify-center space-x-1 text-xs text-center text-gray-500 pt-1">
+                <div className="flex items-center justify-center space-x-1 text-[10px] text-center text-gray-500 pt-1">
                   <p>We&apos;ll only contact you about launch updates</p>
                 </div>
               </form>

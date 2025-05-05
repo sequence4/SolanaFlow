@@ -126,6 +126,9 @@ module.exports = {
         fontFamily: {
           'lekton': ['var(--font-lekton)', 'monospace'],
         },
+        screens: {
+          xs: '475px',
+        },
       },
     },
     plugins: [require("tailwindcss-animate"), require("tailwindcss-scrollbar")],

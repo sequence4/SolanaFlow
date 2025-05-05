@@ -45,7 +45,7 @@ export default function WaitlistModal({ isOpen, onClose }: WaitlistModalProps) {
       onClick={handleBackdropClick}
     >
       <div 
-        className="relative inline-block w-[30%]"
+        className="relative inline-block w-[92%] sm:w-[420px] md:w-[560px] max-h-[90vh] rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <WaitlistForm onClose={onClose} />
