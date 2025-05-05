@@ -22,6 +22,8 @@ test('user can join the wait-list', async ({ page, browserName }) => {
     .first()
     .fill('alice@example.com');
   
+  await page.check('input#consent');
+  
   await submitButton.click();
   await expect(page.getByText(/stay tuned/i)).toBeVisible();
 }); 

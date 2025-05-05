@@ -1,22 +1,24 @@
 import { WaitlistSchema } from '@/lib/waitlistSchema';
 
 describe('WaitlistSchema', () => {
-  it('accepts a minimal valid wallet payload', () => {
+  it('accepts a minimal valid email payload', () => {
     expect(() =>
       WaitlistSchema.parse({
-        wallet_address: 'C56G3dVh1e6KzjYAVc9w1u87rXsHW8gqetfTqtdhQ2jU',
+        email: 'a@b.com',
+        consent: true
       }),
     ).not.toThrow();
   });
 
   it('rejects missing email + wallet', () => {
-    expect(() => WaitlistSchema.parse({})).toThrow('email or wallet required');
+    expect(() => WaitlistSchema.parse({})).toThrow(/email.+required/i);
   });
 
   it('rejects over-long full_name', () => {
     expect(() =>
       WaitlistSchema.parse({
-        wallet_address: 'C56G3dVh1e6KzjYAVc9w1u87rXsHW8gqetfTqtdhQ2jU',
+        email: 'a@b.com',
+        consent: true,
         full_name: 'A'.repeat(81),
       }),
     ).toThrow();
@@ -26,6 +28,7 @@ describe('WaitlistSchema', () => {
     expect(() =>
       WaitlistSchema.parse({
         email: 'a@b.com',
+        consent: true,
         evil: 'hacker',
       }),
     ).toThrow(/unrecognized key/i);

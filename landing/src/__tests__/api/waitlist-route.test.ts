@@ -12,7 +12,7 @@ describe('POST /api/waitlist', () => {
   it('201 + row inserted', async () => {
     await agent
       .post('/api/waitlist')
-      .send({ email: 'alice@example.com' })
+      .send({ email: 'alice@example.com', consent: true })
       .set('Content-Type', 'application/json')
       .expect(201);
 
@@ -36,7 +36,7 @@ describe('POST /api/waitlist', () => {
   it('400 when invalid wallet address is supplied', async () => {
     const res = await agent
       .post('/api/waitlist')
-      .send({ wallet_address: 'invalid-wallet-address' })
+      .send({ email: 'valid@example.com', consent: true, wallet_address: 'invalid-wallet-address' })
       .set('Content-Type', 'application/json')
       .expect(400);
     
@@ -46,7 +46,7 @@ describe('POST /api/waitlist', () => {
   it('400 when invalid email is supplied', async () => {
     const res = await agent
       .post('/api/waitlist')
-      .send({ email: 'not-an-email' })
+      .send({ email: 'not-an-email', consent: true })
       .set('Content-Type', 'application/json')
       .expect(400);
     
@@ -59,7 +59,7 @@ describe('POST /api/waitlist', () => {
 
     await agent
       .post('/api/waitlist')
-      .send({ email })
+      .send({ email, consent: true })
       .set('Content-Type', 'application/json')
       .expect(409);
   });
@@ -67,12 +67,13 @@ describe('POST /api/waitlist', () => {
   it('returns 429 on 6th request in a minute', async () => {
     for (let i = 0; i < 5; i++) {
       await agent.post('/api/waitlist').send({
-        wallet_address: `6z7CD8WuEg3DKoaUYpoa5Dhx3XJRoXnUjYQeUo78noH${i}`
+        email: `user${i}@example.com`, 
+        consent: true
       });
     }
     await agent
       .post('/api/waitlist')
-      .send({ wallet_address: '6z7CD8WuEg3DKoaUYpoa5Dhx3XJRoXnUjYQeUo78noHF' })
+      .send({ email: 'spam@example.com', consent: true })
       .expect(429);
   });
 }); 

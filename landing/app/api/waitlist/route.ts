@@ -37,8 +37,8 @@ export async function POST(req: Request) {
       `INSERT INTO waitlist
            (email, wallet_address, full_name,
             telegram_handle, twitter_handle, discord_username,
-            referred_by, source, signup_ip, meta)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+            referred_by, source, signup_ip, meta, consent)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
          ON CONFLICT (email) DO NOTHING
          RETURNING id`,
       [
@@ -52,6 +52,7 @@ export async function POST(req: Request) {
         n(parsed.source),
         clientIp,
         req.headers,
+        parsed.consent,
       ],
     );
 

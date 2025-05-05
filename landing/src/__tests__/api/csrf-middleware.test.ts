@@ -42,7 +42,8 @@ function makeApi() {
 }
 
 const VALID_BODY = {
-  wallet_address: 'C56G3dVh1e6KzjYAVc9w1u87rXsHW8gqetfTqtdhQ2jU',
+  email: 'alice@example.com',
+  consent: true,
 };
 
 describe('CSRF middleware', () => {

@@ -33,6 +33,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({})
   const [isSuccess, setIsSuccess] = useState(false)
   const [csrf, setCsrf] = useState<string>("");
+  const [consent, setConsent] = useState(false);
   const { toast } = useToast()
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -89,15 +90,13 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
   const validateForm = () => {
     const errors: Record<string,string> = {};
 
-    /* At least one unique identifier */
-    if (!email && !walletAddress) {
-      errors.form = "Please provide either an email or wallet address";
-    }
+    if (!email) errors.email = "Email is required";
+    if (!consent) errors.consent = "Please tick the consent box";
 
-    if (email && !isEmail(email))               errors.email   = "Invalid email";
+    if (email && !isEmail(email)) errors.email = "Invalid email";
     if (walletAddress && !isSolPubkey(walletAddress)) errors.wallet = "Invalid wallet";
-    if (telegramHandle && !isHandle(telegramHandle))   errors.telegram = "Invalid Telegram handle";
-    if (twitterHandle  && !isHandle(twitterHandle))    errors.twitter  = "Invalid Twitter handle";
+    if (telegramHandle && !isHandle(telegramHandle)) errors.telegram = "Invalid Telegram handle";
+    if (twitterHandle && !isHandle(twitterHandle)) errors.twitter = "Invalid Twitter handle";
     if (discordUsername && !isDiscordHandle(discordUsername)) errors.discord = "Invalid Discord handle";
 
     setFormErrors(errors);
@@ -208,22 +207,28 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
     const truncatedDiscord = truncateField(discordUsername, 37)
 
     try {
+      const body: Record<string, unknown> = {
+        email,
+        consent,
+        full_name: fullName,
+        telegram_handle: truncatedTelegram,
+        twitter_handle: truncatedTwitter,
+        discord_username: truncatedDiscord,
+        referred_by: referredBy,
+        source,
+      };
+
+      if (walletAddress.trim()) {
+        body.wallet_address = truncatedWallet;
+      }
+
       const response = await fetch("/api/waitlist", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-csrf-token": csrf,
         },
-        body: JSON.stringify({
-          email,
-          wallet_address: truncatedWallet,
-          full_name: fullName,
-          telegram_handle: truncatedTelegram,
-          twitter_handle: truncatedTwitter,
-          discord_username: truncatedDiscord,
-          referred_by: referredBy,
-          source,
-        }),
+        body: JSON.stringify(body),
       })
 
       if (response.ok) {
@@ -603,6 +608,24 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                     </p>
                   )}
                 </div>
+
+                <div className="flex items-start space-x-2">
+                  <input
+                    id="consent"
+                    type="checkbox"
+                    checked={consent}
+                    onChange={(e) => setConsent(e.target.checked)}
+                    className="mt-1 h-4 w-4 rounded text-[#4d7cfe] border-gray-600 focus:ring-0"
+                  />
+                  <Label htmlFor="consent" className="text-gray-300 text-xs">
+                    I agree to receive email updates about SolanaFlow&rsquo;s launch and related product news.
+                  </Label>
+                </div>
+                {formErrors.consent && (
+                  <p className="text-red-500 text-xs font-mono" aria-live="polite">
+                    {formErrors.consent}
+                  </p>
+                )}
 
                 {/* Honeypot – will be hidden with CSS */}
                 <div className="hidden" aria-hidden="true">
