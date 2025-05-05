@@ -87,25 +87,15 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
     return () => { document.body.style.overflow = ""; };
   }, []);
 
-  const validateForm = () => {
-    const errors: Record<string,string> = {};
-
-    if (!email) errors.email = "Email is required";
-    if (!consent) errors.consent = "Please tick the consent box";
-
-    if (email && !isEmail(email)) errors.email = "Invalid email";
-    if (walletAddress && !isSolPubkey(walletAddress)) errors.wallet = "Invalid wallet";
-    if (telegramHandle && !isHandle(telegramHandle)) errors.telegram = "Invalid Telegram handle";
-    if (twitterHandle && !isHandle(twitterHandle)) errors.twitter = "Invalid Twitter handle";
-    if (discordUsername && !isDiscordHandle(discordUsername)) errors.discord = "Invalid Discord handle";
-
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  }
-
   const truncateField = (value: string, maxLength: number) => {
     return value.slice(0, maxLength)
   }
+
+  const apiErrorToFormError: Record<string, string> = {
+    duplicate: 'This email is already on the waitlist.',
+    'rate-limit exceeded': 'Too many requests – please try again in a minute.',
+    'db insert failed': 'Sorry, something went wrong on our side. Try later.',
+  };
 
   const safeConfetti = (opts: Options = {}): void => {
     try {
@@ -189,6 +179,28 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
   
   
 
+  const validateForm = () => {
+    const errors: Record<string,string> = {};
+
+    if (!email) errors.email = "Email is required";
+    if (!consent) errors.consent = "Please tick the consent box";
+
+    if (email && !isEmail(email)) errors.email = "Invalid email";
+    if (walletAddress && !isSolPubkey(walletAddress)) errors.wallet = "Invalid wallet";
+    if (telegramHandle && !isHandle(telegramHandle)) errors.telegram = "Invalid Telegram handle";
+    if (twitterHandle && !isHandle(twitterHandle)) errors.twitter = "Invalid Twitter handle";
+    if (discordUsername && !isDiscordHandle(discordUsername)) errors.discord = "Invalid Discord handle";
+
+    setFormErrors(errors);
+    
+    const firstKey = Object.keys(errors)[0];
+    if (firstKey) {
+      document.getElementById(firstKey)?.focus();
+    }
+    
+    return Object.keys(errors).length === 0;
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -249,22 +261,29 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
         setTwitterHandle("")
         setDiscordUsername("")
       } else {
-        let apiError = 'Unknown error';
-        const cType = response.headers.get('content-type') ?? '';
-        if (cType.includes('application/json')) {
+        let apiError = 'unknown';
+        const ct = response.headers.get('content-type') ?? '';
+        if (ct.includes('application/json')) {
           try {
             ({ error: apiError } = await response.json());
           } catch { /* ignore */ }
         } else {
           try {
-            apiError = await response.text();
+            apiError = (await response.text()).trim();
           } catch { /* ignore */ }
         }
-        toast({
-          title: "Something went wrong",
-          description: apiError || "Please try again later.",
-          variant: "destructive",
-        })
+
+        const friendly = apiErrorToFormError[apiError] ?? 'Please try again later.';
+
+        if (response.status === 409 && apiError === 'duplicate') {
+          setFormErrors((prev) => ({ ...prev, email: friendly }));
+        } else {
+          toast({
+            title: 'Something went wrong',
+            description: friendly,
+            variant: 'destructive',
+          });
+        }
       }
     } catch (err) {
       console.error(err);
@@ -524,7 +543,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
 
                 <div className="space-y-2">
                   <Label htmlFor="fullName" className="text-gray-300 font-mono text-sm flex items-center">
-                    Full Name{" "}
+                    Name{" "}
                     <span className="text-gray-500 ml-1">(optional)</span>
                   </Label>
                   <div className="relative">
@@ -542,7 +561,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
 
                 <div className="space-y-2">
                   <Label htmlFor="telegram" className="text-gray-300 font-mono text-sm flex items-center">
-                    <span className="text-gray-500 mr-1">#</span> Telegram{" "}
+                    Telegram{" "}
                     <span className="text-gray-500 ml-1">(optional)</span>
                   </Label>
                   <div className="relative">
@@ -565,7 +584,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
 
                 <div className="space-y-2">
                   <Label htmlFor="twitter" className="text-gray-300 font-mono text-sm flex items-center">
-                    <span className="text-gray-500 mr-1">#</span> Twitter{" "}
+                    Twitter{" "}
                     <span className="text-gray-500 ml-1">(optional)</span>
                   </Label>
                   <div className="relative">
@@ -588,7 +607,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
 
                 <div className="space-y-2">
                   <Label htmlFor="discord" className="text-gray-300 font-mono text-sm flex items-center">
-                    <span className="text-gray-500 mr-1">#</span> Discord{" "}
+                    Discord{" "}
                     <span className="text-gray-500 ml-1">(optional)</span>
                   </Label>
                   <div className="relative">
