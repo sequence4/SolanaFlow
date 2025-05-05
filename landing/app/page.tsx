@@ -119,19 +119,23 @@ export default function LandingPage() {
           </div>
         </div>
       </nav>
-      <section className="flex justify-center px-2 sm:px-8 md:px-[8%] pt-12 sm:pt-[10%] xl:pt-[5%] pb-[8%]
+      <section className="flex justify-center px-2 sm:px-8 md:px-[8%] pt-[1%] sm:pt-[10%] lg:pt-[3%] 3xl:pt-[5%] pb-[8%]
                       w-full
                       md:h-[100vh]
                       overflow-visible">
         <div className="w-full h-full z-10">
             <div className="flex flex-col w-full h-full md:flex-row items-start">
-                <div className="flex flex-col justify-center gap-3 xs:gap-5 sm:gap-6 md:gap-2 lg:gap-0 h-full w-full xs:w-full md:w-3/5 lg:w-2/5 mb-12 sm:mb-16 md:mb-0 pr-0 md:pr-4 lg:pr-8">
-                    <div className="flex flex-col gap-0 justify-start">
-                        <div className="w-fit inline-block px-1 sm:px-3 py-1 mb-4 sm:mb-6 rounded-full bg-[#1e2033] border border-[#2a2d4a] text-[10px] xs:text-xs text-[#5580ff] mx-auto xs:mx-auto sm:mx-auto md:mx-0">
-                        <span className="mr-2">●</span> Visual AI Developer Tool for Solana
-                        </div>
-                        <div className="flex flex-col gap-0 xs:gap-3 sm:gap-4">
-                          <h1 className="text-[20px] xs:text-[20px] sm:text-[26px] md:text-xl lg:text-2xl xl:text-3xl 
+
+                <div className="flex flex-col justify-center align-center lg:justify-start gap-3 xs:gap-5 sm:gap-6 md:gap-2 lg:gap-0 
+                                h-full w-full xs:w-full md:w-3/5 lg:w-2/5 mb-12 sm:mb-16 md:mb-0 pr-0 md:pr-4 lg:pr-8 
+                                xl:pt-[0%] 2xl:pt-[0%] 3xl:pt-[5%]">
+                  <div className="flex flex-col gap-0 justify-start ">
+                    <div className="w-fit inline-block py-1 px-2 mb-4 sm:mb-4 rounded-full bg-[#1e2033] 
+                        border border-[#2a2d4a] text-[10px] text-xs md:text-[10px] text-[#5580ff] mx-auto xs:mx-auto sm:mx-auto md:mx-0
+                        ">
+                        <span className="mr-2">●</span> Visual AI Developer Tool for Solana</div>
+                        <div className="flex flex-col gap-0 xs:gap-3 md:gap-2">
+                          <h1 className="text-[20px] sm:text-[26px] md:text-[20px] lg:text-[22px] xl:text-[18px] 3xl:text-[26px]
                           font-bold leading-tight tracking-tight text-center xs:text-center sm:text-center md:text-left" 
                           style={{ fontFamily: '"DM Sans", sans-serif' }}>
                           <span className="block">Deploy Solana dApps</span>
@@ -139,7 +143,7 @@ export default function LandingPage() {
                           <h1 className="text-base xs:text-lg sm:text-[26px] md:text-xl lg:text-2xl xl:text-3xl font-bold 
                           mb-4 sm:mb-6 lg:mb-2 leading-tight tracking-tight text-center xs:text-center sm:text-center md:text-left" 
                           style={{ fontFamily: '"DM Sans", sans-serif' }}>
-                          <span className="text-[40px] xs:text-[35px] sm:text-[50px] md:text-3xl lg:text-4xl xl:text-5xl 
+                          <span className="text-[40px] sm:text-[50px] md:text-[40px] lg:text-[30px] xl:text-[35px] 2xl:text-[35px]
                           text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]" 
                               style={{
                               backgroundSize: "300% 300%",
@@ -161,7 +165,7 @@ export default function LandingPage() {
                           style={{ borderRadius: '4px', backgroundColor: '#0d0e1a' }}
                           onClick={openWaitlistModal}
                         >
-                          <span className="relative z-10 cursor-pointer text-xs xs:text-sm sm:text-base gradient-text">Join the Waitlist</span>
+                          <span className="relative z-10 cursor-pointer text-bold text-[11px] md:text-[12px] gradient-text">Join the Waitlist</span>
                         </Button>
 
                         <style jsx global>{`
@@ -506,21 +510,17 @@ export default function LandingPage() {
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center space-x-2 mb-6 md:mb-0">
-              <div className="w-8 h-8 relative">
+              <div className="w-4 h-4 md:w-6 md:h-6 relative">
                 <img src="/assets/logo.png" alt="FlowCode Logo" className="w-full h-full" />
                 <div className="absolute inset-0 bg-[#5580ff]/20 blur-xl rounded-full"></div>
               </div>
               <span className="text-lg font-bold tracking-tighter" style={{ fontFamily: '"DM Sans", sans-serif' }}>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
-                    style={{
-                      backgroundSize: "300% 300%",
-                      animation: "gradientFlow 3s ease infinite"
-                    }}>Solana</span>
+                <span className="text-white">Solana</span>
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]" 
                   style={{
                     backgroundSize: "300% 300%",
                     animation: "gradientFlow 3s ease infinite"
-                  }}>FlowCode</span>
+                  }}>Flow</span>
               </span>
             </div>
             <div className="flex flex-wrap justify-center gap-6 mb-6 md:mb-0">

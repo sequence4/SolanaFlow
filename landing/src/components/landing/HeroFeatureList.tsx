@@ -22,7 +22,7 @@ export default function HeroFeatureList() {
                 xs:justify-start
                 sm:items-start 
                 gap-3 xs:gap-3 sm:gap-4 
-                mb-3 xs:mb-3 sm:mb-6 md:mb-4 
+                mb-3 xs:mb-3 sm:mb-6 md:mb-4 lg:mb-3
                 relative
                 list-none
                 xs:bg-[#0f111b] xs:p-1 xs:rounded">
@@ -40,14 +40,14 @@ export default function HeroFeatureList() {
             </span>
 
             <div className="flex flex-col items-start items-start sm:items-start text-left gap-1 sm:gap-1">
-              <h3 className="text-xs xs:text-sm sm:text-[20px] md:text-sm font-medium text-white
+              <h3 className="text-xs xs:text-sm sm:text-[20px] md:text-[13px] font-medium text-white
                             flex flex-row xs:flex-row sm:flex-row items-center xs:items-center sm:items-center font-lekton">
-                <span className="font-mono text-[7px] xs:text-[10px] sm:text-[12px] 
+                <span className="font-mono text-[7px] xs:text-[10px] sm:text-[11px] 
                                   text-teal-500/70 mr-1 xs:mr-1.5 sm:mr-1.5 tracking-wider">{`0x${index.toString(16)}`}</span>
                 {feature.title}
               </h3>
 
-              <p className="text-[10px] sm:text-[16px] md:text-[12px] text-gray-400 
+              <p className="text-[10px] sm:text-[16px] md:text-[11px] text-gray-400 
                             leading-tight xs:pl-1 xs:border-l xs:border-teal-900/30 xs:ml-1 font-lekton text-left">
                 {feature.description}
               </p>
