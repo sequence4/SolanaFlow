@@ -226,7 +226,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
         }),
       })
 
-      if (response.status === 201) {
+      if (response.ok) {
         toast({
           title: "You're in!",
           description: "We&apos;ll keep you updated.",
@@ -250,10 +250,14 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
           try {
             ({ error: apiError } = await response.json());
           } catch { /* ignore */ }
+        } else {
+          try {
+            apiError = await response.text();
+          } catch { /* ignore */ }
         }
         toast({
           title: "Something went wrong",
-          description: apiError ?? "Please try again later.",
+          description: apiError || "Please try again later.",
           variant: "destructive",
         })
       }
