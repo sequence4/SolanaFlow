@@ -14,6 +14,7 @@ import LandingStyles from "@/components/landing/style"
 import dynamic from "next/dynamic"
 import UserMessageBox from "@/components/landing/UserMessageBox"
 import FeaturesSection from "@/components/landing/FeaturesSection"
+import FeatureListRefined from "./feature-list-refined"
 
 const WaitlistModal = dynamic(() => import("@/components/WaitlistModal"), {
   ssr: false,
@@ -139,23 +140,7 @@ export default function LandingPage() {
                         </h1>
                     </div>
                     <div className="text-gray-400 mb-6 sm:mb-8 w-full text-sm sm:text-xs md:text-xs lg:text-[13px] max-lg:text-sm leading-relaxed py-2 px-4">
-                    <ul className="list-disc list-outside ml-6 space-y-4">
-                      <li className="pl-2">
-                        <span className="text-white font-semibold">AI&nbsp;Powered&nbsp;Development</span> – Turn ideas into secure Solana dApps with natural-language instructions.
-                      </li>
-                      <li className="pl-2">
-                        <span className="text-white font-semibold">Visual&nbsp;Workflow&nbsp;Builder</span> – Drag-and-drop pre-audited Solana modules for fast, reliable builds.
-                      </li>
-                      <li className="pl-2">
-                        <span className="text-white font-semibold">Instant&nbsp;Deployment</span> – Ship to devnet or mainnet in a single click.
-                      </li>
-                      <li className="pl-2">
-                        <span className="text-white font-semibold">Live&nbsp;Iterations</span> – Update logic and push upgrades in real time.
-                      </li>
-                      <li className="pl-2">
-                        <span className="text-white font-semibold">Collaborative&nbsp;Workspace</span> – Real-time co-editing with built-in version control.
-                      </li>
-                    </ul>
+                      <FeatureListRefined />
                     </div>
                     <div className="flex flex-col sm:flex-row justify-start gap-8">
                         <Button 

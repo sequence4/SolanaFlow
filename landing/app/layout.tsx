@@ -1,7 +1,7 @@
 import React, { Suspense } from "react";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Oxygen_Mono } from 'next/font/google';
+import { Oxygen_Mono, Lekton } from 'next/font/google';
 import Script from "next/script";
 import { Analytics } from "./_analytics";
 import { isGaEnabled } from "@/lib/gtag";
@@ -21,6 +21,12 @@ const oxygenMono = Oxygen_Mono({
   variable: "--font-oxygen-mono",
   subsets: ["latin"],
   weight: ["400"],
+});
+
+const lekton = Lekton({
+  variable: "--font-lekton",
+  subsets: ["latin"],
+  weight: ["400", "700"],
 });
 
 export const metadata: Metadata = {
@@ -71,7 +77,7 @@ export default function RootLayout({
           </>
         )}
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} ${oxygenMono.variable} antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${oxygenMono.variable} ${lekton.variable} antialiased`}>
         {isGaEnabled && (
           <Suspense fallback={null}>
             <Analytics />

@@ -123,6 +123,9 @@ module.exports = {
           shimmer: "shimmer 2s infinite",
           pulse: "pulse 2s infinite",
         },
+        fontFamily: {
+          'lekton': ['var(--font-lekton)', 'monospace'],
+        },
       },
     },
     plugins: [require("tailwindcss-animate"), require("tailwindcss-scrollbar")],
