@@ -1,9 +1,10 @@
-import React from "react";
+import React, { Suspense } from "react";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Oxygen_Mono } from 'next/font/google';
 import Script from "next/script";
-import { GA_ID, isGaEnabled } from "@/lib/gtag";
+import { Analytics } from "./_analytics";
+import { isGaEnabled } from "@/lib/gtag";
 import "@/styles/globals.css";
 
 const geistSans = Geist({
@@ -56,7 +57,7 @@ export default function RootLayout({
         {isGaEnabled && (
           <>
             <Script
-              src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
+              src="https://www.googletagmanager.com/gtag/js?id=G-VRD2S5WGEZ"
               strategy="afterInteractive"
             />
             <Script id="ga-init" strategy="afterInteractive">
@@ -64,13 +65,18 @@ export default function RootLayout({
                 window.dataLayer = window.dataLayer || [];
                 function gtag(){dataLayer.push(arguments);}
                 gtag('js', new Date());
-                gtag('config', '${GA_ID}', { page_path: window.location.pathname });
+                gtag('config', 'G-VRD2S5WGEZ');
               `}
             </Script>
           </>
         )}
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} ${oxygenMono.variable} antialiased`}>
+        {isGaEnabled && (
+          <Suspense fallback={null}>
+            <Analytics />
+          </Suspense>
+        )}
         {children}
       </body>
     </html>
