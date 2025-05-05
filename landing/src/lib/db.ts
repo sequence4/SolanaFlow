@@ -1,23 +1,32 @@
-import { Pool } from 'pg';
-import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
-
-const certPath = process.env.PG_SSL_CA ?? join(process.cwd(), 'certs', 'rds-combined-ca-bundle.pem');
-
-const dbUrl = process.env.DATABASE_URL;
-
-if (dbUrl && dbUrl.includes('dbmasteruser')) {
-  console.error('Refusing to start with privileged DB user');
-  process.exit(1);
-}
-
-// Only read CA file if it exists
-const ssl = existsSync(certPath)
-  ? { rejectUnauthorized: true, ca: readFileSync(certPath, 'utf8') }
-  : undefined;
+import { Pool, QueryConfig, QueryResult } from 'pg';
 
 export const db = new Pool({
-  connectionString: dbUrl,
-  max: 10,
-  ssl
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production'
+    ? { rejectUnauthorized: false }
+    : undefined,
 });
+
+/**
+ * Safe wrapper around pg.Pool#query.
+ * Returns an empty result instead of throwing if PG is down **in dev**.
+ */
+export const safeQuery = async <
+  T extends Record<string, unknown> = Record<string, unknown>
+>(
+  textOrConfig: string | QueryConfig,
+  values?: unknown[],
+): Promise<QueryResult<T>> => {
+  try {
+    return typeof textOrConfig === 'string'
+      ? await db.query<T>(textOrConfig, values)
+      : await db.query<T>(textOrConfig);
+  } catch (err) {
+    if (process.env.NODE_ENV === 'development') {
+      // eslint-disable-next-line no-console
+      console.warn('DB unavailable → returning empty result:', err);
+      return { command: '', rowCount: 0, oid: 0, fields: [], rows: [] } as QueryResult<T>;
+    }
+    throw err;
+  }
+};

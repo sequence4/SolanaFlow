@@ -19,5 +19,10 @@ const mockDb = {
 };
 
 export const db = mockDb;
-const exportObject = { db };
+
+export const safeQuery = jest.fn().mockImplementation(
+  (textOrConfig, values) => db.query(textOrConfig, values)
+);
+
+const exportObject = { db, safeQuery };
 export default exportObject; 

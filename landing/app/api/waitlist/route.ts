@@ -2,7 +2,12 @@ import { NextResponse } from 'next/server';
 import { WaitlistSchema } from '@/lib/waitlistSchema';
 import { parseOrThrow } from '@/lib/parseOrThrow';
 import { waitlistLimit } from '@/lib/rateLimit';
-import { db } from '@/lib/db';
+import { safeQuery } from '@/lib/db';
+
+// TEMP-debug; remove once green
+// eslint-disable-next-line no-console
+console.log('safeQuery in route ▶︎', typeof safeQuery);
+
 
 export const dynamic = 'force-static';
 
@@ -33,7 +38,7 @@ export async function POST(req: Request) {
       req.headers.get('x-real-ip') ??
       null;
 
-    const insert = await db.query(
+    const insert = await safeQuery(
       `INSERT INTO waitlist
            (email, wallet_address, full_name,
             telegram_handle, twitter_handle, discord_username,
