@@ -18,10 +18,21 @@ const inMemoryLimiter = {
   }
 };
 
+const hasUpstashCreds =
+  !!process.env.UPSTASH_REDIS_REST_URL &&
+  !!process.env.UPSTASH_REDIS_REST_TOKEN;
+
 export const waitlistLimit = isTest
   ? (inMemoryLimiter as unknown as Pick<Ratelimit, 'limit'>) // eslint-disable-line @typescript-eslint/no-explicit-any
-  : new Ratelimit({
-      redis: Redis.fromEnv(),
-      limiter: Ratelimit.slidingWindow(5, '1 m'),
-      analytics: false,
-    }); 
+  : hasUpstashCreds
+    ? new Ratelimit({
+        redis: new Redis({
+          url: process.env.UPSTASH_REDIS_REST_URL!,
+          token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+        }),
+        limiter: Ratelimit.slidingWindow(20, '1 h'),
+        analytics: true,
+      })
+    : {
+        limit: async () => ({ success: true, reset: 0 }),
+      } as const; 

@@ -244,7 +244,13 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
         setTwitterHandle("")
         setDiscordUsername("")
       } else {
-        const { error: apiError } = await response.json()
+        let apiError = 'Unknown error';
+        const cType = response.headers.get('content-type') ?? '';
+        if (cType.includes('application/json')) {
+          try {
+            ({ error: apiError } = await response.json());
+          } catch { /* ignore */ }
+        }
         toast({
           title: "Something went wrong",
           description: apiError ?? "Please try again later.",
