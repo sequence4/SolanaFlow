@@ -41,9 +41,10 @@ jobs:
 
       - name: Archive production build
         run: |
-          cp ../pnpm-lock.yaml .
-          cp ../.npmrc . || true
-          tar -czf ../landing.tar.gz \
+          [ -f ../pnpm-lock.yaml ] && cp ../pnpm-lock.yaml .
+          [ -f ../.npmrc ]         && cp ../.npmrc .
+
+          tar --ignore-failed-read -czf ../landing.tar.gz \
             .next \
             public \
             next.config.* \
