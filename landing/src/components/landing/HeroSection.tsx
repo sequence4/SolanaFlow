@@ -20,24 +20,20 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
   useAutoScale(innerRef)
 
   return (
-    <section 
-      className="relative overscroll-y-contain min-h-[calc(100svh-var(--navH,64px))] px-4 md:px-8"
+    <section
+      className="px-4 md:px-8"
     >
-      <div 
+      <div
         ref={innerRef}
-        className="hero-inner
-        py-[var(--hero-pad)]
-        h-full w-full mx-auto max-w-[min(90vw,1400px)]
-          grid
-          gap-4 lg:gap-8
-          lg:grid-cols-[26rem_1fr_28rem]
+        className="hero-wrapper
+          w-full mx-auto max-w-[min(90vw,1400px)]
+          grid gap-4 lg:gap-8
+          lg:grid-cols-[26rem_minmax(32rem,1fr)_24rem]
           lg:[grid-template-areas:'copy_flow_code']
-          [grid-template-areas:'copy']   /* mobile & tablet – only the copy block */
+          [grid-template-areas:'copy']
         "
       >
-        {/* ───────────────────────── LEFT COLUMN ───────────────────────── */}
         <div className="grid-in-copy grid grid-rows-[auto_1fr_auto] gap-6 max-w-[40rem] min-h-0">
-          {/* 🔹 TOP BLOCK - headline + feature list */}
           <div>
             <div className="w-fit inline-block py-1 px-2 mb-4 sm:mb-4 rounded-full bg-[#1e2033] 
                 border border-[#2a2d4a] text-[10px] text-xs md:text-[10px] text-[#5580ff] mx-auto lg:mx-0">
@@ -63,12 +59,10 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
             </h1>
           </div>
 
-          {/* Feature list */}
           <div className="space-y-3 text-[clamp(.875rem,.6vw+0.5rem,1.125rem)] text-gray-400">
             <HeroFeatureList />
           </div>
 
-          {/* 🔸 BOTTOM BLOCK - CTA row */}
           <div className="flex justify-center lg:justify-start gap-4">
             <Button 
               data-testid="open-waitlist-form"
@@ -135,17 +129,14 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
           </div>
         </div>
 
-        {/* ───────────────────────── MIDDLE COLUMN ───────────────────────── */}
-        <div className="grid-in-flow hidden lg:flex items-center justify-center min-w-0 pl-24">
+        <div className="grid-in-flow hidden lg:flex items-center justify-center min-w-0">
           <div className="w-full h-full max-h-[60vh] min-w-0">
             {mounted && <InstructionFlow />}
           </div>
         </div>
 
-        {/* ───────────────────────── RIGHT COLUMN ───────────────────────── */}
-        <div className="grid-in-code hidden lg:flex flex-col gap-0 h-full">
-          {/* terminal = fills whatever's left */}
-          <div className="flex-1 min-h-0 rounded-xl overflow-hidden border border-[#2a2d4a] bg-[#0d0e1a]">
+        <div className="grid-in-code hidden lg:flex basis-0 grow flex-col gap-0">
+          <div className="flex-1 min-h-[18rem] max-h-[calc(100%-6rem)] rounded-xl overflow-hidden border border-[#2a2d4a] bg-[#0d0e1a]">
             <div className="h-full flex flex-col rounded-xl overflow-hidden min-h-0">
               <div className="flex items-center px-4 py-2 bg-[#1e2033] border-b border-[#2a2d4a] rounded-lg">
                 <div className="flex space-x-2 rounded-lg">
@@ -160,9 +151,8 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
             </div>
           </div>
           
-          {/* message box = only as tall as it needs, up to 14rem (224px) */}
-          <div className="flex-none h-[clamp(5rem,10%,5rem)] rounded-xl
-                 overflow-hidden border border-[#2a2d4a]">
+          <div className="mt-auto flex-none h-[5rem]
+             rounded-xl overflow-hidden border border-[#2a2d4a]">
             {mounted && <UserMessageBox 
               messages={[
                 "Generate a Solana wallet dApp that connects Phantom, shows balances, and lets users send SOL",
@@ -184,7 +174,6 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
         </div>
       </div>
       
-      {/* floating particles */}
       <div suppressHydrationWarning>
         <BackgroundEffect mounted={mounted} />
       </div>
