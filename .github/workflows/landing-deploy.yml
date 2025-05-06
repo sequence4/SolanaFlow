@@ -41,13 +41,12 @@ jobs:
 
       - name: Archive production build
         run: |
-          tar -czf landing.tar.gz \
+          tar -czf ../landing.tar.gz \
             .next \
             public \
             next.config.* \
             ecosystem.config.cjs \
             package.json \
-            pnpm-lock.yaml \
             docs \
             scripts
         working-directory: landing
@@ -56,7 +55,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: landing-build
-          path: landing/landing.tar.gz
+          path: landing.tar.gz
           retention-days: 7
 
   deploy:
