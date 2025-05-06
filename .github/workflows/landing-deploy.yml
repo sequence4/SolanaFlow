@@ -97,12 +97,12 @@ jobs:
       - name: Unpack & reload (SSH)
         uses: appleboy/ssh-action@v0.1.7
         env:
-          STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          STAGING_DATABASE_URL:   ${{ secrets.STAGING_DATABASE_URL }}
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
-          ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
-          NEXT_PUBLIC_GTAG: ${{ secrets.NEXT_PUBLIC_GTAG }}
-          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          ALLOWED_ORIGINS:        ${{ secrets.ALLOWED_ORIGINS }}
+          NEXT_PUBLIC_GTAG:       ${{ secrets.NEXT_PUBLIC_GTAG }}
+          NEXT_PUBLIC_API_URL:    ${{ secrets.NEXT_PUBLIC_API_URL }}
         with:
           host: ${{ secrets.STAGING_HOST }}
           username: ${{ secrets.STAGING_USER }}
@@ -132,6 +132,11 @@ jobs:
             EOF
             cd landing
             pnpm install --prod --no-frozen-lockfile
+
+            # ensure pm2 is present and on PATH
+            command -v pm2 >/dev/null 2>&1 || sudo npm install -g pm2@latest
+            export PATH=$PATH:/usr/local/bin
+
             pm2 startOrReload ecosystem.config.cjs
             pm2 save
             echo "✅  Landing deployed & PM2 restarted"
