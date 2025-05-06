@@ -41,7 +41,8 @@ jobs:
 
       - name: Archive production build
         run: |
-          cp ../pnpm-lock.yaml .               # <-- make lock-file visible
+          cp ../pnpm-lock.yaml .
+          cp ../.npmrc . || true
           tar -czf ../landing.tar.gz \
             .next \
             public \
@@ -49,6 +50,7 @@ jobs:
             ecosystem.config.cjs \
             package.json \
             pnpm-lock.yaml \
+            .npmrc \
             docs \
             scripts
         working-directory: landing
