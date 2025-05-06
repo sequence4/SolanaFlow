@@ -2,108 +2,168 @@
 
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Code, Database, Network, Shield } from "lucide-react"
+import { ArrowRight, Code, Cpu, Layers } from "lucide-react"
+import { BsTelegram } from "react-icons/bs";
+import { BsTwitterX } from "react-icons/bs";
+import { BsYoutube } from "react-icons/bs";
+import { useEffect, useState, useRef } from "react"
+import InstructionFlow from "@/components/landing/InstructionFlow"
+import Head from "next/head"
+import TypewriterCode from "@/components/landing/TypeWriterCode"
+import LandingStyles from "@/components/landing/style"
+import ScrollReveal from "@/components/landing/ScrollReveal"
+
 
 export default function LandingPage() {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+
+    return () => {
+      setMounted(false)
+    }
+  }, [])
+
   return (
-    <div className="min-h-screen bg-black text-white">
-      {/* Navbar */}
-      <nav className="container mx-auto px-4 py-6 flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-600 to-blue-500 flex items-center justify-center">
-            <Network className="w-6 h-6 text-white" />
+    <div className="min-h-screen bg-[#0a0b14] text-white font-mono overflow-x-hidden">
+      {/* Google Fonts Integration */}
+      <Head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link 
+          href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap"
+          rel="stylesheet" 
+        />
+      </Head>
+
+      {/* Matrix-like background effect */}
+      {mounted && (
+        <div className="fixed inset-0 z-0 opacity-15 overflow-hidden pointer-events-none">
+          <div className="absolute inset-0">
+            {Array.from({ length: 100 }).map((_, i) => {
+              // Define gradient colors
+              const gradientColors = ['#5f88dc', '#1cf6a0', '#9945ff'];
+              const randomColor = gradientColors[Math.floor(Math.random() * gradientColors.length)];
+              
+              return (
+                <div
+                  key={i}
+                  style={{
+                    position: 'absolute',
+                    top: `${Math.random() * 100}%`,
+                    left: `${Math.random() * 100}%`,
+                    animation: `fall ${5 + Math.random() * 15}s linear infinite`,
+                    animationDelay: `${Math.random() * 5}s`,
+                    color: randomColor,
+                    textShadow: `0 0 5px ${randomColor}`,
+                    fontSize: '1rem',
+                  }}
+                >
+                  {String.fromCharCode(33 + Math.floor(Math.random() * 94))}
+                </div>
+              );
+            })}
           </div>
-          <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-500">
-            NexusAI
+        </div>
+      )}
+
+      {/* Navbar */}
+      <nav className="relative z-10 border-b border-[#1e2033] bg-[#0a0b14]/50 backdrop-blur-md">
+        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 relative">
+              <img src="/assets/logo.png" alt="FlowCode Logo" className="w-full h-full" />
+              <div className="absolute inset-0 bg-[#5580ff]/20 blur-xl rounded-full"></div>
+            </div>
+            <span className="text-xl font-bold tracking-tighter" style={{ fontFamily: '"DM Sans", sans-serif' }}>
+              <span className="text-white">Solana</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]" 
+                style={{
+                  backgroundSize: "300% 300%",
+                  animation: "gradientFlow 3s ease infinite"
+                }}>Flow</span>
           </span>
         </div>
-        <div className="hidden md:flex items-center space-x-6">
-          <Link href="#features" className="text-gray-300 hover:text-white transition-colors">
+
+          <div className="hidden md:flex items-center space-x-12">
+            <Link href="#features" className="text-gray-400 hover:text-[#5580ff] transition-colors text-sm">
             Features
           </Link>
-          <Link href="#about" className="text-gray-300 hover:text-white transition-colors">
-            About
+            <Link href="#demo" className="text-gray-400 hover:text-[#5580ff] transition-colors text-sm">
+              Demo
           </Link>
-          <Link href="#contact" className="text-gray-300 hover:text-white transition-colors">
-            Contact
+            <Link href="#team" className="text-gray-400 hover:text-[#5580ff] transition-colors text-sm">
+              Team
           </Link>
-        </div>
-        <div className="flex items-center space-x-3">
-          <Button variant="ghost" className="text-gray-300 hover:text-white" asChild>
-            <Link href="/login">Login</Link>
-          </Button>
-          <Button
-            className="bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600"
-            asChild
-          >
-            <Link href="/register">Register</Link>
-          </Button>
+          </div>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="relative py-20 overflow-hidden">
-        {/* Background grid effect */}
-        <div className="absolute inset-0 z-0 opacity-20">
-          <div className="absolute w-full h-full grid grid-cols-12 gap-4">
-            {Array.from({ length: 120 }).map((_, i) => (
-              <div
-                key={i}
-                className="w-1 h-1 rounded-full bg-blue-500"
-                style={{
-                  position: "absolute",
-                  top: `${Math.random() * 100}%`,
-                  left: `${Math.random() * 100}%`,
-                  opacity: Math.random(),
-                  animation: `pulse ${2 + Math.random() * 3}s infinite`,
-                }}
-              />
-            ))}
+      <section className="flex justify-center relative w-screen h-[100vh] py-4 sm:py-4 md:py-8 lg:py-10 overflow-hidden">
+        <div className="w-full h-full container relative z-10 px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col w-full h-full md:flex-row items-start py-16 sm:py-20 md:py-25">
+            {/* Left side content */}
+            <div className="flex flex-col justify-evenly gap-2 h-full w-full md:w-2/5 lg:w-2/5 mb-12 md:mb-0 pr-0 md:pr-4 lg:pr-8">
+              <div className="flex flex-col gap-0 justify-start">
+                <div className="w-fit inline-block px-2 sm:px-3 py-1 mb-4 sm:mb-6 rounded-full bg-[#1e2033] border border-[#2a2d4a] text-xs text-[#5580ff]">
+                  <span className="mr-2">●</span> Visual AI Developer Tool for Solana
+                </div>
+                <h1 className="text-3xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 leading-tight tracking-tight" style={{ fontFamily: '"DM Sans", sans-serif' }}>
+                  <span className="block">Build Solana dApps</span>
+                  <span className="text-4xl sm:text-4xl md:text-5xl lg:text-6xl text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]" 
+                    style={{
+                      backgroundSize: "300% 300%",
+                      animation: "gradientFlow 3s ease infinite"
+                    }}>
+                    Without Code
+                  </span>
+                </h1>
+              </div>
+              <div className="text-gray-400 mb-6 sm:mb-8 max-w-lg text-xs sm:text-sm leading-relaxed">
+                <ul className="list-disc list-inside">
+                  <li><span className="text-white font-semibold">FlowCode</span> transforms English into Solana programs.</li>
+                  <li>Design, build, and deploy decentralized applications with our visual workflow builder and
+                  specialized Solana IDE.</li>
+                </ul>
+              </div>
+              <div className="flex flex-col sm:flex-row justify-start gap-2">
+                <Button size="lg" className="bg-[#5580ff] hover:bg-[#4466cc] text-white p-2 rounded whitespace-nowrap">
+                  <span className="cursor-pointer text-xs sm:text-sm">Join the Waitlist</span>
+                </Button>
+                <div className="flex items-center justify-center gap-2 hover:bg-none mt-2 sm:mt-0">
+                    <Button size="icon" variant="ghost"><BsTelegram className="h-4 w-4 sm:h-5 sm:w-5 text-[#5580ff] cursor-pointer hover:bg-none" /></Button>
+                    <Button size="icon" variant="ghost"><BsTwitterX className="h-4 w-4 sm:h-5 sm:w-5 text-[#5580ff] cursor-pointer hover:bg-none" /></Button>
+                    <Button size="icon" variant="ghost"><BsYoutube className="h-4 w-4 sm:h-5 sm:w-5 text-[#5580ff] cursor-pointer hover:bg-none" /></Button>
+                </div>
           </div>
         </div>
 
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-3xl mx-auto text-center mb-16">
-            <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-blue-500 to-cyan-400">
-                Next-Generation Blockchain AI Platform
-              </span>
-            </h1>
-            <p className="text-xl text-gray-300 mb-8">
-              Harness the power of decentralized intelligence with our cutting-edge platform that combines blockchain
-              security with advanced AI capabilities.
-            </p>
-            <div className="flex flex-col sm:flex-row justify-center gap-4">
-              <Button
-                size="lg"
-                className="bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-lg px-8"
-                asChild
-              >
-                <Link href="/main">
-                  Go to App <ArrowRight className="ml-2 h-5 w-5" />
-                </Link>
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="border-gray-700 text-gray-300 hover:bg-gray-800 text-lg px-8"
-              >
-                Learn More
-              </Button>
+            {/* Right side - Flow diagram and code snippet */}
+            <div className="w-full h-full md:w-3/5 flex flex-col lg:flex-row mt-8 md:mt-0">
+              {/* Flow Diagram */}
+              <div className="w-full lg:w-3/5 relative">
+                <div className="h-[600px]">
+                  {mounted && <InstructionFlow />}
             </div>
           </div>
 
-          {/* Glowing orb effect */}
-          <div className="relative mx-auto w-full max-w-4xl h-64 md:h-96 rounded-xl overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-900/20 to-blue-900/20 backdrop-blur-sm rounded-xl border border-gray-800"></div>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 bg-blue-500 rounded-full blur-3xl opacity-20"></div>
-            <div className="absolute top-1/2 left-1/3 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-purple-500 rounded-full blur-3xl opacity-20"></div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <div className="inline-block p-3 rounded-full bg-gray-900/50 backdrop-blur-md border border-gray-800 mb-4">
-                  <Network className="w-8 h-8 text-blue-400" />
+              {/* Code Terminal */}
+              <div className="w-full lg:w-2/5 flex items-center justify-center relative">
+                <div className="mt-8 lg:mt-0 rounded-lg overflow-hidden border border-[#2a2d4a] bg-[#0d0e1a] w-full h-[80%] absolute top-[5%] left-0 right-0">
+                  <div className="flex items-center px-4 py-2 bg-[#1e2033] border-b border-[#2a2d4a]">
+                    <div className="flex space-x-2">
+                      <div className="w-2 h-2 rounded-full bg-[#ff5f57]"></div>
+                      <div className="w-2 h-2 rounded-full bg-[#febc2e]"></div>
+                      <div className="w-2 h-2 rounded-full bg-[#28c840]"></div>
+                    </div>
+                    <div className="ml-4 text-sm text-gray-400">token_minting_program.rs</div>
+                  </div>
+                  <div className="h-full">
+                    {mounted && <TypewriterCode />}
+                  </div>
                 </div>
-                <h3 className="text-xl font-semibold text-white">Secure. Intelligent. Decentralized.</h3>
               </div>
             </div>
           </div>
@@ -111,54 +171,278 @@ export default function LandingPage() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-20 bg-gray-900/50">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-500">
-                Advanced Features
-              </span>
-            </h2>
-            <p className="text-gray-300 max-w-2xl mx-auto">
-              Our platform combines cutting-edge technologies to provide a secure, intelligent, and decentralized
-              experience.
-            </p>
+      <section id="features" className="relative py-24 bg-[#050508] overflow-hidden">
+        {/* Animated background grid */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute inset-0 grid grid-cols-12 gap-1">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i} className="h-full w-full border-r border-white/5" />
+            ))}
+          </div>
+          <div className="absolute inset-0 grid grid-rows-12 gap-1">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i} className="h-full w-full border-b border-white/5" />
+            ))}
+          </div>
+        </div>
+
+        {/* Glow effects */}
+        <div className="absolute top-1/4 -left-20 w-72 h-72 bg-[#5580ff]/20 rounded-full blur-[120px]" />
+        <div className="absolute bottom-1/4 -right-20 w-72 h-72 bg-[#a855f7]/20 rounded-full blur-[120px]" />
+
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="text-center mb-20">
+            <ScrollReveal>
+              <div className="inline-flex items-center px-3 py-1 mb-4 rounded-full bg-[#1a1b2e]/60 border border-[#2a2d4a]/60 text-xs font-medium backdrop-blur-sm">
+                <div className="w-2 h-2 rounded-full bg-[#5580ff] mr-2 animate-pulse" />
+                <span className="bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff] bg-clip-text text-transparent"
+                    style={{
+                      backgroundSize: "300% 300%",
+                      animation: "gradientFlow 3s ease infinite"
+                    }}>
+                  POWERFUL DEVELOPMENT TOOLS
+                </span>
+              </div>
+            </ScrollReveal>
+            
+            <ScrollReveal delay={100}>
+              <h2 className="text-4xl md:text-5xl font-bold mb-6 tracking-tight">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
+                    style={{
+                      backgroundSize: "300% 300%",
+                      animation: "gradientFlow 3s ease infinite"
+                    }}>
+                  Build. Deploy. Scale.
+                </span>
+              </h2>
+            </ScrollReveal>
+            
+            <ScrollReveal delay={200}>
+              <p className="text-gray-400 max-w-2xl mx-auto text-base leading-relaxed">
+                Our platform combines cutting-edge technologies to provide a secure, intelligent, and decentralized
+                development experience for Solana.
+              </p>
+            </ScrollReveal>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Feature 1 */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 hover:border-blue-500/50 transition-all duration-300 group">
-              <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center mb-4 group-hover:bg-blue-500/20 transition-colors">
-                <Shield className="w-6 h-6 text-blue-400" />
+            {/* Feature 1 - Workflow */}
+            <ScrollReveal delay={0}>
+              <div className="relative group">
+                <div className="absolute inset-0 bg-gradient-to-r from-[#5580ff]/20 to-transparent rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="relative bg-[#0a0b14]/80 backdrop-blur-sm border border-[#1e2033] rounded-2xl p-8 h-full transition-all duration-300 group-hover:border-[#5580ff]/50 group-hover:translate-y-[-4px]">
+                  <div className="w-14 h-14 rounded-xl bg-[#5580ff]/10 flex items-center justify-center mb-6 group-hover:bg-[#5580ff]/20 transition-colors">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="w-6 h-6 text-[#5580ff]"
+                    >
+                      <rect width="7" height="7" x="3" y="3" rx="1" />
+                      <rect width="7" height="7" x="14" y="3" rx="1" />
+                      <rect width="7" height="7" x="14" y="14" rx="1" />
+                      <rect width="7" height="7" x="3" y="14" rx="1" />
+                    </svg>
+                  </div>
+                  <div className="flex items-center mb-3">
+                    <h3 className="text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
+                        style={{
+                          backgroundSize: "300% 300%",
+                          animation: "gradientFlow 3s ease infinite"
+                        }}>Visual Workflow Builder</h3>
+                    <span className="ml-2 px-2 py-0.5 rounded-full bg-[#1e2033]/80 text-[#5580ff] text-xs font-medium">
+                      workflow
+                    </span>
+                  </div>
+                  <p className="text-gray-400 mb-5 text-sm leading-relaxed">
+                    Drag and drop Solana plugins to visually design your dApp architecture without writing a single line of
+                    code.
+                  </p>
+                  <ul className="text-gray-400 space-y-3 text-sm">
+                    {["Pre-configured & verified components", "Smart contract templates", "Intuitive flow connections"].map(
+                      (item, index) => (
+                        <li key={index} className="flex items-start">
+                          <div className="w-5 h-5 rounded-full bg-[#5580ff]/10 flex items-center justify-center mr-3 mt-0.5">
+                            <div className="w-1.5 h-1.5 rounded-full bg-[#5580ff]" />
+                          </div>
+                          {item}
+                        </li>
+                      ),
+                    )}
+                  </ul>
+                </div>
               </div>
-              <h3 className="text-xl font-semibold mb-2">Blockchain Security</h3>
-              <p className="text-gray-400">
-                Enterprise-grade security powered by advanced blockchain technology ensuring your data remains
-                protected.
-              </p>
+            </ScrollReveal>
+
+            {/* Feature 2 - Code */}
+            <ScrollReveal delay={200}>
+              <div className="relative group">
+                <div className="absolute inset-0 bg-gradient-to-r from-[#a855f7]/20 to-transparent rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="relative bg-[#0a0b14]/80 backdrop-blur-sm border border-[#1e2033] rounded-2xl p-8 h-full transition-all duration-300 group-hover:border-[#a855f7]/50 group-hover:translate-y-[-4px]">
+                  <div className="w-14 h-14 rounded-xl bg-[#a855f7]/10 flex items-center justify-center mb-6 group-hover:bg-[#a855f7]/20 transition-colors">
+                    <Code className="w-6 h-6 text-[#a855f7]" />
+                  </div>
+                  <div className="flex items-center mb-3">
+                    <h3 className="text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
+                        style={{
+                          backgroundSize: "300% 300%",
+                          animation: "gradientFlow 3s ease infinite"
+                        }}>Solana-Specific IDE</h3>
+                    <span className="ml-2 px-2 py-0.5 rounded-full bg-[#1e2033]/80 text-[#a855f7] text-xs font-medium">
+                      code
+                    </span>
+                  </div>
+                  <p className="text-gray-400 mb-5 text-sm leading-relaxed">
+                    A powerful code editor tailored specifically for Solana development with intelligent autocompletion and
+                    debugging.
+                  </p>
+                  <ul className="text-gray-400 space-y-3 text-sm">
+                    {["Rust and TypeScript support", "Real-time error checking", "Integrated testing tools"].map(
+                      (item, index) => (
+                        <li key={index} className="flex items-start">
+                          <div className="w-5 h-5 rounded-full bg-[#a855f7]/10 flex items-center justify-center mr-3 mt-0.5">
+                            <div className="w-1.5 h-1.5 rounded-full bg-[#a855f7]" />
+                          </div>
+                          {item}
+                        </li>
+                      ),
+                    )}
+                  </ul>
+                </div>
+              </div>
+            </ScrollReveal>
+
+            {/* Feature 3 - Interface */}
+            <ScrollReveal delay={400}>
+              <div className="relative group">
+                <div className="absolute inset-0 bg-gradient-to-r from-[#00c2ff]/20 to-transparent rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="relative bg-[#0a0b14]/80 backdrop-blur-sm border border-[#1e2033] rounded-2xl p-8 h-full transition-all duration-300 group-hover:border-[#00c2ff]/50 group-hover:translate-y-[-4px]">
+                  <div className="w-14 h-14 rounded-xl bg-[#00c2ff]/10 flex items-center justify-center mb-6 group-hover:bg-[#00c2ff]/20 transition-colors">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="w-6 h-6 text-[#00c2ff]"
+                    >
+                      <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                      <line x1="3" x2="21" y1="9" y2="9" />
+                      <line x1="9" x2="9" y1="21" y2="9" />
+                    </svg>
+                  </div>
+                  <div className="flex items-center mb-3">
+                    <h3 className="text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
+                        style={{
+                          backgroundSize: "300% 300%",
+                          animation: "gradientFlow 3s ease infinite"
+                        }}>Interactive UI Builder</h3>
+                    <span className="ml-2 px-2 py-0.5 rounded-full bg-[#1e2033]/80 text-[#00c2ff] text-xs font-medium">
+                      interface
+                    </span>
+                  </div>
+                  <p className="text-gray-400 mb-5 text-sm leading-relaxed">
+                    Preview and interact with your generated dApp UI in real-time as you build your Solana application.
+                  </p>
+                  <ul className="text-gray-400 space-y-3 text-sm">
+                    {["Live UI previews", "Wallet integration testing", "Responsive design tools"].map((item, index) => (
+                      <li key={index} className="flex items-start">
+                        <div className="w-5 h-5 rounded-full bg-[#00c2ff]/10 flex items-center justify-center mr-3 mt-0.5">
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#00c2ff]" />
+                        </div>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </ScrollReveal>
+          </div>
+        </div>
+      </section>
+
+      {/* Demo Video Section */}
+      <section id="demo" className="py-20 bg-[#0a0b14]">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <div className="inline-block px-3 py-1 mb-4 rounded-full bg-[#1e2033] border border-[#2a2d4a] text-xs text-[#5580ff]">
+              <span className="mr-2">▶</span> Demo
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 tracking-tight">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
+                  style={{
+                    backgroundSize: "300% 300%",
+                    animation: "gradientFlow 3s ease infinite"
+                  }}>
+                See FlowCode in Action
+              </span>
+            </h2>
+            <p className="text-gray-400 max-w-2xl mx-auto text-sm">
+              Watch how easy it is to build and deploy a Solana dApp in minutes with our visual development platform.
+            </p>
+          </div>
+
+          {/* Video */}
+          <div className="max-w-6xl mx-auto">
+            <div className="relative aspect-video rounded-xl overflow-hidden border border-[#2a2d4a] shadow-2xl">
+              <div className="absolute inset-0 bg-gradient-to-br from-[#0d0e1a] to-[#0a0b14] flex flex-col items-center justify-center">
+              <video 
+                src="/assets/flowcode-demo.mp4" 
+                autoPlay 
+                muted 
+                loop 
+                playsInline
+                className="w-full h-full object-cover" 
+              />
+              </div>
             </div>
 
-            {/* Feature 2 */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 hover:border-purple-500/50 transition-all duration-300 group">
-              <div className="w-12 h-12 rounded-lg bg-purple-500/10 flex items-center justify-center mb-4 group-hover:bg-purple-500/20 transition-colors">
-                <Code className="w-6 h-6 text-purple-400" />
+            <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-[#0d0e1a] border border-[#2a2d4a] rounded-lg p-4">
+                <div className="flex items-center mb-2">
+                  <div className="w-8 h-8 rounded-full bg-[#5580ff]/20 flex items-center justify-center mr-3">
+                    <span className="text-[#5580ff] font-bold">1</span>
+                  </div>
+                  <h3 className="font-semibold text-sm">Design Your Workflow</h3>
+                </div>
+                <p className="text-gray-400 text-xs">
+                  Drag and drop components to create your dApp architecture visually.
+                </p>
               </div>
-              <h3 className="text-xl font-semibold mb-2">AI-Powered Analytics</h3>
-              <p className="text-gray-400">
-                Harness the power of artificial intelligence to gain insights and make data-driven decisions.
-              </p>
-            </div>
 
-            {/* Feature 3 */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 hover:border-cyan-500/50 transition-all duration-300 group">
-              <div className="w-12 h-12 rounded-lg bg-cyan-500/10 flex items-center justify-center mb-4 group-hover:bg-cyan-500/20 transition-colors">
-                <Database className="w-6 h-6 text-cyan-400" />
+              <div className="bg-[#0d0e1a] border border-[#2a2d4a] rounded-lg p-4">
+                <div className="flex items-center mb-2">
+                  <div className="w-8 h-8 rounded-full bg-[#a855f7]/20 flex items-center justify-center mr-3">
+                    <span className="text-[#a855f7] font-bold">2</span>
+                  </div>
+                  <h3 className="font-semibold text-sm">Customize Your Code</h3>
+                </div>
+                <p className="text-gray-400 text-xs">
+                  Fine-tune your smart contracts and frontend code in our specialized IDE.
+                </p>
               </div>
-              <h3 className="text-xl font-semibold mb-2">Decentralized Network</h3>
-              <p className="text-gray-400">
-                A robust peer-to-peer infrastructure that ensures high availability and resistance to central points of
-                failure.
-              </p>
+
+              <div className="bg-[#0d0e1a] border border-[#2a2d4a] rounded-lg p-4">
+                <div className="flex items-center mb-2">
+                  <div className="w-8 h-8 rounded-full bg-[#00c2ff]/20 flex items-center justify-center mr-3">
+                    <span className="text-[#00c2ff] font-bold">3</span>
+                  </div>
+                  <h3 className="font-semibold text-sm">Deploy & Monitor</h3>
+                </div>
+                <p className="text-gray-400 text-xs">
+                  Launch your dApp to testnet or mainnet with one click and track performance.
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -167,37 +451,53 @@ export default function LandingPage() {
       {/* CTA Section */}
       <section className="py-20">
         <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto bg-gradient-to-r from-gray-900 to-black border border-gray-800 rounded-2xl p-8 md:p-12 relative overflow-hidden">
+          <div className="max-w-4xl mx-auto bg-[#0d0e1a] border border-[#2a2d4a] rounded-2xl p-8 md:p-12 relative overflow-hidden">
             {/* Background effect */}
             <div className="absolute inset-0 opacity-30">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500 rounded-full blur-3xl opacity-20 -translate-y-1/2 translate-x-1/2"></div>
-              <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500 rounded-full blur-3xl opacity-20 translate-y-1/2 -translate-x-1/2"></div>
+              <div className="absolute top-0 right-0 w-64 h-64 bg-[#5580ff] rounded-full blur-3xl opacity-10 -translate-y-1/2 translate-x-1/2"></div>
+              <div className="absolute bottom-0 left-0 w-64 h-64 bg-[#a855f7] rounded-full blur-3xl opacity-10 translate-y-1/2 -translate-x-1/2"></div>
             </div>
 
             <div className="relative z-10 text-center">
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to Experience the Future?</h2>
-              <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-                Join thousands of innovators who are already leveraging our platform to build the next generation of
-                decentralized applications.
+              <h2 className="text-2xl md:text-3xl font-bold mb-4 tracking-tight">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
+                    style={{
+                      backgroundSize: "300% 300%",
+                      animation: "gradientFlow 3s ease infinite"
+                    }}>
+                  Ready to Build Effortlessly on Solana?
+                </span>
+              </h2>
+              <p className="text-gray-400 mb-8 max-w-2xl mx-auto text-sm">
+                Join hundreds of other people on our waitlist to be informed when we launch.
               </p>
               <div className="flex flex-col sm:flex-row justify-center gap-4">
-                <Button
-                  size="lg"
-                  className="bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-lg px-8"
-                  asChild
-                >
-                  <Link href="/main">
-                    Go to App <ArrowRight className="ml-2 h-5 w-5" />
+                <Button size="lg" className="bg-[#5580ff] hover:bg-[#4466cc] text-white px-8 rounded" asChild>
+                  <Link href="/main" className="flex items-center justify-center">
+                    Join The Waitlist <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="border-gray-700 text-gray-300 hover:bg-gray-800 text-lg px-8"
-                  asChild
-                >
-                  <Link href="/register">Create Account</Link>
-                </Button>
+              </div>
+
+              {/* Terminal-like element */}
+              <div className="mt-8 max-w-md mx-auto rounded-lg overflow-hidden border border-[#2a2d4a] text-left">
+                <div className="bg-[#1e2033] px-4 py-2 flex items-center">
+                  <div className="flex space-x-2 mr-2">
+                    <div className="w-3 h-3 rounded-full bg-[#ff5f57]"></div>
+                    <div className="w-3 h-3 rounded-full bg-[#febc2e]"></div>
+                    <div className="w-3 h-3 rounded-full bg-[#28c840]"></div>
+                  </div>
+                  <span className="text-xs text-gray-400">terminal</span>
+                </div>
+                <div className="bg-[#0a0b14] p-4 font-mono text-xs">
+                  <p className="text-gray-400">$ solana-cli</p>
+                  <p className="text-[#00d16b]">Connecting to Solana...</p>
+                  <p className="text-white">✓ Connected to Solana mainnet</p>
+                  <p className="text-gray-400">$ solana deploy my-token-app</p>
+                  <p className="text-[#5580ff]">
+                    Deploying to Solana... <span className="animate-pulse">▋</span>
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -205,62 +505,61 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-black border-t border-gray-800 py-12">
+      <footer className="bg-[#0a0b14] border-t border-[#1e2033] py-12 mt-20">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center space-x-2 mb-6 md:mb-0">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-600 to-blue-500 flex items-center justify-center">
-                <Network className="w-4 h-4 text-white" />
+              <div className="w-8 h-8 relative">
+                <img src="/assets/logo.png" alt="FlowCode Logo" className="w-full h-full" />
+                <div className="absolute inset-0 bg-[#5580ff]/20 blur-xl rounded-full"></div>
               </div>
-              <span className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-500">
-                NexusAI
+              <span className="text-lg font-bold tracking-tighter" style={{ fontFamily: '"DM Sans", sans-serif' }}>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
+                    style={{
+                      backgroundSize: "300% 300%",
+                      animation: "gradientFlow 3s ease infinite"
+                    }}>Solana</span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]" 
+                  style={{
+                    backgroundSize: "300% 300%",
+                    animation: "gradientFlow 3s ease infinite"
+                  }}>FlowCode</span>
               </span>
             </div>
             <div className="flex flex-wrap justify-center gap-6 mb-6 md:mb-0">
-              <Link href="#" className="text-gray-400 hover:text-white transition-colors">
+              <Link href="#" className="text-gray-400 hover:text-white transition-colors text-sm">
                 Privacy Policy
               </Link>
-              <Link href="#" className="text-gray-400 hover:text-white transition-colors">
+              <Link href="#" className="text-gray-400 hover:text-white transition-colors text-sm">
                 Terms of Service
               </Link>
-              <Link href="#" className="text-gray-400 hover:text-white transition-colors">
+              <Link href="#" className="text-gray-400 hover:text-white transition-colors text-sm">
                 Contact
               </Link>
-              <Link href="#" className="text-gray-400 hover:text-white transition-colors">
+              <Link href="#" className="text-gray-400 hover:text-white transition-colors text-sm">
                 About
               </Link>
             </div>
             <div className="flex space-x-4">
-              <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white hover:bg-gray-800">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z" />
-                </svg>
+              <Button size="icon" variant="ghost" className="text-gray-400 hover:text-white hover:bg-[#1e2033]">
+                <BsTelegram className="h-5 w-5" />
               </Button>
-              <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white hover:bg-gray-800">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-                </svg>
+              <Button size="icon" variant="ghost" className="text-gray-400 hover:text-white hover:bg-[#1e2033]">
+                <BsTwitterX className="h-5 w-5" />
               </Button>
-              <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white hover:bg-gray-800">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z" />
-                </svg>
+              <Button size="icon" variant="ghost" className="text-gray-400 hover:text-white hover:bg-[#1e2033]">
+                <BsYoutube className="h-5 w-5" />
               </Button>
             </div>
           </div>
-          <div className="mt-8 pt-8 border-t border-gray-800 text-center text-gray-500 text-sm">
-            © {new Date().getFullYear()} NexusAI. All rights reserved.
+          <div className="mt-8 pt-8 border-t border-[#1e2033] text-center text-gray-500 text-xs">
+            © {new Date().getFullYear()} Solana FlowCode. All rights reserved.
           </div>
         </div>
       </footer>
 
-      {/* Add global styles for the pulse animation */}
-      <style jsx global>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 0.1; }
-          50% { opacity: 0.5; }
-        }
-      `}</style>
+      {/* Add global styles for animations and fonts */}
+      <LandingStyles />
     </div>
   )
 }

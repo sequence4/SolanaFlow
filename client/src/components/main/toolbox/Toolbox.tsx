@@ -13,7 +13,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { NewProjectModal } from '@/components/ui/new-project-modal';
 import ProjectListPopover from '../workflow/ProjectListPopover';
-import { useSignAndSendTx } from '@/hooks/useSignAndSendTx';
+import { useSignAndSendTx } from '@/data/hooks/useSignAndSendTx';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { toast } from "sonner";
 import { useColorModeValue } from '@/components/ui/color-mode';

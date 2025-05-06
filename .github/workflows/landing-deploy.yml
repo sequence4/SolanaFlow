@@ -1,0 +1,113 @@
+name: Landing package – build & deploy
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-landing-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+  TZ: UTC
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: landing
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Next.js landing
+        run: pnpm run build
+
+      - name: Archive production build
+        run: |
+          tar -czf landing.tar.gz \
+            .next \
+            public \
+            next.config.* \
+            ecosystem.config.cjs \
+            package.json \
+            pnpm-lock.yaml \
+            docs \
+            scripts
+
+      - name: Upload build artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: landing-build
+          path: landing.tar.gz
+          retention-days: 7
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artefact
+        uses: actions/download-artifact@v4
+        with:
+          name: landing-build
+
+      - name: Copy build to server (scp)
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host:     ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key:      ${{ secrets.STAGING_SSH_KEY }}
+          port:     22
+          source:   "landing.tar.gz"
+          target:   "/opt/solanaflow/tmp"
+
+      - name: Unpack & reload (SSH)
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host:     ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key:      ${{ secrets.STAGING_SSH_KEY }}
+          port:     22
+          envs: STAGING_DATABASE_URL,UPSTASH_REDIS_REST_URL,UPSTASH_REDIS_REST_TOKEN,\
+                ALLOWED_ORIGINS,NEXT_PUBLIC_GTAG,NEXT_PUBLIC_API_URL
+          script: |
+            set -e
+            cd /opt/solanaflow
+            [ -d landing ] && mv landing "landing-$(date +%Y%m%d%H%M)"
+            mkdir -p landing
+            tar -xzf tmp/landing.tar.gz -C landing --strip-components=0
+            rm -f tmp/landing.tar.gz
+
+            cat > landing/.env <<EOF
+            DATABASE_URL=${STAGING_DATABASE_URL}
+            UPSTASH_REDIS_REST_URL=${UPSTASH_REDIS_REST_URL}
+            UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIS_REST_TOKEN}
+            ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+            NEXT_PUBLIC_GTAG=${NEXT_PUBLIC_GTAG}
+            NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+            NODE_ENV=staging
+            EOF
+
+            cd landing
+            pnpm install --prod --frozen-lockfile
+
+            pm2 startOrReload ecosystem.config.cjs
+            pm2 save
+
+            echo "✅  Landing deployed & PM2 restarted"

@@ -62,15 +62,7 @@ interface InstructionGroupNodeData {
   code?: string;
 }
 
-// We assume these modules exist elsewhere in the project
 const ProjectContext = React.createContext<ProjectContextType>({} as ProjectContextType);
-
-// This function is imported from a utility file, defining it here as a fallback
-const pascalToSnakeCase = (str: string): string => {
-  return str
-    .replace(/([a-z])([A-Z])/g, '$1_$2')
-    .toLowerCase();
-};
 
 // Account Section Component
 const AccountSection = ({ account }: { account: Account }) => {
@@ -461,9 +453,8 @@ export function InstructionGroupNode({ data }: { data: InstructionGroupNodeData 
     >
       {/* Main Header */}
       <div
-        className="p-3 flex items-center bg-[#1a1a24] border-b border-[#333] pl-6 sticky top-0 z-10"
+        className="p-3 flex items-center bg-[#1a1a24] border-b border-[#333] pl-6 sticky top-0 z-10 rounded-t-lg"
       >
-        {/* <Cpu className="h-5 w-5 text-[#5d5dff] mr-2" /> */}
         <h3 className="font-medium flex-1 tracking-tight">{data.label}</h3>
         <div className="flex items-center space-x-2">
           <span className="text-xs bg-[#121218] px-2 py-0.5 rounded-sm border border-[#333] font-mono text-[#5d5dff]">
@@ -473,9 +464,6 @@ export function InstructionGroupNode({ data }: { data: InstructionGroupNodeData 
             <Text className="h-4 w-4 text-[#888] hover:text-[#5d5dff]" />
           </button>
         </div>
-
-        {/* Decorative elements */}
-        <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[#5d5dff] to-[#5d5dff]/30"></div>
       </div>
 
       {/* Description */}
@@ -522,7 +510,7 @@ export function InstructionGroupNode({ data }: { data: InstructionGroupNodeData 
       {/* Content - Scrollable area */}
       <div 
         ref={contentRef}
-        className="p-4 pl-6 bg-[#121218] flex-grow overflow-y-auto custom-scrollbar scrollbar-thin scrollbar-thumb-[#333] scrollbar-track-[#1a1a24] nowheel" 
+        className="p-4 pl-6 bg-[#121218] flex-grow w-[99.7%] overflow-y-auto custom-scrollbar scrollbar-thin scrollbar-thumb-[#333] scrollbar-track-[#1a1a24] nowheel" 
         onWheel={handleWheel}
       >
         {activeSection === "Context" && accounts.length > 0 && (
@@ -583,7 +571,7 @@ export function InstructionGroupNode({ data }: { data: InstructionGroupNodeData 
       </div>
 
       {/* Footer with counters - Fixed at bottom */}
-      <div className="border-t border-[#333] p-3 text-xs text-[#888] font-mono flex justify-between items-center bg-[#121218]">
+      <div className="border-t border-[#333] p-3 text-xs text-[#888] font-mono flex justify-between items-center bg-[#121218] rounded-b-lg">
         <div className="flex items-center">
           <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#1a1a24] border border-[#333] mr-1">
             <Hash className="h-3 w-3 text-[#5d5dff]" />

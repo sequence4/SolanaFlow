@@ -22,8 +22,8 @@ const oxygenMono = Oxygen_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Solana FlowCode",
-  description: "Visual AI developer tool for Solana",
+  title: "Solana FlowCode - Build Solana dApps Without Code",
+  description: "Visual AI developer tool for building and deploying Solana blockchain applications without writing code",
 };
 
 export default function RootLayout({
@@ -33,6 +33,26 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        {/* Script to apply theme before hydration */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  const theme = localStorage.getItem('theme');
+                  if (
+                    theme === 'dark' ||
+                    (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)
+                  ) {
+                    document.documentElement.classList.add('dark');
+                  }
+                } catch {}
+              })();
+            `
+          }}
+        />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} ${oxygenMono.variable} antialiased`}>
         <Providers>{children}</Providers>
       </body>
