@@ -1,52 +1,38 @@
-###############################################################################
-# Node / pnpm
-###############################################################################
 node_modules/
 .pnpm/
-.pnpm-debug.log*
+*.pnpm-debug.log*
 npm-debug.log*
 yarn-debug.log*
-dist/                         # if a build script writes here
-out/                          # Next export dir
-.next/                        # Next build dir
+
+dist/
+out/          
+.next/      
+.swc/
 *.tsbuildinfo
 nohup.out
 
-###############################################################################
-# Env & secrets
-###############################################################################
-.env*
-!.env.example
+.env* 
+!.env.example 
 !landing/.env.test 
 
-###############################################################################
-# Tests & coverage
-###############################################################################
 coverage/
 test-results/
 
-###############################################################################
-# Lighthouse / Playwright artefacts
-###############################################################################
 .lhci-reports/
 .lighthouseci/
-**/lighthouse.*/              # temporary Chrome profiles
+**/lighthouse.*/
 *.report.{html,json}
-# Windows-specific absolute paths that slipped in once
 **/C:/Users*/AppData/Local/lighthouse.*/
 landing/C:\\Users*\\AppData\\Local\\lighthouse.*/
 
-###############################################################################
-# IDE / OS noise
-###############################################################################
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
+yarn-error.log*
+certs/*.pem
 
-**/.next/
-landing/pnpm-lock.yaml
-wallets/landing/coverage/
-coverage/
+projects/
 wallets/
-/landing/.env.production
+wallets/landing/coverage/
+landing/.env.production
