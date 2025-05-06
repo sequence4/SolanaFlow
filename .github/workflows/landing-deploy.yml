@@ -2,7 +2,7 @@ name: Landing package – build & deploy
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -67,28 +67,45 @@ jobs:
         with:
           name: landing-build
 
+      - name: Ensure remote dirs
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: 22
+          debug: true
+          script: |
+            set -e
+            mkdir -p /opt/solanaflow/tmp
+
       - name: Copy build to server (SCP)
         uses: appleboy/scp-action@v0.1.7
         with:
-          host:     ${{ secrets.STAGING_HOST }}
+          host: ${{ secrets.STAGING_HOST }}
           username: ${{ secrets.STAGING_USER }}
-          key:      ${{ secrets.STAGING_SSH_KEY }}
-          port:     22
-          source:   landing.tar.gz
-          target:   /opt/solanaflow/tmp
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: 22
+          debug: true
+          source: landing.tar.gz
+          target: /opt/solanaflow/tmp/
 
       - name: Unpack & reload (SSH)
         uses: appleboy/ssh-action@v0.1.7
         with:
-          host:     ${{ secrets.STAGING_HOST }}
+          host: ${{ secrets.STAGING_HOST }}
           username: ${{ secrets.STAGING_USER }}
-          key:      ${{ secrets.STAGING_SSH_KEY }}
-          port:     22
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: 22
+          debug: true
+          script_stop: true
           envs: STAGING_DATABASE_URL,UPSTASH_REDIS_REST_URL,UPSTASH_REDIS_REST_TOKEN,ALLOWED_ORIGINS,NEXT_PUBLIC_GTAG,NEXT_PUBLIC_API_URL
           script: |
-            set -e
+            set -euxo pipefail
             cd /opt/solanaflow
-            [ -d landing ] && mv landing landing-$(date +%Y%m%d%H%M)
+            if [ -d landing ]; then
+              mv landing landing-$(date +%Y%m%d%H%M)
+            fi
             mkdir -p landing
             tar -xzf tmp/landing.tar.gz -C landing --strip-components=0
             rm -f tmp/landing.tar.gz
