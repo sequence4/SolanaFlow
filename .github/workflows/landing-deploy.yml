@@ -41,6 +41,7 @@ jobs:
 
       - name: Archive production build
         run: |
+          cp ../pnpm-lock.yaml .               # <-- make lock-file visible
           tar -czf ../landing.tar.gz \
             .next \
             public \
