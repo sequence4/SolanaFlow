@@ -25,5 +25,5 @@ test('user can join the wait-list', async ({ page, browserName }) => {
   await page.check('input#consent');
   
   await submitButton.click();
-  await expect(page.getByText(/stay tuned/i)).toBeVisible();
+  await expect(page.getByText(/You(?:'|&apos;)re on the waitlist!/i)).toBeVisible();
 }); 

@@ -16,6 +16,12 @@
   --background-end-rgb: 13, 15, 20;
 
   --border-2-dark: #2d3748;
+  
+  /* --------------------------------------------------------------
+   HERO TOP / BOTTOM PADDING
+   -------------------------------------------------------------- */
+  /* desktop / big-laptop ( > 900 px tall )          → 2.5 rem pad   */
+  --hero-pad: 2.5rem;
 }
 
 @theme inline {
@@ -30,6 +36,21 @@
     --background: #0a0a0a;
     --foreground: #ededed;
   }
+}
+
+/* medium laptops ( 870 - 900 px ) → 2 rem */
+@media (max-height: 900px){
+  :root{ --hero-pad: 2rem; }
+}
+
+/* small 13-in laptops ( 800 - 869 px ) → 1.5 rem */
+@media (max-height: 870px){
+  :root{ --hero-pad: 1.5rem; }
+}
+
+/* very short screens ( ≤ 799 px ) → 1 rem  */
+@media (max-height: 800px){
+  :root{ --hero-pad: 1rem; }
 }
 
 body {
@@ -57,4 +78,20 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #3b4048;
+}
+
+/* Utility for fixed navigation */
+body.with-fixed-nav {
+  padding-top: var(--navH, 64px);
+}
+
+.hero-inner {
+  transform-origin: top left;
+}
+
+/* Hero bottom-gap fix */
+@media (max-width: 1023px) {      /* anything under "lg" */
+  .hero-inner {
+    row-gap: 1rem;                /* 16 px → was 32 px (gap-8) */
+  }
 }

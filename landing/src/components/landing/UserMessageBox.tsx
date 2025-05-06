@@ -71,7 +71,8 @@ export default function UserMessageBox({
   }, [])
 
   return (
-    <div className={`bg-[#0a0b14] rounded-lg p-2 xs:p-3 sm:p-4 ${className} relative overflow-hidden`}>
+    <div className={`bg-[#0a0b14] rounded-lg h-full w-full flex flex-col justify-end
+      p-4 sm:p-5 relative overflow-hidden ${className}`}>
       {/* Animated background orbs */}
       <div className="absolute inset-0 z-0" style={{ overflow: 'hidden' }}>
         {/* Blue orb */}
@@ -164,10 +165,10 @@ export default function UserMessageBox({
         }
       `}</style>
 
-      <div className="relative z-10">
-        <div className="flex justify-between items-center">
-          <div className="h-[2.5rem] xs:h-[3rem] sm:h-[5rem] flex-1 bg-[#0d0e1a] border border-[#2a2d4a] rounded-xl p-1.5 xs:p-2 sm:p-4 shadow-sm">
-            <div className="min-h-[20px] xs:min-h-[24px] text-gray-400 text-[10px] xs:text-xs sm:text-xs" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
+      <div className="relative z-10 flex flex-col h-full">
+        <div className="flex justify-between items-end h-full">
+          <div className="bg-[#0d0e1a] border border-[#2a2d4a] rounded-xl shadow-sm flex-1 flex items-end px-2 py-1">
+            <div className="min-h-full xs:min-h-[24px] text-gray-400 text-[10px] xs:text-xs sm:text-xs" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
               {displayedText}
               {showCursor && <span className="inline-block w-1.5 xs:w-2 h-3 xs:h-4 bg-[#5580ff] ml-0.5">&nbsp;</span>}
             </div>

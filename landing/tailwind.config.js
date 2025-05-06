@@ -127,9 +127,13 @@ module.exports = {
           'lekton': ['var(--font-lekton)', 'monospace'],
         },
         screens: {
-          xs: '475px',
+          'xs': '480px',
+          'hd': { 'raw': '(min-width:1920px) and (min-height:1000px)' },
         },
       },
     },
-    plugins: [require("tailwindcss-animate"), require("tailwindcss-scrollbar")],
+    plugins: [
+      require("tailwindcss-animate"),
+      require("tailwindcss-scrollbar"),
+    ],
   }; 
