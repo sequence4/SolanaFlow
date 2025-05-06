@@ -12,13 +12,10 @@ export function useHeroLayout(heroIdeal = 860, navH = 64) {
       root.style.setProperty("--hero-scale", scale.toString())
     }
 
-    // Initial calculation
     recalc()
     
-    // Recalculate on resize
     window.addEventListener("resize", recalc)
     
-    // Also recalculate after a small delay to ensure DOM is fully loaded
     const timeout = setTimeout(recalc, 100)
     
     return () => {

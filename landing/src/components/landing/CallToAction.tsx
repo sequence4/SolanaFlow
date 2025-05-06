@@ -13,7 +13,6 @@ export default function CallToAction({ openWaitlistModal }: CallToActionProps) {
     <section className="relative pb-20 pt-16 lg:pt-24 lg:pb-32 px-4 md:px-6 lg:px-8 overflow-hidden">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#1e2033]/50 via-[#0a0b14] to-[#0a0b14] z-[-1]"></div>
       
-      {/* Animated particles */}
       <div className="absolute inset-0 overflow-hidden z-[-1]">
         <div className="absolute w-full h-full">
           {[...Array(20)].map((_, i) => (
@@ -34,7 +33,6 @@ export default function CallToAction({ openWaitlistModal }: CallToActionProps) {
         </div>
       </div>
       
-      {/* Add a top padding equivalent to navbar height */}
       <div className="max-w-5xl mx-auto text-center relative z-[1] mt-[var(--navH,64px)]">
         <h2 className="text-3xl md:text-4xl lg:text-5xl hd:text-6xl font-bold mb-6 tracking-tight text-balance" style={{ fontFamily: '"DM Sans", sans-serif' }}>
           <span className="text-white">Ready to</span>{" "}

@@ -3,7 +3,7 @@
 import { useLayoutEffect, useState } from 'react';
 
 export function useNavbarHeight() {
-  const [navbarHeight, setNavbarHeight] = useState(64); // Default height
+  const [navbarHeight, setNavbarHeight] = useState(64);
 
   useLayoutEffect(() => {
     const updateNavbarHeight = () => {
@@ -15,16 +15,12 @@ export function useNavbarHeight() {
       }
     };
 
-    // Initial calculation
     updateNavbarHeight();
 
-    // Recalculate on resize
     window.addEventListener('resize', updateNavbarHeight);
     
-    // Also recalculate when device orientation changes
     window.addEventListener('orientationchange', updateNavbarHeight);
     
-    // Cleanup
     return () => {
       window.removeEventListener('resize', updateNavbarHeight);
       window.removeEventListener('orientationchange', updateNavbarHeight);

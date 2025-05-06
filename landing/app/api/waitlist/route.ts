@@ -4,11 +4,6 @@ import { parseOrThrow } from '@/lib/parseOrThrow';
 import { waitlistLimit } from '@/lib/rateLimit';
 import { safeQuery } from '@/lib/db';
 
-// TEMP-debug; remove once green
-// eslint-disable-next-line no-console
-console.log('safeQuery in route ▶︎', typeof safeQuery);
-
-
 export const dynamic = 'force-static';
 
 export async function POST(req: Request) {

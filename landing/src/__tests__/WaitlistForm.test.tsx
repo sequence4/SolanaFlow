@@ -2,7 +2,6 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import WaitlistForm from '@/components/WaitlistForm';
 import { act } from 'react';
 
-// Mock fetch for both CSRF and form submission
 const fetchMock = jest.fn((url) => {
   if (url === '/api/csrf-token') {
     return Promise.resolve({
@@ -22,12 +21,9 @@ const VALID_WALLET = '6z7CD8WuEg3DKoaUYpoa5Dhx3XJRoXnUjYQeUo78noHH';
 describe('WaitlistForm client-side validation', () => {
   beforeEach(() => {
     fetchMock.mockClear();
-    // Reset body overflow that might be set by previous tests
     document.body.style.overflow = '';
   });
 
-  // Skip the email validation test as it appears the implementation may have changed
-  // We can still test the other important security aspects
   it.skip('shows error for invalid email', async () => {
     await act(async () => {
       render(<WaitlistForm />);
@@ -40,8 +36,7 @@ describe('WaitlistForm client-side validation', () => {
       fireEvent.click(screen.getByRole('button', { name: /join the list/i }));
     });
     
-    // Since validation failed, the fetch for submit should not be called
-    expect(fetchMock).toHaveBeenCalledTimes(1); // only CSRF fetch
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).not.toHaveBeenCalledWith('/api/waitlist', expect.anything());
   });
 
@@ -67,7 +62,6 @@ describe('WaitlistForm client-side validation', () => {
       render(<WaitlistForm />);
     });
 
-    // Reset mock count after initial CSRF fetch
     fetchMock.mockClear();
 
     await act(async () => {
@@ -76,10 +70,8 @@ describe('WaitlistForm client-side validation', () => {
       fireEvent.click(screen.getByRole('button', { name: /join the list/i }));
     });
 
-    // Wait for any pending async operations
     await new Promise((r) => setTimeout(r, 50));
     
-    // No API call should be made when honeypot is filled
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

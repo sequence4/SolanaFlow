@@ -42,7 +42,6 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Script to apply theme before hydration */}
         <script
           dangerouslySetInnerHTML={{
             __html: `

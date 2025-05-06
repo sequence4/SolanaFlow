@@ -2,7 +2,7 @@ import { useLayoutEffect } from "react";
 
 export function useAutoScale(
   ref: React.RefObject<HTMLElement>,
-  navH = 64               // keep in sync with your var(--navH)
+  navH = 64
 ) {
   useLayoutEffect(() => {
     if (!ref.current) return;
@@ -10,13 +10,10 @@ export function useAutoScale(
     const el = ref.current;
 
     function resize() {
-      // total space we're allowed to use
       const avail = window.innerHeight - navH;
 
-      // how tall the hero really is right now
       const need  = el.scrollHeight;
 
-      // scale only if we overflow
       const s = need > avail ? avail / need : 1;
 
       el.style.setProperty("--hero-scale", String(s));

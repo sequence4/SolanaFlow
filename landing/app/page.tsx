@@ -22,7 +22,6 @@ export default function LandingPage() {
   const [mounted, setMounted] = useState(false)
   const [isWaitlistModalOpen, setIsWaitlistModalOpen] = useState(false)
   
-  // Use the hero scale hook to properly scale the hero section
   useHeroScale(920, 64)
 
   const openWaitlistModal = () => setIsWaitlistModalOpen(true)
@@ -33,7 +32,6 @@ export default function LandingPage() {
     return () => setMounted(false)
   }, [])
 
-  // Handle fixed navbar using CSS class
   useLayoutEffect(() => {
     document.body.classList.add('with-fixed-nav');
     return () => document.body.classList.remove('with-fixed-nav');

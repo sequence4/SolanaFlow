@@ -103,7 +103,6 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
       config.useWorker = false;
       confetti(config);
     } catch (err: unknown) {
-      /* eslint-disable-next-line no-console */
       console.warn('Confetti disabled:', err);
     }
   };

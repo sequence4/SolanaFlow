@@ -23,7 +23,7 @@ const hasUpstashCreds =
   !!process.env.UPSTASH_REDIS_REST_TOKEN;
 
 export const waitlistLimit = isTest
-  ? (inMemoryLimiter as unknown as Pick<Ratelimit, 'limit'>) // eslint-disable-line @typescript-eslint/no-explicit-any
+  ? (inMemoryLimiter as unknown as Pick<Ratelimit, 'limit'>)
   : hasUpstashCreds
     ? new Ratelimit({
         redis: new Redis({

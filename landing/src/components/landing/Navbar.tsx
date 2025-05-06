@@ -13,7 +13,6 @@ interface NavbarProps {
 export default function Navbar({ openWaitlistModal }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
-  // Set the initial navbar height on mount
   useEffect(() => {
     const navElement = document.getElementById('site-nav');
     if (navElement) {
@@ -59,7 +58,6 @@ export default function Navbar({ openWaitlistModal }: NavbarProps) {
             </Button>
           </div>
 
-          {/* Mobile Menu Button */}
           <div className="md:hidden">
             <Button 
               variant="ghost" 

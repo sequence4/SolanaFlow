@@ -1,4 +1,3 @@
-// Simplified toast hook for demo purposes
 import { useState } from "react";
 
 type ToastType = {
@@ -14,7 +13,6 @@ export function useToast() {
   const toast = (props: ToastType) => {
     setToasts((prevToasts) => [...prevToasts, props]);
     
-    // Auto-remove toast after 5 seconds
     setTimeout(() => {
       setToasts((prevToasts) => prevToasts.filter((toast) => toast !== props));
     }, 5000);

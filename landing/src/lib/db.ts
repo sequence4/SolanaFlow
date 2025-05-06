@@ -7,10 +7,6 @@ export const db = new Pool({
     : undefined,
 });
 
-/**
- * Safe wrapper around pg.Pool#query.
- * Returns an empty result instead of throwing if PG is down **in dev**.
- */
 export const safeQuery = async <
   T extends Record<string, unknown> = Record<string, unknown>
 >(
@@ -23,7 +19,6 @@ export const safeQuery = async <
       : await db.query<T>(textOrConfig);
   } catch (err) {
     if (process.env.NODE_ENV === 'development') {
-      // eslint-disable-next-line no-console
       console.warn('DB unavailable → returning empty result:', err);
       return { command: '', rowCount: 0, oid: 0, fields: [], rows: [] } as QueryResult<T>;
     }

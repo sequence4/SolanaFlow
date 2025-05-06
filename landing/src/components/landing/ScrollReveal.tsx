@@ -21,8 +21,8 @@ export default function ScrollReveal({ children, delay = 0, className = '' }: Sc
         }
       },
       {
-        threshold: 0.1, // Trigger when 10% of the element is visible
-        rootMargin: '0px 0px -50px 0px' // Slightly before element comes into view
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
       }
     )
 

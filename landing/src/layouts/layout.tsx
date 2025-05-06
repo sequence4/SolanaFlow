@@ -30,8 +30,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <Head>
-        {/* Meta tags, title, etc. */}
-        {/* Script to apply theme before hydration */}
         <script
           dangerouslySetInnerHTML={{
             __html: `

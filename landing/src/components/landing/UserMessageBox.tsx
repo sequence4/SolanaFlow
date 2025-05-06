@@ -73,9 +73,7 @@ export default function UserMessageBox({
   return (
     <div className={`bg-[#0a0b14] rounded-lg h-full w-full flex flex-col justify-end
       p-4 sm:p-5 relative overflow-hidden ${className}`}>
-      {/* Animated background orbs */}
       <div className="absolute inset-0 z-0" style={{ overflow: 'hidden' }}>
-        {/* Blue orb */}
         <div 
           className="absolute w-20 h-20 xs:w-24 xs:h-24 sm:w-32 sm:h-32 rounded-full opacity-5 hidden xs:block sm:block"
           style={{
@@ -87,7 +85,6 @@ export default function UserMessageBox({
           }}
         />
         
-        {/* Green orb */}
         <div 
           className="absolute w-24 h-24 xs:w-32 xs:h-32 sm:w-40 sm:h-40 rounded-full opacity-5 hidden xs:block sm:block"
           style={{
@@ -99,7 +96,6 @@ export default function UserMessageBox({
           }}
         />
         
-        {/* Purple orb */}
         <div 
           className="absolute w-20 h-20 xs:w-28 xs:h-28 sm:w-36 sm:h-36 rounded-full opacity-5 hidden xs:block sm:block"
           style={{
@@ -111,7 +107,6 @@ export default function UserMessageBox({
           }}
         />
         
-        {/* Flowing gradient background for additional effect */}
         <div 
           className="absolute inset-0 opacity-10 hidden xs:block sm:block" 
           style={{
