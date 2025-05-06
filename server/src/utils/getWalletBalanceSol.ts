@@ -25,7 +25,6 @@ export const functionDefs = [
         required: ["address"],
         additionalProperties: false
       },
-      strict: true
     } as const
   }
 ];

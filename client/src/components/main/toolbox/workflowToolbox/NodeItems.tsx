@@ -102,6 +102,7 @@ export const NodeItems = forwardRef<{ setActiveChainTab: (tab: string) => void }
                             <div className="flex-1 overflow-hidden" style={{ backgroundColor: "#121214" }}>
                                 <SimpleBar style={{ width: "100%", height: "100%" }}>
                                     {/* Favorites Section */}
+                                    {/*}
                                     <div className="border-b border-[#2a2a2d]">
                                         <div className="p-3 flex items-center justify-between">
                                             <div className="flex items-center gap-2">
@@ -113,6 +114,7 @@ export const NodeItems = forwardRef<{ setActiveChainTab: (tab: string) => void }
                                             </div>
                                         </div>
                                     </div>
+                                    */}
 
                                     <TabsContent 
                                         value="instructions" 

@@ -1,12 +1,14 @@
 import React from "react";
 import { toast } from "sonner";
 import { projectApi } from "@/api/projectApi";
-import { ProjectContextType, ProjectStateUpdater } from "@/context/project/ProjectContextTypes";
+import { ProjectContextType, ProjectStateUpdater, SaveProjectResponse } from "@/context/project/ProjectContextTypes";
 import { saveProject } from "./saveProject";
 import { fetchFilesAndCodes } from "@/utils/codeGeneration/fetchFilesAndCodes";
 import { FileTreeItemType } from "@/interfaces/FileTreeItemType";
 import { UxOpenPanel } from "@/context/ux/UxContextTypes";
 import { pollTaskStatus4 } from "@/utils/task/taskUtils";
+import { useTaskLogs } from "@/context/logs/useTaskLogs";
+import { Step } from '@/context/logs/TaskLogsContext';
 
 export const fetchProjects = async (
     page: number, 
@@ -49,7 +51,6 @@ export function getSafeProjectContext(
       setProjectState:
         setProjectState || (() => {}), 
       projectState: {
-        // If there's no projectState in the DB, or partial projectState, fill in defaults
         mode: fetched.details?.projectState?.mode || "basic",
         nodes: fetched.details?.projectState?.nodes || [],
         edges: fetched.details?.projectState?.edges || [],
@@ -77,7 +78,6 @@ export const handleOpenProject = async (
     console.log(`[DEBUG] fetchedDetails from API:`, fetchedDetails);
     console.log(`[DEBUG] fetchedDetails.containerUrl:`, fetchedDetails.containerUrl);
 
-    // Merge DB data with local context shape
     const safeProjectContext = getSafeProjectContext(
       fetchedDetails,
       projectContext.details?.setProjectState || (() => {})
@@ -92,17 +92,14 @@ export const handleOpenProject = async (
     if (!fetchedDetails.details?.projectState?.fileTree) {
       setFileTree(null);
     } else {
-      // Explicitly set afterCodeGen to false to prevent code generation during project loading
       fetchFilesAndCodes(projectId, safeProjectContext, setProjectContext, setFileTree, false);
     }
 
-    // Start container to ensure the CRA dev server is running
     try {
       const containerResult = await projectApi.startContainer(projectId);
       console.log('Container start task initiated:', containerResult.taskId);
     } catch (containerError) {
       console.error('Error starting container:', containerError);
-      // Don't fail the whole open project operation if container start fails
     }
   } catch (err) {
     console.error("Error opening project:", err);
@@ -123,26 +120,20 @@ export const handleDeleteProject = async (
   setSelectedFile: (file: FileTreeItemType | null) => void
 ) => {
   try {
-    // Show initial toast about the deletion process starting
     const loadingToast = toast.loading("Deleting Project", {
       description: "Deleting project and cleaning up resources..."
     });
     
-    // Delete project and get the task ID for container removal
     const response = await projectApi.deleteProject(projectId);
     
     if (response.containerTaskId) {
       try {
-        // Poll for container removal task completion
         const taskStatus = await pollTaskStatus4(response.containerTaskId);
-        // Close the loading toast
         toast.dismiss(loadingToast);
         
         if (taskStatus === 'succeed' || taskStatus === 'finished') {
-          // Re-fetch the list to update UI
           await fetchProjects(page, search, setProjects, setTotalPages, setLoading, setError);
           
-          // If user has just deleted the project they had open, reset both ProjectContext and FileContext
           if (projectContext.id === projectId) {
             setProjectContext((prevCtx) => ({
               ...prevCtx,
@@ -166,7 +157,6 @@ export const handleDeleteProject = async (
               },
             }));
 
-            // Reset the file context here as well
             setFileTree(null);
             setSelectedFile(null);
           }
@@ -189,11 +179,9 @@ export const handleDeleteProject = async (
           await fetchProjects(page, search, setProjects, setTotalPages, setLoading, setError);
         }
       } catch (pollError: unknown) {
-        // Close the loading toast
         toast.dismiss(loadingToast);
         console.error("Error polling container removal task:", pollError);
         
-        // Check if pollError has a response property with a status of 404
         const isTaskNotFoundError = 
           pollError && 
           typeof pollError === 'object' && 
@@ -204,7 +192,6 @@ export const handleDeleteProject = async (
           'status' in pollError.response &&
           pollError.response.status === 404;
 
-        // This is actually a success case, as the task was created and the project was deleted.
         if (isTaskNotFoundError) {
           toast("Project Deleted", {
             description: "Project was successfully deleted and resources cleaned up.",
@@ -217,10 +204,8 @@ export const handleDeleteProject = async (
           });
         }
         
-        // Always refresh the project list regardless of error type
         await fetchProjects(page, search, setProjects, setTotalPages, setLoading, setError);
         
-        // If user has just deleted the project they had open, reset contexts
         if (projectContext.id === projectId) {
           setProjectContext((prevCtx) => ({
             ...prevCtx,
@@ -249,11 +234,9 @@ export const handleDeleteProject = async (
         }
       }
     } else {
-      // No container task ID was returned
       toast.dismiss(loadingToast);
       await fetchProjects(page, search, setProjects, setTotalPages, setLoading, setError);
       
-      // Still reset project context if needed
       if (projectContext.id === projectId) {
         setProjectContext((prevCtx) => ({
           ...prevCtx,
@@ -305,6 +288,34 @@ export const handleProjectClick = async (
   closePopover();
 };
 
+export const projectCreationSteps: Step[] = [
+  {
+    icon: "Server",
+    message: "Preparing container environment...",
+    details: "Creating a Docker container and allocating server resources.",
+  },
+  {
+    icon: "Database",
+    message: "Saving project metadata...",
+    details: "Storing project details (name, description, etc.) in the database.",
+  },
+  {
+    icon: "Code",
+    message: "Configuring React App...",
+    details: "Running Anchor init and generating the Create React App starter template.",
+  },
+  {
+    icon: "Cpu",
+    message: "Initializing Anchor...",
+    details: "Running Anchor init and installing dependencies.",
+  },
+  {
+    icon: "HardDrive",
+    message: "Verifying environment...",
+    details: "Starting the dev server and checking that the project is ready.",
+  },
+];
+
 export const handleNewProjectClick = (
   setProjectContext: React.Dispatch<React.SetStateAction<ProjectContextType>>,
   projectContext: ProjectContextType,
@@ -337,6 +348,14 @@ export const handleNewProjectClick = (
   localStorage.removeItem('projectContext');
 };
 
+interface TaskLogActions {
+    setSteps: (steps: Step[]) => void;
+    setProgress: (progress: number) => void;
+    setIsVisible: (isVisible: boolean) => void;
+    addSystemLog: (log: string) => void;
+    resetLogs: () => void;
+}
+
 export const handleConfirmNewProject = async (
   projectContext: ProjectContextType,
   setProjectContext: React.Dispatch<React.SetStateAction<ProjectContextType>>,
@@ -346,38 +365,118 @@ export const handleConfirmNewProject = async (
   setProjectsRefreshCounter: (n: number) => void,
   setUxOpenPanel: (panel: UxOpenPanel) => void,
   setFileTree: (tree: FileTreeItemType | null) => void,
-  setSelectedFile: (file: FileTreeItemType | null) => void
+  setSelectedFile: (file: FileTreeItemType | null) => void,
+  taskLogs?: TaskLogActions
 ) => {
   console.log(`[DEBUG_PROJECT_CONFIRM] Starting handleConfirmNewProject for project name=${localProjectName}`);
-  const newContext: ProjectContextType = {
-    id: "", 
-    name: localProjectName,
-    description: localProjectDescription,
-    details: {
-      setProjectState: projectContext.details?.setProjectState || (() => {}),
-      projectState: {
-        mode: "basic",
-        nodes: [],
-        edges: [],
-        config: {},
-        instructions: [],
-        projectFiles: { lib: "", mod: "", state: "" },
-        fileTree: undefined,
-      },
-    },
-  };
-
-  setProjectContext(newContext);
-  setFileTree(null);
-  setSelectedFile(null);
   
-  // Save the new project to the backend
+  if (!taskLogs) {
+      console.warn("TaskLogs not provided to handleConfirmNewProject. Progress UI will not display.");
+      return;
+  }
+
+  taskLogs.setProgress(0);
+  const initialSteps = [...projectCreationSteps]; 
+  taskLogs.setSteps(initialSteps);
+  taskLogs.setIsVisible(true);
+  taskLogs.addSystemLog(`Creating new project: ${localProjectName}...`);
+  let success = false;
+  await new Promise(resolve => setTimeout(resolve, 15000));
   try {
-    const saved = await saveProject(newContext, setProjectContext);
-    console.log("New project created:", saved);
+    taskLogs.setProgress(20); 
+    taskLogs.addSystemLog("Preparing container environment...");
+    await new Promise(resolve => setTimeout(resolve, 8000));
+    
+    const newContext: ProjectContextType = {
+      id: "", 
+      name: localProjectName,
+      description: localProjectDescription,
+      details: {
+        setProjectState: projectContext.details?.setProjectState || (() => {}),
+        projectState: {
+          mode: "basic",
+          nodes: [],
+          edges: [],
+          config: {},
+          instructions: [],
+          projectFiles: { lib: "", mod: "", state: "" },
+          fileTree: undefined,
+        },
+      },
+    };
+    setProjectContext(newContext);
+    setFileTree(null);
+    setSelectedFile(null);
+    taskLogs.addSystemLog("Local context initialized.");
+
+    taskLogs.setProgress(40); 
+    taskLogs.addSystemLog("Saving project metadata...");
+    await new Promise(resolve => setTimeout(resolve, 20000));
+    
+    const saveResponse: SaveProjectResponse | null = await saveProject(newContext, setProjectContext);
+    if (!saveResponse || !saveResponse.project?.id) {
+      throw new Error("Failed to save project metadata.");
+    }
+    taskLogs.addSystemLog(`Metadata saved (Project ID: ${saveResponse.project.id}).`);
+    const backendTaskId = saveResponse.directoryTask?.taskId;
+
+    taskLogs.setProgress(60); 
+    taskLogs.addSystemLog("Initializing base code (Backend Task)...");
+    await new Promise(resolve => setTimeout(resolve, 10000));
+    if (backendTaskId) {
+      taskLogs.addSystemLog(`Backend task started (ID: ${backendTaskId}). Monitoring...`);
+      try {
+        const finalStatus = await pollTaskStatus4(backendTaskId);
+        
+        if (finalStatus === 'succeed' || finalStatus === 'finished') {
+          taskLogs.addSystemLog("Backend tasks (Code Init, Deps Install, Verification) completed successfully.");
+          success = true; 
+        } else if (finalStatus === 'warning') {
+          taskLogs.addSystemLog("Backend tasks completed with warnings.");
+          success = true; 
+        } else {
+          throw new Error(`Backend task failed with status: ${finalStatus}`);
+        }
+      } catch (pollError) {
+        throw pollError; 
+      }
+    } else {
+      taskLogs.addSystemLog("No backend task ID. Assuming local setup suffices.");
+      success = true;
+    }
+
+    if(success){
+        taskLogs.setProgress(80);
+        taskLogs.addSystemLog("Backend processing finished.");
+        await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
     setProjectsRefreshCounter(projectsRefreshCounter + 1);
+    
+    if (success) {
+       const successStep: Step = {
+          icon: "CheckCircle", 
+          message: "Project created successfully!",
+          details: "All steps completed. Your project is ready."
+       };
+       taskLogs.setSteps([...initialSteps, successStep]); 
+       taskLogs.setProgress(100); 
+       taskLogs.addSystemLog("Project creation finalized!");
+    } else {
+       taskLogs.setProgress(100);
+       taskLogs.addSystemLog("Project creation failed before finalization step.");
+    }
+
   } catch (error) {
     console.error("Failed to create new project:", error);
+    taskLogs.addSystemLog(`Error during project creation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    taskLogs.setProgress(100);
+    success = false; 
+  } finally {
+    if (taskLogs) {
+       await new Promise(resolve => setTimeout(resolve, success ? 3000 : 4000)); 
+       taskLogs.setIsVisible(false);
+    }
   }
 };
 

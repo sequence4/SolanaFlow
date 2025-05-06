@@ -1,0 +1,7 @@
+{
+  "rules": {
+    "@typescript-eslint/no-misused-promises": "off",
+    "@typescript-eslint/no-redeclare": "off",
+    "@typescript-eslint/adjacent-overload-signatures": "off"
+  }
+} 

@@ -30,6 +30,25 @@ function hasWarning(output: string): boolean {
   return lowercasedOutput.includes('warning');
 }
 
+async function getContainerHostPort(containerName: string, containerPort = 3000, taskId: string): Promise<string> {
+  try {
+    const portCmd = `docker port ${containerName} ${containerPort}/tcp`;
+    // Get the port mapping which looks like "0.0.0.0:randomPort"
+    const portMapping = await runCommand(portCmd, '.', taskId, { skipSuccessUpdate: true });
+    const portMatch = portMapping.trim().match(/:(\d+)$/);
+    
+    if (!portMatch) {
+      console.error(`Could not parse host port from Docker output: ${portMapping}`);
+      throw new Error(`Failed to get host port for container ${containerName}`);
+    }
+    
+    return portMatch[1]; // Return the port number as a string
+  } catch (error: any) {
+    console.error(`Error getting container host port: ${error.message}`);
+    throw error;
+  }
+}
+
 export async function runCommand(
   command: string,
   cwd: string,
@@ -167,11 +186,31 @@ export const getBuildArtifactTask = async (projectId: string): Promise<{ status:
   try {
     const rootPath = await getProjectRootPath(projectId);
     const transformedRootPath = transformRootPath(rootPath);
-    const soPath = path.join(APP_CONFIG.ROOT_FOLDER, rootPath, 'target', 'deploy', `${transformedRootPath}.so`);
-
-    const fileBuffer = fs.readFileSync(soPath);
-    const base64So = fileBuffer.toString('base64');
-
+    
+    // Get the container name for this project
+    const containerName = await getContainerName(projectId);
+    if (!containerName) {
+      throw new Error(`No container found for project ${projectId}`);
+    }
+    
+    // Create a temporary task ID for the command execution
+    const tempTaskId = uuidv4();
+    
+    // Read the .so file directly from inside the container
+    const containerSoPath = `/usr/src/${rootPath}/target/deploy/${transformedRootPath}.so`;
+    
+    // Check if the file exists in the container
+    const fileExistsCmd = `docker exec ${containerName} bash -c "if [ -f '${containerSoPath}' ]; then echo 'exists'; else echo 'not_found'; fi"`;
+    const fileExists = await runCommand(fileExistsCmd, '.', tempTaskId, { skipSuccessUpdate: true });
+    
+    if (fileExists.trim() !== 'exists') {
+      throw new Error(`Built artifact not found in container at path: ${containerSoPath}`);
+    }
+    
+    // Read and encode the file directly from the container
+    const base64Cmd = `docker exec ${containerName} bash -c "cat '${containerSoPath}' | base64 -w 0"`;
+    const base64So = await runCommand(base64Cmd, '.', tempTaskId, { skipSuccessUpdate: true });
+    
     return { status: 'success', base64So };
   } catch (error) {
     console.error('Error retrieving built artifact:', error);
@@ -195,162 +234,14 @@ export const startAnchorBuildTask = async (
       
       const rootPath = await getProjectRootPath(projectId);
       
-      console.log(`Starting anchor build preparation for project ${projectId} in container ${containerName}...`);
+      console.log(`Starting anchor build for project ${projectId} in container ${containerName}...`);
       
-      const scriptContent = `const fs = require('fs');
-const path = require('path');
-
-/**
- * Patches Cargo.toml with:
- *
- *   [patch.crates-io]
- *   bytemuck_derive = "=1.8.1"
- *
- * if it's not already there.
- */
-
-// Minimal function to check if a Cargo.toml has [workspace]
-function isWorkspaceToml(tomlContent) {
-  return tomlContent.includes('[workspace]');
-}
-
-function patchCargoToml(cargoTomlPath) {
-  // 1) Read the existing Cargo.toml
-  if (!fs.existsSync(cargoTomlPath)) {
-    console.error(\`Cargo.toml not found at: \${cargoTomlPath}\`);
-    return false;
-  }
-  const originalToml = fs.readFileSync(cargoTomlPath, "utf8");
-
-  // 2) Check if we already have the "bytemuck_derive" override
-  const alreadyHasPatch = originalToml.includes("[patch.crates-io]") && 
-                        originalToml.includes("bytemuck_derive =");
-
-  // 3) If it's already pinned, do nothing
-  if (alreadyHasPatch) {
-    console.log(\`bytemuck_derive override already found in \${cargoTomlPath}. No change needed.\`);
-    return true;
-  }
-
-  // 4) Otherwise, see if there's already a [patch.crates-io] block for us to append to
-  if (originalToml.includes("[patch.crates-io]")) {
-    // Insert the line under the existing [patch.crates-io] block
-    const patchedToml = originalToml.replace(
-      /\\[patch\\.crates-io\\]/,
-      \`[patch.crates-io]\\nbytemuck_derive = "=1.8.1"\`
-    );
-    fs.writeFileSync(cargoTomlPath, patchedToml, "utf8");
-    console.log(\`Inserted bytemuck_derive override in existing [patch.crates-io] block in \${cargoTomlPath}\`);
-  } else {
-    // Add a new block at the end of the file
-    const appendedToml = \`\${originalToml.trim()}
-
-[patch.crates-io]
-bytemuck_derive = "=1.8.1"
-\`;
-    fs.writeFileSync(cargoTomlPath, appendedToml, "utf8");
-    console.log(\`Added new [patch.crates-io] block with bytemuck_derive override to \${cargoTomlPath}\`);
-  }
-  return true;
-}
-
-// Find all Cargo.toml files in the project directory
-function findCargoTomlFiles(startPath) {
-  if (!fs.existsSync(startPath)) {
-    console.error("Directory not found: " + startPath);
-    return [];
-  }
-
-  let results = [];
-  const files = fs.readdirSync(startPath);
-  
-  for (const file of files) {
-    const filename = path.join(startPath, file);
-    const stat = fs.statSync(filename);
-    
-    if (stat.isDirectory() && file !== 'target' && file !== 'node_modules' && !file.startsWith('.')) {
-      // Skip target/ and node_modules/ directories for efficiency
-      results = results.concat(findCargoTomlFiles(filename));
-    } else if (file === 'Cargo.toml') {
-      results.push(filename);
-    }
-  }
-  
-  return results;
-}
-
-// Main logic
-const projectDir = process.argv[2];
-if (!projectDir) {
-  console.error("Usage: node patchCargoToml.js /path/to/project/directory");
-  process.exit(1);
-}
-
-// First find the top-level Cargo.toml
-const topLevelCargoToml = path.join(projectDir, 'Cargo.toml');
-if (!fs.existsSync(topLevelCargoToml)) {
-  console.log('No top-level Cargo.toml found; nothing to patch.');
-  process.exit(0);
-}
-
-// 1) Is the top-level a workspace?
-const topLevelContent = fs.readFileSync(topLevelCargoToml, 'utf8');
-const hasWorkspace = isWorkspaceToml(topLevelContent);
-
-// 2) If workspace, patch only the top-level. If not, patch them all
-if (hasWorkspace) {
-  console.log(\`Top-level Cargo.toml has [workspace], so only patching the root Cargo.toml.\`);
-  patchCargoToml(topLevelCargoToml);
-} else {
-  console.log(\`No [workspace] in top-level, so patching all Cargo.toml files...\`);
-  const allCargoTomlFiles = findCargoTomlFiles(projectDir);
-  console.log(\`Found \${allCargoTomlFiles.length} Cargo.toml files in project\`);
-  // Patch them all
-  for (const cargoTomlPath of allCargoTomlFiles) {
-    patchCargoToml(cargoTomlPath);
-  }
-}
-
-console.log("All relevant Cargo.toml files have been patched successfully");`;
-
       const buildScriptContent = `#!/bin/bash
 set -euo pipefail
 
 cd /usr/src/${rootPath}
 
-echo "===== Step 1: Removing Cargo registry cache to prevent using cached bytemuck_derive 1.9.1 ====="
-rm -rf /root/.cargo/registry
-
-echo "===== Step 2: Removing all Cargo.lock files to force fresh dependency resolution ====="
-find . -name 'Cargo.lock' -type f -delete
-
-echo "===== Step 3: Patching Cargo.toml files to force bytemuck_derive = 1.8.1 ====="
-node /tmp/patchCargoToml.js /usr/src/${rootPath}
-
-echo "===== Step 4: Explicitly pinning bytemuck_derive to version 1.8.1 ====="
-cargo update -p bytemuck_derive --precise 1.8.1 || echo "Cargo update step completed (this warning is normal if bytemuck_derive hasn't been pulled yet)"
-
-echo "===== Step 5: Generating a fresh Cargo.lock file ====="
-cargo generate-lockfile
-
-echo "===== Step 6: Forcing Cargo.lock to version 3 to fix '-Znext-lockfile-bump' error ====="
-sed -i 's/^version = 4$/version = 3/' Cargo.lock
-echo "Cargo.lock set to version 3"
-
-echo "===== Step 7: Performing name check between Cargo.toml and Anchor.toml ====="
-if [ -f Cargo.toml ] && [ -f Anchor.toml ]; then
-  CARGO_NAME=$(grep -m 1 '^name *=' Cargo.toml | cut -d '"' -f 2)
-  echo "Program name in Cargo.toml: $CARGO_NAME"
-  if grep -q "$CARGO_NAME" Anchor.toml; then
-    echo "✓ Program name match confirmed between Cargo.toml and Anchor.toml"
-  else
-    echo "WARNING: Program name in Cargo.toml may not match Anchor.toml"
-  fi
-else
-  echo "WARNING: One or more configuration files missing"
-fi
-
-echo "===== Step 8: Running anchor build with prepared environment ====="
+echo "===== Running anchor build ====="
 anchor build
 `;
       
@@ -359,26 +250,15 @@ anchor build
         fs.mkdirSync(tempDir, { recursive: true });
       }
       
-      const patchScriptPath = path.join(tempDir, `patch-${projectId}.js`);
-      fs.writeFileSync(patchScriptPath, scriptContent, 'utf8');
-      
       const buildScriptPath = path.join(tempDir, `build-${projectId}.sh`);
       fs.writeFileSync(buildScriptPath, buildScriptContent, 'utf8');
       
-      console.log(`Created build scripts locally at ${tempDir}`);
+      console.log(`Created build script locally at ${tempDir}`);
 
-      console.log(`Starting comprehensive build for project ${projectId}...`);
+      console.log(`Starting anchor build for project ${projectId}...`);
       
       try {
         await updateTaskStatus(sanitizedTaskId, 'doing', 'Anchor build in progress...');
-        
-        console.log(`Copying JS patch script to container ${containerName}...`);
-        await runCommand(
-          `docker cp ${patchScriptPath} ${containerName}:/tmp/patchCargoToml.js`,
-          '.',
-          sanitizedTaskId,
-          { skipSuccessUpdate: true }
-        );
         
         console.log(`Copying build script to container ${containerName}...`);
         await runCommand(
@@ -413,7 +293,6 @@ anchor build
         );
         
         try {
-          fs.unlinkSync(patchScriptPath);
           fs.unlinkSync(buildScriptPath);
         } catch (cleanupError: any) {
           console.log(`Non-critical error cleaning up temp files: ${cleanupError.message}`);
@@ -435,7 +314,6 @@ anchor build
         );
         
         try {
-          fs.unlinkSync(patchScriptPath);
           fs.unlinkSync(buildScriptPath);
         } catch (cleanupError: any) {
           console.log(`Non-critical error cleaning up temp files: ${cleanupError.message}`);
@@ -459,6 +337,8 @@ export const startAnchorDeployTask = async (
   let programId: string | null = null;
   const sanitizedTaskId = taskId.trim().replace(/,$/, '');
 
+  console.log(`[DEPLOY_DEBUG] Starting anchor deploy task ${sanitizedTaskId} for project ${projectId}${ephemeralPubkey ? ' with ephemeral key: ' + ephemeralPubkey : ''}`);
+
   setImmediate(async () => {
     try {
       const containerName = await getContainerName(projectId);
@@ -468,54 +348,262 @@ export const startAnchorDeployTask = async (
 
       const rootPath = await getProjectRootPath(projectId);
 
-      await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && solana config set --url https://api.devnet.solana.com"`, '.', sanitizedTaskId);
+      await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && solana config set --url https://api.devnet.solana.com"`, '.', sanitizedTaskId, { skipSuccessUpdate: true });
       
       let walletPath;
+      let containerWalletPath;
+      
       if (ephemeralPubkey) {
         walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${ephemeralPubkey}.json`);
-        console.log(`Using ephemeral key for deployment: ${ephemeralPubkey}`);
+        console.log(`[DEPLOY_DEBUG] Using ephemeral key for deployment: ${ephemeralPubkey}`);
+        console.log(`[DEPLOY_DEBUG] Ephemeral key file path: ${walletPath}`);
         
-        const containerWalletPath = `/tmp/${ephemeralPubkey}.json`;
-        await runCommand(`docker cp ${walletPath} ${containerName}:${containerWalletPath}`, '.', sanitizedTaskId);
+        if (!fs.existsSync(walletPath)) {
+          console.error(`[DEPLOY_DEBUG] ERROR: Ephemeral key file not found at ${walletPath}`);
+          throw new Error(`Ephemeral key file not found at ${walletPath}`);
+        }
         
-        await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && solana config set --keypair ${containerWalletPath}"`, '.', sanitizedTaskId);
+        try {
+          const fileStats = fs.statSync(walletPath);
+          console.log(`[DEPLOY_DEBUG] Key file exists: ${walletPath}, size: ${fileStats.size} bytes`);
+          
+          const keyContent = fs.readFileSync(walletPath, 'utf8');
+          const keyArray = JSON.parse(keyContent);
+          console.log(`[DEPLOY_DEBUG] Key array length: ${keyArray.length}, first few bytes: [${keyArray.slice(0, 3).join(', ')}...]`);
+          if (keyArray.length !== 64) {
+            console.warn(`[DEPLOY_DEBUG] WARNING: Key file does not contain a 64-byte array! Found ${keyArray.length} bytes.`);
+          }
+        } catch (err: any) {
+          console.error(`[DEPLOY_DEBUG] ERROR reading key file: ${err.message}`);
+          throw new Error(`Error reading ephemeral key file: ${err.message}`);
+        }
+        
+        containerWalletPath = `/tmp/${ephemeralPubkey}.json`;
+        console.log(`[DEPLOY_DEBUG] Copying ephemeral key to container path: ${containerWalletPath}`);
+        
+        await runCommand(`docker cp ${walletPath} ${containerName}:${containerWalletPath}`, '.', sanitizedTaskId, { skipSuccessUpdate: true });
+        
+        try {
+          const fileCheckCmd = `docker exec ${containerName} ls -la ${containerWalletPath}`;
+          const fileCheckResult = await runCommand(fileCheckCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
+          console.log(`[DEPLOY_DEBUG] Container key file check: ${fileCheckResult}`);
+          
+          const pubkeyCmd = `docker exec ${containerName} bash -c "solana-keygen pubkey ${containerWalletPath} || echo 'KEYGEN_FAILED'"`;
+          const pubkeyResult = await runCommand(pubkeyCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
+          console.log(`[DEPLOY_DEBUG] Solana-keygen pubkey result: ${pubkeyResult.trim()}`);
+          
+          if (pubkeyResult.trim() !== ephemeralPubkey) {
+            console.error(`[DEPLOY_DEBUG] ERROR: Key verification failed! Expected: ${ephemeralPubkey}, Got: ${pubkeyResult.trim()}`);
+            throw new Error(`Ephemeral key verification failed. Expected: ${ephemeralPubkey}, Got: ${pubkeyResult.trim()}`);
+          } else {
+            console.log(`[DEPLOY_DEBUG] Key verification SUCCESS: ${pubkeyResult.trim()}`);
+          }
+          
+          const anchorTomlCmd = `docker exec ${containerName} bash -c "cat /usr/src/${rootPath}/Anchor.toml || echo 'ANCHOR_TOML_NOT_FOUND'"`;
+          const anchorTomlContent = await runCommand(anchorTomlCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
+          
+          const walletLineMatch = anchorTomlContent.match(/wallet\s*=\s*["']([^"']+)["']/);
+          if (walletLineMatch) {
+            const walletPath = walletLineMatch[1];
+            console.log(`[DEPLOY_DEBUG] Found wallet setting in Anchor.toml: ${walletPath}`);
+            
+            if (walletPath.includes('id.json') || walletPath.includes('~')) {
+              console.warn(`[DEPLOY_DEBUG] WARNING: Anchor.toml specifies default wallet: ${walletPath}`);
+              console.warn(`[DEPLOY_DEBUG] This might override command-line flags in some Anchor versions`);
+              
+              try {
+                const modifiedToml = anchorTomlContent.replace(
+                  /wallet\s*=\s*["'][^"']+["']/,
+                  `wallet = "${containerWalletPath}"`
+                );
+                
+                const updateTomlCmd = `docker exec -i ${containerName} bash -c "cat > /usr/src/${rootPath}/Anchor.toml" << 'EOF'\n${modifiedToml}\nEOF`;
+                await runCommand(updateTomlCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
+                console.log(`[DEPLOY_DEBUG] Updated Anchor.toml to use ephemeral key: ${containerWalletPath}`);
+                
+                const verifyTomlCmd = `docker exec ${containerName} bash -c "cat /usr/src/${rootPath}/Anchor.toml | grep wallet"`;
+                const verifyResult = await runCommand(verifyTomlCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
+                console.log(`[DEPLOY_DEBUG] Verified Anchor.toml wallet setting: ${verifyResult.trim()}`);
+              } catch (tomlUpdateErr: any) {
+                console.error(`[DEPLOY_DEBUG] Error updating Anchor.toml: ${tomlUpdateErr.message}`);
+              }
+            }
+          } else {
+            console.log(`[DEPLOY_DEBUG] No wallet setting found in Anchor.toml. Command-line flags should work.`);
+          }
+        } catch (verifyErr: any) {
+          console.error(`[DEPLOY_DEBUG] Error during key verification: ${verifyErr.message}`);
+        }
+        
+        await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && solana config set --keypair ${containerWalletPath}"`, '.', sanitizedTaskId, { skipSuccessUpdate: true });
       } else {
         walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${creatorId}.json`);
         console.log(`Using creator key for deployment: ${creatorId}`);
         
-        const containerWalletPath = `/tmp/${creatorId}.json`;
-        await runCommand(`docker cp ${walletPath} ${containerName}:${containerWalletPath}`, '.', sanitizedTaskId);
+        containerWalletPath = `/tmp/${creatorId}.json`;
+        await runCommand(`docker cp ${walletPath} ${containerName}:${containerWalletPath}`, '.', sanitizedTaskId, { skipSuccessUpdate: true });
         
-        await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && solana config set --keypair ${containerWalletPath}"`, '.', sanitizedTaskId);
+        await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && solana config set --keypair ${containerWalletPath}"`, '.', sanitizedTaskId, { skipSuccessUpdate: true });
       }
       
-      await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && solana config set --url devnet"`, '.', sanitizedTaskId);
+      await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && solana config set --url devnet"`, '.', sanitizedTaskId, { skipSuccessUpdate: true });
 
-      const result = await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && anchor deploy"`, '.', sanitizedTaskId).catch(async (error: any) => {
+      const anchorDeployCmd = `anchor deploy \
+        --provider.wallet ${containerWalletPath} \
+        --provider.cluster devnet`;
+      
+      console.log(`Running deploy with wallet flag: --provider.wallet ${containerWalletPath}`);
+      
+      console.log(`[EPHEMERAL_DEBUG] Checking Anchor.toml configuration...`);
+      try {
+        const anchorTomlCmd = `docker exec ${containerName} bash -c "cat /usr/src/${rootPath}/Anchor.toml || echo 'ANCHOR_TOML_NOT_FOUND'"`;
+        const anchorTomlContent = await runCommand(anchorTomlCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
+        
+        const walletMatch = anchorTomlContent.match(/wallet\s*=\s*["']([^"']+)["']/);
+        if (walletMatch) {
+          console.log(`[EPHEMERAL_DEBUG] Found wallet in Anchor.toml: ${walletMatch[1]}`);
+          
+          if (walletMatch[1].includes('id.json')) {
+            console.warn(`[EPHEMERAL_DEBUG] WARNING: Anchor.toml specifies default wallet: ${walletMatch[1]}`);
+            console.warn(`[EPHEMERAL_DEBUG] This might override command-line flags in some Anchor versions`);
+          }
+        } else {
+          console.log(`[EPHEMERAL_DEBUG] No wallet setting found in Anchor.toml, command-line flags should work`);
+        }
+      } catch (tomlErr: any) {
+        console.error(`[EPHEMERAL_DEBUG] Error checking Anchor.toml: ${tomlErr.message}`);
+      }
+      
+      const deployCmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && anchor deploy --provider.wallet ${containerWalletPath} --provider.cluster devnet 2>&1"`;
+      console.log(`[DEPLOY_DEBUG] Running command: ${deployCmd}`);
+      
+      const result = await runCommand(deployCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true }).catch(async (error: any) => {
         console.error('Error during deployment:', sanitizedTaskId, error);
-        await updateTaskStatus(sanitizedTaskId, 'failed', `Error: ${error.message}`);
+        
+        console.log(`[EPHEMERAL_DEBUG] Deployment failed. Trying direct anchor deploy with -k flag...`);
+        try {
+          const directDeployCmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && anchor deploy -k ${containerWalletPath} --url devnet 2>&1"`;
+          console.log(`[DEPLOY_DEBUG] Running fallback command: ${directDeployCmd}`);
+          const fallbackResult = await runCommand(directDeployCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
+          console.log(`[EPHEMERAL_DEBUG] Direct deploy result (first 1000 chars):\n${fallbackResult.substring(0, 1000)}`);
+          
+          if (fallbackResult.includes('Program Id:')) {
+            console.log(`[EPHEMERAL_DEBUG] Direct deploy succeeded!`);
+            return fallbackResult;
+          }
+        } catch (fallbackErr: any) {
+          console.error(`[EPHEMERAL_DEBUG] Fallback deploy also failed: ${fallbackErr.message}`);
+        }
+        
+        const errorResult = JSON.stringify({
+          status: 'failed',
+          error: error.message
+        });
+        await updateTaskStatus(sanitizedTaskId, 'failed', errorResult);
+        return `Error: ${error.message}`;
       });
+
+      console.log(`[DEPLOY_DEBUG] Full deploy output (first 1000 chars):\n${result?.substring(0, 1000)}`);
 
       if (result && result.startsWith('Error:')) {
         console.error(`Deployment failed for Task ID: ${sanitizedTaskId}. Reason: ${result}`);
-        await updateTaskStatus(sanitizedTaskId, 'failed', result);
+        const errorResult = JSON.stringify({
+          status: 'failed',
+          error: result
+        });
+        await updateTaskStatus(sanitizedTaskId, 'failed', errorResult);
         return;
       }
 
-      const programIdMatch = result?.match(/Program Id:\s+([a-zA-Z0-9]+)/);
-      if (!programIdMatch) throw new Error('Program ID not found in deploy output. Deployment may have failed.');
+      console.log(`[DEPLOY_DEBUG] Searching for Program Id in output...`);
+      const programIdRegex = /Program Id:\s*([a-zA-Z0-9]{32,44})/;
+      const programIdMatch = result?.match(programIdRegex);
+      
+      if (programIdMatch) {
+        console.log(`[DEPLOY_DEBUG] Found Program Id: ${programIdMatch[1]}`);
+        programId = programIdMatch[1];
+      } else {
+        console.log(`[DEPLOY_DEBUG] WARNING: No Program Id found in output! Searching the entire output for base58-like strings...`);
+        
+        const base58Regex = /\b[1-9A-HJ-NP-Za-km-z]{32,44}\b/g;
+        const potentialIds = result?.match(base58Regex) || [];
+        if (potentialIds.length > 0) {
+          console.log(`[DEPLOY_DEBUG] Found potential base58 program IDs: ${potentialIds.join(', ')}`);
+          
+          if (potentialIds.length > 0) {
+            programId = potentialIds[0] || null;
+            console.log(`[DEPLOY_DEBUG] Using first potential base58 string as Program ID: ${programId}`);
+          }
+        } else {
+          console.log(`[DEPLOY_DEBUG] No base58-like strings found in output!`);
+          const errorResult = JSON.stringify({
+            status: 'failed',
+            error: 'Program ID not found in deploy output'
+          });
+          await updateTaskStatus(sanitizedTaskId, 'failed', errorResult);
+          throw new Error('Program ID not found in deploy output. Deployment may have failed.');
+        }
+      }
 
-      programId = programIdMatch[1];
+      console.log(`[DEPLOY_DEBUG] Using Program ID: ${programId}`);
+      
       if (programId) console.log(`Program successfully deployed with ID: ${programId}`);
+      
+      try {
+        if (programId && !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(programId)) {
+          console.error(`[DEPLOY_DEBUG] ERROR: Invalid program ID format: ${programId}`);
+          const errorResult = JSON.stringify({
+            status: 'failed',
+            error: `Invalid program ID format: ${programId}`
+          });
+          await updateTaskStatus(sanitizedTaskId, 'failed', errorResult);
+          throw new Error(`Invalid program ID format: ${programId}`);
+        }
+        
+        if (!programId) {
+          console.error(`[DEPLOY_DEBUG] ERROR: Program ID is null or undefined`);
+          const errorResult = JSON.stringify({
+            status: 'failed',
+            error: 'Program ID is null or undefined'
+          });
+          await updateTaskStatus(sanitizedTaskId, 'failed', errorResult);
+          throw new Error('Program ID is null or undefined');
+        }
+        
+        const checkProgramCmd = `docker exec ${containerName} bash -c "solana program show ${programId} --url devnet || echo 'PROGRAM_NOT_FOUND'"`;
+        const checkProgramResult = await runCommand(checkProgramCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
+        console.log(`[DEPLOY_DEBUG] Program verification: ${checkProgramResult.substring(0, 500)}`);
+        
+        if (checkProgramResult.includes('PROGRAM_NOT_FOUND')) {
+          console.warn(`[DEPLOY_DEBUG] WARNING: Program ${programId} not found on devnet. It may not be deployed properly.`);
+        } else {
+          console.log(`[DEPLOY_DEBUG] Program ${programId} successfully verified on devnet.`);
+        }
+      } catch (verifyProgramErr: any) {
+        console.error(`[DEPLOY_DEBUG] Error verifying program ID: ${verifyProgramErr.message}`);
+      }
+      
+      const successResult = JSON.stringify({
+        status: 'success',
+        programId: programId
+      });
+      
+      console.log(`[DEPLOY_DEBUG] Final program ID to be returned to client: '${programId}'`);
+      console.log(`[DEPLOY_DEBUG] Task result JSON: ${successResult}`);
       
       await updateTaskStatus(
         sanitizedTaskId,
         'succeed',
-        programId
+        successResult
       );
     } catch (error: any) {
       console.error('Error during deployment:', sanitizedTaskId, error);
-      return [sanitizedTaskId, null];
+      const errorResult = JSON.stringify({
+        status: 'failed',
+        error: error.message
+      });
+      await updateTaskStatus(sanitizedTaskId, 'failed', errorResult);
+      return;
     }
   });
 
@@ -708,16 +796,17 @@ export const startCreateProjectDirectoryTask = async (
       const startContainerCmd = 
         `docker run -d \\
           --name ${containerName} \\
-          -p 3001:3000 \\
-          flowcode-base:latest \\
+          -p 0.0.0.0::3000 \\
+          flowcode-project-base:latest \\
           bash -c "cd /usr/src && tail -f /dev/null"
       `;
       console.log(`[DEBUG_CONTAINER] About to execute docker run command: ${startContainerCmd}`);
       await runCommand(startContainerCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
-      console.log(`[DEBUG_CONTAINER] Docker container created: name=${containerName}, about to update DB with container_url`);
+      console.log(`[DEBUG_CONTAINER] Docker container created: name=${containerName}, about to get host port and update DB`);
 
       try {
-        const containerUrl = `http://localhost:3001`;
+        const hostPort = await getContainerHostPort(containerName, 3000, sanitizedTaskId);
+        const containerUrl = `http://localhost:${hostPort}`;
         console.log(`[DEBUG_CONTAINER] Setting containerUrl=${containerUrl} for container=${containerName}, projectId=${projectId}`);
 
         const updateResult = await pool.query(
@@ -941,17 +1030,6 @@ ${serverGitignoreContent}
 EOF`;
       await runCommand(serverGitignoreCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
 
-      /*
-      await runCommand(`
-        docker exec ${containerName} bash -c "
-          cd /usr/src/${rootPath} &&
-          git init &&
-          git add . &&
-          git commit -m 'Initial scaffold'
-        "
-      `, '.', sanitizedTaskId);
-      */
-      
       console.log("Attempting git initialization to verify filesystem...");
       await runCommand(`
         docker exec ${containerName} bash -c "
@@ -1250,13 +1328,14 @@ async function createNewContainer(
   const startContainerCmd = `
     docker run -d \\
       --name ${containerName} \\
-      -p 3001:3000 \\
-      flowcode-base:latest \\
+      -p 0.0.0.0::3000 \\
+      flowcode-project-base:latest \\
       bash -c "cd /usr/src && tail -f /dev/null"
   `;
   await runCommand(startContainerCmd, '.', taskId, { skipSuccessUpdate: true });
   
-  const containerUrl = `http://localhost:3001`;
+  const hostPort = await getContainerHostPort(containerName, 3000, taskId);
+  const containerUrl = `http://localhost:${hostPort}`;
   
   await pool.query(
     'UPDATE solanaproject SET container_name = $1, container_url = $2 WHERE id = $3',

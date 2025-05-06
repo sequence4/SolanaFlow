@@ -638,7 +638,7 @@ export const createEphemeralKeypair = async (req: Request, res: Response, next: 
     const ephemeral = Keypair.generate();
     const ephemeralPubkeyString = ephemeral.publicKey.toBase58();
 
-    const ephemeralFilePath = path.join(os.tmpdir(), `${ephemeralPubkeyString}.json`);
+    const ephemeralFilePath = path.join(APP_CONFIG.WALLETS_FOLDER, `${ephemeralPubkeyString}.json`);
     fs.writeFileSync(ephemeralFilePath, JSON.stringify([...ephemeral.secretKey]));
 
     console.log(`Created ephemeral keypair with public key ${ephemeralPubkeyString} and saved to ${ephemeralFilePath}`);
@@ -691,15 +691,6 @@ export const deployProject = async (
       return next(new AppError('Error parsing project details', 500));
     }
 
-    if ((details as any).isLite === true) {
-      console.log('Skipping deployment process for lite project');
-      res.status(200).json({ 
-        message: 'Deployment operation skipped for lite project',
-        isLite: true
-      });
-      return;
-    }
-
     const taskId = await startAnchorDeployTask(id, userId);
 
     res.status(200).json({
@@ -709,6 +700,127 @@ export const deployProject = async (
   } catch (error) {
     console.error('Error in deployProject:', error);
     return next(new AppError('Failed to start deployment process', 500));
+  }
+};
+
+export const deployProjectEphemeral = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  const { id } = req.params;
+  const userId = req.user?.id;
+  const orgId = req.user?.org_id;
+  const { ephemeralPubkey } = req.body;
+
+  console.log(`[DEPLOY_EPHEMERAL] Received request to deploy project ${id} with ephemeral key ${ephemeralPubkey}`);
+
+  if (!userId || !orgId) {
+    console.log(`[DEPLOY_EPHEMERAL] Missing user info: userId=${userId}, orgId=${orgId}`);
+    return next(new AppError('User information not found', 400));
+  }
+
+  if (!ephemeralPubkey) {
+    console.log(`[DEPLOY_EPHEMERAL] No ephemeral public key provided in request`);
+    return next(new AppError('Ephemeral public key is required', 400));
+  }
+
+  // Validate the ephemeral public key
+  try {
+    console.log(`[DEPLOY_EPHEMERAL] Validating ephemeral key format`);
+    // Check if the key is in the expected format
+    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(ephemeralPubkey)) {
+      console.log(`[DEPLOY_EPHEMERAL] Invalid ephemeral key format: ${ephemeralPubkey}`);
+      return next(new AppError('Invalid ephemeral public key format', 400));
+    }
+
+    // Check if the key file exists
+    const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${ephemeralPubkey}.json`);
+    if (!fs.existsSync(walletPath)) {
+      console.log(`[DEPLOY_EPHEMERAL] Ephemeral key file not found at ${walletPath}`);
+      return next(new AppError(`Ephemeral key file not found. Please create it first.`, 404));
+    }
+    console.log(`[DEPLOY_EPHEMERAL] Ephemeral key file exists at ${walletPath}`);
+  } catch (validationError: any) {
+    console.error(`[DEPLOY_EPHEMERAL] Error validating ephemeral key:`, validationError);
+    return next(new AppError(`Error validating ephemeral key: ${validationError.message}`, 400));
+  }
+
+  try {
+    const projectCheck = await pool.query(
+      'SELECT details FROM solanaproject WHERE id = $1 AND org_id = $2',
+      [id, orgId]
+    );
+
+    if (projectCheck.rows.length === 0) {
+      console.log(`[DEPLOY_EPHEMERAL] Project not found or no permission: id=${id}, orgId=${orgId}`);
+      return next(
+        new AppError(
+          'Project not found or you do not have permission to deploy it',
+          404
+        )
+      );
+    }
+
+    const { details: detailsStr } = projectCheck.rows[0];
+    let details = {};
+    try {
+      if (typeof detailsStr === 'object' && detailsStr !== null) {
+        details = detailsStr;
+      } else {
+        details = JSON.parse(detailsStr || '{}');
+      }
+    } catch (err: any) {
+      console.error('[DEPLOY_EPHEMERAL] Failed to parse details JSON:', err);
+      return next(new AppError('Error parsing project details', 500));
+    }
+
+    console.log(`[DEPLOY_EPHEMERAL] Starting anchor deploy task with ephemeral key ${ephemeralPubkey}`);
+    const taskId = await startAnchorDeployTask(id, userId, ephemeralPubkey);
+    console.log(`[DEPLOY_EPHEMERAL] Deploy task started: ${taskId}`);
+
+    // Wait for task completion and validate result before sending response
+    try {
+      console.log(`[DEPLOY_EPHEMERAL] Waiting for task ${taskId} to complete...`);
+      const status = await waitForTaskCompletion(taskId, 120000); // 2 minute timeout
+      console.log(`[DEPLOY_EPHEMERAL] Task ${taskId} completed with status: ${status}`);
+      
+      if (status === 'succeed' || status === 'finished') {
+        // Fetch the task's result from the database
+        const client = await pool.connect();
+        try {
+          const taskQuery = await client.query(
+            'SELECT result FROM Task WHERE id = $1',
+            [taskId]
+          );
+          
+          if (taskQuery.rows.length > 0 && taskQuery.rows[0].result) {
+            const programId = taskQuery.rows[0].result;
+            console.log(`[DEPLOY_EPHEMERAL] Task result: '${programId}'`);            
+            console.log(`[DEPLOY_EPHEMERAL] Valid program ID confirmed: ${programId}`);
+          } else {
+            console.log(`[DEPLOY_EPHEMERAL] WARNING: Task completed but returned null or empty result`);
+          }
+        } finally {
+          client.release();
+        }
+      } else if (status === 'failed') {
+        console.log(`[DEPLOY_EPHEMERAL] WARNING: Task completed with failed status`);
+      } else if (status === 'timeout') {
+        console.log(`[DEPLOY_EPHEMERAL] WARNING: Task timed out waiting for completion`);
+      }
+    } catch (waitError: any) {
+      console.log(`[DEPLOY_EPHEMERAL] Error waiting for task completion: ${waitError.message}`);
+      // Continue sending response with taskId, client will poll for completion
+    }
+
+    res.status(200).json({
+      message: 'Ephemeral anchor deploy process started',
+      taskId: taskId,
+    });
+  } catch (error: any) {
+    console.error('[DEPLOY_EPHEMERAL] Error in deployProjectEphemeral:', error);
+    return next(new AppError('Failed to start ephemeral deployment process', 500));
   }
 };
 

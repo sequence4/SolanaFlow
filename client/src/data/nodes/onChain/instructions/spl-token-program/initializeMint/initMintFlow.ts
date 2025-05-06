@@ -17,7 +17,7 @@ export const initMintFlow = {
       type: "instructionGroupNode",
       position: { x: 0, y: 0 },
       data: {
-        label: "Initialize Mint Account",
+        label: "Initialize Mint",
         description: "Creates and initializes a new token mint account with the given decimals and authorities.",
         code: initMintCode,
         accounts: contextData,

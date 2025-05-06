@@ -1,0 +1,18 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/landing"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 1
+    allow:
+      - dependency-type: "direct"
+    commit-message:
+      prefix: "build(landing):"
+      include: "scope"
+    package-manager: "npm"
+    versioning-strategy: "increase"
+    security-updates: true 

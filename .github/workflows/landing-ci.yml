@@ -1,0 +1,108 @@
+name: Landing package CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  landing-ci:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: landing
+    env:
+      CI: true
+      TZ: UTC
+      ACT: ''
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node 20 (GH)
+        if: ${{ env.ACT == '' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Node 20 (act)
+        if: ${{ env.ACT != '' }}
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.6.5 --activate
+          node -v
+          pnpm -v
+
+      - name: Install deps
+        run: pnpm install -F . --no-frozen-lockfile
+
+      - name: Cache Docker layers (postgres:15)
+        uses: ScribeMD/docker-cache@0.3.6
+        with:
+          key: postgres-15
+
+      - name: Type-check landing
+        run: pnpm run type-check
+
+      - name: Lint landing
+        run: pnpm run lint --max-warnings 0
+
+      - name: Run API integration tests
+        run: pnpm test:api
+        env:
+          NODE_ENV: test
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps
+
+      - name: Playwright E2E
+        run: pnpm run test:e2e
+        env:
+          CI: true
+          E2E: 1
+
+      - name: Performance budget (Lighthouse)
+        run: pnpm lighthouse:test
+        env:
+          E2E: 1
+
+      - name: Upload Lighthouse report
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-report
+          path: .lighthouseci
+        
+      - name: Unit + smoke tests
+        run: pnpm test
+
+      - name: Coverage gate
+        run: pnpm test:cov
+
+      - name: Build landing
+        run: pnpm run build
+
+      - name: gitleaks scan
+        if: env.ACT == ''
+        uses: gitleaks/gitleaks-action@v1.6.0
+
+  security-audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run: 
+        working-directory: landing
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: 
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --prod --audit-level high

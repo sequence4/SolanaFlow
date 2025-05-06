@@ -18,6 +18,7 @@
         "@solana/web3.js": "^1.98.0",
         "arbundles": "^0.11.2",
         "bcryptjs": "^3.0.2",
+        "chat": "link:openai/resources/chat",
         "cookie-parser": "^1.4.7",
         "cors": "^2.8.5",
         "dotenv": "^16.4.7",

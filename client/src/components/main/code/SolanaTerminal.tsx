@@ -14,12 +14,12 @@ export default function SolanaTerminal() {
   const [commandHistory, setCommandHistory] = useState<CommandHistoryItem[]>([
     {
       command: "solana --version",
-      output: "solana-cli 1.16.15 (src:devbuild; feat:2916577066)",
+      output: "v2.2.7",
       timestamp: new Date(),
     },
     {
       command: "solana balance",
-      output: "95.95 SOL",
+      output: "28.54 SOL",
       timestamp: new Date(Date.now() - 60000),
     },
   ]);

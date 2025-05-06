@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # Solana FlowCode
+=======
+# Solana Flow
+>>>>>>> origin/develop
 
 A monorepo containing a **Next.js** front-end (`client`) and a **TypeScript**-based Express server (`server`). The client is served on **localhost:3000** (by default) while the server listens on **localhost:9999** (by default). This repository also includes some additional directories and tooling.
 
@@ -30,7 +34,7 @@ This project uses a [PNPM workspace](https://pnpm.io/workspaces) for managing de
 ## Directory Structure
 
 ```
-FLOWCODE (root)
+(root)
 ├─ .github/              # GitHub Actions / Workflows
 ├─ client/               # Next.js (frontend)
 │  ├─ .next/             # Build artifacts
@@ -89,7 +93,11 @@ FLOWCODE (root)
 
 1. **Clone the repository**:
    ```bash
+<<<<<<< HEAD
    git clone https://github.com/ChainLabs-Technologies/solana-flowcode.git
+=======
+   git clone https://github.com/sequence4/SolanaFlow
+>>>>>>> origin/develop
    ```
 
 2. **Install dependencies** (at the monorepo root):
@@ -116,6 +124,7 @@ FLOWCODE (root)
     PORT=9999
     JWT_SECRET=YOUR_JWT_SECRET
     ROOT_FOLDER=/path/to/projects
+    WALLETS_FOLDER=/path/to/wallets
     DB_USER=YOUR_DB_USER
     DB_HOST=YOUR_DB_HOST
     DB_PORT=5432
@@ -193,6 +202,8 @@ pnpm test --filter server
 
 ## License
 
-*Licensing will be added in the future.*
+Copyright © 2025 ChainLabs Technologies. All rights reserved.
+
+This code is provided for personal or non-commercial use only. You may not reproduce, redistribute, or use it for commercial purposes without explicit written permission from the author(s). The code is provided “as is,” without warranty of any kind.
 
 
