@@ -21,13 +21,16 @@ jobs:
         working-directory: landing
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
         with:
           run_install: false
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
@@ -62,12 +65,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download artefact
+      - name: Download arterfact
         uses: actions/download-artifact@v4
         with:
           name: landing-build
 
-      - name: Copy build to server (scp)
+      - name: Copy build to server (SCP)
         uses: appleboy/scp-action@v0.1.7
         with:
           host:     ${{ secrets.STAGING_HOST }}
@@ -84,16 +87,19 @@ jobs:
           username: ${{ secrets.STAGING_USER }}
           key:      ${{ secrets.STAGING_SSH_KEY }}
           port:     22
-          envs: STAGING_DATABASE_URL,UPSTASH_REDIS_REST_URL,UPSTASH_REDIS_REST_TOKEN,\
-                ALLOWED_ORIGINS,NEXT_PUBLIC_GTAG,NEXT_PUBLIC_API_URL
+          envs: STAGING_DATABASE_URL,UPSTASH_REDIS_REST_URL,UPSTASH_REDIS_REST_TOKEN,ALLOWED_ORIGINS,NEXT_PUBLIC_GTAG,NEXT_PUBLIC_API_URL
           script: |
             set -e
             cd /opt/solanaflow
+
+            # Backup existing
             [ -d landing ] && mv landing "landing-$(date +%Y%m%d%H%M)"
+
             mkdir -p landing
             tar -xzf tmp/landing.tar.gz -C landing --strip-components=0
             rm -f tmp/landing.tar.gz
 
+            # Write staging env
             cat > landing/.env <<EOF
             DATABASE_URL=${STAGING_DATABASE_URL}
             UPSTASH_REDIS_REST_URL=${UPSTASH_REDIS_REST_URL}
@@ -104,9 +110,9 @@ jobs:
             NODE_ENV=staging
             EOF
 
+            # Install prod deps & reload
             cd landing
             pnpm install --prod --frozen-lockfile
-
             pm2 startOrReload ecosystem.config.cjs
             pm2 save
 
