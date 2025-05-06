@@ -176,14 +176,14 @@ export default function FeaturesSection() {
                   Drag and drop Solana plugins to visually design your dApp architecture without writing a single line of
                   code.
                 </p>
-                <ul className="text-gray-400 space-y-2 sm:space-y-3 text-[10px] xs:text-xs sm:text-sm w-full flex flex-col items-center xs:items-center sm:items-center md:items-start">
+                <ul className="text-gray-400 space-y-2 sm:space-y-3 text-[10px] xs:text-xs sm:text-sm w-full flex flex-col items-center">
                   {["Pre-configured & verified components", "Smart contract templates", "Intuitive flow connections"].map(
                     (item, index) => (
-                      <li key={index} className="flex items-center w-full max-w-[240px] xs:max-w-[260px] sm:max-w-[280px] md:max-w-none md:w-auto">
+                      <li key={index} className="flex items-center w-full max-w-[240px] xs:max-w-[260px] sm:max-w-[280px]">
                         <div className="flex-shrink-0 flex items-center justify-center w-4 h-4 xs:w-5 xs:h-5 sm:w-5 sm:h-5 rounded-full bg-[#0a0b14] border border-[#5580ff]/20 mr-2 xs:mr-3 sm:mr-3">
                           <div className="w-1 h-1 xs:w-1.5 xs:h-1.5 sm:w-1.5 sm:h-1.5 rounded-full bg-[#5580ff] animate-pulse" />
                         </div>
-                        <span className="text-left">{item}</span>
+                        <span>{item}</span>
                       </li>
                     ),
                   )}
@@ -215,14 +215,14 @@ export default function FeaturesSection() {
                   A powerful code editor tailored specifically for Solana development with intelligent autocompletion and
                   debugging.
                 </p>
-                <ul className="text-gray-400 space-y-2 sm:space-y-3 text-[10px] xs:text-xs sm:text-sm w-full flex flex-col items-center xs:items-center sm:items-center md:items-start">
+                <ul className="text-gray-400 space-y-2 sm:space-y-3 text-[10px] xs:text-xs sm:text-sm w-full flex flex-col items-center">
                   {["Rust and TypeScript support", "Real-time error checking", "Integrated testing tools"].map(
                     (item, index) => (
-                      <li key={index} className="flex items-center w-full max-w-[240px] xs:max-w-[260px] sm:max-w-[280px] md:max-w-none md:w-auto">
+                      <li key={index} className="flex items-center w-full max-w-[240px] xs:max-w-[260px] sm:max-w-[280px]">
                         <div className="flex-shrink-0 flex items-center justify-center w-4 h-4 xs:w-5 xs:h-5 sm:w-5 sm:h-5 rounded-full bg-[#0a0b14] border border-[#a855f7]/20 mr-2 xs:mr-3 sm:mr-3">
                           <div className="w-1 h-1 xs:w-1.5 xs:h-1.5 sm:w-1.5 sm:h-1.5 rounded-full bg-[#a855f7] animate-pulse" />
                         </div>
-                        <span className="text-left">{item}</span>
+                        <span>{item}</span>
                       </li>
                     ),
                   )}
@@ -253,13 +253,13 @@ export default function FeaturesSection() {
                 <p className="text-gray-400 mb-3 xs:mb-4 sm:mb-4 md:mb-5 text-[10px] xs:text-xs sm:text-sm md:text-sm leading-relaxed text-center xs:text-center sm:text-center md:text-left">
                   Preview and interact with your generated dApp UI in real-time as you build your Solana application.
                 </p>
-                <ul className="text-gray-400 space-y-2 sm:space-y-3 text-[10px] xs:text-xs sm:text-sm w-full flex flex-col items-center xs:items-center sm:items-center md:items-start">
+                <ul className="text-gray-400 space-y-2 sm:space-y-3 text-[10px] xs:text-xs sm:text-sm w-full flex flex-col items-center">
                   {["Live UI previews", "Wallet integration testing", "Responsive design tools"].map((item, index) => (
-                    <li key={index} className="flex items-center w-full max-w-[240px] xs:max-w-[260px] sm:max-w-[280px] md:max-w-none md:w-auto">
+                    <li key={index} className="flex items-center w-full max-w-[240px] xs:max-w-[260px] sm:max-w-[280px]">
                       <div className="flex-shrink-0 flex items-center justify-center w-4 h-4 xs:w-5 xs:h-5 sm:w-5 sm:h-5 rounded-full bg-[#0a0b14] border border-[#0ea5e9]/20 mr-2 xs:mr-3 sm:mr-3">
                         <div className="w-1 h-1 xs:w-1.5 xs:h-1.5 sm:w-1.5 sm:h-1.5 rounded-full bg-[#0ea5e9] animate-pulse" />
                       </div>
-                      <span className="text-left">{item}</span>
+                      <span>{item}</span>
                     </li>
                   ))}
                 </ul>

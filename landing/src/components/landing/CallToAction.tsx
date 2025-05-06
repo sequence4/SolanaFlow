@@ -2,6 +2,7 @@
 
 import React from "react"
 import { Button } from "@/components/ui/button"
+import { Sparkles } from "lucide-react"
 
 interface CallToActionProps {
   openWaitlistModal: () => void
@@ -33,7 +34,8 @@ export default function CallToAction({ openWaitlistModal }: CallToActionProps) {
         </div>
       </div>
       
-      <div className="max-w-5xl mx-auto text-center relative z-10">
+      {/* Add a top padding equivalent to navbar height */}
+      <div className="max-w-5xl mx-auto text-center relative z-[1] mt-[var(--navH,64px)]">
         <h2 className="text-3xl md:text-4xl lg:text-5xl hd:text-6xl font-bold mb-6 tracking-tight text-balance" style={{ fontFamily: '"DM Sans", sans-serif' }}>
           <span className="text-white">Ready to</span>{" "}
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
@@ -128,9 +130,7 @@ export default function CallToAction({ openWaitlistModal }: CallToActionProps) {
           
           <div className="flex flex-col items-center max-w-[160px] md:max-w-[180px]">
             <div className="w-14 h-14 md:w-16 md:h-16 flex items-center justify-center bg-[#1e2033] rounded-full mb-3">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 md:h-8 md:w-8 text-[#9945ff]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
-              </svg>
+              <Sparkles className="h-7 w-7 md:h-8 md:w-8 text-[#9945ff]" />
             </div>
             <h3 className="text-white font-bold mb-1">No Code Needed</h3>
             <p className="text-gray-400 text-sm text-center">Build complex dApps with just your ideas</p>

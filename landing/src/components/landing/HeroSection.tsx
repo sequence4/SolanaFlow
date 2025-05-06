@@ -9,6 +9,7 @@ import UserMessageBox from "./UserMessageBox"
 import HeroFeatureList from "./HeroFeatureList"
 import BackgroundEffect from "./BackgroundEffect"
 import { useAutoScale } from "@/utils/useAutoScale"
+import Link from "next/link"
 
 interface HeroSectionProps {
   mounted: boolean
@@ -58,11 +59,9 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
               </span>
             </h1>
           </div>
-
           <div className="space-y-3 text-[clamp(.875rem,.6vw+0.5rem,1.125rem)] text-gray-400">
             <HeroFeatureList />
           </div>
-
           <div className="flex justify-center lg:justify-start gap-4">
             <Button 
               data-testid="open-waitlist-form"
@@ -73,7 +72,6 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
             >
               <span className="relative z-10 cursor-pointer text-bold text-[11px] md:text-[12px] gradient-text">Join the Waitlist</span>
             </Button>
-
             <style jsx global>{`
               .gradient-border-button {
                 position: relative;
@@ -121,20 +119,34 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
                 }
               }
             `}</style>
+        <div className="flex items-center gap-2">
+            <Button asChild size="icon" variant="ghost" aria-label="SolanaFlow on X">
+              <Link
+                href="https://x.com/Solana_FlowCode"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <BsTwitterX className="h-4 w-4 sm:h-5 sm:w-5 text-[#cfd2d3]" />
+              </Link>
+            </Button>
 
-            <div className="flex items-center gap-2">
-              <Button size="icon" variant="ghost"><BsTwitterX className="h-4 w-4 sm:h-5 sm:w-5 text-[#cfd2d3] cursor-pointer hover:bg-none" /></Button>
-              <Button size="icon" variant="ghost"><BsTelegram className="h-4 w-4 sm:h-5 sm:w-5 text-[#cfd2d3] cursor-pointer hover:bg-none" /></Button>
-            </div>
+            <Button asChild size="icon" variant="ghost" aria-label="SolanaFlow on Telegram">
+              <Link
+                href="https://t.me/+WVRI_EcdZrkyZDhk"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <BsTelegram className="h-4 w-4 sm:h-5 sm:w-5 text-[#cfd2d3]" />
+              </Link>
+            </Button>
+          </div>
           </div>
         </div>
-
         <div className="grid-in-flow hidden lg:flex items-center justify-center min-w-0">
           <div className="w-full h-full max-h-[60vh] min-w-0">
             {mounted && <InstructionFlow />}
           </div>
         </div>
-
         <div className="grid-in-code hidden lg:flex basis-0 grow flex-col gap-0">
           <div className="flex-1 min-h-[18rem] max-h-[calc(100%-6rem)] rounded-xl overflow-hidden border border-[#2a2d4a] bg-[#0d0e1a]">
             <div className="h-full flex flex-col rounded-xl overflow-hidden min-h-0">
@@ -173,7 +185,6 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
           </div>
         </div>
       </div>
-      
       <div suppressHydrationWarning>
         <BackgroundEffect mounted={mounted} />
       </div>
