@@ -1,26 +1,21 @@
 export const mintToCode = `
 use anchor_lang::prelude::*;
-use anchor_spl::token::{
-    self,
-    spl_token,
-    Token,
-    MintTo,
-};
+use anchor_spl::token::{self, spl_token, Token, MintToChecked};
 
 #[derive(Accounts)]
 pub struct MintToContext<'info> {
-    #[account(mut)]
+    #[account(mut, signer)]
     pub mint_authority: Signer<'info>,
 
-    /// CHECK: This is the mint account
-    #[account(mut)]
+    /// CHECK: existing mint account
+    #[account(owner = spl_token::ID)]
     pub token_mint: AccountInfo<'info>,
 
-    /// CHECK: This is the destination token account
-    #[account(mut)]
+    /// CHECK: destination token account (writable)
+    #[account(mut, owner = spl_token::ID)]
     pub destination_token_account: AccountInfo<'info>,
 
-    #[account(address = spl_token::id())]
+    #[account(address = spl_token::ID)]
     pub token_program: Program<'info, Token>,
 }
 
@@ -38,36 +33,33 @@ pub fn mint_to(
     let destination_account_info = &ctx.accounts.destination_token_account;
     let mint_authority = &ctx.accounts.mint_authority;
 
-    if token_mint_info.owner != &spl_token::id() {
-        return err!(MintToError::MintNotOwnedByTokenProgram);
-    }
-    if destination_account_info.owner != &spl_token::id() {
-        return err!(MintToError::DestinationNotOwnedByTokenProgram);
-    }
+    // fetch decimals for checked minting
+    let mint_state = spl_token::state::Mint::unpack(&token_mint_info.data.borrow())?;
+    let decimals = mint_state.decimals;
 
     let cpi_ctx = CpiContext::new(
         token_program.to_account_info(),
-        MintTo {
+        MintToChecked {
             mint: token_mint_info.clone(),
             to: destination_account_info.clone(),
             authority: mint_authority.to_account_info(),
         },
     );
 
-    token::mint_to(cpi_ctx, params.amount)?;
+    token::mint_to_checked(cpi_ctx, params.amount, decimals)?;
 
-    // Optionally emit an event to signal that tokens have been minted
-    emit!(TokensMinted {
-        mint_authority: mint_authority.key(),
+    emit!(MintToCompleted {
+        mint: token_mint_info.key(),
+        destination: destination_account_info.key(),
         amount: params.amount,
     });
-
     Ok(())
 }
 
 #[event]
-pub struct TokensMinted {
-    pub mint_authority: Pubkey,
+pub struct MintToCompleted {
+    pub mint: Pubkey,
+    pub destination: Pubkey,
     pub amount: u64,
 }
 

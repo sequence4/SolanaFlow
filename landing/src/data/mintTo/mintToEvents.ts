@@ -1,16 +1,19 @@
 export const mintToEvents = {
-    data: {
-      events: [
-        {
-          name: "MintToCompleted",
-          description: "Fires after successful mint to an account.",
-          fields: [
-            { name: "mint", type: "publicKey" },
-            { name: "destination", type: "publicKey" },
-            { name: "amount", type: "u64" },
-          ],
-        },
-      ],
-    },
-  };
-  
+  id: "mint-to-events",
+  type: "eventsNode",
+  position: { x: 400, y: 160 },
+  data: {
+    label: "Mint To Events",
+    events: [
+      {
+        name: "MintToCompleted",
+        description: "Emitted after successful mint to an account",
+        fields: [
+          { name: "mint", type: "pubkey" },
+          { name: "destination", type: "pubkey" },
+          { name: "amount", type: "u64" },
+        ],
+      },
+    ],
+  },
+};

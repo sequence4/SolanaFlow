@@ -2,23 +2,22 @@ export const initMintCode = `
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::system_instruction;
 use anchor_lang::system_program;
-use anchor_lang::solana_program::program_pack::Pack;
-use anchor_spl::token::{self, spl_token, InitializeMint, Token};
+use anchor_spl::token::{self, spl_token, Token, InitializeMint};
 
 #[derive(Accounts)]
 pub struct InitializeMintContext<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    /// CHECK: This is the mint account
-    #[account(mut)]
+    /// CHECK: new mint account signed by the client creating it
+    #[account(mut, signer)]
     pub token_mint: AccountInfo<'info>,
-
-    #[account(address = spl_token::id())]
-    pub token_program: Program<'info, Token>,
 
     #[account(address = system_program::ID)]
     pub system_program: Program<'info, System>,
+
+    #[account(address = spl_token::ID)]
+    pub token_program: Program<'info, Token>,
 
     pub rent: Sysvar<'info, Rent>,
 }
@@ -40,11 +39,13 @@ pub fn initialize_mint(
     let rent = &ctx.accounts.rent;
 
     let decimals = params.decimals;
+    require!(decimals <= 9, InitializeMintError::InvalidDecimalsValue);
+
     let mint_authority = params.mint_authority;
 
+    // create the mint account; the client signs for \`token_mint\` so no PDA seeds are needed
     let mint_len = spl_token::state::Mint::LEN;
     let lamports = rent.minimum_balance(mint_len);
-
     let create_ix = system_instruction::create_account(
         &payer.key(),
         &token_mint_info.key(),
@@ -52,17 +53,12 @@ pub fn initialize_mint(
         mint_len as u64,
         &spl_token::id(),
     );
-
-    anchor_lang::solana_program::program::invoke_signed(
+    anchor_lang::solana_program::program::invoke(
         &create_ix,
-        &[
-            payer.to_account_info(),
-            token_mint_info.clone(),
-            system_program.to_account_info(),
-        ],
-        &[],
+        &[payer.to_account_info(), token_mint_info.clone(), system_program.to_account_info()],
     )?;
 
+    // initialise mint via CPI
     let cpi_ctx = CpiContext::new(
         token_program.to_account_info(),
         InitializeMint {
@@ -70,22 +66,19 @@ pub fn initialize_mint(
             rent: rent.to_account_info(),
         },
     );
-
     token::initialize_mint(cpi_ctx, decimals, &mint_authority, None)?;
 
-    // Optionally emit an event to signal that the mint has been initialized
     emit!(MintInitialized {
-        mint_authority,
-        amount: 0, // Could be replaced with a real minted amount
+        mint: token_mint_info.key(),
+        decimals,
     });
-
     Ok(())
 }
 
 #[event]
 pub struct MintInitialized {
-    pub mint_authority: Pubkey,
-    pub amount: u64,
+    pub mint: Pubkey,
+    pub decimals: u8,
 }
 
 #[error_code]
@@ -94,5 +87,7 @@ pub enum InitializeMintError {
     MintNotOwnedByTokenProgram,
     #[msg("Destination account is not owned by the Token Program.")]
     DestinationNotOwnedByTokenProgram,
+    #[msg("Decimals value must be between 0 and 9")]
+    InvalidDecimalsValue,
 }
 `;

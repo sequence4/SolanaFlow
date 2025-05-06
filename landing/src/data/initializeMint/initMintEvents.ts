@@ -7,7 +7,7 @@ export const initMintEventsNode = {
     events: [
       {
         name: "MintInitialized",
-        description: "Emitted when a new mint is initialized",
+        description: "Emitted when a new mint is initialised",
         fields: [
           { name: "mint", type: "pubkey" },
           { name: "decimals", type: "u8" },
