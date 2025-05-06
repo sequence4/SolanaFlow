@@ -47,6 +47,7 @@ jobs:
             next.config.* \
             ecosystem.config.cjs \
             package.json \
+            pnpm-lock.yaml \
             docs \
             scripts
         working-directory: landing
