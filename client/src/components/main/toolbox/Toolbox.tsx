@@ -3,11 +3,9 @@
 import React, { useContext, useState, useRef, useEffect } from 'react';
 import '@/styles/toolbox/toolboxStyle.css';
 import { NodeItems } from '@/components/main/toolbox/workflowToolbox/NodeItems';
-import FileTree from '@/components/main/toolbox/codeToolbox/Filetree';
 import ProjectContext from '@/context/project/ProjectContext';
 import FileContext from '@/context/file/FileContext';
 import UxContext from '@/context/ux/UxContext';
-import SimpleBar from 'simplebar-react';
 import 'simplebar-react/dist/simplebar.min.css';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -16,12 +14,8 @@ import ProjectListPopover from '../workflow/ProjectListPopover';
 import { useSignAndSendTx } from '@/data/hooks/useSignAndSendTx';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { toast } from "sonner";
-import { useColorModeValue } from '@/components/ui/color-mode';
 import PulseLoader from "react-spinners/PulseLoader";
-import { handleGenerateCode } from '@/utils/codeGeneration/handleGenerateCode';
-import { handleDeployProgram } from '@/utils/project/deployUpgradableProgram';
 import { handleDeployWithLogs } from '@/utils/project/handleDeployWithLogs';
-import { saveProject } from '@/utils/project/saveProject';
 import { handleConfirmNewProject, handleOpenProject, handleSaveClick } from '@/utils/project/projectUtils';
 import { useTaskLogs } from '@/context/logs/useTaskLogs';
 import {
@@ -30,16 +24,12 @@ import {
   Filter,
   Settings,
   Clock,
-  BookOpen,
   Edit3,
   ArrowRight,
   Info,
-  Tag,
   FolderOpen,
   Save,
   Plus,
-  Code,
-  Hammer,
   Rocket,
   ChevronRight,
 } from "lucide-react";
@@ -64,8 +54,6 @@ export const Toolbox = () => {
     const [isProjectListModalOpen, setIsProjectListModalOpen] = useState(false);
     const [projectsRefreshCounter, setProjectsRefreshCounter] = useState(0);
     
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [isCodeReady, setIsCodeReady] = useState(false);
     const [isDeploying, setIsDeploying] = useState(false);
     const [showDeployModal, setShowDeployModal] = useState(false);
     const [selectedOption, setSelectedOption] = useState('user-wallet');
@@ -74,9 +62,6 @@ export const Toolbox = () => {
     const { publicKey } = useWallet();
     const taskLogs = useTaskLogs();
     
-    const deployModalBg = useColorModeValue('var(--toolbar-deploy-modal-bg-light)', 'var(--toolbar-deploy-modal-bg-dark)');
-    const deployModalBorderColor = useColorModeValue('var(--toolbar-deploy-modal-border-light)', 'var(--toolbar-deploy-modal-border-dark)');
-    const deployModalTextColor = useColorModeValue('var(--toolbar-deploy-modal-text-light)', 'var(--toolbar-deploy-modal-text-dark)');
 
     useEffect(() => {
         setProjectName(projectContext.name || "My Token Project");
@@ -95,7 +80,6 @@ export const Toolbox = () => {
     };
 
     const handleCreateProject = (data: { name: string; description: string; repoUrl?: string }) => {
-        // Reset logs before starting new project creation
         taskLogs.resetLogs();
         
         handleConfirmNewProject(
@@ -126,36 +110,6 @@ export const Toolbox = () => {
         );
     };
     
-    const handleGenerateClick = async () => {
-        if (isGenerating) return;
-        try {
-            const saveResp = await saveProject(projectContext, setProjectContext);
-            if (!saveResp) {
-                console.log('No saveResp, cannot generate code');
-                return;
-            }
-            const projectId = saveResp.project?.id;  
-            setIsGenerating(true);
-            
-            await handleGenerateCode(
-                { ...projectContext, id: projectId },
-                setIsGenerating,
-                setIsCodeReady,
-                (tab: any) => setActiveTab(tab),
-                setFileTree,
-                setProjectContext,
-                taskLogs
-            );
-        } catch (error) {
-            console.error('Error generating code:', error);
-            setIsGenerating(false);
-        }
-    };
-    
-    const handleViewCode = () => { 
-        setActiveTab('code'); 
-    };
-    
     const handleOpenDeployModal = () => {
         setShowDeployModal(true);
     };
@@ -168,7 +122,6 @@ export const Toolbox = () => {
         if (isDeploying) return;
         setIsDeploying(true);
         
-        // CLOSE THE POPUP IMMEDIATELY
         setShowDeployModal(false);
         
         try {
@@ -196,9 +149,7 @@ export const Toolbox = () => {
         }
     };
     
-    const nodesCount = projectContext?.details?.projectState?.nodes?.length || 0;
     const projectDeployed = !!projectContext?.details?.projectState?.deployed;
-    const canGenerateCode = nodesCount > 0;
     const canDeploy = fileTree !== null || projectDeployed;
 
     useEffect(() => {
@@ -299,25 +250,7 @@ export const Toolbox = () => {
                         </button>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 mb-4">
-                        <button 
-                            className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center"
-                            onClick={fileTree ? handleViewCode : handleGenerateClick}
-                            disabled={!canGenerateCode}
-                        >
-                            {isGenerating ? (
-                                <PulseLoader
-                                    color="#80a3ff"
-                                    size={3}
-                                    cssOverride={{ display: 'inline-block', margin: '0' }}
-                                />
-                            ) : (
-                                <>
-                                    <Code className={`h-4 w-4 mr-2 ${fileTree ? "text-[#9de19f]" : ""}`} />
-                                    <span>{fileTree ? "View Code" : "Generate Code"}</span>
-                                </>
-                            )}
-                        </button>
+                    <div className="grid grid-cols-1 gap-2 mb-4">
                         <button 
                             className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center"
                             onClick={projectDeployed ? undefined : handleOpenDeployModal}
@@ -338,7 +271,6 @@ export const Toolbox = () => {
                         </button>
                     </div>
                     
-                    {/* Display Program ID with Solana Explorer link if deployed */}
                     {projectDeployed && projectContext.details?.projectState?.programId && (
                         <div className="bg-[#1e1e20] border border-[#2a2a2d] rounded-md p-2 mb-4">
                             <div className="flex items-center text-xs">
@@ -393,7 +325,6 @@ export const Toolbox = () => {
                 </div>
             </div>
 
-            {/* Search Bar */}
             <div className="p-4 border-b border-[#2a2a2d]">
                 <div className="relative">
                     <Search
@@ -444,7 +375,6 @@ export const Toolbox = () => {
                 )}
             </div>
 
-            {/* Main Content */}
             <div className="flex-1 overflow-hidden">
                 {isExpanded && activeTab === 'workflow' && (
                     <NodeItems 
@@ -454,46 +384,17 @@ export const Toolbox = () => {
                 )}
                 {activeTab === 'interface' && (
                     <div className="p-4 text-[#6e6e76]">
-                        {/* Interface-specific Toolbox content */}
                         <p>Interface Tab Toolbox Placeholder</p>
                     </div>
                 )}
-                {activeTab === 'code' && <FileTree />}
             </div>
 
-            {/* Bottom Section */}
-            {/*}
-            <div className="p-3 border-t border-[#2a2a2d]">
-                <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium">Documentation</span>
-                    <button className="text-xs text-[#4d7cfe] hover:text-[#4d7cfe]/90 transition-colors">View All</button>
-                </div>
-                <div className="bg-[#1e1e20] border border-[#2a2a2d] rounded-md p-3 hover:border-[#2a2a2d] transition-all cursor-pointer group">
-                    <div className="flex items-center">
-                        <BookOpen className="h-4 w-4 text-[#4d7cfe] mr-2" />
-                        <span className="text-xs font-medium text-white group-hover:text-white transition-colors">
-                            Token Program Guide
-                        </span>
-                    </div>
-                    <p className="mt-1 text-xs text-[#6e6e76] group-hover:text-[#6e6e76] transition-colors">
-                        Learn how to create and manage tokens
-                    </p>
-                    <div className="mt-2 flex items-center text-xs text-[#4d7cfe] group-hover:text-[#4d7cfe]/90 transition-colors">
-                        <span>Read more</span>
-                        <ArrowRight className="h-3 w-3 ml-1" />
-                    </div>
-                </div>
-            </div>
-            */}
-
-            {/* New Project Modal */}
             <NewProjectModal
                 open={isNewProjectModalOpen}
                 onOpenChange={setIsNewProjectModalOpen}
                 onSubmit={handleCreateProject}
             />
 
-            {/* Project List Modal */}
             <Dialog open={isProjectListModalOpen} onOpenChange={(open) => setIsProjectListModalOpen(open)}>
                 <DialogContent className="bg-[#111827] text-slate-100" 
                 style={{width: "fit-content", border: "1px solid rgb(36, 45, 68)"}}>
@@ -501,7 +402,7 @@ export const Toolbox = () => {
                         modalIsOpen={isProjectListModalOpen}
                         refreshTrigger={projectsRefreshCounter}
                         onProjectClick={(projectId, projectName) => {
-                            handleOpenProject(projectId, projectContext, setProjectContext, setFileTree);
+                            handleOpenProject(projectId, projectContext, setProjectContext, setSelectedFile);
                             setIsProjectListModalOpen(false);
                         }}
                         closePopover={() => setIsProjectListModalOpen(false)}
@@ -509,7 +410,6 @@ export const Toolbox = () => {
                 </DialogContent>
             </Dialog>
             
-            {/* Deploy Modal */}
             {showDeployModal && (
                 <Dialog open={showDeployModal} onOpenChange={handleDeployCancel}>
                     <DialogContent className="p-0 sm:max-w-md border border-[#2a2a2a] bg-[#121212] text-gray-200 rounded-md shadow-xl overflow-hidden [&>button]:hidden">
