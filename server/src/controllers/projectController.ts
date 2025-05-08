@@ -1,8 +1,8 @@
-import { NextFunction, Request, Response, RequestHandler } from 'express';
+import { NextFunction, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/database';
 import { AppError } from '../middleware/errorHandler';
-import { getProjectRootPath, startDeleteProjectFolderTask } from '../utils/fileUtils';
+import { getProjectRootPath } from '../utils/fileUtils';
 import { startProjectContainer } from '../utils/projectUtils';
 import { normalizeProjectName } from '../utils/stringUtils';
 import {
@@ -24,8 +24,7 @@ import path from 'path';
 import { APP_CONFIG } from '../config/appConfig';
 import fs from 'fs';
 import { Keypair } from '@solana/web3.js';
-import { createTask, updateTaskStatus, waitForTaskCompletion } from '../utils/taskUtils';
-import os from 'os';
+import { waitForTaskCompletion } from '../utils/taskUtils';
 
 export const runCommandController = async (
   req: Request,
@@ -1032,5 +1031,3 @@ export const startContainer = async (req: Request, res: Response, next: NextFunc
     next(error);
   }
 };
-
-
