@@ -25,7 +25,9 @@ RUN (curl -sSfL "https://release.anza.xyz/solana/${SOLANA_CHANNEL}/install" | ba
     (curl -sSfL "https://release.solana.com/${SOLANA_CHANNEL}/install" | bash -s -- -y)
 
 RUN cargo install --git https://github.com/coral-xyz/anchor avm --locked --force && \
-    avm install 0.31.1 && avm use 0.31.1 && anchor --version
+    cargo install --git https://github.com/coral-xyz/anchor anchor-cli --tag v0.31.1 --locked --force && \
+    avm link --force /root/.cargo/bin/anchor 0.31.1 && \
+    avm use 0.31.1 && anchor --version
 
 RUN mkdir -p /tmp/bootstrap && cd /tmp/bootstrap && \
     anchor init dummy --no-git && cd dummy && anchor build -- --locked || true && rm -rf target
