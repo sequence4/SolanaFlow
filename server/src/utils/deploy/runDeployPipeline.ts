@@ -18,7 +18,6 @@ interface PipelineArgs {
     graph,
     sendProgress,
   }: PipelineArgs) {
-    // 1 ─ environment setup ───────────────────────────────────────────────────────
     sendProgress({ stage: "environment", message: "Preparing your build environment…" });
     const workspace = await prepEnv(projectId, userId);
  

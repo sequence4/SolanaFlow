@@ -1,11 +1,7 @@
 import pool from "src/config/database";
 import { execSync } from "child_process";
 import { resolveContainerUrl } from "./resolveContainerUrl";
-
-export interface RentedContainer {
-  name: string;
-  url:  string;
-}
+import { RentedContainer } from "./interfaces";
 
 export async function rentContainerFromPool(): Promise<RentedContainer | null> {
   const res = await pool.query<{
