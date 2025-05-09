@@ -3,9 +3,7 @@ import {
   startProjectContainer,
   startCreateProjectDirectoryTask,
 } from "../projectUtils";
-import {
-  rentContainerFromPool,
-} from "../container/rentContainerFromPool";
+import { rentContainerFromPool } from "../container/rentContainerFromPool";
 import { resolveContainerUrl } from "../container/resolveContainerUrl";
 import {
   isUrlAlive,
@@ -25,7 +23,7 @@ export async function prepEnv(
     `SELECT root_path, container_url
        FROM SolanaProject
       WHERE id = $1`,
-    [projectId],
+    [projectId]
   );
 
   if (res.rowCount === 0) throw new Error("Project not found");
@@ -40,20 +38,23 @@ export async function prepEnv(
   }
 
   const rented = await rentContainerFromPool();
-  const containerName = rented?.name ?? (await startProjectContainer(projectId, userId));
-  const containerUrl = rented?.url ?? (await resolveContainerUrl(containerName));
+  const containerName =
+    rented?.name ?? (await startProjectContainer(projectId, userId));
+  const containerUrl =
+    rented?.url ?? (await resolveContainerUrl(containerName));
 
   await pool.query(
     `UPDATE SolanaProject
         SET container_url = $1,
             container_name = $2
       WHERE id = $3`,
-    [containerUrl, containerName, projectId],
+    [containerUrl, containerName, projectId]
   );
 
-  const pathInside = `/workspace/${rootPath}`;
+  const pathInside = `/workspace/${projectId}`;
+
   if (!(await folderExists(containerName, pathInside))) {
-    await startCreateProjectDirectoryTask(userId, rootPath, projectId);
+    await startCreateProjectDirectoryTask(userId, projectId, projectId);
   }
 
   return { rootPath, containerName, containerUrl };
