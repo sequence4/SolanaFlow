@@ -84,108 +84,55 @@ export const createProject = async (
   next: NextFunction
 ): Promise<void> => {
   let { name, description, details } = req.body;
-  const org_id = req.user?.org_id;
   const userId = req.user?.id;
+
+  if (!userId) {
+    return next(new AppError('User not found', 400));
+  }
 
   if (!name || name.trim() === '') {
     const today = new Date().toISOString().slice(0, 10);
     name = `Untitled-${today}`;
   }
 
-  console.log(`[DEBUG_CODE_ENDPOINT] Received request to createProject with name=${name}, description=${description?.substring(0, 20)}..., userId=${userId}, org_id=${org_id}`);
-
-  if (!org_id || !userId) {
-    console.log(`[DEBUG_CODE_ENDPOINT] createProject failed - missing org_id or userId`);
-    next(new AppError('User organization not found', 400));
-    return;
-  }
+  console.log('[DEBUG_CODE_ENDPOINT] createProject name=%s user=%s', name, userId);
 
   const client = await pool.connect();
-  let projectCreated = false;
-  let projectId: string | null = null;
-
   try {
     await client.query('BEGIN');
 
-    const normalizedName = normalizeProjectName(name);
-    const randomSuffix = uuidv4().slice(0, 8);
-    const root_path = `${normalizedName}-${randomSuffix}`;
-    console.log(`[DEBUG_CODE_ENDPOINT] Generated root_path=${root_path} for project name=${name}`);
+    const normalized = normalizeProjectName(name);
+    const rootPath   = `${normalized}-${uuidv4().slice(0, 8)}`;
+    const projectId  = uuidv4();
 
-    const extendedDetails = {
-      ...(details || {}),
-      isLite: true,
-    };
+    const extendedDetails = { ...(details || {}), isLite: true };
 
-    projectId = uuidv4();
-    console.log(`[DEBUG_CODE_ENDPOINT] Generated projectId=${projectId}`);
-
-    const result = await client.query(
-      'INSERT INTO solanaproject (id, name, description, org_id, root_path, details, last_updated, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $7) RETURNING *',
-      [projectId, name, description, org_id, root_path, JSON.stringify(extendedDetails), new Date()]
+    await client.query(
+      `INSERT INTO solanaproject
+       (id, name, description, root_path, details, last_updated, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$6)`,
+      [projectId, name, description, rootPath,
+       JSON.stringify(extendedDetails), new Date()]
     );
 
-    const newProject = result.rows[0];
-    console.log(`[DEBUG_CODE_ENDPOINT] Project inserted in DB, id=${newProject.id}, root_path=${newProject.root_path}`);
-    
     await client.query('COMMIT');
-    projectCreated = true;
-    console.log(`[DEBUG_CODE_ENDPOINT] Transaction committed for projectId=${projectId}`);
-    
-    let taskId: string;
-    try {
-      console.log(`[DEBUG_CODE_ENDPOINT] About to start createProjectDirectoryTask for projectId=${projectId}, root_path=${root_path}`);
-      taskId = await startCreateProjectDirectoryTask(userId, root_path, projectId);
-      console.log(`[DEBUG_CODE_ENDPOINT] Created directory task with taskId=${taskId} for projectId=${projectId}`);
-    } catch (taskError: any) {
-      console.error('[DEBUG_CODE_ENDPOINT] Error creating project directory task:', taskError);
-      res.status(201).json({
-        message: 'Project created successfully, but directory creation failed',
-        project: {
-          id: newProject.id.toString(),
-          name: newProject.name,
-          description: newProject.description,
-          org_id: newProject.org_id,
-          root_path: newProject.root_path,
-          details: newProject.details,
-          last_updated: newProject.last_updated,
-          created_at: newProject.created_at
-        },
-        directoryTaskError: taskError.message
-      });
-      return;
-    }
 
-    console.log(`[DEBUG_CODE_ENDPOINT] Responding with success for projectId=${projectId}, taskId=${taskId}`);
+    const taskId = await startCreateProjectDirectoryTask(userId, rootPath, projectId);
+
     res.status(201).json({
       message: 'Project created successfully',
-      project: {
-        id: newProject.id.toString(),
-        name: newProject.name,
-        description: newProject.description,
-        org_id: newProject.org_id,
-        root_path: newProject.root_path,
-        details: newProject.details,
-        last_updated: newProject.last_updated,
-        created_at: newProject.created_at
-      },
-      directoryTask: {
-        taskId: taskId,
-        message: 'Project directory creation started'
-      }
+      project: { id: projectId, name, description, root_path: rootPath, details: extendedDetails },
+      directoryTask: { taskId, message: 'Project directory creation started' }
     });
-
-  } catch (error) {
-    if (!projectCreated) {
-      await client.query('ROLLBACK');
-      console.log(`[DEBUG_CODE_ENDPOINT] Transaction rolled back due to error`);
-    }
-    console.error('[DEBUG_CODE_ENDPOINT] Error in createProject:', error);
-    next(error);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[DEBUG_CODE_ENDPOINT] createProject error', err);
+    next(err);
   } finally {
     client.release();
   }
 };
+
 
 export const createProjectDirectory = async (
   req: Request,
