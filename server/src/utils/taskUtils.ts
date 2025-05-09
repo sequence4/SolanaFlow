@@ -5,20 +5,19 @@ import fs from 'fs';
 
 export async function createTask(
   name: string,
-  creatorId: string,
+  creatorId: string | null,
   projectId: string
 ): Promise<string> {
   const client = await pool.connect();
   try {
-    const taskId = uuidv4();
+    const id = uuidv4();
     await client.query(
-      'INSERT INTO Task (id, name, creator_id, project_id, status, created_at) VALUES ($1, $2, $3, $4, $5, NOW())',
-      [taskId, name, creatorId, projectId, 'queued']
+      `INSERT INTO "Task"
+       (id,name,creator_id,project_id,status,created_at)
+       VALUES ($1,$2,$3,$4,'queued',NOW())`,
+      [id, name, creatorId, projectId]
     );
-    return taskId;
-  } catch (error) {
-    console.error('Error creating task:', error);
-    throw error;
+    return id;
   } finally {
     client.release();
   }

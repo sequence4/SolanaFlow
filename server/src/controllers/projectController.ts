@@ -82,51 +82,40 @@ export const createProject = async (
   req: Request,
   res: Response,
   next: NextFunction
-): Promise<void> => {
+) => {
   let { name, description, details } = req.body;
-  const userId = req.user?.id;
-
-  if (!userId) {
-    return next(new AppError('User not found', 400));
-  }
+  const userId = req.user?.id ?? null;
 
   if (!name || name.trim() === '') {
-    const today = new Date().toISOString().slice(0, 10);
-    name = `Untitled-${today}`;
+    name = `Untitled-${new Date().toISOString().slice(0,10)}`;
   }
-
-  console.log('[DEBUG_CODE_ENDPOINT] createProject name=%s user=%s', name, userId);
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    const normalized = normalizeProjectName(name);
-    const rootPath   = `${normalized}-${uuidv4().slice(0, 8)}`;
-    const projectId  = uuidv4();
-
-    const extendedDetails = { ...(details || {}), isLite: true };
+    const rootPath  = `${normalizeProjectName(name)}-${uuidv4().slice(0,8)}`;
+    const projectId = uuidv4();
+    const extended  = { ...(details||{}), isLite:true };
 
     await client.query(
-      `INSERT INTO solanaproject
-       (id, name, description, root_path, details, last_updated, created_at)
+      `INSERT INTO "SolanaProject"
+       (id,name,description,root_path,details,last_updated,created_at)
        VALUES ($1,$2,$3,$4,$5,$6,$6)`,
-      [projectId, name, description, rootPath,
-       JSON.stringify(extendedDetails), new Date()]
+      [projectId, name, description, rootPath, JSON.stringify(extended), new Date()]
     );
 
     await client.query('COMMIT');
 
-    const taskId = await startCreateProjectDirectoryTask(userId, rootPath, projectId);
+    //const taskId = await startCreateProjectDirectoryTask(userId, rootPath, projectId);
 
     res.status(201).json({
-      message: 'Project created successfully',
-      project: { id: projectId, name, description, root_path: rootPath, details: extendedDetails },
-      directoryTask: { taskId, message: 'Project directory creation started' }
+      message:'Project created successfully',
+      project:{ id:projectId, name, description, root_path:rootPath, details:extended },
+      directoryTask:{ taskId:null, message:'Project directory creation started' }
     });
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error('[DEBUG_CODE_ENDPOINT] createProject error', err);
     next(err);
   } finally {
     client.release();
