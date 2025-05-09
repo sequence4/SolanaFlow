@@ -7,9 +7,6 @@ ENV HOME=/root
 ENV PATH=$HOME/.cargo/bin:$HOME/.local/share/solana/install/active_release/bin:$PATH
 ENV PATH=$HOME/.nvm/versions/node/${NODE_VERSION}/bin:$PATH
 
-# ──────────────────────────────────────────────────────────────────────────────
-# 1) tool-chains ─ rust + node + solana
-# ──────────────────────────────────────────────────────────────────────────────
 RUN apt-get update -qq && apt-get install -y --no-install-recommends \
     build-essential git curl wget jq pkg-config python3 \
     libssl-dev libudev-dev zlib1g-dev llvm clang cmake make \
@@ -27,36 +24,19 @@ RUN . "$NVM_DIR/nvm.sh" && nvm install ${NODE_VERSION} && nvm use ${NODE_VERSION
 RUN (curl -sSfL "https://release.anza.xyz/solana/${SOLANA_CHANNEL}/install" | bash -s -- -y) || \
     (curl -sSfL "https://release.solana.com/${SOLANA_CHANNEL}/install" | bash -s -- -y)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# 2) anchor cli
-# ──────────────────────────────────────────────────────────────────────────────
 RUN cargo install --git https://github.com/coral-xyz/anchor anchor-cli --tag v0.31.1 --locked --force && \
     anchor --version
 
-# ──────────────────────────────────────────────────────────────────────────────
-# 3) warm-up anchor cache (cuts cold build times)
-# ──────────────────────────────────────────────────────────────────────────────
 RUN mkdir -p /tmp/bootstrap && cd /tmp/bootstrap && \
     anchor init dummy --no-git && cd dummy && anchor build -- --locked || true && rm -rf target
 
-# ──────────────────────────────────────────────────────────────────────────────
-# 4) scaffold next-js template (non-interactive, CI=1 skips Turbopack prompt)
-# ──────────────────────────────────────────────────────────────────────────────
 RUN mkdir -p /usr/share/flowcode && \
     env CI=1 npx --yes create-next-app@latest /usr/share/flowcode/template-nextjs \
         --typescript --eslint --tailwind --no-src-dir --app --use-yarn && \
     yarn --cwd /usr/share/flowcode/template-nextjs install --production
 
-# ──────────────────────────────────────────────────────────────────────────────
-# 5) local test keypair
-# ──────────────────────────────────────────────────────────────────────────────
-RUN solana-keygen new --no-passphrase -o /root/.config/solana/id.json && \
-    solana config set --url http://127.0.0.1:8899 && (solana airdrop 2 || true)
-
-# ──────────────────────────────────────────────────────────────────────────────
 FROM builder AS runtime
 WORKDIR /workspace
 VOLUME /workspace
 COPY --from=builder /usr/share/flowcode /usr/share/flowcode
 CMD ["sleep","infinity"]
-
