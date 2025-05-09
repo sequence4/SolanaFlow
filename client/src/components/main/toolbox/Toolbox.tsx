@@ -11,11 +11,8 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { NewProjectModal } from '@/components/ui/new-project-modal';
 import ProjectListPopover from '../workflow/ProjectListPopover';
-import { useSignAndSendTx } from '@/data/hooks/useSignAndSendTx';
-import { useWallet } from '@solana/wallet-adapter-react';
 import { toast } from "sonner";
 import PulseLoader from "react-spinners/PulseLoader";
-import { handleDeployWithLogs } from '@/utils/project/handleDeployWithLogs';
 import { handleConfirmNewProject, handleOpenProject, handleSaveClick } from '@/utils/project/projectUtils';
 import { useTaskLogs } from '@/context/logs/useTaskLogs';
 import {
@@ -36,12 +33,14 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator"
 import { Label } from "@/components/ui/label";
+import { runDeployPipelineWithLogs } from '@/utils/deploy/deployPipeline';
+import { useEnsureProjectId } from '@/hooks/useEnsureProjectId';
 
 export const Toolbox = () => {
     const [isExpanded] = useState(true);
     const { projectContext, setProjectContext } = useContext(ProjectContext);
     const { fileTree, setFileTree, setSelectedFile } = useContext(FileContext);
-    const { activeTab, setActiveTab, setUxOpenPanel } = useContext(UxContext);
+    const { activeTab, setUxOpenPanel } = useContext(UxContext);
     const [activeChainTab, setActiveChainTab] = useState<"on-chain" | "off-chain">("on-chain");
     const [projectName, setProjectName] = useState(projectContext.name || "My Token Project");
     const [isEditing, setIsEditing] = useState(false);
@@ -58,10 +57,8 @@ export const Toolbox = () => {
     const [showDeployModal, setShowDeployModal] = useState(false);
     const [selectedOption, setSelectedOption] = useState('user-wallet');
     
-    const signAndSendTx = useSignAndSendTx();
-    const { publicKey } = useWallet();
     const taskLogs = useTaskLogs();
-    
+    const { ensureId } = useEnsureProjectId(projectContext, setProjectContext);
 
     useEffect(() => {
         setProjectName(projectContext.name || "My Token Project");
@@ -125,18 +122,13 @@ export const Toolbox = () => {
         setShowDeployModal(false);
         
         try {
-            if (!publicKey) {
-                throw new Error('No wallet connected');
-            }
-            
-            await handleDeployWithLogs(
-                projectContext,
-                setProjectContext,
-                publicKey,
-                signAndSendTx,
-                'devnet',
-                selectedOption === 'user-wallet' ? 'fullWallet' : 'delegated',
-                taskLogs
+            const id = await ensureId();
+            const graph = projectContext.details?.projectState;
+
+            await runDeployPipelineWithLogs(
+              { ...projectContext, id },
+              graph,
+              taskLogs
             );
         } catch (err) {
             console.error('Deployment error:', err);
