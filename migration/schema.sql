@@ -1,15 +1,11 @@
-DROP TRIGGER  IF EXISTS update_solana_project_last_updated  ON "SolanaProject";
-DROP TRIGGER  IF EXISTS update_project_file_last_updated    ON "ProjectFile";
-DROP TRIGGER  IF EXISTS update_task_last_updated            ON "Task";
+DROP TRIGGER  IF EXISTS update_solana_project_last_updated ON "SolanaProject";
+DROP TRIGGER  IF EXISTS update_task_last_updated           ON "Task";
 
 DROP FUNCTION IF EXISTS update_last_updated_column();
 
 DROP TABLE IF EXISTS warm_container_pool;
 DROP TABLE IF EXISTS "Task";
-DROP TABLE IF EXISTS "ProjectFile";
 DROP TABLE IF EXISTS "SolanaProject";
-DROP TABLE IF EXISTS "Creator";
-DROP TABLE IF EXISTS "Organisation";
 
 CREATE TABLE "SolanaProject" (
   id             UUID PRIMARY KEY,
@@ -23,17 +19,6 @@ CREATE TABLE "SolanaProject" (
   created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX idx_solana_project_name ON "SolanaProject"(name);
-
-CREATE TABLE "ProjectFile" (
-  id           UUID PRIMARY KEY,
-  name         TEXT NOT NULL,
-  file_path    TEXT NOT NULL,
-  file_size    BIGINT,
-  file_hash    TEXT,
-  last_updated TIMESTAMP,
-  created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX idx_project_file_path ON "ProjectFile"(file_path);
 
 CREATE TABLE "Task" (
   id           UUID PRIMARY KEY,
@@ -67,10 +52,6 @@ $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER update_solana_project_last_updated
   BEFORE UPDATE ON "SolanaProject"
-  FOR EACH ROW EXECUTE FUNCTION update_last_updated_column();
-
-CREATE TRIGGER update_project_file_last_updated
-  BEFORE UPDATE ON "ProjectFile"
   FOR EACH ROW EXECUTE FUNCTION update_last_updated_column();
 
 CREATE TRIGGER update_task_last_updated
