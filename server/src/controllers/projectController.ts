@@ -83,13 +83,14 @@ export const createProject = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  const { 
-    name, 
-    description, 
-    details 
-  } = req.body;
+  let { name, description, details } = req.body;
   const org_id = req.user?.org_id;
   const userId = req.user?.id;
+
+  if (!name || name.trim() === '') {
+    const today = new Date().toISOString().slice(0, 10);
+    name = `Untitled-${today}`;
+  }
 
   console.log(`[DEBUG_CODE_ENDPOINT] Received request to createProject with name=${name}, description=${description?.substring(0, 20)}..., userId=${userId}, org_id=${org_id}`);
 
