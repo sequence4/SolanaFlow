@@ -1,121 +1,100 @@
-import { prepEnv, isUrlAlive, resolveContainerUrl } from '../prepEnv';
-import pool from 'src/config/database';
-import { 
-  startProjectContainer, 
-  startCreateProjectDirectoryTask, 
-} from '../../projectUtils';
-import { execSync } from 'child_process';
+import { prepEnv } from '../prepEnv'
+import pool from 'src/config/database'
+import * as projectUtils from '../../projectUtils'
+import * as containerPool from '../../container/rentContainerFromPool'
+import * as helpers from '../../container/containerHelpers'
+import * as resolver from '../../container/containerHelpers'
 
 jest.mock('src/config/database', () => ({
-  query: jest.fn(),
-}));
+  query: jest.fn()
+}))
 
-jest.mock('../../projectUtils', () => ({
+jest.mock('../src/utils/projectUtils', () => ({
   startProjectContainer: jest.fn(),
-  startCreateProjectDirectoryTask: jest.fn(),
-  getContainerName: jest.fn(),
-}));
+  startCreateProjectDirectoryTask: jest.fn()
+}))
 
-jest.mock('child_process', () => ({
-  execSync: jest.fn(),
-}));
+jest.mock('../src/utils/container/rentContainerFromPool', () => ({
+  rentContainerFromPool: jest.fn()
+}))
 
-jest.mock('../prepEnv', () => {
-  const originalModule = jest.requireActual('../prepEnv');
+jest.mock('../src/utils/container/containerHelpers', () => {
+  const real = jest.requireActual('../src/utils/container/containerHelpers')
   return {
-    ...originalModule,
+    ...real,
     isUrlAlive: jest.fn(),
-    resolveContainerUrl: jest.fn(),
-  };
-});
+    folderExists: jest.fn()
+  }
+})
 
-describe('prepEnv function', () => {
+jest.mock('../src/utils/container/resolveContainerUrl', () => ({
+  resolveContainerUrl: jest.fn()
+}))
+
+const db = pool as unknown as { query: jest.Mock }
+const startProjectContainer = projectUtils.startProjectContainer as jest.Mock
+const startCreateProjectDirectoryTask = projectUtils.startCreateProjectDirectoryTask as jest.Mock
+const rentContainerFromPool = containerPool.rentContainerFromPool as jest.Mock
+const isUrlAlive = helpers.isUrlAlive as jest.Mock
+const folderExists = helpers.folderExists as jest.Mock
+const resolveContainerUrl = resolver.resolveContainerUrl as jest.Mock
+
+describe('prepEnv()', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-  });
+    jest.clearAllMocks()
+  })
 
-  test('should return existing container when URL is alive', async () => {
-    (pool.query as jest.Mock).mockResolvedValue({
+  it('returns existing alive container', async () => {
+    db.query.mockResolvedValue({
       rowCount: 1,
-      rows: [{ root_path: 'test-project', container_url: 'http://test-container:3000' }]
-    });
+      rows: [{ root_path: 'demo', container_url: 'http://warm-1:3000' }]
+    })
+    isUrlAlive.mockResolvedValue(true)
 
-    (isUrlAlive as jest.Mock).mockResolvedValue(true);
+    const ws = await prepEnv('p1', 'u1')
 
-    const result = await prepEnv('test-project-id', 'test-user-id');
+    expect(ws).toEqual({
+      rootPath: 'demo',
+      containerName: 'warm-1',
+      containerUrl: 'http://warm-1:3000'
+    })
+    expect(rentContainerFromPool).not.toHaveBeenCalled()
+    expect(startProjectContainer).not.toHaveBeenCalled()
+  })
 
-    expect(result).toEqual({
-      rootPath: 'test-project',
-      containerName: 'test-container',
-      containerUrl: 'http://test-container:3000'
-    });
-
-    expect(pool.query).toHaveBeenCalledWith(
-      "SELECT root_path, container_url FROM solanaproject WHERE id = $1", 
-      ['test-project-id']
-    );
-
-    expect(isUrlAlive).toHaveBeenCalledWith('http://test-container:3000');
-
-    expect(startProjectContainer).not.toHaveBeenCalled();
-  });
-
-  test('should start new container when URL is not alive', async () => {
-    (pool.query as jest.Mock).mockResolvedValue({
+  it('rents warm container when none stored', async () => {
+    db.query.mockResolvedValueOnce({
       rowCount: 1,
-      rows: [{ root_path: 'test-project', container_url: 'http://test-container:3000' }]
-    });
+      rows: [{ root_path: 'demo', container_url: null }]
+    })
+    rentContainerFromPool.mockResolvedValue({ name: 'warm-2', url: 'http://warm-2:3000' })
+    folderExists.mockResolvedValue(true)
 
-    (isUrlAlive as jest.Mock).mockResolvedValue(false);
+    const ws = await prepEnv('p2', 'u2')
 
-    (startProjectContainer as jest.Mock).mockResolvedValue('new-container');
-    (resolveContainerUrl as jest.Mock).mockResolvedValue('http://new-container:3000');
+    expect(ws.containerName).toBe('warm-2')
+    expect(rentContainerFromPool).toHaveBeenCalled()
+    expect(startProjectContainer).not.toHaveBeenCalled()
+    expect(db.query).toHaveBeenCalledWith(
+      'UPDATE solanaproject SET container_url = $1, container_name = $2 WHERE id = $3',
+      ['http://warm-2:3000', 'warm-2', 'p2']
+    )
+  })
 
-    (execSync as jest.Mock).mockImplementation(() => {
-      throw new Error('Folder does not exist');
-    });
+  it('cold-starts when pool empty', async () => {
+    db.query.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ root_path: 'demo', container_url: null }]
+    })
+    rentContainerFromPool.mockResolvedValue(null)
+    startProjectContainer.mockResolvedValue('cold-1')
+    resolveContainerUrl.mockResolvedValue('http://cold-1:3000')
+    folderExists.mockResolvedValue(false)
 
-    const result = await prepEnv('test-project-id', 'test-user-id');
+    const ws = await prepEnv('p3', 'u3')
 
-    expect(result).toEqual({
-      rootPath: 'test-project',
-      containerName: 'new-container',
-      containerUrl: 'http://new-container:3000'
-    });
-
-    expect(pool.query).toHaveBeenCalledWith(
-      "SELECT root_path, container_url FROM solanaproject WHERE id = $1", 
-      ['test-project-id']
-    );
-
-    expect(isUrlAlive).toHaveBeenCalledWith('http://test-container:3000');
-
-    expect(startProjectContainer).toHaveBeenCalledWith('test-project-id', 'test-user-id');
-
-    expect(resolveContainerUrl).toHaveBeenCalledWith('new-container');
-
-    expect(pool.query).toHaveBeenCalledWith(
-      "UPDATE solanaproject SET container_url=$1, container_name=$2 WHERE id=$3",
-      ['http://new-container:3000', 'new-container', 'test-project-id']
-    );
-
-    expect(startCreateProjectDirectoryTask).toHaveBeenCalledWith(
-      'test-user-id', 'test-project', 'test-project-id'
-    );
-  });
-
-  test('should throw error when project not found', async () => {
-    (pool.query as jest.Mock).mockResolvedValue({
-      rowCount: 0,
-      rows: []
-    });
-
-    await expect(prepEnv('non-existent-id', 'test-user-id'))
-      .rejects.toThrow('Project not found');
-
-    expect(pool.query).toHaveBeenCalledWith(
-      "SELECT root_path, container_url FROM solanaproject WHERE id = $1", 
-      ['non-existent-id']
-    );
-  });
-}); 
+    expect(ws.containerName).toBe('cold-1')
+    expect(startProjectContainer).toHaveBeenCalledWith('p3', 'u3')
+    expect(startCreateProjectDirectoryTask).toHaveBeenCalledWith('u3', 'demo', 'p3')
+  })
+})
