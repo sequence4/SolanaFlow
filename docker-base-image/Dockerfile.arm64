@@ -7,23 +7,36 @@ ENV HOME=/root
 ENV PATH=$HOME/.cargo/bin:$HOME/.local/share/solana/install/active_release/bin:$HOME/.avm/bin:$PATH
 ENV PATH=$HOME/.nvm/versions/node/${NODE_VERSION}/bin:$PATH
 
-RUN apt-get update -qq && apt-get install -y --no-install-recommends build-essential git curl wget jq pkg-config python3 libssl-dev libudev-dev zlib1g-dev llvm clang cmake make libprotobuf-dev protobuf-compiler ca-certificates && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apt-get update -qq && apt-get install -y --no-install-recommends \
+    build-essential git curl wget jq pkg-config python3 \
+    libssl-dev libudev-dev zlib1g-dev llvm clang cmake make \
+    libprotobuf-dev protobuf-compiler ca-certificates && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN curl -sSf https://sh.rustup.rs | bash -s -- -y --profile minimal --default-toolchain stable && . "$HOME/.cargo/env" && rustup component add rustfmt clippy
+RUN curl -sSf https://sh.rustup.rs | bash -s -- -y --profile minimal --default-toolchain stable && \
+    . "$HOME/.cargo/env" && rustup component add rustfmt clippy
 
 RUN curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
 ENV NVM_DIR=$HOME/.nvm
-RUN . "$NVM_DIR/nvm.sh" && nvm install ${NODE_VERSION} && nvm use ${NODE_VERSION} && nvm alias default ${NODE_VERSION} && npm install -g yarn
+RUN . "$NVM_DIR/nvm.sh" && nvm install ${NODE_VERSION} && nvm use ${NODE_VERSION} && \
+    nvm alias default ${NODE_VERSION} && npm install -g yarn
 
-RUN (curl -sSfL https://release.anza.xyz/solana/${SOLANA_CHANNEL}/install | bash -s -- -y) || (curl -sSfL https://release.solana.com/${SOLANA_CHANNEL}/install | bash -s -- -y)
+RUN (curl -sSfL "https://release.anza.xyz/solana/${SOLANA_CHANNEL}/install" | bash -s -- -y) || \
+    (curl -sSfL "https://release.solana.com/${SOLANA_CHANNEL}/install" | bash -s -- -y)
 
-RUN cargo install --git https://github.com/coral-xyz/anchor avm --locked --force && avm install v0.31.1 && avm use v0.31.1 && anchor --version
+RUN cargo install --git https://github.com/coral-xyz/anchor avm --locked --force && \
+    avm install 0.31.1 && avm use 0.31.1 && anchor --version
 
-RUN mkdir -p /tmp/bootstrap && cd /tmp/bootstrap && anchor init dummy --no-git && cd dummy && anchor build -- --locked || true && rm -rf target
+RUN mkdir -p /tmp/bootstrap && cd /tmp/bootstrap && \
+    anchor init dummy --no-git && cd dummy && anchor build -- --locked || true && rm -rf target
 
-RUN mkdir -p /usr/share/flowcode && npx --yes create-next-app@latest /usr/share/flowcode/template-nextjs --typescript --eslint --tailwind --no-src-dir --app --use-yarn && yarn --cwd /usr/share/flowcode/template-nextjs install --production
+RUN mkdir -p /usr/share/flowcode && \
+    npx --yes create-next-app@latest /usr/share/flowcode/template-nextjs \
+        --typescript --eslint --tailwind --no-src-dir --app --use-yarn && \
+    yarn --cwd /usr/share/flowcode/template-nextjs install --production
 
-RUN solana-keygen new --no-passphrase -o /root/.config/solana/id.json && solana config set --url http://127.0.0.1:8899 && (solana airdrop 2 || true)
+RUN solana-keygen new --no-passphrase -o /root/.config/solana/id.json && \
+    solana config set --url http://127.0.0.1:8899 && (solana airdrop 2 || true)
 
 FROM builder AS runtime
 WORKDIR /workspace
