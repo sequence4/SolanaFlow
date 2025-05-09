@@ -58,7 +58,7 @@ export const Toolbox = () => {
     const [selectedOption, setSelectedOption] = useState('user-wallet');
     
     const taskLogs = useTaskLogs();
-    const { ensureId } = useEnsureProjectId(projectContext, setProjectContext);
+    const { ensureId, modalOpen, setModalOpen, handleModalSubmit } = useEnsureProjectId(projectContext, setProjectContext);
 
     useEffect(() => {
         setProjectName(projectContext.name || "My Token Project");
@@ -120,18 +120,24 @@ export const Toolbox = () => {
         setIsDeploying(true);
         
         setShowDeployModal(false);
+        console.log('[deploy] Starting deploy process...');
         
         try {
+            console.log('[deploy] Calling ensureId()');
             const id = await ensureId();
-            const graph = projectContext.details?.projectState;
+            console.log(`[deploy] Project ID ensured: ${id}`);
+            
+            const graph = projectContext.details?.projectState ?? {};
+            console.log('[deploy] Graph data:', graph);
 
+            console.log('[deploy] Calling runDeployPipelineWithLogs');
             await runDeployPipelineWithLogs(
               { ...projectContext, id },
               graph,
               taskLogs
             );
         } catch (err) {
-            console.error('Deployment error:', err);
+            console.error('[deploy] Deployment error:', err);
             toast("Deployment error", {
                 description: String(err),
                 style: { backgroundColor: "#f87171", color: "white" }
@@ -385,6 +391,13 @@ export const Toolbox = () => {
                 open={isNewProjectModalOpen}
                 onOpenChange={setIsNewProjectModalOpen}
                 onSubmit={handleCreateProject}
+            />
+
+            {/* Project creation modal triggered by ensureId() */}
+            <NewProjectModal
+                open={modalOpen}
+                onOpenChange={setModalOpen}
+                onSubmit={handleModalSubmit}
             />
 
             <Dialog open={isProjectListModalOpen} onOpenChange={(open) => setIsProjectListModalOpen(open)}>
