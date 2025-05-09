@@ -1,7 +1,7 @@
 //import { getBuildArtifactTask, startAnchorBuildTask, startAnchorDeployTask } from "./projectUtils";
 //import { startAnchorInitTask } from "./projectUtils";
 //import { waitForTaskCompletion } from "./taskUtils";
-//import { prepEnv } from "./prepEnv";
+import { prepEnv } from "./prepEnv";
 
 interface PipelineArgs {
     projectId: string;
@@ -10,7 +10,7 @@ interface PipelineArgs {
     sendProgress: (data: unknown) => void;
   }
 
-  /*
+  
  
   export async function runDeployPipeline({
     projectId,
@@ -22,6 +22,7 @@ interface PipelineArgs {
     sendProgress({ stage: "environment", message: "Preparing your build environment…" });
     const workspace = await prepEnv(projectId, userId);
  
+    /*
     // 2 ─ code generation ─────────────────────────────────────────────────
     sendProgress({ stage: "code-gen", message: "Generating Anchor code…" });
     await handleGenerateCode(projectId, graph, workspace);
@@ -51,8 +52,10 @@ interface PipelineArgs {
     // 6 ─ fetch txSig & report ────────────────────────────────────────────
     const txSig = await getTxSigFromTask(deployTask);
     sendProgress({ stage: "deploy-done", txSig });
+    */
   }
  
+  /*
   async function needsBuild(projectId: string): Promise<boolean> {
     const artifact = await getBuildArtifactTask(projectId);
     // quick checksum against latest code hash (implement as you like)
