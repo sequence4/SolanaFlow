@@ -18,6 +18,11 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 9999;
 
+app.use((req, _res, next) => {
+  console.log('[TRACE] %s %s', req.method, req.url);
+  next();
+});
+
 app.use(cookieParser());
 app.use(cors({
   origin: 'http://localhost:3000',
