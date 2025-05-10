@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-# Solana FlowCode
-=======
 # Solana Flow
->>>>>>> origin/develop
 
 A monorepo containing a **Next.js** front-end (`client`) and a **TypeScript**-based Express server (`server`). The client is served on **localhost:3000** (by default) while the server listens on **localhost:9999** (by default). This repository also includes some additional directories and tooling.
 
@@ -202,7 +198,7 @@ pnpm test --filter server
 
 ## License
 
-Copyright © 2025 ChainLabs Technologies. All rights reserved.
+Copyright © 2025 Sequence4 Ltd. All rights reserved.
 
 This code is provided for personal or non-commercial use only. You may not reproduce, redistribute, or use it for commercial purposes without explicit written permission from the author(s). The code is provided “as is,” without warranty of any kind.
 
