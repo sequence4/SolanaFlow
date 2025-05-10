@@ -20,10 +20,12 @@ export async function deployPipeline(
   
   console.log(`[SSE] Headers prepared, auth token ${token ? 'present' : 'missing'}`);
 
-  await fetchEventSource(`${API_URL}/projects/${projectId}/deploy-pipeline`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ graph }),
+  await fetchEventSource(
+    `${API_URL}/api/deploy/${projectId}/deploy-pipeline`,
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ graph }),
 
     async onopen(res) {
       console.log(`[SSE] Connection opened with status: ${res.status}`);

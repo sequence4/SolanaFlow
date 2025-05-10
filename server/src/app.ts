@@ -11,6 +11,7 @@ import { errorHandler } from './middleware/errorHandler';
 import containerRoutes from './routes/containerRoutes';
 import cookieParser from 'cookie-parser';
 import 'dotenv-flow/config'; 
+import deployRoutes from './routes/deployRoutes';
 
 dotenv.config();
 
@@ -33,6 +34,7 @@ app.use('/org', orgRoutes);
 app.use('/tasks', taskRoutes);
 app.use('/ai', aiRoutes);
 app.use('/api/container', containerRoutes);
+app.use('/api/deploy', deployRoutes);
 
 app.get('/health', (req, res) => {
   res.status(200).json({ message: 'Server is running' });
