@@ -22,7 +22,12 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
 
   return (
     <section
-      className="px-8 md:px-10 lg:px-12 pb-8 md:pb-12 lg:pb-16" 
+      className="
+        min-h-[calc(100vh-10rem)]
+        flex flex-col justify-between
+        px-6 md:px-12 xl:px-[5vw]
+        py-[1vh]
+      "
     >
       <div
         ref={innerRef}
@@ -131,7 +136,7 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
         </div>
 
         {/* Waitlist button and socials - repositioned to float above flow graph on desktop */}
-        <div className="hero-actions flex justify-center gap-6 mt-8 lg:mt-0 lg:absolute lg:self-start lg:justify-start lg:left-[36rem] lg:top-4 lg:z-20 2xl:left-[38rem]">
+        <div className="hero-actions flex justify-center gap-6 mt-8 lg:mt-0 lg:absolute lg:self-start lg:justify-start lg:left-[37rem] lg:top-4 lg:z-20 2xl:left-[38rem]">
           <Button 
             data-testid="open-waitlist-form"
             size="default" 
@@ -212,12 +217,12 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
         </div>
 
         <div className="grid-in-flow hidden lg:flex items-center justify-center min-w-0">
-          <div className="w-full h-full max-h-[60vh] min-w-0">
+          <div className="w-full h-full max-h-full min-w-0">
             {mounted && <InstructionFlow />}
           </div>
         </div>
         <div className="grid-in-code hidden 2xl:flex basis-0 grow flex-col gap-0">
-          <div className="flex-none h-[5rem] mb-4
+          <div className="flex-none h-[4.5rem] mb-4
              rounded-xl overflow-hidden border border-[#2a2d4a]">
             {mounted && <UserMessageBox 
               messages={[
