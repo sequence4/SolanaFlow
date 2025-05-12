@@ -47,6 +47,7 @@ const DemoSection: FC = () => {
             </div>
           </div>
 
+          {/*
           <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4 ">
             <div className="relative group bg-[#0a0b14]/80 backdrop-blur-sm border border-[#2a2d4a] rounded-[5px] p-4 overflow-hidden transition-all duration-300 hover:translate-y-[-4px] hover:border-[#5580ff]">
               <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[#5580ff] to-transparent opacity-50"></div>
@@ -156,6 +157,7 @@ const DemoSection: FC = () => {
               </div>
             </div>
           </div>
+          */}
         </div>
       </div>
     </section>
