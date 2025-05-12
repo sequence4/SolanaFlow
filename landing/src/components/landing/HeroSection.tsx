@@ -22,7 +22,7 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
 
   return (
     <section
-      className="px-8 md:px-16 lg:px-24" 
+      className="px-8 md:px-10 lg:px-12 pb-8 md:pb-12 lg:pb-16" 
     >
       <div
         ref={innerRef}
@@ -40,36 +40,82 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
           2xl:[grid-template-areas:'copy_flow_code']
         "
       >
-        <div className="grid-in-copy grid grid-rows-[auto_auto_auto] gap-8 max-w-[32rem] min-h-0 pr-4">
+        <div className="grid-in-copy flex flex-col gap-6 max-w-[32rem] min-h-0 pr-4">
           <div>
             <div className="w-fit inline-block py-1 px-2 mb-4 sm:mb-4 rounded-full bg-[#1e2033] 
                 border border-[#2a2d4a] text-[10px] text-xs md:text-[10px] text-[#5580ff] mx-auto lg:mx-0">
                 <span className="mr-2">●</span> Visual AI Developer Tool for Solana
             </div>
             
-            <div className="flex flex-row gap-4 justify-start mb-4">
-              <h1 className="font-bold leading-tight tracking-tight text-center lg:text-left" 
-                style={{ fontFamily: 'var(--font-chakra-petch)' }}>
-                <span className="block text-[clamp(2rem,3.5vw,3.5rem)] leading-none text-white" 
-                    style={{
-                    backgroundSize: "300% 300%",
-                    animation: "gradientFlow 3s ease infinite"
-                    }}>
-                    Describe.
-                </span>
-              </h1>
-              <h1 className="font-bold leading-tight tracking-tight text-center lg:text-left" 
-                style={{ fontFamily: 'var(--font-chakra-petch)' }}>
-                <span className="block text-[clamp(2rem,3.5vw,3.5rem)] leading-none
-                  bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]
-                  text-transparent bg-clip-text" 
-                    style={{
-                    backgroundSize: "300% 300%",
-                    animation: "gradientFlow 3s ease infinite"
-                    }}>
-                    Deploy.
-                </span>
-              </h1>
+            <div className="flex flex-col gap-1 justify-start mb-4">
+              <div className="flex flex-row">
+                <h1 className="font-bold leading-tight tracking-tight text-left" 
+                  style={{ fontFamily: 'var(--font-chakra-petch)' }}>
+                  <span className="block text-[clamp(2rem,3.5vw,3.5rem)] leading-none text-white" 
+                      style={{
+                      backgroundSize: "300% 300%",
+                      animation: "gradientFlow 3s ease infinite"
+                      }}>
+                      Code
+                  </span>
+                </h1>
+                <h1 className="font-bold leading-tight tracking-tight text-left" 
+                  style={{ fontFamily: 'var(--font-chakra-petch)' }}>
+                  <span className="block text-[clamp(2rem,3.5vw,3.5rem)] leading-none
+                    bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]
+                    text-transparent bg-clip-text" 
+                      style={{
+                      backgroundSize: "300% 300%",
+                      animation: "gradientFlow 3s ease infinite"
+                      }}>
+                      Smarter
+                  </span>
+                </h1>
+                <h1 className="font-bold leading-tight tracking-tight text-left" 
+                  style={{ fontFamily: 'var(--font-chakra-petch)' }}>
+                  <span className="block text-[clamp(2rem,3.5vw,3.5rem)] leading-none text-white" 
+                      style={{
+                      backgroundSize: "300% 300%",
+                      animation: "gradientFlow 3s ease infinite"
+                      }}>
+                      .
+                  </span>
+                </h1>
+              </div>
+              <div className="flex flex-row">
+                <h1 className="font-bold leading-tight tracking-tight text-left" 
+                  style={{ fontFamily: 'var(--font-chakra-petch)' }}>
+                  <span className="block text-[clamp(2rem,3.5vw,3.5rem)] leading-none text-white" 
+                      style={{
+                      backgroundSize: "300% 300%",
+                      animation: "gradientFlow 3s ease infinite"
+                      }}>
+                      Ship
+                  </span>
+                </h1>
+                <h1 className="font-bold leading-tight tracking-tight text-left" 
+                  style={{ fontFamily: 'var(--font-chakra-petch)' }}>
+                  <span className="block text-[clamp(2rem,3.5vw,3.5rem)] leading-none
+                    bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]
+                    text-transparent bg-clip-text" 
+                      style={{
+                      backgroundSize: "300% 300%",
+                      animation: "gradientFlow 3s ease infinite"
+                      }}>
+                      Faster
+                  </span>
+                </h1>
+                <h1 className="font-bold leading-tight tracking-tight text-left" 
+                  style={{ fontFamily: 'var(--font-chakra-petch)' }}>
+                  <span className="block text-[clamp(2rem,3.5vw,3.5rem)] leading-none text-white" 
+                      style={{
+                      backgroundSize: "300% 300%",
+                      animation: "gradientFlow 3s ease infinite"
+                      }}>
+                      .
+                  </span>
+                </h1>
+              </div>
             </div>
 
             <h1 className="text-[17px] sm:text-[17px] md:text-[17px] lg:text-[19px] xl:text-[21px] 3xl:text-[23px]
@@ -79,10 +125,10 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
             </h1>
 
           </div>
-          <div className="space-y-3 text-[clamp(.875rem,.6vw+0.5rem,1.125rem)] text-gray-400">
+          <div className="space-y-2 text-[clamp(.4rem,.6vw+0.5rem,1.125rem)] text-gray-400 mb-6 md:mb-8 lg:mb-10">
             <HeroFeatureList />
           </div>
-          <div className="flex justify-center lg:justify-start gap-4 mt-6">
+          <div className="flex justify-center lg:justify-start gap-10 mt-auto pt-4 md:pt-6 lg:pt-8">
             <Button 
               data-testid="open-waitlist-form"
               size="default" 

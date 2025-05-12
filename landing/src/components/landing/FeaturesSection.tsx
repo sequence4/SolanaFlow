@@ -114,32 +114,20 @@ export default function FeaturesSection() {
               style={{backgroundSize: "300% 300%",animation: "gradientFlow 3s ease infinite"}}>POWERFUL DEVELOPMENT TOOLS</span>
         </div>
       </ScrollReveal>
-      <div className="relative flex flex-col justify-between items-center gap-2" style={{ fontFamily: 'var(--font-chakra-petch)' }}>
+      <div className="relative flex flex-col justify-between items-center gap-4" style={{ fontFamily: 'var(--font-chakra-petch)' }}>
         <h1 className="text-[28px] sm:text-[40px] md:text-4xl font-bold tracking-tight mb-2 mt-2 flex flex-row gap-8">
           <motion.span
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
-            className="inline-block bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80"
+            className="inline-block"
           >
-            Describe.
+            <span className="text-white">Imagine</span>
+            <span>.</span>{" "}
+            <span className="text-white">Launch</span>
+            <span>.</span>{" "}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]" style={{ backgroundSize: "300% 300%", animation: "gradientFlow 3s ease infinite" }}>Scale</span><span>.</span>
           </motion.span>{" "}
-          <motion.span
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            className="inline-block bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80"
-          >
-            Deploy.
-          </motion.span>{" "}
-          <motion.span
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.5 }}
-            className="inline-block bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80"
-          >
-            Scale.
-          </motion.span>
         </h1>
         <div className="h-[2px] w-[50%] xs:w-[60%] md:w-64 bg-gradient-to-r from-transparent via-[#64d2ff] to-transparent mx-auto mt-4 xs:mt-6 sm:mt-8 mb-4 xs:mb-6 sm:mb-8 opacity-70"></div>
         <motion.p
@@ -149,8 +137,7 @@ export default function FeaturesSection() {
           className="max-w-xl mx-auto md:text-md text-gray-500 px-4 sm:px-0 text-center sm:mb-4"
           style={{ fontFamily: 'var(--font-oxygen-mono)' }}
         >
-          The platform combines cutting-edge technologies to provide a secure, intelligent, and decentralized
-          development experience for Solana.
+          The platform leverages cutting-edge technology to deliver a secure, intelligent, and streamlined development experience—purpose-built for the Solana ecosystem.
         </motion.p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-3 gap-6 sm:gap-6 md:gap-8 px-2 xs:px-4 sm:px-6 w-full max-w-6xl mx-auto">
