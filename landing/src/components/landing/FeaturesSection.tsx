@@ -114,15 +114,15 @@ export default function FeaturesSection() {
               style={{backgroundSize: "300% 300%",animation: "gradientFlow 3s ease infinite"}}>POWERFUL DEVELOPMENT TOOLS</span>
         </div>
       </ScrollReveal>
-      <div className="relative flex flex-col justify-between items-center gap-2">
-        <h1 className="text-[28px] sm:text-[40px] md:text-4xl font-bold tracking-tight mb-2 mt-2">
+      <div className="relative flex flex-col justify-between items-center gap-2" style={{ fontFamily: 'var(--font-chakra-petch)' }}>
+        <h1 className="text-[28px] sm:text-[40px] md:text-4xl font-bold tracking-tight mb-2 mt-2 flex flex-row gap-8">
           <motion.span
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
             className="inline-block bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80"
           >
-            Design.
+            Describe.
           </motion.span>{" "}
           <motion.span
             initial={{ opacity: 0, y: 20 }}
@@ -146,7 +146,8 @@ export default function FeaturesSection() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 1, delay: 0.7 }}
-          className="max-w-2xl mx-auto text-[13px] xs:text-sm sm:text-[17px] text-gray-500 px-4 sm:px-0 text-center sm:mb-4"
+          className="max-w-xl mx-auto md:text-md text-gray-500 px-4 sm:px-0 text-center sm:mb-4"
+          style={{ fontFamily: 'var(--font-oxygen-mono)' }}
         >
           The platform combines cutting-edge technologies to provide a secure, intelligent, and decentralized
           development experience for Solana.

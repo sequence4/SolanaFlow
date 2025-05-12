@@ -22,7 +22,7 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
 
   return (
     <section
-      className="px-4 md:px-8"
+      className="px-6 md:px-12 lg:px-20"
     >
       <div
         ref={innerRef}
@@ -32,15 +32,15 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
           grid gap-4 lg:gap-8
 
           /* —— 2-column layout from 1024 px up —— */
-          lg:grid-cols-[34rem_minmax(34rem,1fr)]
+          lg:grid-cols-[34rem_minmax(28rem,1fr)]
           lg:[grid-template-areas:'copy_flow']
 
           /* —— full 3-column layout only from 1536 px up —— */
-          2xl:grid-cols-[34rem_minmax(34rem,1fr)_24rem]
+          2xl:grid-cols-[34rem_minmax(28rem,1fr)_24rem]
           2xl:[grid-template-areas:'copy_flow_code']
         "
       >
-        <div className="grid-in-copy grid grid-rows-[auto_1fr_auto] gap-6 max-w-[34rem] min-h-0 pr-4">
+        <div className="grid-in-copy grid grid-rows-[auto_auto_auto] gap-6 max-w-[34rem] min-h-0 pr-4">
           <div>
             <div className="w-fit inline-block py-1 px-2 mb-4 sm:mb-4 rounded-full bg-[#1e2033] 
                 border border-[#2a2d4a] text-[10px] text-xs md:text-[10px] text-[#5580ff] mx-auto lg:mx-0">
@@ -82,7 +82,7 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
           <div className="space-y-3 text-[clamp(.875rem,.6vw+0.5rem,1.125rem)] text-gray-400">
             <HeroFeatureList />
           </div>
-          <div className="flex justify-center lg:justify-start gap-4">
+          <div className="flex justify-center lg:justify-start gap-4 mt-6">
             <Button 
               data-testid="open-waitlist-form"
               size="default" 
