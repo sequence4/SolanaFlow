@@ -2,7 +2,8 @@
 
 import React from "react"
 import { Button } from "@/components/ui/button"
-import TechBackground, { LightningIcon, SecurityIcon, NoCodeIcon } from "./TechBackground"
+import TechBackground, { LightningIcon, SecurityIcon } from "./TechBackground"
+import { Sparkles } from "lucide-react"
 
 interface CallToActionProps {
   openWaitlistModal: () => void
@@ -22,12 +23,12 @@ export default function CallToAction({ openWaitlistModal }: CallToActionProps) {
               style={{
               backgroundSize: "300% 300%",
               animation: "gradientFlow 3s ease infinite"
-              }}>Build</span>{" "}
+              }}>Launch</span>{" "}
           <span className="text-white">on Solana?</span>
         </h2>
         
-        <p className="text-gray-500 max-w-xl mx-auto mb-10 text-base md:text-md" style={{ fontFamily: 'var(--font-oxygen-mono)' }}>
-          Join our waitlist to get early access to SolanaFlow and start building your blockchain applications without writing a single line of code.
+        <p className="text-gray-400 max-w-xl mx-auto mb-10 text-base md:text-md" style={{ fontFamily: 'var(--font-oxygen-mono)' }}>
+          Join the SolanaFlow waitlist for early access and start creating powerful blockchain apps — no coding required.
         </p>
         
         <Button 
@@ -87,29 +88,29 @@ export default function CallToAction({ openWaitlistModal }: CallToActionProps) {
           }
         `}</style>
         
-        <div className="mt-12 flex flex-wrap justify-center gap-6 md:gap-10 items-center">
-          <div className="flex flex-col items-center max-w-[160px] md:max-w-[180px] bg-[#0f1123]/40 p-4 rounded-lg backdrop-blur-sm border border-[#2a2d4a]">
-            <div className="mb-3">
+        <div className="mt-12 flex flex-wrap justify-center gap-4 md:gap-10 items-stretch">
+          <div className="flex flex-col items-center max-w-[160px] md:max-w-[180px] w-full h-[180px] md:h-[200px] bg-[#0f1123]/40 p-4 rounded-lg backdrop-blur-sm border border-[#2a2d4a]">
+            <div className="mb-3 h-10 flex items-center justify-center">
               <LightningIcon />
             </div>
-            <h3 className="text-white font-bold mb-1">Lightning Fast</h3>
-            <p className="text-gray-400 text-sm text-center">Build dApps in minutes instead of weeks</p>
+            <h3 className="text-white font-bold mb-1 text-center">Lightning-Fast</h3>
+            <p className="text-gray-400 text-sm text-center mt-auto">Launch powerful Solana dApps in minutes, not weeks.</p>
           </div>
           
-          <div className="flex flex-col items-center max-w-[160px] md:max-w-[180px] bg-[#0f1123]/40 p-4 rounded-lg backdrop-blur-sm border border-[#2a2d4a]">
-            <div className="mb-3">
+          <div className="flex flex-col items-center max-w-[160px] md:max-w-[180px] w-full h-[180px] md:h-[200px] bg-[#0f1123]/40 p-4 rounded-lg backdrop-blur-sm border border-[#2a2d4a]">
+            <div className="mb-3 h-10 flex items-center justify-center">
               <SecurityIcon />
             </div>
-            <h3 className="text-white font-bold mb-1">Secure Code</h3>
-            <p className="text-gray-400 text-sm text-center">AI-generated code follows best security practices</p>
+            <h3 className="text-white font-bold mb-1 text-center">Security First</h3>
+            <p className="text-gray-400 text-sm text-center mt-auto">Built exclusively from pre-audited, secure Solana plugins.</p>
           </div>
           
-          <div className="flex flex-col items-center max-w-[160px] md:max-w-[180px] bg-[#0f1123]/40 p-4 rounded-lg backdrop-blur-sm border border-[#2a2d4a]">
-            <div className="mb-3">
-              <NoCodeIcon />
+          <div className="flex flex-col items-center max-w-[160px] md:max-w-[180px] w-full h-[180px] md:h-[200px] bg-[#0f1123]/40 p-4 rounded-lg backdrop-blur-sm border border-[#2a2d4a]">
+            <div className="mb-3 h-10 flex items-center justify-center">
+              <Sparkles className="h-6 w-6 text-[#1cf6a0]" />
             </div>
-            <h3 className="text-white font-bold mb-1">No Code Needed</h3>
-            <p className="text-gray-400 text-sm text-center">Build complex dApps with just your ideas</p>
+            <h3 className="text-white font-bold mb-1 text-center">Purely No-Code</h3>
+            <p className="text-gray-400 text-sm text-center mt-auto">Turn big ideas into powerful dApps—zero coding required.</p>
           </div>
         </div>
       </div>

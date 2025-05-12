@@ -1,5 +1,6 @@
 "use client"
 
+import { Sparkles } from "lucide-react"
 import { useEffect, useRef } from "react"
 
 export default function TechBackground() {
@@ -216,42 +217,3 @@ export function SecurityIcon() {
     </div>
   )
 }
-
-export function NoCodeIcon() {
-  return (
-    <div className="relative w-10 h-10">
-      <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-        {/* Circular tech background */}
-        <circle cx="20" cy="20" r="15" stroke="rgba(168, 85, 247, 0.3)" strokeWidth="1" strokeDasharray="3 2" />
-        <circle cx="20" cy="20" r="10" stroke="rgba(168, 85, 247, 0.5)" strokeWidth="1" strokeDasharray="2 2" />
-
-        {/* Magic wand */}
-        <path d="M15 15L25 25" stroke="rgb(168, 85, 247)" strokeWidth="2" strokeLinecap="round" />
-
-        {/* Sparkles */}
-        <path
-          d="M28 12L30 14M26 14L28 12M28 16L26 14"
-          stroke="rgb(168, 85, 247)"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M12 28L14 30M10 30L12 28M12 32L10 30"
-          stroke="rgb(168, 85, 247)"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-
-        {/* Star */}
-        <path
-          d="M20 12L21.5 16.5H26L22.5 19.5L24 24L20 21L16 24L17.5 19.5L14 16.5H18.5L20 12Z"
-          fill="rgba(168, 85, 247, 0.2)"
-          stroke="rgb(168, 85, 247)"
-          strokeWidth="1"
-        />
-      </svg>
-    </div>
-  )
-} 
