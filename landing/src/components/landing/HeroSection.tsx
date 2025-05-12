@@ -41,11 +41,10 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
                 <span className="mr-2">●</span> Visual AI Developer Tool for Solana
             </div>
             
-            <div className="flex flex-row gap-4 justify-between">
-              <h1 className="font-bold leading-tight tracking-tight text-center lg:text-left
-                mb-4 sm:mb-6 lg:mb-2" 
-                style={{ fontFamily: '"DM Sans", sans-serif' }}>
-                <span className="block text-[clamp(2.25rem,4.5vw,4.5rem)] leading-[0.9] text-white" 
+            <div className="flex flex-row gap-4 justify-start mb-4">
+              <h1 className="font-bold leading-tight tracking-tight text-center lg:text-left" 
+                style={{ fontFamily: 'var(--font-chakra-petch)' }}>
+                <span className="block text-[clamp(2rem,3.5vw,3.5rem)] leading-none text-white" 
                     style={{
                     backgroundSize: "300% 300%",
                     animation: "gradientFlow 3s ease infinite"
@@ -53,10 +52,9 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
                     Describe.
                 </span>
               </h1>
-              <h1 className="font-bold leading-tight tracking-tight text-center lg:text-left
-                mb-4 sm:mb-6 lg:mb-2" 
-                style={{ fontFamily: '"DM Sans", sans-serif' }}>
-                <span className="block text-[clamp(2.25rem,4.5vw,4.5rem)] leading-[0.9]
+              <h1 className="font-bold leading-tight tracking-tight text-center lg:text-left" 
+                style={{ fontFamily: 'var(--font-chakra-petch)' }}>
+                <span className="block text-[clamp(2rem,3.5vw,3.5rem)] leading-none
                   bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]
                   text-transparent bg-clip-text" 
                     style={{
@@ -68,10 +66,10 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
               </h1>
             </div>
 
-            <h1 className="text-[18px] sm:text-[26px] md:text-[20px] lg:text-[22px] xl:text-[24px] 3xl:text-[26px]
-              font-bold leading-tight tracking-tight text-balance text-left" 
-              style={{ fontFamily: '"DM Sans", sans-serif' }}>
-              <span className="block">Zero to dApp in minutes—without code.</span>
+            <h1 className="text-[17px] sm:text-[17px] md:text-[17px] lg:text-[19px] xl:text-[21px] 3xl:text-[23px]
+              font-bold leading-tight tracking-tight text-balance text-left text-gray-400" 
+              style={{ fontFamily: 'var(--font-oxygen-mono)' }}>
+              <span className="block">Zero to dApp in minutes — without code.</span>
             </h1>
 
           </div>
