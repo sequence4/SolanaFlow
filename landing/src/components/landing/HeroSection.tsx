@@ -26,15 +26,21 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
     >
       <div
         ref={innerRef}
-        className="hero-wrapper
-          w-full mx-auto max-w-[min(90vw,1400px)]
+        className="
+          hero-wrapper
+          w-full mx-auto max-w-full
           grid gap-4 lg:gap-8
-          lg:grid-cols-[30rem_minmax(34rem,1fr)_24rem]
-          lg:[grid-template-areas:'copy_flow_code']
-          [grid-template-areas:'copy']
+
+          /* —— 2-column layout from 1024 px up —— */
+          lg:grid-cols-[34rem_minmax(34rem,1fr)]
+          lg:[grid-template-areas:'copy_flow']
+
+          /* —— full 3-column layout only from 1536 px up —— */
+          2xl:grid-cols-[34rem_minmax(34rem,1fr)_24rem]
+          2xl:[grid-template-areas:'copy_flow_code']
         "
       >
-        <div className="grid-in-copy grid grid-rows-[auto_1fr_auto] gap-6 max-w-[34rem] min-h-0 pr-4 lg:-ml-8">
+        <div className="grid-in-copy grid grid-rows-[auto_1fr_auto] gap-6 max-w-[34rem] min-h-0 pr-4">
           <div>
             <div className="w-fit inline-block py-1 px-2 mb-4 sm:mb-4 rounded-full bg-[#1e2033] 
                 border border-[#2a2d4a] text-[10px] text-xs md:text-[10px] text-[#5580ff] mx-auto lg:mx-0">
@@ -161,7 +167,7 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
             {mounted && <InstructionFlow />}
           </div>
         </div>
-        <div className="grid-in-code hidden lg:flex basis-0 grow flex-col gap-0">
+        <div className="grid-in-code hidden 2xl:flex basis-0 grow flex-col gap-0">
           <div className="flex-none h-[5rem] mb-4
              rounded-xl overflow-hidden border border-[#2a2d4a]">
             {mounted && <UserMessageBox 
