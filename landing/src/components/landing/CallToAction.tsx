@@ -10,12 +10,12 @@ interface CallToActionProps {
 
 export default function CallToAction({ openWaitlistModal }: CallToActionProps) {
   return (
-    <section className="relative pt-10 px-4 md:px-6 lg:px-8 overflow-hidden min-h-[70vh]">
+    <section className="relative py-20 px-4 md:px-6 lg:px-8 overflow-hidden min-h-[70vh]">
       <div className="absolute inset-0 z-0">
         <TechBackground />
       </div>
       
-      <div className="max-w-5xl mx-auto text-center relative z-10 mt-[var(--navH,64px)]">
+      <div className="max-w-5xl mx-auto text-center relative z-10">
         <h2 className="text-3xl md:text-3xl lg:text-4xl hd:text-6xl font-bold mb-6 tracking-tight text-balance" style={{ fontFamily: 'var(--font-chakra-petch)' }}>
           <span className="text-white">Ready to</span>{" "}
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
