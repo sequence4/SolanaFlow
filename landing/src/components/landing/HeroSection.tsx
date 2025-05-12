@@ -217,7 +217,7 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
         </div>
 
         <div className="grid-in-flow hidden lg:flex items-center justify-center min-w-0">
-          <div className="w-full h-full max-h-full min-w-0">
+          <div className="w-full h-full max-h-full min-w-0 lg:-translate-y-4">
             {mounted && <InstructionFlow />}
           </div>
         </div>
