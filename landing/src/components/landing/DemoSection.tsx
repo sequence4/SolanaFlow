@@ -19,7 +19,7 @@ const DemoSection: FC = () => {
           </div>
            
             <h2 className="text-3xl md:text-3xl font-bold mb-4 tracking-tight">
-                <span className="text-white">
+                <span className="text-white" style={{ fontFamily: 'var(--font-chakra-petch)' }}>
                 Preview SolanaFlow MVP in Action
               </span>
             </h2>

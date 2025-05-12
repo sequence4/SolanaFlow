@@ -12,19 +12,17 @@ export default function TechBackground() {
     const ctx = canvas.getContext("2d")
     if (!ctx) return
 
-    // Set canvas dimensions
     const setCanvasDimensions = () => {
       if (!canvas) return
       canvas.width = window.innerWidth
-      canvas.height = window.innerHeight * 1.5 // Make it taller to ensure it covers the section
+      canvas.height = window.innerHeight * 1.5
     }
 
     setCanvasDimensions()
     window.addEventListener("resize", setCanvasDimensions)
 
-    // Create particles
     const particlesArray: Particle[] = []
-    const particleCount = 120 // Increase the number of particles
+    const particleCount = 120
 
     class Particle {
       x: number
@@ -41,7 +39,6 @@ export default function TechBackground() {
         this.speedX = (Math.random() - 0.5) * 0.5
         this.speedY = (Math.random() - 0.5) * 0.5
 
-        // Colors: teal, purple, blue variants
         const colors = ["rgba(45, 212, 191, 0.9)", "rgba(168, 85, 247, 0.9)", "rgba(59, 130, 246, 0.9)"]
         this.color = colors[Math.floor(Math.random() * colors.length)]
       }
@@ -68,15 +65,13 @@ export default function TechBackground() {
       }
     }
 
-    // Initialize particles
     for (let i = 0; i < particleCount; i++) {
       particlesArray.push(new Particle())
     }
 
-    // Draw grid
     function drawGrid() {
       if (!ctx || !canvas) return
-      ctx.strokeStyle = "rgba(66, 66, 90, 0.5)" // Make grid more visible
+      ctx.strokeStyle = "rgba(66, 66, 90, 0.1)"
       ctx.lineWidth = 0.5
 
       const gridSize = 40
@@ -96,7 +91,6 @@ export default function TechBackground() {
       }
     }
 
-    // Connect particles with lines
     function connectParticles() {
       if (!ctx) return
       const maxDistance = 150
@@ -109,7 +103,7 @@ export default function TechBackground() {
 
           if (distance < maxDistance) {
             const opacity = 1 - distance / maxDistance
-            ctx.strokeStyle = `rgba(45, 212, 191, ${opacity * 0.3})` // Increase opacity
+            ctx.strokeStyle = `rgba(45, 212, 191, ${opacity * 0.3})`
             ctx.lineWidth = 0.8
             ctx.beginPath()
             ctx.moveTo(particlesArray[a].x, particlesArray[a].y)
@@ -120,22 +114,19 @@ export default function TechBackground() {
       }
     }
 
-    // Animation loop
     function animate() {
       if (!ctx || !canvas) return
       ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-      // Create gradient background
       const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height)
-      gradient.addColorStop(0, "#0f172a") // Dark blue
-      gradient.addColorStop(1, "#0f1123") // Darker blue
+      gradient.addColorStop(0, "#0f172a")
+      gradient.addColorStop(1, "#0f1123")
 
       ctx.fillStyle = gradient
       ctx.fillRect(0, 0, canvas.width, canvas.height)
 
       drawGrid()
 
-      // Update and draw particles
       particlesArray.forEach((particle) => {
         particle.update()
         particle.draw()
@@ -157,7 +148,7 @@ export default function TechBackground() {
     <canvas 
       ref={canvasRef} 
       className="absolute top-0 left-0 w-full h-full -z-10" 
-      style={{ background: "#0f1123", opacity: 1 }} // Ensure full opacity
+      style={{ background: "#0f1123", opacity: 1 }}
     />
   )
 }
