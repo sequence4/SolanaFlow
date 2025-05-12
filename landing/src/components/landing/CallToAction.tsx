@@ -34,7 +34,7 @@ export default function CallToAction({ openWaitlistModal }: CallToActionProps) {
       </div>
       
       <div className="max-w-5xl mx-auto text-center relative z-[1] mt-[var(--navH,64px)]">
-        <h2 className="text-3xl md:text-4xl lg:text-5xl hd:text-6xl font-bold mb-6 tracking-tight text-balance" style={{ fontFamily: '"DM Sans", sans-serif' }}>
+        <h2 className="text-3xl md:text-3xl lg:text-4xl hd:text-6xl font-bold mb-6 tracking-tight text-balance" style={{ fontFamily: 'var(--font-chakra-petch)' }}>
           <span className="text-white">Ready to</span>{" "}
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
               style={{

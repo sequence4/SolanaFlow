@@ -5,7 +5,7 @@ import type { FC } from "react"
 
 const DemoSection: FC = () => {
   return (
-    <section id="demo" className="py-20 bg-[#0a0b14]">
+    <section id="demo" className="py-20 bg-[#090a12] ">
       <div className="container mx-auto px-4">
         <div className="text-center mb-16">
           <div className="inline-block px-3 py-1 mb-4 rounded-full bg-[#1e2033] border border-[#2a2d4a] text-xs text-[#5580ff]">
