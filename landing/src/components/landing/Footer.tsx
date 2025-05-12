@@ -33,7 +33,7 @@ export default function Footer() {
         
         <div className="pt-6 border-t border-[#1e2033] text-center">
           <p className="text-gray-500 text-xs">
-            &copy; {new Date().getFullYear()} SolanaFlow. All rights reserved.
+            &copy; {new Date().getFullYear()} Sequence4 Ltd. All rights reserved.
           </p>
         </div>
       </div>
