@@ -22,7 +22,7 @@ export default function TechBackground() {
     window.addEventListener("resize", setCanvasDimensions)
 
     const particlesArray: Particle[] = []
-    const particleCount = 120
+    const particleCount = 60
 
     class Particle {
       x: number
