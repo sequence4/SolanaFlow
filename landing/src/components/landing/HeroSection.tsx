@@ -29,35 +29,51 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
         className="hero-wrapper
           w-full mx-auto max-w-[min(90vw,1400px)]
           grid gap-4 lg:gap-8
-          lg:grid-cols-[26rem_minmax(32rem,1fr)_24rem]
+          lg:grid-cols-[30rem_minmax(34rem,1fr)_24rem]
           lg:[grid-template-areas:'copy_flow_code']
           [grid-template-areas:'copy']
         "
       >
-        <div className="grid-in-copy grid grid-rows-[auto_1fr_auto] gap-6 max-w-[40rem] min-h-0">
+        <div className="grid-in-copy grid grid-rows-[auto_1fr_auto] gap-6 max-w-[34rem] min-h-0 pr-4 lg:-ml-8">
           <div>
             <div className="w-fit inline-block py-1 px-2 mb-4 sm:mb-4 rounded-full bg-[#1e2033] 
                 border border-[#2a2d4a] text-[10px] text-xs md:text-[10px] text-[#5580ff] mx-auto lg:mx-0">
                 <span className="mr-2">●</span> Visual AI Developer Tool for Solana
             </div>
-            <h1 className="text-[20px] sm:text-[26px] md:text-[20px] lg:text-[22px] xl:text-[24px] 3xl:text-[26px]
-              font-bold leading-tight tracking-tight text-balance text-center xs:text-center sm:text-center lg:text-left" 
+            
+            <div className="flex flex-row gap-4 justify-between">
+              <h1 className="font-bold leading-tight tracking-tight text-center lg:text-left
+                mb-4 sm:mb-6 lg:mb-2" 
+                style={{ fontFamily: '"DM Sans", sans-serif' }}>
+                <span className="block text-[clamp(2.25rem,4.5vw,4.5rem)] leading-[0.9] text-white" 
+                    style={{
+                    backgroundSize: "300% 300%",
+                    animation: "gradientFlow 3s ease infinite"
+                    }}>
+                    Describe.
+                </span>
+              </h1>
+              <h1 className="font-bold leading-tight tracking-tight text-center lg:text-left
+                mb-4 sm:mb-6 lg:mb-2" 
+                style={{ fontFamily: '"DM Sans", sans-serif' }}>
+                <span className="block text-[clamp(2.25rem,4.5vw,4.5rem)] leading-[0.9]
+                  bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]
+                  text-transparent bg-clip-text" 
+                    style={{
+                    backgroundSize: "300% 300%",
+                    animation: "gradientFlow 3s ease infinite"
+                    }}>
+                    Deploy.
+                </span>
+              </h1>
+            </div>
+
+            <h1 className="text-[18px] sm:text-[26px] md:text-[20px] lg:text-[22px] xl:text-[24px] 3xl:text-[26px]
+              font-bold leading-tight tracking-tight text-balance text-left" 
               style={{ fontFamily: '"DM Sans", sans-serif' }}>
-              <span className="block">Deploy Solana dApps</span>
+              <span className="block">Zero to dApp in minutes—without code.</span>
             </h1>
-            <h1 className="font-bold leading-tight tracking-tight text-center lg:text-left
-              mb-4 sm:mb-6 lg:mb-2" 
-              style={{ fontFamily: '"DM Sans", sans-serif' }}>
-              <span className="block text-[clamp(2.25rem,4.5vw,4.5rem)] leading-[0.9]
-                bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]
-                text-transparent bg-clip-text" 
-                  style={{
-                  backgroundSize: "300% 300%",
-                  animation: "gradientFlow 3s ease infinite"
-                  }}>
-                  Without&nbsp;Code
-              </span>
-            </h1>
+
           </div>
           <div className="space-y-3 text-[clamp(.875rem,.6vw+0.5rem,1.125rem)] text-gray-400">
             <HeroFeatureList />
