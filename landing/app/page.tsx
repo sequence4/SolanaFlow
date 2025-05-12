@@ -38,7 +38,7 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#0f1123] text-white font-mono overflow-x-hidden">
+    <div className="min-h-screen bg-[#0a0c1c] text-white font-mono overflow-x-hidden">
       {mounted && (
         <WaitlistModal 
           isOpen={isWaitlistModalOpen} 

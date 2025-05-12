@@ -22,7 +22,7 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
 
   return (
     <section
-      className="px-6 md:px-12 lg:px-20"
+      className="px-8 md:px-16 lg:px-24" 
     >
       <div
         ref={innerRef}
@@ -40,7 +40,7 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
           2xl:[grid-template-areas:'copy_flow_code']
         "
       >
-        <div className="grid-in-copy grid grid-rows-[auto_auto_auto] gap-6 max-w-[34rem] min-h-0 pr-4">
+        <div className="grid-in-copy grid grid-rows-[auto_auto_auto] gap-8 max-w-[32rem] min-h-0 pr-4">
           <div>
             <div className="w-fit inline-block py-1 px-2 mb-4 sm:mb-4 rounded-full bg-[#1e2033] 
                 border border-[#2a2d4a] text-[10px] text-xs md:text-[10px] text-[#5580ff] mx-auto lg:mx-0">
