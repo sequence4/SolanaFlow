@@ -148,22 +148,7 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
           </div>
         </div>
         <div className="grid-in-code hidden lg:flex basis-0 grow flex-col gap-0">
-          <div className="flex-1 min-h-[18rem] max-h-[calc(100%-6rem)] rounded-xl overflow-hidden border border-[#2a2d4a] bg-[#0d0e1a]">
-            <div className="h-full flex flex-col rounded-xl overflow-hidden min-h-0">
-              <div className="flex items-center px-4 py-2 bg-[#1e2033] border-b border-[#2a2d4a] rounded-lg">
-                <div className="flex space-x-2 rounded-lg">
-                  <div className="w-2 h-2 xs:w-2 xs:h-2 sm:w-2 sm:h-2 rounded-full bg-[#ff5f57]"></div>
-                  <div className="w-2 h-2 xs:w-2 xs:h-2 sm:w-2 sm:h-2 rounded-full bg-[#febc2e]"></div>
-                  <div className="w-2 h-2 xs:w-2 xs:h-2 sm:w-2 sm:h-2 rounded-full bg-[#28c840]"></div>
-                </div>
-              </div>
-              <div className="flex-1 min-h-0 overflow-y-auto">
-                {mounted && <TypewriterCode />}
-              </div>
-            </div>
-          </div>
-          
-          <div className="mt-auto flex-none h-[5rem]
+          <div className="flex-none h-[5rem] mb-4
              rounded-xl overflow-hidden border border-[#2a2d4a]">
             {mounted && <UserMessageBox 
               messages={[
@@ -182,6 +167,21 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
               delayBetweenMessages={3000}
               className="w-full h-full"
             />}
+          </div>
+          
+          <div className="flex-1 min-h-[18rem] max-h-[calc(100%-6rem)] rounded-xl overflow-hidden border border-[#2a2d4a] bg-[#0d0e1a]">
+            <div className="h-full flex flex-col rounded-xl overflow-hidden min-h-0">
+              <div className="flex items-center px-4 py-2 bg-[#1e2033] border-b border-[#2a2d4a] rounded-lg">
+                <div className="flex space-x-2 rounded-lg">
+                  <div className="w-2 h-2 xs:w-2 xs:h-2 sm:w-2 sm:h-2 rounded-full bg-[#ff5f57]"></div>
+                  <div className="w-2 h-2 xs:w-2 xs:h-2 sm:w-2 sm:h-2 rounded-full bg-[#febc2e]"></div>
+                  <div className="w-2 h-2 xs:w-2 xs:h-2 sm:w-2 sm:h-2 rounded-full bg-[#28c840]"></div>
+                </div>
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                {mounted && <TypewriterCode />}
+              </div>
+            </div>
           </div>
         </div>
       </div>

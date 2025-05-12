@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { Send } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface UserMessageBoxProps {
   messages: string[]
@@ -32,6 +33,7 @@ export default function UserMessageBox({
   const [isTyping, setIsTyping] = useState(true)
   const [isDeleting, setIsDeleting] = useState(false)
   const [showCursor, setShowCursor] = useState(true)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     let timeout: NodeJS.Timeout
@@ -71,109 +73,45 @@ export default function UserMessageBox({
   }, [])
 
   return (
-    <div className={`bg-[#0a0b14] rounded-lg h-full w-full flex flex-col justify-end
-      p-4 sm:p-5 relative overflow-hidden ${className}`}>
-      <div className="absolute inset-0 z-0" style={{ overflow: 'hidden' }}>
-        <div 
-          className="absolute w-20 h-20 xs:w-24 xs:h-24 sm:w-32 sm:h-32 rounded-full opacity-5 hidden xs:block sm:block"
-          style={{
-            background: 'radial-gradient(circle, #5f88dc 0%, rgba(95,136,220,0) 70%)',
-            filter: 'blur(8px)',
-            top: '10%',
-            left: '10%',
-            animation: 'floatOrb1 15s ease-in-out infinite, pulseOrb 8s ease-in-out infinite'
-          }}
-        />
-        
-        <div 
-          className="absolute w-24 h-24 xs:w-32 xs:h-32 sm:w-40 sm:h-40 rounded-full opacity-5 hidden xs:block sm:block"
-          style={{
-            background: 'radial-gradient(circle, #1cf6a0 0%, rgba(28,246,160,0) 70%)',
-            filter: 'blur(8px)',
-            bottom: '10%',
-            right: '15%',
-            animation: 'floatOrb2 18s ease-in-out infinite, pulseOrb 6s ease-in-out infinite'
-          }}
-        />
-        
-        <div 
-          className="absolute w-20 h-20 xs:w-28 xs:h-28 sm:w-36 sm:h-36 rounded-full opacity-5 hidden xs:block sm:block"
-          style={{
-            background: 'radial-gradient(circle, #9945ff 0%, rgba(153,69,255,0) 70%)',
-            filter: 'blur(8px)',
-            bottom: '20%',
-            left: '40%',
-            animation: 'floatOrb3 12s ease-in-out infinite, pulseOrb 10s ease-in-out infinite'
-          }}
-        />
-        
-        <div 
-          className="absolute inset-0 opacity-10 hidden xs:block sm:block" 
-          style={{
-            background: 'linear-gradient(60deg, #5f88dc, #1cf6a0, #9945ff)',
-            backgroundSize: '300% 300%',
-            animation: 'gradientFlow 5s ease infinite',
-          }}
-        />
+    <div className={`w-full max-w-[650px] mx-auto relative ${className}`}>
+      {/* Subtle label */}
+      <div className="absolute -top-6 left-2 text-xs text-[#6c7793] font-light tracking-wider">
+        <span className="text-[#00e2c3]">AI</span> <span className="opacity-70">ASSISTANT</span>
       </div>
-      
-      <style jsx>{`
-        @keyframes gradientFlow {
-          0% {
-            background-position: 0% 50%;
-          }
-          50% {
-            background-position: 100% 50%;
-          }
-          100% {
-            background-position: 0% 50%;
-          }
-        }
-        
-        @keyframes floatOrb1 {
-          0% { transform: translate(0, 0); }
-          25% { transform: translate(100%, 50%); }
-          50% { transform: translate(80%, 100%); }
-          75% { transform: translate(-50%, 50%); }
-          100% { transform: translate(0, 0); }
-        }
-        
-        @keyframes floatOrb2 {
-          0% { transform: translate(0, 0); }
-          25% { transform: translate(-70%, -30%); }
-          50% { transform: translate(-20%, -80%); }
-          75% { transform: translate(50%, -40%); }
-          100% { transform: translate(0, 0); }
-        }
-        
-        @keyframes floatOrb3 {
-          0% { transform: translate(0, 0); }
-          33% { transform: translate(50%, -30%); }
-          66% { transform: translate(-30%, -50%); }
-          100% { transform: translate(0, 0); }
-        }
-        
-        @keyframes pulseOrb {
-          0% { opacity: 0.1; }
-          50% { opacity: 0.3; }
-          100% { opacity: 0.1; }
-        }
-      `}</style>
 
-      <div className="relative z-10 flex flex-col h-full">
-        <div className="flex justify-between items-end h-full">
-          <div className="bg-[#0d0e1a] border border-[#2a2d4a] rounded-xl shadow-sm flex-1 flex items-end px-2 py-1">
-            <div className="min-h-full xs:min-h-[24px] text-gray-400 text-[10px] xs:text-xs sm:text-xs" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
+      <div className="relative group">
+        {/* Input container */}
+        <div className="relative flex items-start bg-[#121420] border border-[#2a2e3f] rounded-lg overflow-hidden group-hover:border-[#3a3f52] transition-colors duration-300 shadow-lg">
+          <div className="absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-[#00c2ff] to-[#00e2c3]"></div>
+
+          <div className="w-full bg-transparent outline-none py-4 pl-6 pr-12 text-gray-200 text-sm min-h-[80px] h-auto max-h-[120px]">
+            <div className="overflow-hidden line-clamp-3 break-words">
               {displayedText}
-              {showCursor && <span className="inline-block w-1.5 xs:w-2 h-3 xs:h-4 bg-[#5580ff] ml-0.5">&nbsp;</span>}
+              {showCursor && <span className="inline-block w-1.5 h-4 bg-[#5580ff] ml-0.5">&nbsp;</span>}
             </div>
           </div>
+
           <button
-            className="ml-2 p-1.5 xs:p-2 bg-[#161726] border border-[#2a2d4a] cursor-default text-white rounded-full flex items-center justify-center"
+            className={cn(
+              "absolute right-3 top-3 p-2 rounded-full",
+              "bg-gradient-to-r from-[#00c2ff] to-[#00e2c3]",
+              "text-black hover:opacity-90 transition-all",
+              "flex items-center justify-center",
+              "transform hover:scale-105",
+              "shadow-[0_0_15px_rgba(0,194,255,0.3)]",
+            )}
             aria-label="Send message"
           >
-            <Send size={12} className="text-[#5580ff] xs:w-3.5 xs:h-3.5 sm:w-4 sm:h-4"/>
+            <Send size={16} className="text-[#0d1117]" />
           </button>
+        </div>
+
+        {/* Glow effect */}
+        <div className="absolute -inset-0.5 bg-gradient-to-r from-[#00c2ff] to-[#00e2c3] opacity-0 group-hover:opacity-15 rounded-lg blur-md transition-opacity duration-300"></div>
+
+        {/* Subtle tech pattern */}
+        <div className="absolute inset-0 rounded-lg overflow-hidden pointer-events-none opacity-10">
+          <div className="absolute top-0 left-0 w-full h-full bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiMyMDIwMjAiIGZpbGwtb3BhY2l0eT0iMC40Ij48cGF0aCBkPSJNMzYgMzRoLTJ2LTRoMnY0em0wLTZ2LTRoLTJ2NGgyek0yNCAzNGgydi00aC0ydjR6bTAtNnYtNGgtMnY0aDJ6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-30"></div>
         </div>
       </div>
     </div>

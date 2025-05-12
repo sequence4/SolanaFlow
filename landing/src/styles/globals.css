@@ -83,3 +83,18 @@ body.with-fixed-nav {
     row-gap: 1rem;
   }
 }
+
+/* Pulse animation for cursor */
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 1s ease-in-out infinite;
+}
