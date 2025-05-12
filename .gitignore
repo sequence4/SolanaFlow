@@ -36,3 +36,6 @@ projects/
 wallets/
 wallets/landing/coverage/
 landing/.env.production
+
+landing-prod.tgz
+solanaflow-landing
