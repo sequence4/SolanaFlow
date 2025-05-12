@@ -2,7 +2,7 @@ import { CodeIcon, BoxIcon, ZapIcon, RefreshCwIcon, UsersIcon } from "lucide-rea
 
 export default function HeroFeatureList() {
   return (
-    <div className="relative py-1 sm:py-2 md:py-3 font-lekton w-full">
+    <div className="relative py-1 sm:py-2 md:py-3 font-lekton w-full max-w-[30rem] mx-auto lg:mx-0">
       <div className="absolute inset-0 opacity-5">
         <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
           <pattern id="circuit" width="40" height="40" patternUnits="userSpaceOnUse">
@@ -14,7 +14,7 @@ export default function HeroFeatureList() {
 
       <div className="relative z-10 flex flex-col items-center lg:items-start lg:justify-start w-full">
         {features.map((feature, index) => (
-          <div key={index} className="w-full w-[90%] group 
+          <div key={index} className="w-full group 
                 flex 
                 flex-row
                 items-start 
