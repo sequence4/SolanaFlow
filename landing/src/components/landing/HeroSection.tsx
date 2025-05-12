@@ -128,63 +128,66 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
           <div className="space-y-2 text-[clamp(.4rem,.6vw+0.5rem,1.125rem)] text-gray-400 mb-6 md:mb-8 lg:mb-10">
             <HeroFeatureList />
           </div>
-          <div className="flex justify-center lg:justify-start gap-10 mt-auto pt-4 md:pt-6 lg:pt-8">
-            <Button 
-              data-testid="open-waitlist-form"
-              size="default" 
-              className="relative z-0 text-white font-medium rounded whitespace-nowrap gradient-border-button" 
-              style={{ borderRadius: '4px', backgroundColor: '#0d0e1a' }}
-              onClick={openWaitlistModal}
-            >
-              <span className="relative z-10 cursor-pointer text-bold text-[11px] md:text-[12px] gradient-text">Join the Waitlist</span>
-            </Button>
-            <style jsx global>{`
-              .gradient-border-button {
-                position: relative;
-                z-index: 0;
-                padding: 8px 16px;
-                border: none;
-                overflow: hidden;
+        </div>
+
+        {/* Waitlist button and socials - repositioned to float above flow graph on desktop */}
+        <div className="hero-actions flex justify-center gap-6 mt-8 lg:mt-0 lg:absolute lg:self-start lg:justify-start lg:left-[36rem] lg:top-4 lg:z-20 2xl:left-[38rem]">
+          <Button 
+            data-testid="open-waitlist-form"
+            size="default" 
+            className="relative z-0 text-white font-medium rounded whitespace-nowrap gradient-border-button" 
+            style={{ borderRadius: '4px', backgroundColor: '#0d0e1a' }}
+            onClick={openWaitlistModal}
+          >
+            <span className="relative z-10 cursor-pointer text-bold text-[11px] md:text-[12px] gradient-text">Join the Waitlist</span>
+          </Button>
+          <style jsx global>{`
+            .gradient-border-button {
+              position: relative;
+              z-index: 0;
+              padding: 8px 16px;
+              border: none;
+              overflow: hidden;
+            }
+            
+            .gradient-border-button::before {
+              content: '';
+              position: absolute;
+              z-index: -2;
+              inset: 0;
+              padding: 2px;
+              border-radius: inherit;
+              background: linear-gradient(60deg, #5f88dc, #1cf6a0, #9945ff);
+              background-size: 300% 300%;
+              animation: gradientBorderFlow 3s ease infinite;
+              -webkit-mask: 
+                linear-gradient(#fff 0 0) content-box, 
+                linear-gradient(#fff 0 0);
+              -webkit-mask-composite: xor;
+              mask-composite: exclude;
+            }
+            
+            .gradient-text {
+              background: linear-gradient(60deg, #5f88dc, #1cf6a0, #9945ff);
+              background-size: 300% 300%;
+              animation: gradientBorderFlow 3s ease infinite;
+              -webkit-background-clip: text;
+              background-clip: text;
+              color: transparent;
+            }
+            
+            @keyframes gradientBorderFlow {
+              0% {
+                background-position: 0% 50%;
               }
-              
-              .gradient-border-button::before {
-                content: '';
-                position: absolute;
-                z-index: -2;
-                inset: 0;
-                padding: 2px;
-                border-radius: inherit;
-                background: linear-gradient(60deg, #5f88dc, #1cf6a0, #9945ff);
-                background-size: 300% 300%;
-                animation: gradientBorderFlow 3s ease infinite;
-                -webkit-mask: 
-                  linear-gradient(#fff 0 0) content-box, 
-                  linear-gradient(#fff 0 0);
-                -webkit-mask-composite: xor;
-                mask-composite: exclude;
+              50% {
+                background-position: 100% 50%;
               }
-              
-              .gradient-text {
-                background: linear-gradient(60deg, #5f88dc, #1cf6a0, #9945ff);
-                background-size: 300% 300%;
-                animation: gradientBorderFlow 3s ease infinite;
-                -webkit-background-clip: text;
-                background-clip: text;
-                color: transparent;
+              100% {
+                background-position: 0% 50%;
               }
-              
-              @keyframes gradientBorderFlow {
-                0% {
-                  background-position: 0% 50%;
-                }
-                50% {
-                  background-position: 100% 50%;
-                }
-                100% {
-                  background-position: 0% 50%;
-                }
-              }
-            `}</style>
+            }
+          `}</style>
         <div className="flex items-center gap-2">
             <Button asChild size="icon" variant="ghost" aria-label="SolanaFlow on X">
               <Link
@@ -206,8 +209,8 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
               </Link>
             </Button>
           </div>
-          </div>
         </div>
+
         <div className="grid-in-flow hidden lg:flex items-center justify-center min-w-0">
           <div className="w-full h-full max-h-[60vh] min-w-0">
             {mounted && <InstructionFlow />}
