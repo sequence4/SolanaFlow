@@ -3,6 +3,7 @@
 import React, { useState } from "react"
 import { X, ChevronDown, ChevronUp, Terminal } from "lucide-react"
 import { Dialog, DialogContent, DialogTrigger } from "./ui/dialog"
+import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { Button } from "./ui/button"
 import { ScrollArea } from "./ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
@@ -39,6 +40,7 @@ export default function LegalDocsPopup({ trigger, isOpen: externalIsOpen, onClos
           <Button
             variant="outline"
             className="bg-transparent border border-[rgb(var(--popup-accent)/0.20)] text-[#38E8FF] hover:bg-[rgba(56,232,255,0.10)] hover:text-[#38E8FF]"
+            style={{ fontFamily: 'var(--font-chakra-petch)' }}
           >
             <Terminal className="w-4 h-4 mr-2" />
             Legal Docs & Contact
@@ -46,7 +48,7 @@ export default function LegalDocsPopup({ trigger, isOpen: externalIsOpen, onClos
         )}
       </DialogTrigger>
       <DialogContent 
-        style={{ "--popup-accent": POPUP_ACCENT_RGB } as React.CSSProperties}
+        style={{ "--popup-accent": POPUP_ACCENT_RGB } as React.CSSProperties }
         className="sm:max-w-[700px] p-0 bg-gradient-to-b from-[#0D1117] to-[#0A0E14] 
                   border border-[rgb(var(--popup-accent)/0.20)] 
                   rounded-lg 
@@ -57,32 +59,28 @@ export default function LegalDocsPopup({ trigger, isOpen: externalIsOpen, onClos
           <div className="flex items-center relative">
             <Terminal className="w-4 h-4 mr-2 text-gray-400" />
             <span className="text-sm relative z-10 text-gray-400" 
-            style={{ fontFamily: 'var(--font-chakra-petch)' }}>
+            style={{ fontFamily: 'var(--font-chakra-petch)' }}
+            >
               SolanaFlow Legal Docs
             </span>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsOpen(false)}
-            className="text-gray-400 hover:text-white hover:bg-[rgba(56,232,255,0.10)] rounded-full h-8 w-8 p-0"
-          >
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
-          </Button>
+          <DialogPrimitive.Close asChild>
+          </DialogPrimitive.Close>
         </div>
 
         <Tabs defaultValue="terms" className="w-full">
           <div className="border-b border-[rgb(var(--popup-accent)/0.20)] bg-gradient-to-r from-transparent 
                           via-[rgba(56,232,255,0.05)] to-transparent">
-            <TabsList className="bg-transparent h-12 p-0 pl-4 flex gap-2">
+            <TabsList className="bg-transparent h-12 p-0 pl-4 flex gap-2"
+            style={{ fontFamily: 'var(--font-chakra-petch)' }}>
               <TabsTrigger
                 value="terms"
                 className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[rgba(56,232,255,0.10)] 
                           data-[state=active]:to-[rgba(94,162,239,0.10)] data-[state=active]:text-transparent 
                           data-[state=active]:bg-clip-text data-[state=active]:bg-gradient-to-r 
                           data-[state=active]:from-[#38E8FF] data-[state=active]:to-[#5EA2EF] 
-                          rounded px-3 py-2 font-mono text-xs"
+                          rounded px-3 py-2 font-mono text-sm"
+                style={{ fontFamily: 'var(--font-chakra-petch)' }}
               >
                 Terms and Conditions
               </TabsTrigger>
@@ -90,8 +88,10 @@ export default function LegalDocsPopup({ trigger, isOpen: externalIsOpen, onClos
                 value="privacy"
                 className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[rgba(56,232,255,0.10)] 
                 data-[state=active]:to-[rgba(94,162,239,0.10)] data-[state=active]:text-transparent 
-                data-[state=active]:bg-clip-text data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#38E8FF] 
-                data-[state=active]:to-[#5EA2EF] rounded px-3 py-2 font-mono text-xs"
+                data-[state=active]:bg-clip-text data-[state=active]:bg-gradient-to-r 
+                data-[state=active]:from-[#38E8FF] data-[state=active]:to-[#5EA2EF] 
+                rounded px-3 py-2 font-mono text-sm"
+                style={{ fontFamily: 'var(--font-chakra-petch)' }}
               >
                 Privacy Policy
               </TabsTrigger>
@@ -100,21 +100,26 @@ export default function LegalDocsPopup({ trigger, isOpen: externalIsOpen, onClos
                 className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[rgba(56,232,255,0.10)] 
                 data-[state=active]:to-[rgba(94,162,239,0.10)] data-[state=active]:text-transparent 
                 data-[state=active]:bg-clip-text data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#38E8FF] 
-                data-[state=active]:to-[#5EA2EF] rounded px-3 py-2 font-mono text-xs"
+                data-[state=active]:to-[#5EA2EF] rounded px-3 py-2 font-mono text-sm"
+                style={{ fontFamily: 'var(--font-chakra-petch)' }}
               >
                 Cookie Policy
               </TabsTrigger>
               <TabsTrigger
                 value="contact"
-                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[rgba(56,232,255,0.10)] data-[state=active]:to-[rgba(94,162,239,0.10)] data-[state=active]:text-transparent data-[state=active]:bg-clip-text data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#38E8FF] data-[state=active]:to-[#5EA2EF] rounded px-3 py-2 font-mono text-xs"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[rgba(56,232,255,0.10)] 
+                data-[state=active]:to-[rgba(94,162,239,0.10)] data-[state=active]:text-transparent data-[state=active]:bg-clip-text 
+                data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#38E8FF] data-[state=active]:to-[#5EA2EF] 
+                rounded px-3 py-2 font-mono text-sm"
+                style={{ fontFamily: 'var(--font-chakra-petch)' }}
               >
                 Contact
               </TabsTrigger>
             </TabsList>
           </div>
 
-          <ScrollArea className="h-[400px] p-6">
-            <TabsContent value="terms" className="mt-0 focus-visible:outline-none focus-visible:ring-0">
+          <ScrollArea className="h-[400px] p-6 text-gray-400" style={{ fontFamily: 'var(--font-chakra-petch)' }}>
+            <TabsContent value="terms" className="text-gray-400 mt-0 focus-visible:outline-none focus-visible:ring-0">
               <TerminalContent content={termsContent} />
             </TabsContent>
             <TabsContent value="privacy" className="mt-0 focus-visible:outline-none focus-visible:ring-0">
@@ -129,19 +134,23 @@ export default function LegalDocsPopup({ trigger, isOpen: externalIsOpen, onClos
           </ScrollArea>
         </Tabs>
 
-        <div className="flex justify-end p-4 border-t border-[rgb(var(--popup-accent)/0.20)] bg-gradient-to-r from-transparent via-[rgba(56,232,255,0.05)] to-transparent">
-          <Button
-            onClick={() => setIsOpen(false)}
-            className="relative overflow-hidden font-mono font-semibold rounded-md text-white 
-            border border-[rgb(var(--popup-accent)/0.2)]"
-            style={{
-              background: "linear-gradient(to-b, #0D1117, #0A0E14)",
-              boxShadow: "0 0 10px rgba(56, 232, 255, 0.15)",
-            }}
-          >
-            <span className="relative z-10 text-white text-xs">Accept Terms</span>
-          </Button>
-        </div>
+        <div className="flex justify-end p-4 border-t border-[rgb(var(--popup-accent)/0.20)] bg-gradient-to-r from-transparent 
+                           via-[rgba(56,232,255,0.05)] to-transparent">
+            <Button
+              variant="outline"
+              onClick={() => setIsOpen(false)}
+              className="bg-transparent
+                        border-[rgb(var(--popup-accent)/0.10)]
+                        text-[#153c47]
+                        hover:text-[#1f505e]
+                        font-mono text-sm font-semibold
+                        rounded-md px-4 py-2
+                        shadow-[0_0_10px_rgba(56,232,255,0.15)]"
+                        style={{ fontFamily: 'var(--font-chakra-petch)' }}
+            >
+              Accept&nbsp;Terms
+            </Button>
+          </div>
       </DialogContent>
     </Dialog>
   )
@@ -153,7 +162,8 @@ function TerminalContent({ content }: { content: string }) {
   const sections = content.split("## ").filter(Boolean)
 
   return (
-    <div className="font-mono text-sm text-[#E6E6E6] leading-relaxed space-y-6 bg-gradient-to-b from-transparent to-[#0A0E14]/50">
+    <div className="font-mono text-sm text-gray-400 leading-relaxed space-y-6 bg-gradient-to-b from-transparent to-[#0A0E14]/50" 
+    style={{ fontFamily: 'var(--font-chakra-petch)' }}>
       {sections.map((section, index) => {
         const [title, ...contentLines] = section.split("\n")
         const sectionContent = contentLines.join("\n")
@@ -213,7 +223,7 @@ We do not guarantee the accuracy of content on the Service.
 
 ## Changes to Terms
 We may modify these Terms at any time.
-Continued use of the Service constitutes acceptance of modified Terms.`
+Continued use of the Service constitutes acceptance of modified Terms.`;
 
 const privacyContent = `## Information Collection
 We collect information you provide directly to us.
@@ -245,7 +255,7 @@ We do not knowingly collect information from children.
 
 ## Changes to Privacy Policy
 We may modify this Privacy Policy at any time.
-Continued use of the Service constitutes acceptance of modified Policy.`
+Continued use of the Service constitutes acceptance of modified Policy.`;
 
 const cookiesContent = `## What Are Cookies
 Cookies are small text files stored on your device.
@@ -266,21 +276,15 @@ We do not control these third-party cookies.
 
 ## Changes to Cookie Policy
 We may modify this Cookie Policy at any time.
-Continued use of the Service constitutes acceptance of modified Policy.`
+Continued use of the Service constitutes acceptance of modified Policy.`;
 
-// Sample content – replace with your real contact info
 const contactContent = `## Get in Touch
 For questions about SolanaFlow or these documents, reach out:
 
-* Email: legal@solanaflow.dev
-* X (Twitter): @Solana_FlowCode
-* Telegram: t.me/SolanaFlow
-
-## Registered Address
-SolanaFlow Labs LTD  
-42 Code Street  
-Singapore 049483
+* Email: team@sequence4.io
+* X (Twitter): @s0lana_flow
+* Telegram: https://t.me/+WVRI_EcdZrkyZDhk
 
 ## Copyright & Trademark
-© ${new Date().getFullYear()} SolanaFlow Labs LTD.  
-All product names, logos, and brands are property of their respective owners.` 
+© ${new Date().getFullYear()} Sequence4 Ltd.
+All product names, logos, and brands are property of their respective owners.`;
