@@ -61,7 +61,7 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
                       backgroundSize: "300% 300%",
                       animation: "gradientFlow 3s ease infinite"
                       }}>
-                      Code
+                      Build
                   </span>
                 </h1>
                 <h1 className="font-bold leading-tight tracking-tight text-left" 

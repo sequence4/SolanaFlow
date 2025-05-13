@@ -3,7 +3,7 @@
 import React, { useEffect, useRef } from "react"
 import { motion } from "framer-motion"
 import ScrollReveal from "./ScrollReveal"
-import { Blocks, Code, Waypoints } from "lucide-react"
+import { Blocks, Code, Waypoints, Eye, Codesandbox, Ungroup } from "lucide-react"
 
 export default function FeaturesSection() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -122,9 +122,9 @@ export default function FeaturesSection() {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="inline-block"
           >
-            <span className="text-white">Imagine</span>
+            <span className="text-white">Describe</span>
             <span>.</span>{" "}
-            <span className="text-white">Launch</span>
+            <span className="text-white">Deploy</span>
             <span>.</span>{" "}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]" style={{ backgroundSize: "300% 300%", animation: "gradientFlow 3s ease infinite" }}>Scale</span><span>.</span>
           </motion.span>{" "}
@@ -134,7 +134,7 @@ export default function FeaturesSection() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 1, delay: 0.7 }}
-          className="max-w-xl mx-auto md:text-md text-gray-500 px-4 sm:px-0 text-center sm:mb-6 md:mb-10"
+          className="max-w-xl mx-auto md:text-md text-gray-400 px-4 sm:px-0 text-center sm:mb-6 md:mb-10"
           style={{ fontFamily: 'var(--font-oxygen-mono)' }}
         >
           The platform leverages cutting-edge technology to deliver a secure, intelligent, and streamlined development experience—purpose-built for the Solana ecosystem.
@@ -153,13 +153,8 @@ export default function FeaturesSection() {
                 <div className="flex flex-col xs:flex-col sm:flex-col md:flex-row items-center xs:items-center
                 sm:items-center md:items-center mb-2 sm:mb-2 md:mb-3
                 ">
-                  <h3 className="text-base text-lg sm:text-xl md:text-2xl 
-                  font-semibold text-transparent 
-                  bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
-                      style={{
-                        backgroundSize: "300% 300%",
-                        animation: "gradientFlow 3s ease infinite"
-                      }}>Visual Workflow Builder</h3>
+                  <h3 className="text-base text-lg sm:text-xl md:text-2xl font-semibold text-[#9cb3ff]"
+                      style={{ textShadow: "0 0 18px rgba(85,128,255,0.8), 0 0 8px rgba(85,128,255,0.6)" }}>Visual Workflow Builder</h3>
                   <span className="mt-1 xs:mt-1 sm:mt-1 md:mt-0 md:ml-2 px-2 py-0.5 rounded-full bg-[#1e2033]/80 text-[#5580ff] text-xs">
                     workflow
                   </span>
@@ -174,7 +169,7 @@ export default function FeaturesSection() {
                       <li key={index} className="flex items-center w-full max-w-[240px] xs:max-w-[260px] sm:max-w-[280px]
                       text-xs md:text-sm">
                         <div className="flex-shrink-0 flex items-center justify-center w-4 h-4 xs:w-5 xs:h-5 sm:w-5 sm:h-5 
-                        rounded-full bg-[#0a0b14] border border-[#5580ff]/20 mr-2 xs:mr-3 sm:mr-3">
+                        rounded-full bg-[#9cb3ff]/10 border border-[#5580ff]/20 mr-2 xs:mr-3 sm:mr-3">
                           <div className="w-1 h-1 xs:w-1.5 xs:h-1.5 sm:w-1.5 sm:h-1.5 rounded-full bg-[#5580ff] animate-pulse" />
                         </div>
                         <span>{item}</span>
@@ -188,44 +183,6 @@ export default function FeaturesSection() {
 
           <ScrollReveal delay={200}>
             <div className="relative group h-full">
-              <div className="absolute inset-0 bg-gradient-to-r from-[#a855f7]/20 to-transparent rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <div className="flex flex-col gap-2 relative bg-gradient-to-b from-[#a855f7]/5 to-[#a855f7]/5 backdrop-blur-sm border border-[#a855f7]/20 rounded-2xl p-3 xs:p-4 sm:p-6 md:p-8 h-full transition-all duration-300 group-hover:border-[#a855f7]/50 group-hover:translate-y-[-4px] shadow-[0_0_10px_rgba(168,85,247,0.2)]">
-                <div className="flex items-center justify-center w-full mb-3 xs:mb-4 sm:mb-6">
-                  <div className="w-10 h-10 xs:w-12 xs:h-12 sm:w-14 sm:h-14 rounded-xl bg-[#a855f7]/10 flex items-center justify-center group-hover:bg-[#a855f7]/20 transition-colors">
-                    <Code className="w-4 h-4 xs:w-5 xs:h-5 sm:w-6 sm:h-6 text-[#a855f7]" />
-                  </div>
-                </div>
-                <div className="flex flex-col xs:flex-col sm:flex-col md:flex-row items-center xs:items-center sm:items-center md:items-center mb-2 sm:mb-2 md:mb-3">
-                  <h3 className="text-base text-lg sm:text-xl md:text-2xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
-                      style={{
-                        backgroundSize: "300% 300%",
-                        animation: "gradientFlow 3s ease infinite"
-                      }}>Solana-Optimized IDE</h3>
-                  <span className="mt-1 xs:mt-1 sm:mt-1 md:mt-0 md:ml-2 px-2 py-0.5 rounded-full bg-[#1e2033]/80 text-[#a855f7] text-xs">
-                    code
-                  </span>
-                </div>
-                <p className="text-gray-300 mb-3 xs:mb-4 sm:mb-4 md:mb-5 text-sm md:text-md leading-relaxed text-center xs:text-center sm:text-center md:text-left">
-                A powerful code editor purpose-built for efficient Solana development.
-                </p>
-                <ul className="text-gray-300 space-y-2 sm:space-y-3 text-[10px] xs:text-xs sm:text-sm w-full flex flex-col items-center">
-                  {["Native Rust & TypeScript Support", "Instant Error Detection", "Built-in Testing & Debugging"].map(
-                    (item, index) => (
-                      <li key={index} className="flex items-center w-full max-w-[240px] xs:max-w-[260px] sm:max-w-[280px] text-xs md:text-sm">
-                        <div className="flex-shrink-0 flex items-center justify-center w-4 h-4 xs:w-5 xs:h-5 sm:w-5 sm:h-5 rounded-full bg-[#0a0b14] border border-[#a855f7]/20 mr-2 xs:mr-3 sm:mr-3">
-                          <div className="w-1 h-1 xs:w-1.5 xs:h-1.5 sm:w-1.5 sm:h-1.5 rounded-full bg-[#a855f7] animate-pulse" />
-                        </div>
-                        <span>{item}</span>
-                      </li>
-                    ),
-                  )}
-                </ul>
-              </div>
-            </div>
-          </ScrollReveal>
-
-          <ScrollReveal delay={400}>
-            <div className="relative group h-full">
               <div className="absolute inset-0 bg-gradient-to-r from-[#0ea5e9]/20 to-transparent rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               <div className="flex flex-col gap-2 relative bg-gradient-to-b from-[#0ea5e9]/5 to-[#0ea5e9]/5 backdrop-blur-sm border border-[#0ea5e9]/20 rounded-2xl p-3 xs:p-4 sm:p-6 md:p-8 h-full transition-all duration-300 group-hover:border-[#0ea5e9]/50 group-hover:translate-y-[-4px] shadow-[0_0_10px_rgba(14,165,233,0.2)]">
                 <div className="flex items-center justify-center w-full mb-3 xs:mb-4 sm:mb-6">
@@ -234,11 +191,8 @@ export default function FeaturesSection() {
                   </div>
                 </div>
                 <div className="flex flex-col xs:flex-col sm:flex-col md:flex-row items-center xs:items-center sm:items-center md:items-center mb-2 sm:mb-2 md:mb-3">
-                  <h3 className="text-base text-lg sm:text-xl md:text-2xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
-                      style={{
-                        backgroundSize: "300% 300%",
-                        animation: "gradientFlow 3s ease infinite"
-                      }}>Interactive UI Builder</h3>
+                  <h3 className="text-base text-lg sm:text-xl md:text-2xl font-semibold text-[#8bdbf8]"
+                      style={{ textShadow: "0 0 18px rgba(14,165,233,0.8), 0 0 8px rgba(14,165,233,0.6)" }}>Interactive UI Builder</h3>
                   <span className="mt-1 xs:mt-1 sm:mt-1 md:mt-0 md:ml-2 px-2 py-0.5 rounded-full bg-[#1e2033]/80 text-[#0ea5e9] text-xs">
                     interface
                   </span>
@@ -249,8 +203,146 @@ export default function FeaturesSection() {
                 <ul className="text-gray-300 space-y-2 sm:space-y-3 text-[10px] xs:text-xs sm:text-sm w-full flex flex-col items-center">
                   {["Live, Interactive Previews", "Built-in Wallet Integration", "Fully Responsive Designs"].map((item, index) => (
                     <li key={index} className="flex items-center w-full max-w-[240px] xs:max-w-[260px] sm:max-w-[280px] text-xs md:text-sm">
-                      <div className="flex-shrink-0 flex items-center justify-center w-4 h-4 xs:w-5 xs:h-5 sm:w-5 sm:h-5 rounded-full bg-[#0a0b14] border border-[#0ea5e9]/20 mr-2 xs:mr-3 sm:mr-3">
+                      <div className="flex-shrink-0 flex items-center justify-center w-4 h-4 xs:w-5 xs:h-5 sm:w-5 sm:h-5 rounded-full bg-[#8bdbf8]/10 border border-[#0ea5e9]/20 mr-2 xs:mr-3 sm:mr-3">
                         <div className="w-1 h-1 xs:w-1.5 xs:h-1.5 sm:w-1.5 sm:h-1.5 rounded-full bg-[#0ea5e9] animate-pulse" />
+                      </div>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </ScrollReveal>
+
+          <ScrollReveal delay={400}>
+            <div className="relative group h-full">
+              <div className="absolute inset-0 bg-gradient-to-r from-[#0d9488]/20 to-transparent rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="flex flex-col gap-2 relative bg-gradient-to-b from-[#0d9488]/5 to-[#0d9488]/5 backdrop-blur-sm border border-[#0d9488]/20 rounded-2xl p-3 xs:p-4 sm:p-6 md:p-8 h-full transition-all duration-300 group-hover:border-[#0d9488]/50 group-hover:translate-y-[-4px] shadow-[0_0_10px_rgba(13,148,136,0.2)]">
+                <div className="flex items-center justify-center w-full mb-3 xs:mb-4 sm:mb-6">
+                  <div className="w-10 h-10 xs:w-12 xs:h-12 sm:w-14 sm:h-14 rounded-xl bg-[#0d9488]/10 flex items-center justify-center group-hover:bg-[#0d9488]/20 transition-colors">
+                    <Code className="w-4 h-4 xs:w-5 xs:h-5 sm:w-6 sm:h-6 text-[#0d9488]" />
+                  </div>
+                </div>
+                <div className="flex flex-col xs:flex-col sm:flex-col md:flex-row items-center xs:items-center sm:items-center md:items-center mb-2 sm:mb-2 md:mb-3">
+                  <h3 className="text-base text-lg sm:text-xl md:text-2xl font-semibold text-[#7cded9]"
+                      style={{ textShadow: "0 0 18px rgba(13,148,136,0.8), 0 0 8px rgba(13,148,136,0.6)" }}>Solana-Optimized IDE</h3>
+                  <span className="mt-1 xs:mt-1 sm:mt-1 md:mt-0 md:ml-2 px-2 py-0.5 rounded-full bg-[#1e2033]/80 text-[#0d9488] text-xs">
+                    code
+                  </span>
+                </div>
+                <p className="text-gray-300 mb-3 xs:mb-4 sm:mb-4 md:mb-5 text-sm md:text-md leading-relaxed text-center xs:text-center sm:text-center md:text-left">
+                A powerful code editor purpose-built for efficient Solana development.
+                </p>
+                <ul className="text-gray-300 space-y-2 sm:space-y-3 text-[10px] xs:text-xs sm:text-sm w-full flex flex-col items-center">
+                  {["Native Rust & TypeScript Support", "Instant Error Detection", "Built-in Testing & Debugging"].map(
+                    (item, index) => (
+                      <li key={index} className="flex items-center w-full max-w-[240px] xs:max-w-[260px] sm:max-w-[280px] text-xs md:text-sm">
+                        <div className="flex-shrink-0 flex items-center justify-center w-4 h-4 xs:w-5 xs:h-5 sm:w-5 sm:h-5 rounded-full bg-[#7cded9]/10 border border-[#0d9488]/20 mr-2 xs:mr-3 sm:mr-3">
+                          <div className="w-1 h-1 xs:w-1.5 xs:h-1.5 sm:w-1.5 sm:h-1.5 rounded-full bg-[#0d9488] animate-pulse" />
+                        </div>
+                        <span>{item}</span>
+                      </li>
+                    ),
+                  )}
+                </ul>
+              </div>
+            </div>
+          </ScrollReveal>
+
+          <ScrollReveal delay={600}>
+            <div className="relative group h-full">
+              <div className="absolute inset-0 bg-gradient-to-r from-[#0d9488]/20 to-transparent rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="flex flex-col gap-2 relative bg-gradient-to-b from-[#0d9488]/5 to-[#0d9488]/5 backdrop-blur-sm border border-[#0d9488]/20 rounded-2xl p-3 xs:p-4 sm:p-6 md:p-8 h-full transition-all duration-300 group-hover:border-[#0d9488]/50 group-hover:translate-y-[-4px] shadow-[0_0_10px_rgba(13,148,136,0.2)]">
+                <div className="flex items-center justify-center w-full mb-3 xs:mb-4 sm:mb-6">
+                  <div className="w-10 h-10 xs:w-12 xs:h-12 sm:w-14 sm:h-14 rounded-xl bg-[#0d9488]/10 flex items-center justify-center group-hover:bg-[#0d9488]/20 transition-colors">
+                    <Codesandbox className="w-4 h-4 xs:w-5 xs:h-5 sm:w-6 sm:h-6 text-[#0d9488]" />
+                  </div>
+                </div>
+                <div className="flex flex-col xs:flex-col sm:flex-col md:flex-row items-center xs:items-center sm:items-center md:items-center mb-2 sm:mb-2 md:mb-3">
+                  <h3 className="text-base text-lg sm:text-xl md:text-2xl font-semibold text-[#7cded9]"
+                      style={{ textShadow: "0 0 18px rgba(13,148,136,0.8), 0 0 8px rgba(13,148,136,0.6)" }}>Extensive Plugin Library</h3>
+                  <span className="mt-1 xs:mt-1 sm:mt-1 md:mt-0 md:ml-2 px-2 py-0.5 rounded-full bg-[#1e2033]/80 text-[#0d9488] text-xs">
+                    plugins
+                  </span>
+                </div>
+                <p className="text-gray-300 mb-3 xs:mb-4 sm:mb-4 md:mb-5 text-sm md:text-md leading-relaxed text-center xs:text-center sm:text-center md:text-left">
+                Access a comprehensive library of pre-audited Solana modules to accelerate your dApp development.
+                </p>
+                <ul className="text-gray-300 space-y-2 sm:space-y-3 text-[10px] xs:text-xs sm:text-sm w-full flex flex-col items-center">
+                  {["Pre-Audited Modules", "Continuous Integration", "Seamless Integration"].map(
+                    (item, index) => (
+                      <li key={index} className="flex items-center w-full max-w-[240px] xs:max-w-[260px] sm:max-w-[280px] text-xs md:text-sm">
+                        <div className="flex-shrink-0 flex items-center justify-center w-4 h-4 xs:w-5 xs:h-5 sm:w-5 sm:h-5 rounded-full bg-[#7cded9]/10 border border-[#0d9488]/20 mr-2 xs:mr-3 sm:mr-3">
+                          <div className="w-1 h-1 xs:w-1.5 xs:h-1.5 sm:w-1.5 sm:h-1.5 rounded-full bg-[#0d9488] animate-pulse" />
+                        </div>
+                        <span>{item}</span>
+                      </li>
+                    ),
+                  )}
+                </ul>
+              </div>
+            </div>
+          </ScrollReveal>
+
+          <ScrollReveal delay={800}>
+            <div className="relative group h-full">
+              <div className="absolute inset-0 bg-gradient-to-r from-[#0ea5e9]/20 to-transparent rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="flex flex-col gap-2 relative bg-gradient-to-b from-[#0ea5e9]/5 to-[#0ea5e9]/5 backdrop-blur-sm border border-[#0ea5e9]/20 rounded-2xl p-3 xs:p-4 sm:p-6 md:p-8 h-full transition-all duration-300 group-hover:border-[#0ea5e9]/50 group-hover:translate-y-[-4px] shadow-[0_0_10px_rgba(14,165,233,0.2)]">
+                <div className="flex items-center justify-center w-full mb-3 xs:mb-4 sm:mb-6">
+                  <div className="w-10 h-10 xs:w-12 xs:h-12 sm:w-14 sm:h-14 rounded-xl bg-[#0ea5e9]/10 flex items-center justify-center group-hover:bg-[#0ea5e9]/20 transition-colors">
+                    <Ungroup className="w-4 h-4 xs:w-5 xs:h-5 sm:w-6 sm:h-6 text-[#0ea5e9]" />
+                  </div>
+                </div>
+                <div className="flex flex-col xs:flex-col sm:flex-col md:flex-row items-center xs:items-center sm:items-center md:items-center mb-2 sm:mb-2 md:mb-3">
+                  <h3 className="text-base text-lg sm:text-xl md:text-2xl font-semibold text-[#8bdbf8]"
+                      style={{ textShadow: "0 0 18px rgba(14,165,233,0.8), 0 0 8px rgba(14,165,233,0.6)" }}>Collaborative Development</h3>
+                  <span className="mt-1 xs:mt-1 sm:mt-1 md:mt-0 md:ml-2 px-2 py-0.5 rounded-full bg-[#1e2033]/80 text-[#0ea5e9] text-xs">
+                    collaboration
+                  </span>
+                </div>
+                <p className="text-gray-300 mb-3 xs:mb-4 sm:mb-4 md:mb-5 text-sm md:text-md leading-relaxed text-center xs:text-center sm:text-center md:text-left">
+                Work together in real-time with your team to build and refine your Solana applications.
+                </p>
+                <ul className="text-gray-300 space-y-2 sm:space-y-3 text-[10px] xs:text-xs sm:text-sm w-full flex flex-col items-center">
+                  {["Real-Time Co-Editing", "Integrated Version Control", "Team Communication Tools"].map(
+                    (item, index) => (
+                      <li key={index} className="flex items-center w-full max-w-[240px] xs:max-w-[260px] sm:max-w-[280px] text-xs md:text-sm">
+                        <div className="flex-shrink-0 flex items-center justify-center w-4 h-4 xs:w-5 xs:h-5 sm:w-5 sm:h-5 rounded-full bg-[#8bdbf8]/10 border border-[#0ea5e9]/20 mr-2 xs:mr-3 sm:mr-3">
+                          <div className="w-1 h-1 xs:w-1.5 xs:h-1.5 sm:w-1.5 sm:h-1.5 rounded-full bg-[#0ea5e9] animate-pulse" />
+                        </div>
+                        <span>{item}</span>
+                      </li>
+                    ),
+                  )}
+                </ul>
+              </div>
+            </div>
+          </ScrollReveal>
+
+          <ScrollReveal delay={1000}>
+            <div className="relative group h-full">
+              <div className="absolute inset-0 bg-gradient-to-r from-[#5580ff]/20 to-transparent rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="flex flex-col gap-2 relative bg-gradient-to-b from-[#5580ff]/5 to-[#5580ff]/5 backdrop-blur-sm border border-[#5580ff]/20 rounded-2xl p-3 xs:p-4 sm:p-6 md:p-8 h-full transition-all duration-300 group-hover:border-[#5580ff]/50 group-hover:translate-y-[-4px] shadow-[0_0_10px_rgba(85,128,255,0.2)]">
+                <div className="flex items-center justify-center w-full mb-3 xs:mb-4 sm:mb-6">
+                  <div className="w-10 h-10 xs:w-12 xs:h-12 sm:w-14 sm:h-14 rounded-xl bg-[#5580ff]/10 flex items-center justify-center group-hover:bg-[#5580ff]/20 transition-colors">
+                    <Eye className="w-4 h-4 xs:w-5 xs:h-5 sm:w-6 sm:h-6 text-[#5580ff]" />
+                  </div>
+                </div>
+                <div className="flex flex-col xs:flex-col sm:flex-col md:flex-row items-center xs:items-center sm:items-center md:items-center mb-2 sm:mb-2 md:mb-3">
+                  <h3 className="text-base text-lg sm:text-xl md:text-2xl font-semibold text-[#9cb3ff]"
+                      style={{ textShadow: "0 0 18px rgba(85,128,255,0.8), 0 0 8px rgba(85,128,255,0.6)" }}>AI-Powered Assistant</h3>
+                  <span className="mt-1 xs:mt-1 sm:mt-1 md:mt-0 md:ml-2 px-2 py-0.5 rounded-full bg-[#1e2033]/80 text-[#5580ff] text-xs">
+                    assistant
+                  </span>
+                </div>
+                <p className="text-gray-300 mb-3 xs:mb-4 sm:mb-4 md:mb-5 text-sm md:text-md leading-relaxed text-center xs:text-center sm:text-center md:text-left">
+                Leverage an intelligent AI agent to streamline your Solana dApp development process.
+                </p>
+                <ul className="text-gray-300 space-y-2 sm:space-y-3 text-[10px] xs:text-xs sm:text-sm w-full flex flex-col items-center">
+                  {["Natural Language Prompts", "On-Chain Task Automation", "Extensive Function Library"].map((item, index) => (
+                    <li key={index} className="flex items-center w-full max-w-[240px] xs:max-w-[260px] sm:max-w-[280px] text-xs md:text-sm">
+                      <div className="flex-shrink-0 flex items-center justify-center w-4 h-4 xs:w-5 xs:h-5 sm:w-5 sm:h-5 rounded-full bg-[#9cb3ff]/10 border border-[#5580ff]/20 mr-2 xs:mr-3 sm:mr-3">
+                        <div className="w-1 h-1 xs:w-1.5 xs:h-1.5 sm:w-1.5 sm:h-1.5 rounded-full bg-[#5580ff] animate-pulse" />
                       </div>
                       <span>{item}</span>
                     </li>

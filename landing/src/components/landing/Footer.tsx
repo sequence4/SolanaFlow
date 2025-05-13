@@ -2,6 +2,7 @@
 
 import React from "react"
 import Link from "next/link"
+import LegalDocsPopup from "@/components/LegalDocsPopup"
 
 export default function Footer() {
   return (
@@ -22,12 +23,13 @@ export default function Footer() {
           </div>
           
           <div className="flex flex-wrap justify-center gap-8">
-            <Link href="#" className="text-gray-400 hover:text-white transition-colors text-sm">
-              Contact
-            </Link>
-            <Link href="#" className="text-gray-400 hover:text-white transition-colors text-sm">
-              Privacy Policy
-            </Link>
+            <LegalDocsPopup
+              trigger={
+                <span className="cursor-pointer text-gray-400 hover:text-white transition-colors text-sm">
+                  Legal Docs & Contact
+                </span>
+              }
+            />
           </div>
         </div>
         
