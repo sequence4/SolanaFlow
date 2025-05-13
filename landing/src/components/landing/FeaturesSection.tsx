@@ -269,7 +269,7 @@ export default function FeaturesSection() {
                 Access a comprehensive library of pre-audited Solana modules to accelerate your dApp development.
                 </p>
                 <ul className="text-gray-300 space-y-2 sm:space-y-3 text-[10px] xs:text-xs sm:text-sm w-full flex flex-col items-center">
-                  {["Pre-Audited Modules", "Continuous Integration", "Seamless Integration"].map(
+                  {["Security-Hardened Modules", "Continuous Validation Pipeline", "Compliance-Ready Components"].map(
                     (item, index) => (
                       <li key={index} className="flex items-center w-full max-w-[240px] xs:max-w-[260px] sm:max-w-[280px] text-xs md:text-sm">
                         <div className="flex-shrink-0 flex items-center justify-center w-4 h-4 xs:w-5 xs:h-5 sm:w-5 sm:h-5 rounded-full bg-[#7cded9]/10 border border-[#0d9488]/20 mr-2 xs:mr-3 sm:mr-3">
