@@ -135,15 +135,14 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
           </div>
         </div>
 
-        <div className="hero-actions flex justify-center gap-6 mt-8 lg:mt-0 lg:absolute lg:self-start lg:justify-start lg:left-[37rem] lg:top-4 lg:z-20 2xl:left-[38rem]">
+        <div className="hero-actions flex flex-col md:flex-row items-center justify-center gap-6 md:mt-8 lg:mt-0 lg:absolute lg:self-start lg:justify-start lg:left-[37rem] lg:top-4 lg:z-20 2xl:left-[38rem]">
           <Button 
             data-testid="open-waitlist-form"
-            size="default" 
-            className="relative z-0 text-white font-medium rounded whitespace-nowrap gradient-border-button" 
+            className="h-12 relative z-0 text-white text-[15px] rounded whitespace-nowrap gradient-border-button" 
             style={{ borderRadius: '4px', backgroundColor: '#0d0e1a' }}
             onClick={openWaitlistModal}
           >
-            <span className="relative z-10 cursor-pointer text-bold text-[11px] md:text-[12px] gradient-text">Join the Waitlist</span>
+            <span className="relative z-10 cursor-pointer text-bold gradient-text">Join the Waitlist</span>
           </Button>
           <style jsx global>{`
             .gradient-border-button {
@@ -192,14 +191,14 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
               }
             }
           `}</style>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
             <Button asChild size="icon" variant="ghost" aria-label="SolanaFlow on X">
               <Link
                 href="https://x.com/solanaflow_io"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <BsTwitterX className="h-4 w-4 sm:h-5 sm:w-5 text-[#cfd2d3]" />
+                <BsTwitterX className="h-6 w-6 sm:h-8 sm:w-8 text-[#cfd2d3]" />
               </Link>
             </Button>
 
@@ -209,7 +208,7 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <BsTelegram className="h-4 w-4 sm:h-5 sm:w-5 text-[#cfd2d3]" />
+                <BsTelegram className="h-6 w-6 sm:h-8 sm:w-8 text-[#cfd2d3]" />
               </Link>
             </Button>
           </div>
