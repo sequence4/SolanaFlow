@@ -39,3 +39,4 @@ landing/.env.production
 
 landing-prod.tgz
 solanaflow-landing
+build.log
