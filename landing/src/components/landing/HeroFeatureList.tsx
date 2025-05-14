@@ -64,7 +64,7 @@ const features = [
   },
   {
     title: "Drag, Drop, Done",
-    description: "Quickly build workflows using pre-audited Solana components—no code required.",
+    description: "Quickly build workflows using pre-audited Solana components — no coding required.",
     icon: <BoxIcon className="h-3 w-3 xs:h-4 xs:w-4 sm:h-4 sm:w-4" />,
   },
   {
