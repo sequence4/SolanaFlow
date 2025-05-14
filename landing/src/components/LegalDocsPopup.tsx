@@ -281,8 +281,8 @@ Continued use of the Service constitutes acceptance of modified Policy.`;
 const contactContent = `## Get in Touch
 For questions about SolanaFlow or these documents, reach out:
 
-* Email: team@sequence4.io
-* X (Twitter): @s0lana_flow
+* Email: team@solanaflow.io
+* X (Twitter): @solanaflow_io
 * Telegram: https://t.me/+WVRI_EcdZrkyZDhk
 
 ## Copyright & Trademark
