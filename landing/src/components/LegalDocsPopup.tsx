@@ -49,16 +49,16 @@ export default function LegalDocsPopup({ trigger, isOpen: externalIsOpen, onClos
       </DialogTrigger>
       <DialogContent 
         style={{ "--popup-accent": POPUP_ACCENT_RGB } as React.CSSProperties }
-        className="sm:max-w-[700px] p-0 bg-gradient-to-b from-[#0D1117] to-[#0A0E14] 
+        className="sm:max-w-[700px] max-w-[95vw] p-0 bg-gradient-to-b from-[#0D1117] to-[#0A0E14] 
                   border border-[rgb(var(--popup-accent)/0.20)] 
                   rounded-lg 
                   shadow-[0_0_20px_rgba(56,232,255,0.2)]"
       >
-        <div className="flex items-center justify-between p-4 border-b border-[rgb(var(--popup-accent)/0.20)] 
+        <div className="flex items-center justify-between p-3 sm:p-4 border-b border-[rgb(var(--popup-accent)/0.20)] 
                         bg-gradient-to-r from-[#0D1117] via-[#101620] to-[#0D1117]">
           <div className="flex items-center relative">
-            <Terminal className="w-4 h-4 mr-2 text-gray-400" />
-            <span className="text-sm relative z-10 text-gray-400" 
+            <Terminal className="w-3 h-3 sm:w-4 sm:h-4 mr-2 text-gray-400" />
+            <span className="text-xs sm:text-sm relative z-10 text-gray-400" 
             style={{ fontFamily: 'var(--font-chakra-petch)' }}
             >
               SolanaFlow Legal Docs
@@ -71,7 +71,7 @@ export default function LegalDocsPopup({ trigger, isOpen: externalIsOpen, onClos
         <Tabs defaultValue="terms" className="w-full">
           <div className="border-b border-[rgb(var(--popup-accent)/0.20)] bg-gradient-to-r from-transparent 
                           via-[rgba(56,232,255,0.05)] to-transparent">
-            <TabsList className="bg-transparent h-12 p-0 pl-4 flex gap-2"
+            <TabsList className="bg-transparent h-10 sm:h-12 p-0 pl-2 sm:pl-4 flex gap-1 sm:gap-2 overflow-x-auto"
             style={{ fontFamily: 'var(--font-chakra-petch)' }}>
               <TabsTrigger
                 value="terms"
@@ -79,7 +79,7 @@ export default function LegalDocsPopup({ trigger, isOpen: externalIsOpen, onClos
                           data-[state=active]:to-[rgba(94,162,239,0.10)] data-[state=active]:text-transparent 
                           data-[state=active]:bg-clip-text data-[state=active]:bg-gradient-to-r 
                           data-[state=active]:from-[#38E8FF] data-[state=active]:to-[#5EA2EF] 
-                          rounded px-3 py-2 font-mono text-sm"
+                          rounded px-2 sm:px-3 py-1 sm:py-2 font-mono text-xs sm:text-sm"
                 style={{ fontFamily: 'var(--font-chakra-petch)' }}
               >
                 Terms and Conditions
@@ -90,7 +90,7 @@ export default function LegalDocsPopup({ trigger, isOpen: externalIsOpen, onClos
                 data-[state=active]:to-[rgba(94,162,239,0.10)] data-[state=active]:text-transparent 
                 data-[state=active]:bg-clip-text data-[state=active]:bg-gradient-to-r 
                 data-[state=active]:from-[#38E8FF] data-[state=active]:to-[#5EA2EF] 
-                rounded px-3 py-2 font-mono text-sm"
+                rounded px-2 sm:px-3 py-1 sm:py-2 font-mono text-xs sm:text-sm"
                 style={{ fontFamily: 'var(--font-chakra-petch)' }}
               >
                 Privacy Policy
@@ -100,7 +100,7 @@ export default function LegalDocsPopup({ trigger, isOpen: externalIsOpen, onClos
                 className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[rgba(56,232,255,0.10)] 
                 data-[state=active]:to-[rgba(94,162,239,0.10)] data-[state=active]:text-transparent 
                 data-[state=active]:bg-clip-text data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#38E8FF] 
-                data-[state=active]:to-[#5EA2EF] rounded px-3 py-2 font-mono text-sm"
+                data-[state=active]:to-[#5EA2EF] rounded px-2 sm:px-3 py-1 sm:py-2 font-mono text-xs sm:text-sm"
                 style={{ fontFamily: 'var(--font-chakra-petch)' }}
               >
                 Cookie Policy
@@ -110,7 +110,7 @@ export default function LegalDocsPopup({ trigger, isOpen: externalIsOpen, onClos
                 className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[rgba(56,232,255,0.10)] 
                 data-[state=active]:to-[rgba(94,162,239,0.10)] data-[state=active]:text-transparent data-[state=active]:bg-clip-text 
                 data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#38E8FF] data-[state=active]:to-[#5EA2EF] 
-                rounded px-3 py-2 font-mono text-sm"
+                rounded px-2 sm:px-3 py-1 sm:py-2 font-mono text-xs sm:text-sm"
                 style={{ fontFamily: 'var(--font-chakra-petch)' }}
               >
                 Contact
@@ -118,7 +118,7 @@ export default function LegalDocsPopup({ trigger, isOpen: externalIsOpen, onClos
             </TabsList>
           </div>
 
-          <ScrollArea className="h-[400px] p-6 text-gray-400" style={{ fontFamily: 'var(--font-chakra-petch)' }}>
+          <ScrollArea className="h-[300px] sm:h-[400px] p-4 sm:p-6 text-gray-400" style={{ fontFamily: 'var(--font-chakra-petch)' }}>
             <TabsContent value="terms" className="text-gray-400 mt-0 focus-visible:outline-none focus-visible:ring-0">
               <TerminalContent content={termsContent} />
             </TabsContent>
@@ -134,7 +134,7 @@ export default function LegalDocsPopup({ trigger, isOpen: externalIsOpen, onClos
           </ScrollArea>
         </Tabs>
 
-        <div className="flex justify-end p-4 border-t border-[rgb(var(--popup-accent)/0.20)] bg-gradient-to-r from-transparent 
+        <div className="flex justify-end p-3 sm:p-4 border-t border-[rgb(var(--popup-accent)/0.20)] bg-gradient-to-r from-transparent 
                            via-[rgba(56,232,255,0.05)] to-transparent">
             <Button
               variant="outline"
@@ -143,8 +143,8 @@ export default function LegalDocsPopup({ trigger, isOpen: externalIsOpen, onClos
                         border-[rgb(var(--popup-accent)/0.10)]
                         text-[#153c47]
                         hover:text-[#1f505e]
-                        font-mono text-sm font-semibold
-                        rounded-md px-4 py-2
+                        font-mono text-xs sm:text-sm font-semibold
+                        rounded-md px-3 sm:px-4 py-1 sm:py-2
                         shadow-[0_0_10px_rgba(56,232,255,0.15)]"
                         style={{ fontFamily: 'var(--font-chakra-petch)' }}
             >
@@ -162,7 +162,7 @@ function TerminalContent({ content }: { content: string }) {
   const sections = content.split("## ").filter(Boolean)
 
   return (
-    <div className="font-mono text-sm text-gray-400 leading-relaxed space-y-6 bg-gradient-to-b from-transparent to-[#0A0E14]/50" 
+    <div className="font-mono text-xs sm:text-sm text-gray-400 leading-relaxed space-y-4 sm:space-y-6 bg-gradient-to-b from-transparent to-[#0A0E14]/50" 
     style={{ fontFamily: 'var(--font-chakra-petch)' }}>
       {sections.map((section, index) => {
         const [title, ...contentLines] = section.split("\n")
@@ -172,21 +172,21 @@ function TerminalContent({ content }: { content: string }) {
         return (
           <div key={sectionId} className="border border-[rgb(var(--popup-accent)/0.20)] rounded-md overflow-hidden backdrop-blur-sm">
             <div
-              className="flex items-center justify-between p-3 bg-gradient-to-r from-[rgba(56,232,255,0.05)] to-[rgba(94,162,239,0.05)] cursor-pointer"
+              className="flex items-center justify-between p-2 sm:p-3 bg-gradient-to-r from-[rgba(56,232,255,0.05)] to-[rgba(94,162,239,0.05)] cursor-pointer"
               onClick={() => setExpanded((prev) => ({ ...prev, [sectionId]: !prev[sectionId] }))}
             >
-              <div className="text-transparent bg-clip-text bg-gradient-to-r from-[#38E8FF] to-[#5EA2EF] font-semibold ml-2">
+              <div className="text-transparent bg-clip-text bg-gradient-to-r from-[#38E8FF] to-[#5EA2EF] font-semibold ml-1 sm:ml-2 text-xs sm:text-sm">
                 {title.trim()}
               </div>
               {expanded[sectionId] ? (
-                <ChevronUp className="h-4 w-4 text-transparent bg-clip-text bg-gradient-to-r from-[#38E8FF] to-[#5EA2EF]" />
+                <ChevronUp className="h-3 w-3 sm:h-4 sm:w-4 text-transparent bg-clip-text bg-gradient-to-r from-[#38E8FF] to-[#5EA2EF]" />
               ) : (
-                <ChevronDown className="h-4 w-4 text-transparent bg-clip-text bg-gradient-to-r from-[#38E8FF] to-[#5EA2EF]" />
+                <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 text-transparent bg-clip-text bg-gradient-to-r from-[#38E8FF] to-[#5EA2EF]" />
               )}
             </div>
 
             {expanded[sectionId] && (
-              <div className="p-4 bg-gradient-to-b from-[#0D1117] to-[#0A0E14] whitespace-pre-wrap border-t border-[rgb(var(--popup-accent)/0.10)]">
+              <div className="p-3 sm:p-4 bg-gradient-to-b from-[#0D1117] to-[#0A0E14] whitespace-pre-wrap border-t border-[rgb(var(--popup-accent)/0.10)] text-xs sm:text-sm">
                 {sectionContent}
               </div>
             )}
