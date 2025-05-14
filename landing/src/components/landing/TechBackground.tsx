@@ -1,6 +1,5 @@
 "use client"
 
-import { Sparkles } from "lucide-react"
 import { useEffect, useRef } from "react"
 
 export default function TechBackground() {

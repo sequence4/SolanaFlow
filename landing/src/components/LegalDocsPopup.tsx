@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState } from "react"
-import { X, ChevronDown, ChevronUp, Terminal } from "lucide-react"
+import { ChevronDown, ChevronUp, Terminal } from "lucide-react"
 import { Dialog, DialogContent, DialogTrigger } from "./ui/dialog"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { Button } from "./ui/button"

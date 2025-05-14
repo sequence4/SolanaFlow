@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState } from "react"
 import { Send } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -33,7 +33,6 @@ export default function UserMessageBox({
   const [isTyping, setIsTyping] = useState(true)
   const [isDeleting, setIsDeleting] = useState(false)
   const [showCursor, setShowCursor] = useState(true)
-  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     let timeout: NodeJS.Timeout
