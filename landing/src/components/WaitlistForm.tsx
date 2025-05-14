@@ -17,7 +17,7 @@ import {
   isDiscordHandle
 } from "@/utils/validators";
 
-export const POPUP_ACCENT = "#38E8FF"
+export const POPUP_ACCENT = "#00fff7"
 export const POPUP_ACCENT_RGB = "56 232 255"
 
 interface WaitlistFormProps {
@@ -275,8 +275,8 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
   }
 
   return (
-    <div className="bg-gradient-to-b from-[#0D1117] to-[#0A0E14] text-white border border-[rgb(var(--popup-accent)/0.10)] 
-    rounded-lg shadow-[0_0_10px_rgba(56,232,255,0.3)]"
+    <div className="bg-gradient-to-b from-[#0D1117] to-[#0A0E14] text-white border border-[rgb(var(--popup-accent)/0.25)] 
+    rounded-lg shadow-[0_0_15px_rgba(0,255,247,0.4)]"
          style={{ "--popup-accent": POPUP_ACCENT_RGB } as React.CSSProperties }>
       <div className="flex items-center justify-between p-4 border-b border-[rgb(var(--popup-accent)/0.20)] bg-gradient-to-r from-[#0D1117] via-[#101620] to-[#0D1117]">
         <div className="flex items-center">
