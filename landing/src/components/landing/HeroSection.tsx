@@ -135,7 +135,6 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
           </div>
         </div>
 
-        {/* Waitlist button and socials - repositioned to float above flow graph on desktop */}
         <div className="hero-actions flex justify-center gap-6 mt-8 lg:mt-0 lg:absolute lg:self-start lg:justify-start lg:left-[37rem] lg:top-4 lg:z-20 2xl:left-[38rem]">
           <Button 
             data-testid="open-waitlist-form"
@@ -196,7 +195,7 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
         <div className="flex items-center gap-2">
             <Button asChild size="icon" variant="ghost" aria-label="SolanaFlow on X">
               <Link
-                href="https://x.com/Solana_FlowCode"
+                href="https://x.com/solanaflow_io"
                 target="_blank"
                 rel="noopener noreferrer"
               >
