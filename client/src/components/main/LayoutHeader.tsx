@@ -35,12 +35,12 @@ export default function LayoutHeader() {
       <div className="flex items-center gap-2">
       <Image 
         src="/logo.png" 
-        alt="Solana FlowCode" 
+        alt="SolanaFlow" 
         width={40} 
         height={40} 
         className="rounded-md" 
       />
-        <p className="text-white font-bold">Solana FlowCode</p>
+        <p className="text-white font-bold">SolanaFlow</p>
       </div>
 
       {/* Right side: wallet connect + chat toggle */}
