@@ -38,7 +38,7 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#0a0b14] text-white font-mono overflow-x-hidden">
+    <div className="min-h-screen bg-[#0a0c1c] text-white font-mono overflow-x-hidden">
       {mounted && (
         <WaitlistModal 
           isOpen={isWaitlistModalOpen} 
@@ -62,12 +62,12 @@ export default function LandingPage() {
       <main>
         <HeroSection mounted={mounted} openWaitlistModal={openWaitlistModal} />
 
-        <section id="features" className="relative py-16 lg:py-24 px-4 sm:px-10 bg-[#050508] overflow-hidden">
+        <section id="features" className="relative py-16 lg:py-24 px-4 sm:px-10 bg-[#0f162a] overflow-hidden">
           <FeaturesBackground />
           <div className="container mx-auto max-w-7xl">
-        <FeaturesSection />
-        </div>
-      </section>
+            <FeaturesSection />
+          </div>
+        </section>
 
         <DemoSection />
         

@@ -1,5 +1,5 @@
-CREATE DATABASE solanaflow;
-\connect solanaflow
+CREATE DATABASE solanaflow_waitlist;
+\connect solanaflow_waitlist
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "citext";
@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS waitlist (
   source         TEXT,
   signup_ip      INET,
   meta           JSONB,
+  consent          BOOLEAN NOT NULL DEFAULT FALSE,
   CONSTRAINT chk_contact
     CHECK (email IS NOT NULL OR wallet_address IS NOT NULL)
 );

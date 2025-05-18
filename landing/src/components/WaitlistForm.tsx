@@ -1,12 +1,13 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { ArrowRight, Loader2, X } from "lucide-react"
+import { ArrowRight, Loader2, Terminal } from "lucide-react"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import confetti from "canvas-confetti"
 import type { Options } from "canvas-confetti"
 import {
@@ -15,6 +16,9 @@ import {
   isHandle,
   isDiscordHandle
 } from "@/utils/validators";
+
+export const POPUP_ACCENT = "#00fff7"
+export const POPUP_ACCENT_RGB = "56 232 255"
 
 interface WaitlistFormProps {
   onClose?: () => void;
@@ -35,30 +39,6 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
   const [csrf, setCsrf] = useState<string>("");
   const [consent, setConsent] = useState(false);
   const { toast } = useToast()
-  const contentRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!contentRef.current) return;
-    
-    let scrollTimeout: NodeJS.Timeout;
-    const scrollDiv = contentRef.current;
-    
-    const handleScroll = () => {
-      scrollDiv.classList.add('scrolling');
-      
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(() => {
-        scrollDiv.classList.remove('scrolling');
-      }, 1000);
-    };
-    
-    scrollDiv.addEventListener('scroll', handleScroll);
-    
-    return () => {
-      scrollDiv.removeEventListener('scroll', handleScroll);
-      clearTimeout(scrollTimeout);
-    };
-  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -222,16 +202,14 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
         email,
         consent,
         full_name: fullName,
-        telegram_handle: truncatedTelegram,
-        twitter_handle: truncatedTwitter,
-        discord_username: truncatedDiscord,
         referred_by: referredBy,
         source,
       };
 
-      if (walletAddress.trim()) {
-        body.wallet_address = truncatedWallet;
-      }
+      if (walletAddress.trim()) body.wallet_address = truncatedWallet;
+      if (telegramHandle.trim()) body.telegram_handle = truncatedTelegram;
+      if (twitterHandle.trim()) body.twitter_handle = truncatedTwitter;
+      if (discordUsername.trim()) body.discord_username = truncatedDiscord;
 
       const response = await fetch("/api/waitlist", {
         method: "POST",
@@ -297,41 +275,33 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
   }
 
   return (
-    <div className="bg-[#0d0e1a] text-white rounded-2xl border border-[#2a2d4a] shadow-xl">
-      <div className="flex items-center justify-between p-4 sm:p-6 border-b border-[#2a2d4a]">
-        <div className="flex items-center space-x-2">
-          <span className="text-base sm:text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
-                style={{
-                  backgroundSize: "300% 300%",
-                  animation: "gradientFlow 3s ease infinite"
-                }}>
+    <div className="bg-gradient-to-b from-[#0D1117] to-[#0A0E14] text-white border border-[rgb(var(--popup-accent)/0.25)] 
+    rounded-lg shadow-[0_0_15px_rgba(0,255,247,0.4)]"
+         style={{ "--popup-accent": POPUP_ACCENT_RGB } as React.CSSProperties }>
+      <div className="flex items-center justify-between p-4 border-b border-[rgb(var(--popup-accent)/0.20)] bg-gradient-to-r from-[#0D1117] via-[#101620] to-[#0D1117]">
+        <div className="flex items-center">
+          <Terminal className="w-4 h-4 mr-2 text-gray-400" />
+          <span className="text-sm text-gray-400"
+                style={{ fontFamily: 'var(--font-chakra-petch)' }}>
             Join the SolanaFlow Waitlist
           </span>
         </div>
-        <button
-          onClick={onClose}
-          className="text-gray-400 hover:text-white transition-colors"
-        >
-          <X className="h-4 w-4 sm:h-5 sm:w-5" />
-        </button>
+       
       </div>
 
-      <div 
-        ref={contentRef}
-        className="overflow-y-auto max-h-[60vh] sm:max-h-[70vh] px-4 sm:px-6 py-4 sm:py-6 custom-scrollbar"
-      >
+      <ScrollArea className="h-[400px] p-6 flex flex-col justify-center items-center" style={{ fontFamily: 'var(--font-chakra-petch)' }}>
         {isSuccess ? (
-          <div className="text-center py-8">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 rounded-full bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff] flex items-center justify-center">
-              <ArrowRight className="h-8 w-8 sm:h-10 sm:w-10 text-[#0d0e1a]" />
-            </div>
-            <h3 className="text-lg sm:text-xl font-bold mb-2">You&apos;re on the waitlist!</h3>
+          <div className="flex flex-col items-center justify-center py-[15%]">
+            <h3 className="text-lg sm:text-2xl text-gray-200 mb-2 ">You&apos;re on the waitlist!</h3>
             <p className="text-gray-400 text-sm sm:text-base mb-4">
               We&apos;ll notify you as soon as SolanaFlow is ready for you.
             </p>
             <Button
               onClick={onClose}
-              className="bg-[#1e2033] hover:bg-[#2a2d4a] text-white"
+              variant="outline"
+              className="bg-transparent border-[#1d4d57] text-[#255b66] hover:bg-[rgba(56,232,255,0.10)] 
+                hover:text-[#3a8d9e] font-mono text-xs font-semibold rounded-lg px-4 py-2 shadow-[0_0_10px_rgba(56,232,255,0.15)]"
+                style={{ fontFamily: 'var(--font-chakra-petch)' }}
             >
               Close
             </Button>
@@ -340,7 +310,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
           <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
             <div className="space-y-3 sm:space-y-4">
               <div>
-                <Label htmlFor="email" className="text-xs sm:text-sm text-gray-400">
+                <Label htmlFor="email" className="text-xs sm:text-sm text-gray-400" style={{ fontFamily: 'var(--font-chakra-petch)' }}>
                   Email <span className="text-red-500">*</span>
                 </Label>
                 <Input
@@ -348,10 +318,11 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className={`bg-[#1e2033] border-[#2a2d4a] text-xs sm:text-sm h-8 sm:h-10 ${
+                  className={`bg-[#0D1117] border-[rgb(var(--popup-accent)/0.10)] text-[#E6E6E6] placeholder:text-[#5b6775] text-xs sm:text-sm h-8 sm:h-10 ${
                     formErrors.email ? "border-red-500" : ""
                   }`}
                   placeholder="you@example.com"
+                  style={{ fontFamily: 'var(--font-chakra-petch)' }}
                 />
                 {formErrors.email && (
                   <p className="text-red-500 text-xs mt-1">{formErrors.email}</p>
@@ -359,18 +330,19 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
               </div>
 
               <div>
-                <Label htmlFor="wallet" className="text-xs sm:text-sm text-gray-400">
+                <Label htmlFor="wallet" className="text-xs sm:text-sm text-gray-400" style={{ fontFamily: 'var(--font-chakra-petch)' }}>
                   Wallet (Solana)
                 </Label>
                 <Input
                   id="wallet"
                   type="text"
                   value={walletAddress}
-                  onChange={(e) => setWalletAddress(e.target.value)}
-                  className={`bg-[#1e2033] border-[#2a2d4a] text-xs sm:text-sm h-8 sm:h-10 ${
+                  onChange={(e) => setWalletAddress(e.target.value.trimStart())}
+                  className={`bg-[#0D1117] border-[rgb(var(--popup-accent)/0.10)] text-[#E6E6E6] placeholder:text-[#5b6775] text-xs sm:text-sm h-8 sm:h-10 ${
                     formErrors.wallet ? "border-red-500" : ""
                   }`}
                   placeholder="Your Solana wallet address"
+                  style={{ fontFamily: 'var(--font-chakra-petch)' }}
                 />
                 {formErrors.wallet && (
                   <p className="text-red-500 text-xs mt-1">{formErrors.wallet}</p>
@@ -378,7 +350,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
               </div>
 
               <div>
-                <Label htmlFor="fullName" className="text-xs sm:text-sm text-gray-400">
+                <Label htmlFor="fullName" className="text-xs sm:text-sm text-gray-400" style={{ fontFamily: 'var(--font-chakra-petch)' }}>
                   Name{" "}
                   <span className="text-gray-500 ml-1">(optional)</span>
                 </Label>
@@ -387,10 +359,11 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className={`bg-[#1e2033] border-[#2a2d4a] text-xs sm:text-sm h-8 sm:h-10 ${
+                  className={`bg-[#0D1117] border-[rgb(var(--popup-accent)/0.10)] text-[#E6E6E6] placeholder:text-[#5b6775] text-xs sm:text-sm h-8 sm:h-10 ${
                     formErrors.fullName ? "border-red-500" : ""
                   }`}
                   placeholder="Your full name"
+                  style={{ fontFamily: 'var(--font-chakra-petch)' }}
                 />
                 {formErrors.fullName && (
                   <p className="text-red-500 text-xs mt-1">{formErrors.fullName}</p>
@@ -398,7 +371,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
               </div>
 
               <div>
-                <Label htmlFor="telegram" className="text-xs sm:text-sm text-gray-400">
+                <Label htmlFor="telegram" className="text-xs sm:text-sm text-gray-400" style={{ fontFamily: 'var(--font-chakra-petch)' }}>
                   Telegram{" "}
                   <span className="text-gray-500 ml-1">(optional)</span>
                 </Label>
@@ -406,11 +379,12 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                   id="telegram"
                   type="text"
                   value={telegramHandle}
-                  onChange={(e) => setTelegramHandle(e.target.value)}
-                  className={`bg-[#1e2033] border-[#2a2d4a] text-xs sm:text-sm h-8 sm:h-10 ${
+                  onChange={(e) => setTelegramHandle(e.target.value.trimStart())}
+                  className={`bg-[#0D1117] border-[rgb(var(--popup-accent)/0.10)] text-[#E6E6E6] placeholder:text-[#5b6775] text-xs sm:text-sm h-8 sm:h-10 ${
                     formErrors.telegram ? "border-red-500" : ""
                   }`}
                   placeholder="@username"
+                  style={{ fontFamily: 'var(--font-chakra-petch)' }}
                 />
                 {formErrors.telegram && (
                   <p className="text-red-500 text-xs mt-1">{formErrors.telegram}</p>
@@ -418,7 +392,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
               </div>
 
               <div>
-                <Label htmlFor="twitter" className="text-xs sm:text-sm text-gray-400">
+                <Label htmlFor="twitter" className="text-xs sm:text-sm text-gray-400" style={{ fontFamily: 'var(--font-chakra-petch)' }}>
                   Twitter{" "}
                   <span className="text-gray-500 ml-1">(optional)</span>
                 </Label>
@@ -426,11 +400,12 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                   id="twitter"
                   type="text"
                   value={twitterHandle}
-                  onChange={(e) => setTwitterHandle(e.target.value)}
-                  className={`bg-[#1e2033] border-[#2a2d4a] text-xs sm:text-sm h-8 sm:h-10 ${
+                  onChange={(e) => setTwitterHandle(e.target.value.trimStart())}
+                  className={`bg-[#0D1117] border-[rgb(var(--popup-accent)/0.10)] text-[#E6E6E6] placeholder:text-[#5b6775] text-xs sm:text-sm h-8 sm:h-10 ${
                     formErrors.twitter ? "border-red-500" : ""
                   }`}
                   placeholder="@handle"
+                  style={{ fontFamily: 'var(--font-chakra-petch)' }}
                 />
                 {formErrors.twitter && (
                   <p className="text-red-500 text-xs mt-1">{formErrors.twitter}</p>
@@ -438,7 +413,7 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
               </div>
 
               <div>
-                <Label htmlFor="discord" className="text-xs sm:text-sm text-gray-400">
+                <Label htmlFor="discord" className="text-xs sm:text-sm text-gray-400" style={{ fontFamily: 'var(--font-chakra-petch)' }}>
                   Discord{" "}
                   <span className="text-gray-500 ml-1">(optional)</span>
                 </Label>
@@ -446,11 +421,12 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                   id="discord"
                   type="text"
                   value={discordUsername}
-                  onChange={(e) => setDiscordUsername(e.target.value)}
-                  className={`bg-[#1e2033] border-[#2a2d4a] text-xs sm:text-sm h-8 sm:h-10 ${
+                  onChange={(e) => setDiscordUsername(e.target.value.trimStart())}
+                  className={`bg-[#0D1117] border-[rgb(var(--popup-accent)/0.10)] text-[#E6E6E6] placeholder:text-[#5b6775] text-xs sm:text-sm h-8 sm:h-10 ${
                     formErrors.discord ? "border-red-500" : ""
                   }`}
                   placeholder="username#0000"
+                  style={{ fontFamily: 'var(--font-chakra-petch)' }}
                 />
                 {formErrors.discord && (
                   <p className="text-red-500 text-xs mt-1">{formErrors.discord}</p>
@@ -463,9 +439,9 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                   type="checkbox"
                   checked={consent}
                   onChange={(e) => setConsent(e.target.checked)}
-                  className="mt-1 h-4 w-4 rounded text-[#4d7cfe] border-gray-600 focus:ring-0"
+                  className="mt-1 h-4 w-4 rounded text-[#38E8FF] border-[rgb(var(--popup-accent)/0.30)] focus:ring-0 bg-[#0D1117]"
                 />
-                <Label htmlFor="consent" className="text-xs sm:text-sm text-gray-400">
+                <Label htmlFor="consent" className="text-xs sm:text-sm text-gray-400" style={{ fontFamily: 'var(--font-chakra-petch)' }}>
                   I agree to receive email updates about SolanaFlow&apos;s launch and related product news.
                 </Label>
               </div>
@@ -474,14 +450,17 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
               )}
             </div>
 
-            <div className="pt-4">
+            <div className="flex justify-end p-4 border-t border-[rgb(var(--popup-accent)/0.20)] bg-gradient-to-r from-transparent via-[rgba(56,232,255,0.05)] to-transparent">
               <Button
                 type="submit"
                 disabled={isSubmitting}
                 data-testid="join-waitlist-btn"
-                className="w-full py-2 bg-gradient-to-r from-[#4d7cfe] to-[#22d3ee] hover:opacity-90 text-white font-medium relative overflow-hidden group rounded-xl"
+                variant="outline"
+                className="bg-transparent border-[#1d4d57] text-[#255b66] hover:bg-[rgba(56,232,255,0.10)] 
+                hover:text-[#3a8d9e] font-mono text-xs font-semibold rounded-lg px-4 py-2 shadow-[0_0_10px_rgba(56,232,255,0.15)]"
+                style={{ fontFamily: 'var(--font-chakra-petch)' }}
               >
-                <span className="relative z-10 flex items-center justify-center text-[14px]">
+                <span className="flex items-center justify-center">
                   {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -494,17 +473,11 @@ export default function WaitlistForm({ onClose }: WaitlistFormProps) {
                     </>
                   )}
                 </span>
-                <span className="absolute inset-0 bg-gradient-to-r from-[#4d7cfe] to-[#22d3ee] group-hover:scale-105 transition-transform duration-300"></span>
-                <span className="absolute inset-0 opacity-0 group-hover:opacity-20 bg-[radial-gradient(circle,_white_10%,_transparent_70%)] transition-opacity duration-300"></span>
               </Button>
-            </div>
-
-            <div className="flex items-center justify-center space-x-1 text-[10px] text-center text-gray-500 pt-1">
-              <p>We&apos;ll only contact you about launch updates</p>
             </div>
           </form>
         )}
-      </div>
+      </ScrollArea>
     </div>
   )
 } 
