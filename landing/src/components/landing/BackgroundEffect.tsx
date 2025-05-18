@@ -23,8 +23,8 @@ export default function BackgroundEffect({ mounted }: BackgroundEffectProps) {
   
   useEffect(() => {
     if (mounted) {
-      const gradientColors = ['#5f88dc', '#1cf6a0', '#9945ff'];
-      const newParticles = Array.from({ length: 100 }).map((_, i) => {
+      const gradientColors = ['#45a3f7', '#2dd4bf', '#8b5cf6'];
+      const newParticles = Array.from({ length: 70 }).map((_, i) => {
         const randomColor = gradientColors[Math.floor(Math.random() * gradientColors.length)];
         
         return {
@@ -35,7 +35,7 @@ export default function BackgroundEffect({ mounted }: BackgroundEffectProps) {
           animationDelay: `${Math.random() * 5}s`,
           color: randomColor,
           textShadow: `0 0 5px ${randomColor}`,
-          fontSize: '1rem',
+          fontSize: '0.85rem',
           char: String.fromCharCode(33 + Math.floor(Math.random() * 94))
         };
       });
@@ -47,8 +47,8 @@ export default function BackgroundEffect({ mounted }: BackgroundEffectProps) {
   if (!mounted || particles.length === 0) return null;
   
   return (
-    <div className="fixed inset-0 z-0 opacity-15 overflow-hidden pointer-events-none">
-      <div className="absolute inset-0">
+    <div className="fixed inset-0 z-0 opacity-10 overflow-hidden pointer-events-none">
+      <div className="absolute inset-0 bg-[#0f1123]">
         {particles.map((particle) => (
           <div
             key={particle.id}

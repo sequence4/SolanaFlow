@@ -23,7 +23,7 @@ export default function Navbar({ openWaitlistModal }: NavbarProps) {
 
   return (
     <>
-      <nav id="site-nav" className="fixed top-0 left-0 right-0 z-10 border-b border-[#1e2033] bg-[#0a0b14]/80 backdrop-blur-md">
+      <nav id="site-nav" className="fixed top-0 left-0 right-0 z-10 border-b border-[#1e2033] bg-[#0e1123]/50 backdrop-blur-md">
         <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-5 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <div className="w-4 h-4 md:w-6 md:h-6 relative">
