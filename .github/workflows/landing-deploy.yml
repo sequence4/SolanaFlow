@@ -41,19 +41,17 @@ jobs:
 
       - name: Archive production build
         run: |
-          [ -f ../pnpm-lock.yaml ] && cp ../pnpm-lock.yaml .
-          [ -f ../.npmrc ] && cp ../.npmrc .
-          tar --ignore-failed-read -czf ../landing.tar.gz \
+          cd landing
+          tar -czf ../landing.tar.gz \
             .next \
             public \
             next.config.* \
             ecosystem.config.cjs \
             package.json \
-            pnpm-lock.yaml \
-            .npmrc \
+            ../pnpm-lock.yaml \
             docs \
             scripts
-        working-directory: landing
+          cd ..
 
       - name: Upload build artefact
         uses: actions/upload-artifact@v4
@@ -115,9 +113,7 @@ jobs:
           script: |
             set -euxo pipefail
             cd /opt/solanaflow
-            if [ -d landing ]; then
-              mv landing landing-$(date +%Y%m%d%H%M)
-            fi
+            [ -d landing ] && mv landing "landing-$(date +%Y%m%d%H%M)"
             mkdir -p landing
             tar -xzf tmp/landing.tar.gz -C landing --strip-components=0
             rm -f tmp/landing.tar.gz

@@ -2,7 +2,7 @@ import { CodeIcon, BoxIcon, ZapIcon, RefreshCwIcon, UsersIcon } from "lucide-rea
 
 export default function HeroFeatureList() {
   return (
-    <div className="relative py-1 sm:py-2 md:py-3 font-lekton w-full">
+    <div className="relative py-1 sm:py-2 md:py-3 font-lekton w-full max-w-[30rem] mx-auto lg:mx-0">
       <div className="absolute inset-0 opacity-5">
         <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
           <pattern id="circuit" width="40" height="40" patternUnits="userSpaceOnUse">
@@ -14,7 +14,7 @@ export default function HeroFeatureList() {
 
       <div className="relative z-10 flex flex-col items-center lg:items-start lg:justify-start w-full">
         {features.map((feature, index) => (
-          <div key={index} className="w-full w-[90%] group 
+          <div key={index} className="w-full group 
                 flex 
                 flex-row
                 items-start 
@@ -58,28 +58,28 @@ export default function HeroFeatureList() {
 
 const features = [
   {
-    title: "AI Powered Development",
-    description: "Turn ideas into secure Solana dApps with natural-language instructions.",
+    title: "AI-Powered dApps",
+    description: "Turn simple English prompts into secure, launch-ready Solana applications.",
     icon: <CodeIcon className="h-3 w-3 xs:h-4 xs:w-4 sm:h-4 sm:w-4" />,
   },
   {
-    title: "Visual Workflow Builder",
-    description: "Drag-and-drop pre-audited Solana modules for fast, reliable builds.",
+    title: "Drag, Drop, Done",
+    description: "Quickly build workflows using pre-audited Solana components — no coding required.",
     icon: <BoxIcon className="h-3 w-3 xs:h-4 xs:w-4 sm:h-4 sm:w-4" />,
   },
   {
-    title: "Instant Deployment",
-    description: "Ship to devnet or mainnet in a single click.",
+    title: "Deploy Instantly",
+    description: "Launch to Devnet or Mainnet in just one click.",
     icon: <ZapIcon className="h-3 w-3 xs:h-4 xs:w-4 sm:h-4 sm:w-4" />,
   },
   {
-    title: "Live Iterations",
-    description: "Update logic and push upgrades in real time.",
+    title: "Live Updates",
+    description: "Push real-time changes and iterate instantly.",
     icon: <RefreshCwIcon className="h-3 w-3 xs:h-4 xs:w-4 sm:h-4 sm:w-4" />,
   },
   {
-    title: "Collaborative Workspace",
-    description: "Real-time co-editing with built-in version control.",
+    title: "Team Sync",
+    description: "Real-time collaboration, integrated version control.",
     icon: <UsersIcon className="h-3 w-3 xs:h-4 xs:w-4 sm:h-4 sm:w-4" />,
   },
 ] 

@@ -1,7 +1,7 @@
 import React, { Suspense } from "react";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Oxygen_Mono, Lekton } from 'next/font/google';
+import { Oxygen_Mono, Lekton, VT323, Chakra_Petch } from 'next/font/google';
 import Script from "next/script";
 import { Analytics } from "./_analytics";
 import { isGaEnabled } from "@/lib/gtag";
@@ -25,6 +25,19 @@ const oxygenMono = Oxygen_Mono({
 
 const lekton = Lekton({
   variable: "--font-lekton",
+  subsets: ["latin"],
+  weight: ["400", "700"],
+});
+
+const vt323 = VT323({
+  variable: "--font-vt323",
+  subsets: ["latin"],
+  weight: ["400"],
+});
+
+
+const chakraPetch = Chakra_Petch({
+  variable: "--font-chakra-petch",
   subsets: ["latin"],
   weight: ["400", "700"],
 });
@@ -76,7 +89,7 @@ export default function RootLayout({
           </>
         )}
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} ${oxygenMono.variable} ${lekton.variable} antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${oxygenMono.variable} ${lekton.variable} ${vt323.variable} ${chakraPetch.variable} antialiased`}>
         {isGaEnabled && (
           <Suspense fallback={null}>
             <Analytics />

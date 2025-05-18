@@ -1,11 +1,11 @@
 "use client"
 
 import React from "react"
-import Link from "next/link"
+import LegalDocsPopup from "@/components/LegalDocsPopup"
 
 export default function Footer() {
   return (
-    <footer className="bg-[#080912] border-t border-[#1e2033]">
+    <footer className="bg-[#0f1123] border-t border-[#1e2033]">
       <div className="container mx-auto max-w-7xl px-4 py-10 lg:py-16">
         <div className="flex flex-col md:flex-row justify-between items-center mb-8">
           <div className="mb-6 md:mb-0">
@@ -22,18 +22,19 @@ export default function Footer() {
           </div>
           
           <div className="flex flex-wrap justify-center gap-8">
-            <Link href="#" className="text-gray-400 hover:text-white transition-colors text-sm">
-              Contact
-            </Link>
-            <Link href="#" className="text-gray-400 hover:text-white transition-colors text-sm">
-              Privacy Policy
-            </Link>
+            <LegalDocsPopup
+              trigger={
+                <span className="cursor-pointer text-gray-400 hover:text-white transition-colors text-sm">
+                  Legal Docs & Contact
+                </span>
+              }
+            />
           </div>
         </div>
         
         <div className="pt-6 border-t border-[#1e2033] text-center">
           <p className="text-gray-500 text-xs">
-            &copy; {new Date().getFullYear()} SolanaFlow. All rights reserved.
+            &copy; {new Date().getFullYear()} Sequence4 Ltd. All rights reserved.
           </p>
         </div>
       </div>

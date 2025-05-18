@@ -5,6 +5,7 @@ node_modules/
 .next/
 out/
 dist/
+deploy/
 
 coverage/
 test-results/
@@ -20,3 +21,7 @@ npm-debug.log*
 yarn-error.log*
 
 certs/*.pem
+
+solanaflow-landing
+landing-prod.tgz
+scripts/landing-local-ci.sh

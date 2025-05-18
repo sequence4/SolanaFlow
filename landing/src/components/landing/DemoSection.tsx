@@ -5,7 +5,7 @@ import type { FC } from "react"
 
 const DemoSection: FC = () => {
   return (
-    <section id="demo" className="py-20 bg-[#0a0b14]">
+    <section id="demo" className="py-20 bg-[#0f1123]">
       <div className="container mx-auto px-4">
         <div className="text-center mb-16">
           <div className="inline-block px-3 py-1 mb-4 rounded-full bg-[#1e2033] border border-[#2a2d4a] text-xs text-[#5580ff]">
@@ -17,25 +17,22 @@ const DemoSection: FC = () => {
               <span className="mr-2">▶</span> Demo
             </span>
           </div>
-          <h2 className="text-3xl md:text-3xl font-bold mb-4 tracking-tight">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]"
-                style={{
-                  backgroundSize: "300% 300%",
-                  animation: "gradientFlow 3s ease infinite"
-                }}>
-              Preview SolanaFlow MVP in Action
-            </span>
-          </h2>
-          <p className="text-gray-400 max-w-2xl mx-auto text-sm">
-            See how easily you can build and deploy Solana dApps.  </p>
-          <p className="text-gray-400 max-w-2xl mx-auto text-sm">
-            Beta launching imminently — join the waitlist now!
+           
+            <h2 className="text-3xl md:text-3xl font-bold mb-4 tracking-tight">
+                <span className="text-white" style={{ fontFamily: 'var(--font-chakra-petch)' }}>
+                Preview SolanaFlow MVP in Action
+              </span>
+            </h2>
+          <p className="text-gray-500 max-w-xl mx-auto md-text-md" style={{ fontFamily: 'var(--font-oxygen-mono)' }}>
+            See how easily you can build and deploy Solana dApps. 
+            Beta launching imminently — join the waitlist now! 
           </p>
+         
         </div>
 
         <div className="max-w-6xl mx-auto">
           <div className="relative aspect-video rounded-xl overflow-hidden border border-[#2a2d4a] shadow-2xl">
-            <div className="absolute inset-0 bg-gradient-to-br from-[#0d0e1a] to-[#0a0b14] flex flex-col items-center justify-center">
+            <div className="absolute inset-0 bg-gradient-to-br from-[#0d0e1a] to-[#0f1123] flex flex-col items-center justify-center">
             <video 
               src="/assets/solanaflow-demo.mp4" 
               autoPlay 
@@ -47,6 +44,7 @@ const DemoSection: FC = () => {
             </div>
           </div>
 
+          {/*
           <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4 ">
             <div className="relative group bg-[#0a0b14]/80 backdrop-blur-sm border border-[#2a2d4a] rounded-[5px] p-4 overflow-hidden transition-all duration-300 hover:translate-y-[-4px] hover:border-[#5580ff]">
               <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[#5580ff] to-transparent opacity-50"></div>
@@ -156,6 +154,7 @@ const DemoSection: FC = () => {
               </div>
             </div>
           </div>
+          */}
         </div>
       </div>
     </section>

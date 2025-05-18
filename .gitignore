@@ -37,3 +37,7 @@ wallets/
 wallets/landing/coverage/
 landing/.env.production
 landing.tar.gz
+
+landing-prod.tgz
+solanaflow-landing
+build.log

@@ -22,111 +22,183 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
 
   return (
     <section
-      className="px-4 md:px-8"
+      className="
+        min-h-[calc(100vh-10rem)]
+        flex flex-col justify-between
+        px-6 md:px-12 xl:px-[5vw]
+        py-[1vh]
+      "
     >
       <div
         ref={innerRef}
-        className="hero-wrapper
-          w-full mx-auto max-w-[min(90vw,1400px)]
+        className="
+          hero-wrapper
+          w-full mx-auto max-w-full
           grid gap-4 lg:gap-8
-          lg:grid-cols-[26rem_minmax(32rem,1fr)_24rem]
-          lg:[grid-template-areas:'copy_flow_code']
-          [grid-template-areas:'copy']
+
+          /* —— 2-column layout from 1024 px up —— */
+          lg:grid-cols-[34rem_minmax(28rem,1fr)]
+          lg:[grid-template-areas:'copy_flow']
+
+          /* —— full 3-column layout only from 1536 px up —— */
+          2xl:grid-cols-[34rem_minmax(28rem,1fr)_24rem]
+          2xl:[grid-template-areas:'copy_flow_code']
         "
       >
-        <div className="grid-in-copy grid grid-rows-[auto_1fr_auto] gap-6 max-w-[40rem] min-h-0">
+        <div className="grid-in-copy flex flex-col gap-6 max-w-[32rem] min-h-0 pr-4">
           <div>
             <div className="w-fit inline-block py-1 px-2 mb-4 sm:mb-4 rounded-full bg-[#1e2033] 
                 border border-[#2a2d4a] text-[10px] text-xs md:text-[10px] text-[#5580ff] mx-auto lg:mx-0">
                 <span className="mr-2">●</span> Visual AI Developer Tool for Solana
             </div>
-            <h1 className="text-[20px] sm:text-[26px] md:text-[20px] lg:text-[22px] xl:text-[24px] 3xl:text-[26px]
-              font-bold leading-tight tracking-tight text-balance text-center xs:text-center sm:text-center lg:text-left" 
-              style={{ fontFamily: '"DM Sans", sans-serif' }}>
-              <span className="block">Deploy Solana dApps</span>
+            
+            <div className="flex flex-col gap-1 justify-start mb-4">
+              <div className="flex flex-row">
+                <h1 className="font-bold leading-tight tracking-tight text-left" 
+                  style={{ fontFamily: 'var(--font-chakra-petch)' }}>
+                  <span className="block text-[clamp(2rem,3.5vw,3.5rem)] leading-none text-white" 
+                      style={{
+                      backgroundSize: "300% 300%",
+                      animation: "gradientFlow 3s ease infinite"
+                      }}>
+                      Build
+                  </span>
+                </h1>
+                <h1 className="font-bold leading-tight tracking-tight text-left" 
+                  style={{ fontFamily: 'var(--font-chakra-petch)' }}>
+                  <span className="block text-[clamp(2rem,3.5vw,3.5rem)] leading-none
+                    bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]
+                    text-transparent bg-clip-text" 
+                      style={{
+                      backgroundSize: "300% 300%",
+                      animation: "gradientFlow 3s ease infinite"
+                      }}>
+                      Smarter
+                  </span>
+                </h1>
+                <h1 className="font-bold leading-tight tracking-tight text-left" 
+                  style={{ fontFamily: 'var(--font-chakra-petch)' }}>
+                  <span className="block text-[clamp(2rem,3.5vw,3.5rem)] leading-none text-white" 
+                      style={{
+                      backgroundSize: "300% 300%",
+                      animation: "gradientFlow 3s ease infinite"
+                      }}>
+                      .
+                  </span>
+                </h1>
+              </div>
+              <div className="flex flex-row">
+                <h1 className="font-bold leading-tight tracking-tight text-left" 
+                  style={{ fontFamily: 'var(--font-chakra-petch)' }}>
+                  <span className="block text-[clamp(2rem,3.5vw,3.5rem)] leading-none text-white" 
+                      style={{
+                      backgroundSize: "300% 300%",
+                      animation: "gradientFlow 3s ease infinite"
+                      }}>
+                      Ship
+                  </span>
+                </h1>
+                <h1 className="font-bold leading-tight tracking-tight text-left" 
+                  style={{ fontFamily: 'var(--font-chakra-petch)' }}>
+                  <span className="block text-[clamp(2rem,3.5vw,3.5rem)] leading-none
+                    bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]
+                    text-transparent bg-clip-text" 
+                      style={{
+                      backgroundSize: "300% 300%",
+                      animation: "gradientFlow 3s ease infinite"
+                      }}>
+                      Faster
+                  </span>
+                </h1>
+                <h1 className="font-bold leading-tight tracking-tight text-left" 
+                  style={{ fontFamily: 'var(--font-chakra-petch)' }}>
+                  <span className="block text-[clamp(2rem,3.5vw,3.5rem)] leading-none text-white" 
+                      style={{
+                      backgroundSize: "300% 300%",
+                      animation: "gradientFlow 3s ease infinite"
+                      }}>
+                      .
+                  </span>
+                </h1>
+              </div>
+            </div>
+
+            <h1 className="text-[17px] sm:text-[17px] md:text-[17px] lg:text-[19px] xl:text-[21px] 3xl:text-[23px]
+              font-bold leading-tight tracking-tight text-balance text-left text-gray-400" 
+              style={{ fontFamily: 'var(--font-oxygen-mono)' }}>
+              <span className="block">Zero to dApp in minutes — without code.</span>
             </h1>
-            <h1 className="font-bold leading-tight tracking-tight text-center lg:text-left
-              mb-4 sm:mb-6 lg:mb-2" 
-              style={{ fontFamily: '"DM Sans", sans-serif' }}>
-              <span className="block text-[clamp(2.25rem,4.5vw,4.5rem)] leading-[0.9]
-                bg-gradient-to-r from-[#5f88dc] via-[#1cf6a0] to-[#9945ff]
-                text-transparent bg-clip-text" 
-                  style={{
-                  backgroundSize: "300% 300%",
-                  animation: "gradientFlow 3s ease infinite"
-                  }}>
-                  Without&nbsp;Code
-              </span>
-            </h1>
+
           </div>
-          <div className="space-y-3 text-[clamp(.875rem,.6vw+0.5rem,1.125rem)] text-gray-400">
+          <div className="space-y-2 text-[clamp(.4rem,.6vw+0.5rem,1.125rem)] text-gray-400 mb-6 md:mb-8 lg:mb-10">
             <HeroFeatureList />
           </div>
-          <div className="flex justify-center lg:justify-start gap-4">
-            <Button 
-              data-testid="open-waitlist-form"
-              size="default" 
-              className="relative z-0 text-white font-medium rounded whitespace-nowrap gradient-border-button" 
-              style={{ borderRadius: '4px', backgroundColor: '#0d0e1a' }}
-              onClick={openWaitlistModal}
-            >
-              <span className="relative z-10 cursor-pointer text-bold text-[11px] md:text-[12px] gradient-text">Join the Waitlist</span>
-            </Button>
-            <style jsx global>{`
-              .gradient-border-button {
-                position: relative;
-                z-index: 0;
-                padding: 8px 16px;
-                border: none;
-                overflow: hidden;
+        </div>
+
+        <div className="hero-actions flex flex-col md:flex-row items-center justify-center gap-6 md:mt-8 lg:mt-0 lg:absolute lg:self-start lg:justify-start lg:left-[37rem] lg:top-4 lg:z-20 2xl:left-[38rem]">
+          <Button 
+            data-testid="open-waitlist-form"
+            className="h-12 relative z-0 text-white text-[15px] rounded whitespace-nowrap gradient-border-button" 
+            style={{ borderRadius: '4px', backgroundColor: '#0d0e1a' }}
+            onClick={openWaitlistModal}
+          >
+            <span className="relative z-10 cursor-pointer text-bold gradient-text">Join the Waitlist</span>
+          </Button>
+          <style jsx global>{`
+            .gradient-border-button {
+              position: relative;
+              z-index: 0;
+              padding: 8px 16px;
+              border: none;
+              overflow: hidden;
+            }
+            
+            .gradient-border-button::before {
+              content: '';
+              position: absolute;
+              z-index: -2;
+              inset: 0;
+              padding: 2px;
+              border-radius: inherit;
+              background: linear-gradient(60deg, #5f88dc, #1cf6a0, #9945ff);
+              background-size: 300% 300%;
+              animation: gradientBorderFlow 3s ease infinite;
+              -webkit-mask: 
+                linear-gradient(#fff 0 0) content-box, 
+                linear-gradient(#fff 0 0);
+              -webkit-mask-composite: xor;
+              mask-composite: exclude;
+            }
+            
+            .gradient-text {
+              background: linear-gradient(60deg, #5f88dc, #1cf6a0, #9945ff);
+              background-size: 300% 300%;
+              animation: gradientBorderFlow 3s ease infinite;
+              -webkit-background-clip: text;
+              background-clip: text;
+              color: transparent;
+            }
+            
+            @keyframes gradientBorderFlow {
+              0% {
+                background-position: 0% 50%;
               }
-              
-              .gradient-border-button::before {
-                content: '';
-                position: absolute;
-                z-index: -2;
-                inset: 0;
-                padding: 2px;
-                border-radius: inherit;
-                background: linear-gradient(60deg, #5f88dc, #1cf6a0, #9945ff);
-                background-size: 300% 300%;
-                animation: gradientBorderFlow 3s ease infinite;
-                -webkit-mask: 
-                  linear-gradient(#fff 0 0) content-box, 
-                  linear-gradient(#fff 0 0);
-                -webkit-mask-composite: xor;
-                mask-composite: exclude;
+              50% {
+                background-position: 100% 50%;
               }
-              
-              .gradient-text {
-                background: linear-gradient(60deg, #5f88dc, #1cf6a0, #9945ff);
-                background-size: 300% 300%;
-                animation: gradientBorderFlow 3s ease infinite;
-                -webkit-background-clip: text;
-                background-clip: text;
-                color: transparent;
+              100% {
+                background-position: 0% 50%;
               }
-              
-              @keyframes gradientBorderFlow {
-                0% {
-                  background-position: 0% 50%;
-                }
-                50% {
-                  background-position: 100% 50%;
-                }
-                100% {
-                  background-position: 0% 50%;
-                }
-              }
-            `}</style>
-        <div className="flex items-center gap-2">
+            }
+          `}</style>
+        <div className="flex items-center gap-4">
             <Button asChild size="icon" variant="ghost" aria-label="SolanaFlow on X">
               <Link
-                href="https://x.com/Solana_FlowCode"
+                href="https://x.com/solanaflow_io"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <BsTwitterX className="h-4 w-4 sm:h-5 sm:w-5 text-[#cfd2d3]" />
+                <BsTwitterX className="h-6 w-6 sm:h-8 sm:w-8 text-[#cfd2d3]" />
               </Link>
             </Button>
 
@@ -136,34 +208,19 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <BsTelegram className="h-4 w-4 sm:h-5 sm:w-5 text-[#cfd2d3]" />
+                <BsTelegram className="h-6 w-6 sm:h-8 sm:w-8 text-[#cfd2d3]" />
               </Link>
             </Button>
           </div>
-          </div>
         </div>
+
         <div className="grid-in-flow hidden lg:flex items-center justify-center min-w-0">
-          <div className="w-full h-full max-h-[60vh] min-w-0">
+          <div className="w-full h-full max-h-full min-w-0 lg:-translate-y-4">
             {mounted && <InstructionFlow />}
           </div>
         </div>
-        <div className="grid-in-code hidden lg:flex basis-0 grow flex-col gap-0">
-          <div className="flex-1 min-h-[18rem] max-h-[calc(100%-6rem)] rounded-xl overflow-hidden border border-[#2a2d4a] bg-[#0d0e1a]">
-            <div className="h-full flex flex-col rounded-xl overflow-hidden min-h-0">
-              <div className="flex items-center px-4 py-2 bg-[#1e2033] border-b border-[#2a2d4a] rounded-lg">
-                <div className="flex space-x-2 rounded-lg">
-                  <div className="w-2 h-2 xs:w-2 xs:h-2 sm:w-2 sm:h-2 rounded-full bg-[#ff5f57]"></div>
-                  <div className="w-2 h-2 xs:w-2 xs:h-2 sm:w-2 sm:h-2 rounded-full bg-[#febc2e]"></div>
-                  <div className="w-2 h-2 xs:w-2 xs:h-2 sm:w-2 sm:h-2 rounded-full bg-[#28c840]"></div>
-                </div>
-              </div>
-              <div className="flex-1 min-h-0 overflow-y-auto">
-                {mounted && <TypewriterCode />}
-              </div>
-            </div>
-          </div>
-          
-          <div className="mt-auto flex-none h-[5rem]
+        <div className="grid-in-code hidden 2xl:flex basis-0 grow flex-col gap-0">
+          <div className="flex-none h-[4.5rem] mb-4
              rounded-xl overflow-hidden border border-[#2a2d4a]">
             {mounted && <UserMessageBox 
               messages={[
@@ -182,6 +239,21 @@ export default function HeroSection({ mounted, openWaitlistModal }: HeroSectionP
               delayBetweenMessages={3000}
               className="w-full h-full"
             />}
+          </div>
+          
+          <div className="flex-1 min-h-[18rem] max-h-[calc(100%-6rem)] rounded-xl overflow-hidden border border-[#2a2d4a] bg-[#0d0e1a]">
+            <div className="h-full flex flex-col rounded-xl overflow-hidden min-h-0">
+              <div className="flex items-center px-4 py-2 bg-[#1e2033] border-b border-[#2a2d4a] rounded-lg">
+                <div className="flex space-x-2 rounded-lg">
+                  <div className="w-2 h-2 xs:w-2 xs:h-2 sm:w-2 sm:h-2 rounded-full bg-[#ff5f57]"></div>
+                  <div className="w-2 h-2 xs:w-2 xs:h-2 sm:w-2 sm:h-2 rounded-full bg-[#febc2e]"></div>
+                  <div className="w-2 h-2 xs:w-2 xs:h-2 sm:w-2 sm:h-2 rounded-full bg-[#28c840]"></div>
+                </div>
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                {mounted && <TypewriterCode />}
+              </div>
+            </div>
           </div>
         </div>
       </div>
