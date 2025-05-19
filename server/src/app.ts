@@ -12,6 +12,7 @@ import containerRoutes from './routes/containerRoutes';
 import cookieParser from 'cookie-parser';
 import 'dotenv-flow/config'; 
 import deployRoutes from './routes/deployRoutes';
+import workspaceRoutes from './routes/workspaceRoutes';
 
 dotenv.config();
 
@@ -40,6 +41,7 @@ app.use('/tasks', taskRoutes);
 app.use('/ai', aiRoutes);
 app.use('/api/container', containerRoutes);
 app.use('/api/deploy', deployRoutes);
+app.use('/workspace', workspaceRoutes);
 
 app.get('/health', (req, res) => {
   res.status(200).json({ message: 'Server is running' });
