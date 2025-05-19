@@ -1,9 +1,9 @@
-name: Deploy to EC2 via SSM
+name: Deploy to EC2 via SSH
 
 on:
   push:
     branches:
-      - '**'            # run on every branch
+      - '**'
 
 permissions:
   id-token: write
@@ -14,28 +14,57 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Temporary AWS credentials via OIDC
       - name: Configure AWS creds via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region:     ${{ secrets.AWS_REGION }}
 
-      # 2) Ship and execute commands on the EC2 box
-      - name: Send SSM deploy commands
+      - name: Deploy over SSH
+        env:
+          EC2_HOST:        ${{ secrets.EC2_HOST }} 
+          EC2_SG_ID:       ${{ secrets.EC2_SG_ID }}
+          SSH_KEY:         ${{ secrets.EC2_SG_ID }}
         run: |
-          aws ssm send-command \
-            --instance-ids  ${{ secrets.EC2_INSTANCE_ID }} \
-            --document-name "AWS-RunShellScript" \
-            --comment       "SolanaFlow CI deploy" \
-            --parameters \
-            'commands=[
-            "cd /home/ec2-user/SolanaFlow",
-            "git fetch origin && git checkout main && git reset --hard origin/main",
-            "pnpm --filter server build",
-            "pm2 restart api || pm2 start dist/index.js --name api",
-            "docker pull ghcr.io/hhdgknsn/workspace:latest",
-            "for p in $(seq 6000 6004); do docker rm -f ws-$p || true; docker create --name ws-$p -p $p:3000 -v /srv/workspaces:/usr/src/workspace -e WORKSPACE_ID=ws-$p ghcr.io/hhdgknsn/workspace:latest; done",
-            "install -m 755 /home/ec2-user/SolanaFlow/server/scripts/reap-ws.sh /usr/local/bin/reap-ws.sh",
-            "echo \"* * * * * root /usr/local/bin/reap-ws.sh\" > /etc/cron.d/ws-reaper"
-            ]'
+          set -e
+
+          # 0. Allow current GitHub-runner CIDRs on port 22
+          GH_IPS=$(curl -s https://api.github.com/meta | jq -r '.actions[]')
+          for ip in $GH_IPS; do
+            aws ec2 authorize-security-group-ingress \
+              --group-id "$EC2_SG_ID" \
+              --ip-permissions "IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges=[{CidrIp=$ip,Description=gh-runner-temp}]" \
+              || true
+          done
+
+          # 1. Prepare SSH key & known_hosts
+          echo "$SSH_KEY" > key.pem
+          chmod 600 key.pem
+          ssh-keyscan -H "$(echo $EC2_HOST | cut -d@ -f2)" >> ~/.ssh/known_hosts
+
+          # 2. Run deploy commands remotely
+          ssh -i key.pem "$EC2_HOST" <<'REMOTE'
+            set -e
+            cd /home/ec2-user/SolanaFlow
+            git fetch origin && git checkout main && git reset --hard origin/main
+            pnpm --filter server build
+            pm2 restart api || pm2 start dist/index.js --name api
+            docker pull ghcr.io/hhdgknsn/workspace:latest
+            for p in $(seq 6000 6004); do
+              docker rm -f ws-$p || true
+              docker create --name ws-$p -p $p:3000 \
+                -v /srv/workspaces:/usr/src/workspace \
+                -e WORKSPACE_ID=ws-$p \
+                ghcr.io/hhdgknsn/workspace:latest
+            done
+            install -m 755 server/scripts/reap-ws.sh /usr/local/bin/reap-ws.sh
+            echo "* * * * * root /usr/local/bin/reap-ws.sh" | sudo tee /etc/cron.d/ws-reaper >/dev/null
+          REMOTE
+
+          # 3. Revoke GitHub-runner CIDRs
+          for ip in $GH_IPS; do
+            aws ec2 revoke-security-group-ingress \
+              --group-id "$EC2_SG_ID" \
+              --ip-permissions "IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges=[{CidrIp=$ip}]" \
+              || true
+          done
