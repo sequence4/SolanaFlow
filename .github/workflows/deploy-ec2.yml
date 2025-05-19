@@ -1,29 +1,34 @@
-name: Deploy to EC2
+name: Deploy to EC2 via SSM
 
 on:
   push:
-    branches: [refactor/deploy]
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Pull latest code and restart API on EC2
-        uses: appleboy/ssh-action@v1
+      - name: Configure AWS creds via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ec2-user
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd ~/SolanaFlow
-            git pull --ff-only
-            pnpm --filter server build
-            pm2 restart api || pm2 start dist/index.js --name api
-            docker pull ghcr.io/hhdgknsn/workspace:latest
-            for p in $(seq 6000 6004); do
-              docker rm -f ws-$p || true
-              docker create --name ws-$p -p $p:3000 \
-                -v /srv/workspaces:/usr/src/workspace \
-                -e WORKSPACE_ID=ws-$p \
-                ghcr.io/hhdgknsn/workspace:latest
-            done
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Send SSM deploy commands
+        run: |
+          aws ssm send-command \
+            --instance-ids ${{ vars.EC2_INSTANCE_ID }} \
+            --document-name "AWS-RunShellScript" \
+            --comment "SolanaFlow CI deploy" \
+            --parameters 'commands=[
+              "cd ~/SolanaFlow",
+              "git pull --ff-only",
+              "pnpm --filter server build",
+              "pm2 restart api || pm2 start dist/index.js --name api",
+              "docker pull ghcr.io/hhdgknsn/workspace:latest",
+              "for p in $(seq 6000 6004); do docker rm -f ws-$p || true; docker create --name ws-$p -p $p:3000 -v /srv/workspaces:/usr/src/workspace -e WORKSPACE_ID=ws-$p ghcr.io/hhdgknsn/workspace:latest; done"
+            ]'
