@@ -31,4 +31,6 @@ jobs:
               "pm2 restart api || pm2 start dist/index.js --name api",
               "docker pull ghcr.io/hhdgknsn/workspace:latest",
               "for p in $(seq 6000 6004); do docker rm -f ws-$p || true; docker create --name ws-$p -p $p:3000 -v /srv/workspaces:/usr/src/workspace -e WORKSPACE_ID=ws-$p ghcr.io/hhdgknsn/workspace:latest; done"
+              "install -m 755 ~/SolanaFlow/server/scripts/reap-ws.sh /usr/local/bin/reap-ws.sh",
+              "echo '* * * * * root /usr/local/bin/reap-ws.sh' > /etc/cron.d/ws-reaper"
             ]'
