@@ -6,7 +6,7 @@ on:
       - '**'
 
 permissions:
-  id-token: write
+  id-token: write          # <-- required for OIDC
   contents: read
 
 jobs:
@@ -14,57 +14,76 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Configure AWS creds via OIDC
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-          aws-region:     ${{ secrets.AWS_REGION }}
+    # 1 ──────────────────────────────────────────── AWS creds via OIDC
+    - name: Configure AWS creds via OIDC
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+        aws-region:     ${{ secrets.AWS_REGION }}
 
-      - name: Deploy over SSH
-        env:
-          EC2_HOST:        ${{ secrets.EC2_HOST }} 
-          EC2_SG_ID:       ${{ secrets.EC2_SG_ID }}
-          SSH_KEY:         ${{ secrets.EC2_SG_ID }}
-        run: |
+    # DEBUG ─────────────────────────────────────── print OIDC claims
+    - name: get-oidc-token
+      id: oidc
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const token = await core.getIDToken();
+          core.setOutput('id_token', token);
+
+    - name: decode OIDC claims
+      run: |
+        echo "Decoded JWT ↓"
+        echo "$ID_TOKEN" | cut -d'.' -f2 | base64 -d | jq
+      env:
+        ID_TOKEN: ${{ steps.oidc.outputs.id_token }}
+    # DEBUG END ────────────────────────────────────
+
+    # 2 ──────────────────────────────────────────── SSH deploy
+    - name: Deploy over SSH
+      env:
+        EC2_HOST:        ${{ secrets.EC2_HOST }}          # ec2-user@IP
+        EC2_SG_ID:       ${{ secrets.EC2_SG_ID }}         # sg-xxxx
+        SSH_KEY:         ${{ secrets.SSH_PRIVATE_KEY }}   # PEM contents
+      run: |
+        set -e
+
+        # 0. Allow GitHub-runner CIDRs on port 22
+        GH_IPS=$(curl -s https://api.github.com/meta | jq -r '.actions[]')
+        for ip in $GH_IPS; do
+          aws ec2 authorize-security-group-ingress \
+            --group-id "$EC2_SG_ID" \
+            --ip-permissions "IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges=[{CidrIp=$ip,Description=gh-runner-temp}]" \
+            || true
+        done
+
+        # 1. prepare SSH
+        echo "$SSH_KEY" > key.pem
+        chmod 600 key.pem
+        ssh-keyscan -H "$(echo $EC2_HOST | cut -d@ -f2)" >> ~/.ssh/known_hosts
+
+        # 2. remote commands
+        ssh -i key.pem "$EC2_HOST" <<'REMOTE'
           set -e
-
-          # 0. Allow current GitHub-runner CIDRs on port 22
-          GH_IPS=$(curl -s https://api.github.com/meta | jq -r '.actions[]')
-          for ip in $GH_IPS; do
-            aws ec2 authorize-security-group-ingress \
-              --group-id "$EC2_SG_ID" \
-              --ip-permissions "IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges=[{CidrIp=$ip,Description=gh-runner-temp}]" \
-              || true
+          cd /home/ec2-user/SolanaFlow
+          git fetch origin && git checkout main && git reset --hard origin/main
+          pnpm --filter server build
+          pm2 restart api || pm2 start dist/index.js --name api
+          docker pull ghcr.io/hhdgknsn/workspace:latest
+          for p in $(seq 6000 6004); do
+            docker rm -f ws-$p || true
+            docker create --name ws-$p -p $p:3000 \
+              -v /srv/workspaces:/usr/src/workspace \
+              -e WORKSPACE_ID=ws-$p \
+              ghcr.io/hhdgknsn/workspace:latest
           done
+          install -m 755 server/scripts/reap-ws.sh /usr/local/bin/reap-ws.sh
+          echo "* * * * * root /usr/local/bin/reap-ws.sh" | sudo tee /etc/cron.d/ws-reaper >/dev/null
+        REMOTE
 
-          # 1. Prepare SSH key & known_hosts
-          echo "$SSH_KEY" > key.pem
-          chmod 600 key.pem
-          ssh-keyscan -H "$(echo $EC2_HOST | cut -d@ -f2)" >> ~/.ssh/known_hosts
-
-          # 2. Run deploy commands remotely
-          ssh -i key.pem "$EC2_HOST" <<'REMOTE'
-            set -e
-            cd /home/ec2-user/SolanaFlow
-            git fetch origin && git checkout main && git reset --hard origin/main
-            pnpm --filter server build
-            pm2 restart api || pm2 start dist/index.js --name api
-            docker pull ghcr.io/hhdgknsn/workspace:latest
-            for p in $(seq 6000 6004); do
-              docker rm -f ws-$p || true
-              docker create --name ws-$p -p $p:3000 \
-                -v /srv/workspaces:/usr/src/workspace \
-                -e WORKSPACE_ID=ws-$p \
-                ghcr.io/hhdgknsn/workspace:latest
-            done
-            install -m 755 server/scripts/reap-ws.sh /usr/local/bin/reap-ws.sh
-            echo "* * * * * root /usr/local/bin/reap-ws.sh" | sudo tee /etc/cron.d/ws-reaper >/dev/null
-          REMOTE
-
-          # 3. Revoke GitHub-runner CIDRs
-          for ip in $GH_IPS; do
-            aws ec2 revoke-security-group-ingress \
-              --group-id "$EC2_SG_ID" \
-              --ip-permissions "IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges=[{CidrIp=$ip}]" \
-              || true
-          done
+        # 3. revoke CIDRs
+        for ip in $GH_IPS; do
+          aws ec2 revoke-security-group-ingress \
+            --group-id "$EC2_SG_ID" \
+            --ip-permissions "IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges=[{CidrIp=$ip}]" \
+            || true
+        done
