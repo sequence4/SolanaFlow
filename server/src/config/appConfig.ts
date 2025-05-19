@@ -1,11 +1,9 @@
-import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { AppError } from '../middleware/errorHandler';
+import dotenvFlow from 'dotenv-flow';
+dotenvFlow.config({ purge_dotenv: true });
 
-dotenv.config();
-
-// Function to check if ROOT_FOLDER exists and is writable
 const checkRootFolder = (folderPath: string) => {
   if (!fs.existsSync(folderPath)) {
     throw new AppError(`ROOT_FOLDER does not exist: ${folderPath}`, 500);
@@ -18,7 +16,6 @@ const checkRootFolder = (folderPath: string) => {
   }
 };
 
-// Validate and normalize ROOT_FOLDER path
 const rootFolder = process.env.ROOT_FOLDER
   ? path.resolve(process.env.ROOT_FOLDER)
   : null;
@@ -36,11 +33,10 @@ export const APP_CONFIG = {
   WALLETS_FOLDER: process.env.WALLETS_FOLDER as string,
   PASSWORD_SALT_ROUNDS: 10,
   TOKEN_EXPIRATION: '7d',
-  MAX_FILE_SIZE: 1024 * 1024 * 5, // 5MB
+  MAX_FILE_SIZE: 1024 * 1024 * 5,
   BETA_CODE: process.env.BETA_CODE as string,
 };
 
-// Validate required environment variables
 const requiredEnvVars = [
   'JWT_SECRET',
   'ROOT_FOLDER',
