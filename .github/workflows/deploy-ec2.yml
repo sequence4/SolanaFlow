@@ -2,7 +2,7 @@ name: Deploy to EC2 via SSM
 
 on:
   push:
-    branches: [main]
+    branches: [develop]
 
 permissions:
   id-token: write
