@@ -3,10 +3,10 @@ name: Deploy to EC2 via SSH
 on:
   push:
     branches:
-      - '**'
+      - '**'          # run on every branch
 
 permissions:
-  id-token: write          # <-- required for OIDC
+  id-token: write     # needed to fetch the OIDC token
   contents: read
 
 jobs:
@@ -14,15 +14,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1 ──────────────────────────────────────────── AWS creds via OIDC
+    ######################################################################
+    # 1 – Assume the AWS role via GitHub OIDC
+    ######################################################################
     - name: Configure AWS creds via OIDC
       uses: aws-actions/configure-aws-credentials@v4
       with:
         role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
         aws-region:     ${{ secrets.AWS_REGION }}
 
-    # DEBUG ─────────────────────────────────────── print OIDC claims
-    - name: get-oidc-token
+    ######################################################################
+    # DEBUG – print the exact OIDC token so we can verify aud / sub
+    # Remove these two steps once “Assumed role … SUCCESS” shows up.
+    ######################################################################
+    - name: Get OIDC token
       id: oidc
       uses: actions/github-script@v7
       with:
@@ -30,24 +35,24 @@ jobs:
           const token = await core.getIDToken();
           core.setOutput('id_token', token);
 
-    - name: decode OIDC claims
+    - name: Decode OIDC claims
       run: |
         echo "Decoded JWT ↓"
-        echo "$ID_TOKEN" | cut -d'.' -f2 | base64 -d | jq
+        echo "$ID_TOKEN" | cut -d'.' -f2 | base64 -d | jq .
       env:
         ID_TOKEN: ${{ steps.oidc.outputs.id_token }}
-    # DEBUG END ────────────────────────────────────
-
-    # 2 ──────────────────────────────────────────── SSH deploy
+    ######################################################################
+    # 2 – SSH deploy, with GitHub-runner CIDRs whitelisted then revoked
+    ######################################################################
     - name: Deploy over SSH
       env:
         EC2_HOST:        ${{ secrets.EC2_HOST }}          # ec2-user@IP
-        EC2_SG_ID:       ${{ secrets.EC2_SG_ID }}         # sg-xxxx
-        SSH_KEY:         ${{ secrets.SSH_PRIVATE_KEY }}   # PEM contents
+        EC2_SG_ID:       ${{ secrets.EC2_SG_ID }}         # sg-xxxxxxxx
+        SSH_KEY:         ${{ secrets.EC2_SSH_KEY }}   # PEM contents
       run: |
         set -e
 
-        # 0. Allow GitHub-runner CIDRs on port 22
+        # 0  Temporarily allow the runner’s CIDRs on port 22
         GH_IPS=$(curl -s https://api.github.com/meta | jq -r '.actions[]')
         for ip in $GH_IPS; do
           aws ec2 authorize-security-group-ingress \
@@ -56,12 +61,12 @@ jobs:
             || true
         done
 
-        # 1. prepare SSH
+        # 1  Prepare SSH key & known_hosts
         echo "$SSH_KEY" > key.pem
         chmod 600 key.pem
         ssh-keyscan -H "$(echo $EC2_HOST | cut -d@ -f2)" >> ~/.ssh/known_hosts
 
-        # 2. remote commands
+        # 2  Run deployment commands on the server
         ssh -i key.pem "$EC2_HOST" <<'REMOTE'
           set -e
           cd /home/ec2-user/SolanaFlow
@@ -80,7 +85,7 @@ jobs:
           echo "* * * * * root /usr/local/bin/reap-ws.sh" | sudo tee /etc/cron.d/ws-reaper >/dev/null
         REMOTE
 
-        # 3. revoke CIDRs
+        # 3  Revoke the temporary CIDR rules
         for ip in $GH_IPS; do
           aws ec2 revoke-security-group-ingress \
             --group-id "$EC2_SG_ID" \
