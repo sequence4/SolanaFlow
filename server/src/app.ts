@@ -1,18 +1,19 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import authRoutes from './routes/authRoutes';
-import projectRoutes from './routes/projectRoutes';
-import fileRoutes from './routes/fileRoutes';
-import orgRoutes from './routes/orgRoutes';
-import taskRoutes from './routes/taskRoutes';
-import aiRoutes from './routes/aiRoutes';
-import { errorHandler } from './middleware/errorHandler';
-import containerRoutes from './routes/containerRoutes';
+import authRoutes from '@/routes/authRoutes';
+import projectRoutes from '@/routes/projectRoutes';
+import fileRoutes from '@/routes/fileRoutes';
+import orgRoutes from '@/routes/orgRoutes';
+import taskRoutes from '@/routes/taskRoutes';
+import aiRoutes from '@/routes/aiRoutes';
+import { errorHandler } from '@/middleware/errorHandler';
+import containerRoutes from '@/routes/containerRoutes';
 import cookieParser from 'cookie-parser';
 import 'dotenv-flow/config'; 
-import deployRoutes from './routes/deployRoutes';
-import workspaceRoutes from './routes/workspaceRoutes';
+import deployRoutes from '@/routes/deployRoutes';
+import workspaceRoutes from '@/routes/workspaceRoutes';
+import poolRoutes from '@/routes/poolRoutes';
 
 dotenv.config();
 
@@ -42,6 +43,7 @@ app.use('/ai', aiRoutes);
 app.use('/api/container', containerRoutes);
 app.use('/api/deploy', deployRoutes);
 app.use('/workspace', workspaceRoutes);
+app.use('/api/pool', poolRoutes); 
 
 app.get('/health', (req, res) => {
   res.status(200).json({ message: 'Server is running' });

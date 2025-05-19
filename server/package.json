@@ -3,10 +3,13 @@
     "version": "1.0.0",
     "scripts": {
         "build": "tsc",
-        "start": "node dist/app.js",
+        "start": "node -r module-alias/register dist/app.js",
         "dev": "ts-node src/app.ts",
         "lint": "eslint . --ext .ts",
         "test": "echo \"(Server) No tests implemented yet.\" && exit 0"
+    },
+    "_moduleAliases": {
+        "@": "dist"
     },
     "keywords": [],
     "author": "",
@@ -25,6 +28,7 @@
         "dotenv-flow": "^4.1.0",
         "express": "^4.21.2",
         "jsonwebtoken": "^9.0.2",
+        "module-alias": "^2.2.3",
         "openai": "^4.85.4",
         "pg": "^8.13.3",
         "ts-node": "^10.9.2",
