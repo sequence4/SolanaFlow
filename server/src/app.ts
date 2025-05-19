@@ -14,6 +14,7 @@ import 'dotenv-flow/config';
 import deployRoutes from '@/routes/deployRoutes';
 import workspaceRoutes from '@/routes/workspaceRoutes';
 import poolRoutes from '@/routes/poolRoutes';
+import internalCertRoute from '@/routes/internalCertRoute';
 
 dotenv.config();
 
@@ -44,6 +45,7 @@ app.use('/api/container', containerRoutes);
 app.use('/api/deploy', deployRoutes);
 app.use('/workspace', workspaceRoutes);
 app.use('/api/pool', poolRoutes); 
+app.use(internalCertRoute);
 
 app.get('/health', (req, res) => {
   res.status(200).json({ message: 'Server is running' });
