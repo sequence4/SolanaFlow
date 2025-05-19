@@ -8,7 +8,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Pull latest code on EC2 and restart API
+      - name: Pull latest code and restart API on EC2
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -19,3 +19,11 @@ jobs:
             git pull --ff-only
             pnpm --filter server build
             pm2 restart api || pm2 start dist/index.js --name api
+            docker pull ghcr.io/hhdgknsn/workspace:latest
+            for p in $(seq 6000 6004); do
+              docker rm -f ws-$p || true
+              docker create --name ws-$p -p $p:3000 \
+                -v /srv/workspaces:/usr/src/workspace \
+                -e WORKSPACE_ID=ws-$p \
+                ghcr.io/hhdgknsn/workspace:latest
+            done
