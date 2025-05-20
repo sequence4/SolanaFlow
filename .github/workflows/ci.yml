@@ -12,23 +12,29 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
+      # ---- Check out repository ----------------------------------------------
       - name: Check out repository
         uses: actions/checkout@v4.2.2
 
+      # ---- Node.js ----------------------------------------------
       - name: Use Node.js 20
         uses: actions/setup-node@v3
         with:
           node-version: 20
 
+      # ---- Corepack ----------------------------------------------
       - name: Enable Corepack
         run: corepack enable
 
+      # ---- PNPM ----------------------------------------------
       - name: Prepare PNPM
         run: corepack prepare pnpm@latest --activate
 
+      # ---- Install dependencies ----------------------------------------------
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # ---- Lint ----------------------------------------------
       - name: Lint Client
         run: pnpm --filter ./client run lint --max-warnings 9999
 
@@ -36,14 +42,29 @@ jobs:
         run: pnpm --filter ./server run lint --max-warnings 9999
 
 
+    # ---- Build ----------------------------------------------
       - name: Build Client
         run: pnpm --filter client run build
 
       - name: Build Server
         run: pnpm --filter server run build
-
+    
+    # ---- Test ----------------------------------------------
       - name: Test Client
         run: pnpm --filter client run test
 
-      - name: Test Server
-        run: pnpm --filter server run test
+      - name: Test Server (incl. warm-pool suite)
+        env:
+          JEST_JUNIT_OUTPUT: server/junit.xml
+        run: |
+          pnpm --filter server run test \
+            -- --runInBand --ci \
+               --reporters=default --reporters=jest-junit
+
+      # ---- Upload JUnit report -------------------------------------------
+      - name: Upload JUnit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-server
+          path: server/junit.xml
