@@ -1,11 +1,17 @@
-DROP TRIGGER  IF EXISTS update_solana_project_last_updated ON "solanaproject";
-DROP TRIGGER  IF EXISTS update_task_last_updated           ON "task";
+DROP TRIGGER IF EXISTS update_solana_project_last_updated ON "SolanaProject";
+DROP TRIGGER IF EXISTS update_task_last_updated           ON "Task";
+
+DROP TRIGGER IF EXISTS update_solana_project_last_updated ON "solanaproject";
+DROP TRIGGER IF EXISTS update_task_last_updated           ON "task";
 
 DROP FUNCTION IF EXISTS update_last_updated_column();
 
-DROP TABLE IF EXISTS warm_container_pool;
-DROP TABLE IF EXISTS "task";
-DROP TABLE IF EXISTS "solanaproject";
+DROP TABLE IF EXISTS warm_container_pool           CASCADE;
+DROP TABLE IF EXISTS "task"                        CASCADE;
+DROP TABLE IF EXISTS "solanaproject"               CASCADE;
+
+DROP TABLE IF EXISTS "Task"                        CASCADE;
+DROP TABLE IF EXISTS "SolanaProject"               CASCADE;
 
 CREATE TABLE "solanaproject" (
   id             UUID PRIMARY KEY,
