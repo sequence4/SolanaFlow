@@ -1,5 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { AppError } from "../middleware/errorHandler";
+import { runDeployPipeline } from "../utils/deploy/runDeployPipeline";
+import pool from "../config/database";
 
 export async function deployPipeline(
     req: Request,
@@ -32,15 +34,15 @@ export async function deployPipeline(
   
     try {
       console.log(`[API] Starting deploy pipeline process`);
-    /*
+      
       await runDeployPipeline({
         projectId: id,
         userId,
         graph,
         sendProgress: send,
       });
-    */
       
+      /*
       // Send some simulated progress events for testing
       send({ stage: "environment", message: "Preparing your build environment…" });
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -55,6 +57,8 @@ export async function deployPipeline(
       await new Promise(resolve => setTimeout(resolve, 1000));
   
       send({ stage: "done" });
+      */
+      
       console.log(`[API] Deploy pipeline completed successfully`);
       res.end();
     } catch (err) {

@@ -16,6 +16,7 @@ import {
   runCommandController,
   compileTsController,
   startContainer,
+  getContainerUrl,
 } from '../controllers/projectController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { buildProject, testProject, getBuildArtifact } from '../controllers/projectController';
@@ -30,6 +31,7 @@ router.put('/update/:id', authMiddleware, editProject);
 router.get('/details/:id', authMiddleware, getProjectDetails);
 router.delete('/:id', authMiddleware, deleteProject);
 router.post('/:id/start-container', authMiddleware, startContainer);
+router.get('/:id/container-url', authMiddleware, getContainerUrl);
 router.post('/init', authMiddleware, anchorInitProject);
 router.post('/:id/set-cluster', authMiddleware, setCluster);
 router.post('/:id/build', authMiddleware, buildProject);

@@ -99,7 +99,7 @@ export const createProject = async (
     const extended  = { ...(details||{}), isLite:true };
 
     await client.query(
-      `INSERT INTO "SolanaProject"
+      `INSERT INTO solanaproject
        (id,name,description,root_path,details,last_updated,created_at)
        VALUES ($1,$2,$3,$4,$5,$6,$6)`,
       [projectId, name, description, rootPath, JSON.stringify(extended), new Date()]
@@ -968,3 +968,31 @@ export const startContainer = async (req: Request, res: Response, next: NextFunc
     next(error);
   }
 };
+
+export async function getContainerUrl(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { id } = req.params;
+    
+    // Query the database to get the container URL
+    const { rows } = await pool.query(
+      "SELECT container_url FROM solanaproject WHERE id = $1",
+      [id]
+    );
+
+    if (!rows.length || !rows[0].container_url) {
+      res.status(404).json({ 
+        message: "Container URL not found for this project" 
+      });
+      return;
+    }
+
+    res.json({ containerUrl: rows[0].container_url });
+    return;
+  } catch (error) {
+    next(error);
+  }
+}

@@ -291,4 +291,16 @@ export const projectApi = {
     }
   },
 
+  fetchContainerUrl: async (projectId: string): Promise<{ containerUrl: string }> => {
+    try {
+      console.log(`[DEBUG_API] fetchContainerUrl - Fetching container URL for project: ${projectId}`);
+      const response = await api.get(`/projects/${projectId}/container-url`);
+      console.log(`[DEBUG_API] fetchContainerUrl - Response:`, response.data);
+      return response.data;
+    } catch (error) {
+      console.error('[DEBUG_API] Error fetching container URL:', error);
+      throw error;
+    }
+  },
+
 };

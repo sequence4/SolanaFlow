@@ -141,7 +141,8 @@ export const Toolbox = () => {
             esRef.current = runDeployPipelineWithLogs(
               { ...projectContext, id },
               graph,
-              taskLogs
+              taskLogs,
+              setProjectContext
             );
             
             console.log('[deploy] Deploy pipeline started with EventSource');

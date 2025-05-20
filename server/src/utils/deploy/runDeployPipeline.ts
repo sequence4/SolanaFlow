@@ -20,6 +20,13 @@ interface PipelineArgs {
   }: PipelineArgs) {
     sendProgress({ stage: "environment", message: "Preparing your build environment…" });
     const workspace = await prepEnv(projectId, userId);
+
+    // emit the container URL so the UI can tune in
+    sendProgress({
+      stage: "container-ready",
+      containerUrl: workspace.containerUrl,
+      message: "Container is up"
+    });
  
     /*
     // 2 ─ code generation ─────────────────────────────────────────────────
@@ -52,6 +59,19 @@ interface PipelineArgs {
     const txSig = await getTxSigFromTask(deployTask);
     sendProgress({ stage: "deploy-done", txSig });
     */
+    
+    // For testing purposes, let's simulate the pipeline stages
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    sendProgress({ stage: "code-gen", message: "Generating Anchor code…" });
+    
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    sendProgress({ stage: "build", message: "Building program…" });
+    
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    sendProgress({ stage: "deploy", message: "Deploying / upgrading…" });
+    
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    sendProgress({ stage: "done", message: "Deployment complete" });
   }
  
   /*
@@ -62,7 +82,7 @@ interface PipelineArgs {
   }
  
   async function currentCodeHash(projectId: string): Promise<string> {
-    // tiny helper that SHA-256’s lib.rs + instruction/*.rs inside container
+    // tiny helper that SHA-256's lib.rs + instruction/*.rs inside container
     // implement with `docker exec sh -c 'sha256sum …'` or Node hashing
     return "dummy-hash"; // placeholder
   }

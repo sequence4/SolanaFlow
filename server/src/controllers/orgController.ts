@@ -24,7 +24,7 @@ export const listOrganizationProjects = async (
   try {
     let query = `
       SELECT id, name, description, root_path, created_at, last_updated
-      FROM SolanaProject
+      FROM solanaproject
       WHERE org_id = $1
     `;
     const queryParams: any[] = [orgId];

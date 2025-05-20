@@ -1,5 +1,7 @@
 import { deployPipeline as sseDeploy } from '@/api/deployPipeline';
 import { ProjectContextType } from '@/context/project/ProjectContextTypes';
+import ProjectContext from '@/context/project/ProjectContext';
+import { useContext } from 'react';
 
 export function runDeployPipelineWithLogs(
   projectContext: ProjectContextType,
@@ -10,6 +12,7 @@ export function runDeployPipelineWithLogs(
     resetLogs: () => void;
     updateStage: (stage: string) => void;
   },
+  setProjectContext: React.Dispatch<React.SetStateAction<ProjectContextType>>,
 ) {
   console.log(`[deployPipeline] Starting runDeployPipelineWithLogs for project: ${projectContext.id}`);
   console.log(`[deployPipeline] Graph data summary: ${Object.keys(graph || {}).length} keys`);
@@ -25,6 +28,13 @@ export function runDeployPipelineWithLogs(
     // Update the stage in the task logs context
     if (msg.stage) {
       taskLogs.updateStage(msg.stage);
+    }
+
+    // Capture containerUrl if present
+    if (msg.containerUrl) {
+      console.log(`[deployPipeline] Received containerUrl: ${msg.containerUrl}`);
+      taskLogs.addSystemLog(`🌐 Container URL: ${msg.containerUrl}`);
+      setProjectContext(prev => ({ ...prev, containerUrl: msg.containerUrl }));
     }
 
     // Handle completion cases
