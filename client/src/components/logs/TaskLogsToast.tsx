@@ -1,9 +1,10 @@
 "use client";
 
 import React from "react";
-import { Loader2, CheckCircle2, Terminal, Server, Database, Code, Cpu, HardDrive, Check } from "lucide-react";
+import { Loader2, Server, Database, Code, Cpu, HardDrive, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTaskLogs } from "@/context/logs/useTaskLogs";
+import { STAGES } from "@/context/logs/TaskLogsProvider";
 
 const iconMap: Record<string, React.ReactNode> = {
   Server: <Server className="h-4 w-4" />,
@@ -17,18 +18,23 @@ const iconMap: Record<string, React.ReactNode> = {
 export default function TaskLogsToast() {
   const {
     isVisible,
-    progress,
     currentStep,
-    steps,
     showDetails,
     setShowDetails,
     systemLogs,
-    memoryStats,
-    networkStats,
-    nodeVersion,
   } = useTaskLogs();
 
   if (!isVisible) return null;
+
+  const safeStep = currentStep; // Don't clamp negative values
+  const progress = safeStep < 0 ? 0 : ((safeStep + 1) / STAGES.length) * 100;
+  
+  const renderedRows = STAGES.map((s, i) => ({
+    ...s,
+    status: i < safeStep ? "done"
+          : i === safeStep ? "active"
+          : "todo"
+  }));
 
   return (
     <div className="z-1000 fixed bottom-0 right-120 w-96 bg-[#0A0B10]/95 border border-[#1A1B25] rounded-lg shadow-xl backdrop-blur-sm overflow-hidden">
@@ -57,11 +63,9 @@ export default function TaskLogsToast() {
             )}
           </div>
           <h3 className="font-medium text-sm">
-            {progress === 100 
-              ? "Completed" 
-              : (steps.length > 0 && currentStep < steps.length) 
-                  ? steps[currentStep].message 
-                  : "Processing..."}
+            {safeStep < 0 ? "Waiting for pipeline..." :
+             progress === 100 || safeStep >= STAGES.length ? "Completed" : 
+             STAGES[safeStep].label}
           </h3>
         </div>
         <div className="ml-auto flex items-center space-x-1 z-10">
@@ -71,6 +75,12 @@ export default function TaskLogsToast() {
             className="ml-2 text-xs text-gray-400 hover:text-white transition-colors"
           >
             {showDetails ? "Hide Details" : "Show Details"}
+          </button>
+          <button
+            onClick={() => navigator.clipboard.writeText(systemLogs.join("\n"))}
+            className="ml-2 text-xs text-gray-400 hover:text-white transition-colors"
+          >
+            Copy log
           </button>
         </div>
       </div>
@@ -88,45 +98,39 @@ export default function TaskLogsToast() {
 
         {/* Status logs */}
         <div className="space-y-2 mb-3">
-          {steps.length > 0 ? (
-            steps.map((step, index) => (
-              <div
-                key={index}
-                className={cn(
-                  "flex items-start gap-3 py-1.5 px-2 rounded transition-colors",
-                  progress < 100 && index === currentStep ? "bg-[#0E1018]/80" : "",
-                  progress === 100 || index < currentStep ? "text-gray-300" : "text-gray-500",
-                )}
-              >
-                <div className="mt-0.5">
-                  {progress === 100 ? (
-                    <Check className="h-4 w-4 text-green-500" />
-                  ) : index < currentStep ? (
-                    <Check className="h-4 w-4 text-green-500" />
-                  ) : index === currentStep ? (
-                    <div className="h-4 w-4 flex items-center justify-center">
-                      <div className="h-4 w-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
-                    </div>
-                  ) : (
-                    <div className="h-4 w-4 rounded-full border border-gray-600" />
-                  )}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center">
-                    <span className="text-xs font-medium">{step.message}</span>
+          {renderedRows.map((row) => (
+            <div
+              key={row.stage}
+              className={cn(
+                "flex items-start gap-3 py-1.5 px-2 rounded transition-colors",
+                row.status === "active" ? "bg-[#0E1018]/80" : "",
+                row.status !== "todo" ? "text-gray-300" : "text-gray-500",
+              )}
+            >
+              <div className="mt-0.5">
+                {row.status === "done" && <Check className="h-4 w-4 text-green-500" />}
+                {row.status === "active" && (
+                  <div className="h-4 w-4 flex items-center justify-center">
+                    <div className="h-4 w-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
                   </div>
-
-                  {showDetails && (progress === 100 || index <= currentStep) && (
-                    <div className="mt-1 text-xs text-gray-500 pl-6">{step.details}</div>
-                  )}
-                </div>
+                )}
+                {row.status === "todo" && (
+                  <div className="h-4 w-4 rounded-full border border-gray-600" />
+                )}
               </div>
-            ))
-          ) : (
-            <div className="text-xs text-gray-400 italic text-center py-2">
-              Preparing operation...
+              <div className="flex-1">
+                <div className="flex items-center">
+                  <span className="text-xs font-medium">{row.label}</span>
+                </div>
+
+                {showDetails && row.status !== "todo" && (
+                  <div className="mt-1 text-xs text-gray-500 pl-6">
+                    {systemLogs.find(l => l.includes(row.stage)) ?? row.stage}
+                  </div>
+                )}
+              </div>
             </div>
-          )}
+          ))}
         </div>
 
         {/* Footer with technical stats */}

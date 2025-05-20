@@ -2,11 +2,11 @@ import { fetchEventSource, EventSourceMessage } from '@microsoft/fetch-event-sou
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:9999';
 
-export async function deployPipeline(
+export function deployPipeline(
   projectId: string,
   graph: unknown,
   onProgress: (msg: unknown) => void,
-): Promise<void> {
+) {
   console.log(`[SSE] Starting deploy pipeline for project: ${projectId}`);
   console.log(`[SSE] API_URL: ${API_URL}`);
   
@@ -20,30 +20,56 @@ export async function deployPipeline(
   
   console.log(`[SSE] Headers prepared, auth token ${token ? 'present' : 'missing'}`);
 
-  await fetchEventSource(
-    `${API_URL}/api/deploy/${projectId}/deploy-pipeline`,
-    {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ graph }),
-
-    async onopen(res) {
-      console.log(`[SSE] Connection opened with status: ${res.status}`);
-      if (res.status >= 400)
-        throw new Error(`HTTP ${res.status} while opening SSE`);
+  const url = `${API_URL}/api/deploy/${projectId}/deploy-pipeline`;
+  
+  const controller = new AbortController();
+  
+  fetchEventSource(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ graph }),
+    signal: controller.signal,
+    
+    async onopen(response) {
+      console.log(`[SSE] Connection opened with status: ${response.status}`);
+      if (response.status >= 400) {
+        throw new Error(`HTTP ${response.status} while opening SSE`);
+      }
     },
-
-    onmessage(ev: EventSourceMessage) {
-      const msg = JSON.parse(ev.data);
-      console.log(`[SSE] Received message:`, msg);
-      onProgress(msg);
+    
+    onmessage(event: EventSourceMessage) {
+      try {
+        const msg = JSON.parse(event.data);
+        console.log(`[SSE] Received message:`, msg);
+        onProgress(msg);
+      } catch (error) {
+        console.error(`[SSE] Error parsing message:`, error);
+      }
     },
-
+    
     onerror(err) {
       console.error(`[SSE] Error in connection:`, err);
-      throw err;
+    },
+    
+    onclose() {
+      console.log(`[SSE] Connection closed`);
     },
   });
   
-  console.log(`[SSE] Deploy pipeline completed for project: ${projectId}`);
+  console.log(`[SSE] EventSource created for project: ${projectId}`);
+  
+  // Return an object with the same interface as EventSource for compatibility
+  return {
+    close: () => {
+      console.log(`[SSE] Manually closing connection`);
+      controller.abort();
+    },
+    addEventListener: (event: string, handler: EventListener) => {
+      // This is a minimal implementation to match the interface
+      if (event === 'close') {
+        // We can't really add listeners to the fetch stream,
+        // but this will be called from our wrapper code
+      }
+    }
+  };
 }

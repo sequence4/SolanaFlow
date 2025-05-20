@@ -48,6 +48,7 @@ export const Toolbox = () => {
     const [isFocused, setIsFocused] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const nodeItemsRef = useRef<any>(null);
+    const esRef = useRef<ReturnType<typeof runDeployPipelineWithLogs> | null>(null);
     
     const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
     const [isProjectListModalOpen, setIsProjectListModalOpen] = useState(false);
@@ -123,6 +124,12 @@ export const Toolbox = () => {
         console.log('[deploy] Starting deploy process...');
         
         try {
+            if (esRef.current) {
+                console.log('[deploy] Closing previous EventSource');
+                esRef.current.close();
+                esRef.current = null;
+            }
+            
             console.log('[deploy] Calling ensureId()');
             const id = await ensureId();
             console.log(`[deploy] Project ID ensured: ${id}`);
@@ -131,11 +138,13 @@ export const Toolbox = () => {
             console.log('[deploy] Graph data:', graph);
 
             console.log('[deploy] Calling runDeployPipelineWithLogs');
-            await runDeployPipelineWithLogs(
+            esRef.current = runDeployPipelineWithLogs(
               { ...projectContext, id },
               graph,
               taskLogs
             );
+            
+            console.log('[deploy] Deploy pipeline started with EventSource');
         } catch (err) {
             console.error('[deploy] Deployment error:', err);
             toast("Deployment error", {
@@ -160,6 +169,15 @@ export const Toolbox = () => {
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (esRef.current) {
+                console.log('[deploy] Closing EventSource on unmount');
+                esRef.current.close();
+            }
+        };
     }, []);
 
     return (

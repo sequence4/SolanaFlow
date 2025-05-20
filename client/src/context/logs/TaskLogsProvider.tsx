@@ -3,6 +3,15 @@
 import React, { useState, useEffect, useCallback } from "react";
 import TaskLogsContext, { TaskLog, Step } from "./TaskLogsContext";
 
+// Define the canonical stages list to be used across the app
+export const STAGES = [
+  { stage: "environment", label: "Build env",   icon: "Server"   },
+  { stage: "code-gen",    label: "Code-gen",    icon: "Code"     },
+  { stage: "build",       label: "Compile",     icon: "Cpu"      },
+  { stage: "deploy",      label: "Deploy",      icon: "HardDrive"},
+  { stage: "done",        label: "Complete",    icon: "CheckCircle"}
+] as const;
+
 export default function TaskLogsProvider({
   children,
 }: {
@@ -11,7 +20,7 @@ export default function TaskLogsProvider({
   const [logs, setLogs] = useState<TaskLog[]>([]);
   const [isVisible, setIsVisible] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [currentStep, setCurrentStep] = useState(0);
+  const [currentStep, setCurrentStep] = useState(-1); // Start at -1 to indicate "waiting for pipeline"
   const [steps, setSteps] = useState<Step[]>([]);
   const [showDetails, setShowDetails] = useState(false);
   const [systemLogs, setSystemLogs] = useState<string[]>([]);
@@ -28,23 +37,13 @@ export default function TaskLogsProvider({
     }
   }, [progress]);
 
-  // Update current step based on progress
+  // Update progress based on currentStep
   useEffect(() => {
-    // Calculate which step we're on based on progress and the number of steps
-    if (steps.length > 0 && progress > 0) {
-      const stepIndex = Math.min(
-        Math.floor((progress / 100) * steps.length),
-        steps.length - 1
-      );
-      // Only update if the step actually changes
-      if (stepIndex !== currentStep) {
-        setCurrentStep(stepIndex);
-      }
-    } else {
-      // If no steps or progress is 0, reset to step 0
-      setCurrentStep(0);
-    }
-  }, [progress, steps, currentStep]);
+    const newProgress = currentStep < 0 
+      ? 0 
+      : Math.min(((currentStep + 1) / STAGES.length) * 100, 100);
+    setProgress(newProgress);
+  }, [currentStep]);
 
   const addLog = useCallback((message: string) => {
     setLogs((prevLogs) => [
@@ -79,11 +78,18 @@ export default function TaskLogsProvider({
   const resetLogs = useCallback(() => {
     setLogs([]);
     setProgress(0);
-    setCurrentStep(0);
+    setCurrentStep(-1); // Reset to "waiting" state
     setSystemLogs([]);
     // Keep steps until a new task explicitly sets them
     // setSteps([]); 
     setShowDetails(false); // Reset details view as well
+  }, []);
+
+  const updateStage = useCallback((stage: string) => {
+    const index = STAGES.findIndex(s => s.stage === stage);
+    // Set to found index or -1 if stage is unrecognized
+    setCurrentStep(index);
+    setIsVisible(true);
   }, []);
 
   return (
@@ -108,6 +114,7 @@ export default function TaskLogsProvider({
         addSystemLog,
         resetLogs,
         setSteps: handleSetSteps,
+        updateStage,
       }}
     >
       {children}
