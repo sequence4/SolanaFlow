@@ -1,6 +1,10 @@
 import { execSync } from "child_process";
 
 export async function resolveContainerUrl(name: string): Promise<string> {
+  if (name.startsWith('failed-container-')) {
+    throw new Error('Container creation failed – see previous logs.');
+  }
+
   try {
     // ensure container is running, or `docker port` prints nothing
     execSync(`docker start ${name}`, { stdio: "ignore" });

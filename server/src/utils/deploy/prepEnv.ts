@@ -22,7 +22,7 @@ export async function prepEnv(projectId: string, userId: string): Promise<Worksp
   }
 
   const rented = await rentContainerFromPool()
-  const containerName = rented?.name ?? (await startProjectContainer(projectId, userId))
+  const containerName = rented?.name ?? (await startProjectContainer(projectId, userId, rootPath))
   const containerUrl = rented?.url ?? (await resolveContainerUrl(containerName))
 
   await pool.query(

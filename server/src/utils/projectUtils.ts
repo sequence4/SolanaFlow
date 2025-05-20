@@ -13,6 +13,7 @@ import {
   serverIndexContent, 
 } from '../data/templateFiles';
 
+const USER_WORKSPACE_IMAGE = "ghcr.io/hhdgknsn/workspace:anchor";
 
 function hasWarning(output: string): boolean {
   const lowercasedOutput = output.toLowerCase();
@@ -797,7 +798,7 @@ export const startCreateProjectDirectoryTask = async (
         `docker run -d \\
           --name ${containerName} \\
           -p 0.0.0.0::3000 \\
-          flowcode-project-base:latest \\
+          ${USER_WORKSPACE_IMAGE} \\
           bash -c "cd /usr/src && tail -f /dev/null"
       `;
       console.log(`[DEBUG_CONTAINER] About to execute docker run command: ${startContainerCmd}`);
@@ -1236,10 +1237,12 @@ export const startProjectContainer = async (
 ): Promise<string> => {
   const taskId = await createTask('Start Project Container', creatorId, projectId);
   const sanitizedTaskId = taskId.trim().replace(/,$/, '');
+  let existingContainer: string | null = null;
+  let newContainerName: string | undefined;
 
   setImmediate(async () => {
     try {
-      const existingContainer = await getContainerName(projectId);
+      existingContainer = await getContainerName(projectId);
       
       if (existingContainer) {
         console.log(`Found existing container ${existingContainer} for project ${projectId}`);
@@ -1289,7 +1292,7 @@ export const startProjectContainer = async (
             return;
           }
           
-          const newContainerName = `userproj-${projectId}-${Date.now()}`;
+          newContainerName = `userproj-${projectId}-${Date.now()}`;
           console.log(`Creating new container ${newContainerName} for project ${projectId}`);
           await createNewContainer(newContainerName, projectId, sanitizedTaskId);
         }
@@ -1303,7 +1306,7 @@ export const startProjectContainer = async (
           return;
         }
         
-        const newContainerName = `userproj-${projectId}-${Date.now()}`;
+        newContainerName = `userproj-${projectId}-${Date.now()}`;
         console.log(`No existing container found. Creating new container ${newContainerName} for project ${projectId}`);
         await createNewContainer(newContainerName, projectId, sanitizedTaskId);
       }
@@ -1317,7 +1320,7 @@ export const startProjectContainer = async (
     }
   });
   
-  return sanitizedTaskId;
+  return existingContainer ?? newContainerName ?? `failed-container-${projectId}`;
 };
 
 async function createNewContainer(
@@ -1329,7 +1332,7 @@ async function createNewContainer(
     docker run -d \\
       --name ${containerName} \\
       -p 0.0.0.0::3000 \\
-      flowcode-project-base:latest \\
+      ${USER_WORKSPACE_IMAGE} \\
       bash -c "cd /usr/src && tail -f /dev/null"
   `;
   await runCommand(startContainerCmd, '.', taskId, { skipSuccessUpdate: true });
@@ -1358,166 +1361,6 @@ async function createNewContainer(
     docker exec ${containerName} bash -c "cd /usr/src && anchor init ${rootPath}"
   `;
   await runCommand(anchorInitCmd, '.', taskId, { skipSuccessUpdate: true });
-  
-  const runNpmStartCmd = `
-    docker exec ${containerName} bash -c "cd /usr/src/${rootPath}/app && export CI=true && export BROWSER=none && export HOST=0.0.0.0 && export PORT=3000 && npm start > /usr/src/${rootPath}/app/cra-startup.log 2>&1 &"
-  `;
-  await runCommand(runNpmStartCmd, '.', taskId, { skipSuccessUpdate: true });
-  console.log(`CRA dev server starting in container ${containerName} with forced environment variables`);
-  
-  const isServerReady = await waitForServerReady(containerName);
-  
-  if (isServerReady) {
-    await updateTaskStatus(
-      taskId,
-      'succeed',
-      `New container ${containerName} created successfully and CRA server is ready`
-    );
-  } else {
-    await updateTaskStatus(
-      taskId,
-      'succeed',
-      `New container ${containerName} created successfully. CRA server is still starting up.`
-    );
-  }
-}
-
-export const startInstallNodeDependenciesTask = async (
-  projectId: string,
-  creatorId: string,
-  packages: string[],
-  targetDir: 'app' | 'server' = 'app'
-): Promise<string> => {
-  const taskId = await createTask('Install Node Dependencies', creatorId, projectId);
-  console.log(`Starting node dependency installation task for project ${projectId} with packages:`, packages);
-
-  setImmediate(async () => {
-    try {
-      if (packages.length === 0) {
-        console.log(`No packages to install for project ${projectId}`);
-        await updateTaskStatus(taskId, 'succeed', 'No packages to install');
-        return;
-      }
-      
-      const containerName = await getContainerName(projectId);
-      
-      if (!containerName) {
-        throw new Error(`No container found for project ${projectId}`);
-      }
-      
-      const rootPathResult = await pool.query(
-        'SELECT name FROM solanaproject WHERE id = $1',
-        [projectId]
-      );
-      
-      let rootPath = '';
-      if (rootPathResult.rows.length > 0) {
-        rootPath = normalizeProjectName(rootPathResult.rows[0].name);
-      } else {
-        throw new Error(`Could not determine project name for project ${projectId}`);
-      }
-      
-      console.log(`Found container ${containerName} for project ${projectId}`);
-      
-      await updateTaskStatus(taskId, 'doing', `Installing ${packages.join(', ')} in ${targetDir}...`);
-      console.log(`Installing packages: ${packages.join(', ')} for project ${projectId} in ${targetDir}`);
-      
-      const installCommand = `npm install ${packages.join(' ')}`;
-      console.log(`Install command: ${installCommand}`);
-      
-      try {
-        const dockerInstallCmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath}/${targetDir} && ${installCommand}"`;
-        console.log(`Executing in container: ${dockerInstallCmd}`);
-        
-        await runCommand(dockerInstallCmd, '.', taskId);
-        console.log(`Successfully installed packages in container ${containerName} (${targetDir})`);
-        await updateTaskStatus(taskId, 'succeed', `Successfully installed dependencies in container ${containerName} (${targetDir})`);
-      } catch (error: any) {
-        console.error(`Failed to install packages in container. Error:`, error);
-        await updateTaskStatus(taskId, 'failed', `Error installing dependencies: ${error.message}`);
-      }
-    } catch (error: any) {
-      console.error(`Error in startInstallNodeDependenciesTask:`, error);
-      await updateTaskStatus(taskId, 'failed', `Error: ${error.message}`);
-    }
-  });
-
-  return taskId;
-};
-
-export async function runUserProjectCode(
-  projectId: string,
-  taskId: string,
-  functionName: string,
-  parameters: any,
-  ephemeralPubkey?: string
-): Promise<string> {
-  const containerName = await getContainerName(projectId);
-  
-  if (!containerName) {
-    throw new Error(`No container found for project ${projectId}`);
-  }
-  
-  const rootPathResult = await pool.query(
-    'SELECT name FROM solanaproject WHERE id = $1',
-    [projectId]
-  );
-  
-  let rootPath = '';
-  if (rootPathResult.rows.length > 0) {
-    rootPath = normalizeProjectName(rootPathResult.rows[0].name);
-  } else {
-    throw new Error(`Could not determine project name for project ${projectId}`);
-  }
-  
-  console.log(`Found container ${containerName} for project ${projectId}`);
-  
-  const tempRunnerDir = `/usr/src/${rootPath}/app/_temp_${taskId}`;
-  await runCommand(`docker exec ${containerName} mkdir -p ${tempRunnerDir}`, '.', taskId);
-
-  const runnerSrcPath = path.join(__dirname, '../../runners/myRunnerTemplate.ts');
-  const ephemeralSrcPath = path.join(__dirname, '../../runners/ephemeralKeyUtils.ts');
-  const localBundlrSrcPath = path.join(__dirname, '../../runners/localBundlrUtils.ts');
-
-  await runCommand(`docker cp ${runnerSrcPath} ${containerName}:${tempRunnerDir}/runner.ts`, '.', taskId);
-  await runCommand(`docker cp ${ephemeralSrcPath} ${containerName}:${tempRunnerDir}/ephemeralKeyUtils.ts`, '.', taskId);
-  await runCommand(`docker cp ${localBundlrSrcPath} ${containerName}:${tempRunnerDir}/localBundlrUtils.ts`, '.', taskId);
-
-  let finalParams: any;
-  if (Array.isArray(parameters)) {
-    finalParams = ephemeralPubkey ? [...parameters, ephemeralPubkey] : parameters;
-  } else {
-    finalParams = ephemeralPubkey ? { ...parameters, ephemeralPubkey } : parameters;
-  }
-
-  const paramsContent = JSON.stringify(finalParams, null, 2);
-  const writeParamsCmd = `docker exec -i ${containerName} bash -c "cat > ${tempRunnerDir}/params.json" << 'EOF'
-${paramsContent}
-EOF`;
-  await runCommand(writeParamsCmd, '.', taskId);
-
-  const compileCommand = [
-    'npx ts-node',
-    '--skip-project',
-    '--transpile-only',
-    `--compiler-options '{"module":"commonjs","esModuleInterop":true}'`,
-    `"${tempRunnerDir}/runner.ts"`,
-    `"${tempRunnerDir}/params.json"`
-  ].join(' ');
-  
-  const dockerRunCmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath}/app && ${compileCommand}"`;
-  const commandResult = await runCommand(dockerRunCmd, '.', taskId);
-
-  await runCommand(`docker exec ${containerName} rm -rf ${tempRunnerDir}`, '.', taskId);
-
-  return commandResult;
-}
-
-async function updateContainerInDB(containerName: string, projectId: string) {
-  await pool.query(
-    'UPDATE solanaproject SET container_name = $1 WHERE id = $2',
-    [containerName, projectId]
-  );
 }
 
 export async function getContainerName(projectId: string): Promise<string | null> {
@@ -1612,4 +1455,70 @@ async function waitForServerReady(containerName: string, maxAttempts = 30, delay
   return false;
 }
 
+export async function runUserProjectCode(
+  projectId: string,
+  taskId: string,
+  functionName: string,
+  parameters: any,
+  ephemeralPubkey?: string
+): Promise<string> {
+  const containerName = await getContainerName(projectId);
+  
+  if (!containerName) {
+    throw new Error(`No container found for project ${projectId}`);
+  }
+  
+  const rootPathResult = await pool.query(
+    'SELECT name FROM solanaproject WHERE id = $1',
+    [projectId]
+  );
+  
+  let rootPath = '';
+  if (rootPathResult.rows.length > 0) {
+    rootPath = normalizeProjectName(rootPathResult.rows[0].name);
+  } else {
+    throw new Error(`Could not determine project name for project ${projectId}`);
+  }
+  
+  console.log(`Found container ${containerName} for project ${projectId}`);
+  
+  const tempRunnerDir = `/usr/src/${rootPath}/app/_temp_${taskId}`;
+  await runCommand(`docker exec ${containerName} mkdir -p ${tempRunnerDir}`, '.', taskId);
 
+  const runnerSrcPath = path.join(__dirname, '../../runners/myRunnerTemplate.ts');
+  const ephemeralSrcPath = path.join(__dirname, '../../runners/ephemeralKeyUtils.ts');
+  const localBundlrSrcPath = path.join(__dirname, '../../runners/localBundlrUtils.ts');
+
+  await runCommand(`docker cp ${runnerSrcPath} ${containerName}:${tempRunnerDir}/runner.ts`, '.', taskId);
+  await runCommand(`docker cp ${ephemeralSrcPath} ${containerName}:${tempRunnerDir}/ephemeralKeyUtils.ts`, '.', taskId);
+  await runCommand(`docker cp ${localBundlrSrcPath} ${containerName}:${tempRunnerDir}/localBundlrUtils.ts`, '.', taskId);
+
+  let finalParams: any;
+  if (Array.isArray(parameters)) {
+    finalParams = ephemeralPubkey ? [...parameters, ephemeralPubkey] : parameters;
+  } else {
+    finalParams = ephemeralPubkey ? { ...parameters, ephemeralPubkey } : parameters;
+  }
+
+  const paramsContent = JSON.stringify(finalParams, null, 2);
+  const writeParamsCmd = `docker exec -i ${containerName} bash -c "cat > ${tempRunnerDir}/params.json" << 'EOF'
+${paramsContent}
+EOF`;
+  await runCommand(writeParamsCmd, '.', taskId);
+
+  const compileCommand = [
+    'npx ts-node',
+    '--skip-project',
+    '--transpile-only',
+    `--compiler-options '{"module":"commonjs","esModuleInterop":true}'`,
+    `"${tempRunnerDir}/runner.ts"`,
+    `"${tempRunnerDir}/params.json"`
+  ].join(' ');
+  
+  const dockerRunCmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath}/app && ${compileCommand}"`;
+  const commandResult = await runCommand(dockerRunCmd, '.', taskId);
+
+  await runCommand(`docker exec ${containerName} rm -rf ${tempRunnerDir}`, '.', taskId);
+
+  return commandResult;
+}
