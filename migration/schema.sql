@@ -1,13 +1,13 @@
-DROP TRIGGER  IF EXISTS update_solana_project_last_updated ON "SolanaProject";
-DROP TRIGGER  IF EXISTS update_task_last_updated           ON "Task";
+DROP TRIGGER  IF EXISTS update_solana_project_last_updated ON "solanaproject";
+DROP TRIGGER  IF EXISTS update_task_last_updated           ON "task";
 
 DROP FUNCTION IF EXISTS update_last_updated_column();
 
 DROP TABLE IF EXISTS warm_container_pool;
-DROP TABLE IF EXISTS "Task";
-DROP TABLE IF EXISTS "SolanaProject";
+DROP TABLE IF EXISTS "task";
+DROP TABLE IF EXISTS "solanaproject";
 
-CREATE TABLE "SolanaProject" (
+CREATE TABLE "solanaproject" (
   id             UUID PRIMARY KEY,
   name           TEXT NOT NULL,
   description    TEXT,
@@ -18,20 +18,20 @@ CREATE TABLE "SolanaProject" (
   last_updated   TIMESTAMP,
   created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_solana_project_name ON "SolanaProject"(name);
+CREATE INDEX idx_solana_project_name ON "solanaproject"(name);
 
-CREATE TABLE "Task" (
+CREATE TABLE "task" (
   id           UUID PRIMARY KEY,
   name         TEXT NOT NULL,
   created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   creator_id   UUID,
   result       TEXT,
   last_updated TIMESTAMP,
-  project_id   UUID REFERENCES "SolanaProject"(id) ON DELETE CASCADE,
+  project_id   UUID REFERENCES "solanaproject"(id) ON DELETE CASCADE,
   status       VARCHAR(50) CHECK (status IN ('queued','doing','finished',
                                              'succeed','failed','warning'))
 );
-CREATE INDEX idx_task_status ON "Task"(status);
+CREATE INDEX idx_task_status ON "task"(status);
 
 CREATE TABLE warm_container_pool (
   name       TEXT PRIMARY KEY,
@@ -51,9 +51,9 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER update_solana_project_last_updated
-  BEFORE UPDATE ON "SolanaProject"
+  BEFORE UPDATE ON "solanaproject"
   FOR EACH ROW EXECUTE FUNCTION update_last_updated_column();
 
 CREATE TRIGGER update_task_last_updated
-  BEFORE UPDATE ON "Task"
+  BEFORE UPDATE ON "task"
   FOR EACH ROW EXECUTE FUNCTION update_last_updated_column();
