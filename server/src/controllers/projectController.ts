@@ -726,7 +726,7 @@ export const deployProjectEphemeral = async (
         const client = await pool.connect();
         try {
           const taskQuery = await client.query(
-            'SELECT result FROM Task WHERE id = $1',
+            'SELECT result FROM task WHERE id = $1',
             [taskId]
           );
           

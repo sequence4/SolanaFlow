@@ -102,7 +102,7 @@ interface PipelineArgs {
  
   async function getTxSigFromTask(taskId: string): Promise<string | null> {
     const r = await pool.query<{ result: string }>(
-      "SELECT result FROM Task WHERE id=$1",
+      "SELECT result FROM task WHERE id=$1",
       [taskId]
     );
     return r.rows[0]?.result || null;

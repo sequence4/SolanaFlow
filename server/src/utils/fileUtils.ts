@@ -88,7 +88,7 @@ export const startDeleteProjectFolderTask = async (
   try {
     const taskId = uuidv4();
     await client.query(
-      'INSERT INTO Task (id, name, created_at, creator_id, status) VALUES ($1, $2, NOW(), $3, $4)',
+      'INSERT INTO task (id, name, created_at, creator_id, status) VALUES ($1, $2, NOW(), $3, $4)',
       [taskId, 'Delete Project Folder', creatorId, 'doing']
     );
 
