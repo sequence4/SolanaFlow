@@ -1,11 +1,19 @@
 import { execSync } from "child_process";
 
 export async function resolveContainerUrl(name: string): Promise<string> {
-  const out = execSync(`docker port ${name} 3000/tcp`).toString().trim()
-  const m = out.match(/:(\d+)$/)
-  if (!m) throw new Error(`port not found for ${name}`)
-  const host = process.env.DOCKER_HOST ?? 'localhost'
-  return `http://${host}:${m[1]}`
+  try {
+    // ensure container is running, or `docker port` prints nothing
+    execSync(`docker start ${name}`, { stdio: "ignore" });
+  } catch {
+    /* already running or start failed – ignore */
+  }
+
+  const out = execSync(`docker port ${name} 3000/tcp`, { encoding: "utf8" }).trim();
+  if (!out) throw new Error(`port not found for ${name}`);
+  const m = out.match(/:(\d+)$/);
+  if (!m) throw new Error(`port parse fail for ${name}`);
+  const host = process.env.PUBLIC_FQDN ?? `${m[1]}.ws.solanaflow.dev`;
+  return `https://${host}`;
 }
 
 export async function isUrlAlive(url: string): Promise<boolean> {
@@ -17,10 +25,6 @@ export async function isUrlAlive(url: string): Promise<boolean> {
     return false;
   }
 }
-
-export function extractContainerName(url: string) {
-  return new URL(url).hostname;
-}  
 
 export async function folderExists(container: string, path: string): Promise<boolean> {
   try {

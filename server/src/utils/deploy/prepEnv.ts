@@ -2,19 +2,23 @@ import pool from 'src/config/database'
 import { startProjectContainer, startCreateProjectDirectoryTask } from '../projectUtils'
 import { rentContainerFromPool } from '../container/rentContainerFromPool'
 import { resolveContainerUrl } from '../container/containerHelpers'
-import { isUrlAlive, extractContainerName, folderExists } from '../container/containerHelpers'
+import { isUrlAlive, folderExists } from '../container/containerHelpers'
 import { WorkspaceHandle } from '../container/interfaces'
 
 export async function prepEnv(projectId: string, userId: string): Promise<WorkspaceHandle> {
-  const res = await pool.query<{ root_path: string; container_url: string | null }>(
-    'SELECT root_path, container_url FROM solanaproject WHERE id = $1',
+  const res = await pool.query<{
+    root_path: string;
+    container_url: string | null;
+    container_name: string | null;
+  }>(
+    'SELECT root_path, container_url, container_name FROM solanaproject WHERE id = $1',
     [projectId]
   )
   if (res.rowCount === 0) throw new Error('Project not found')
-  const { root_path: rootPath, container_url: dbUrl } = res.rows[0]
+  const { root_path: rootPath, container_url: dbUrl, container_name: dbContainerName } = res.rows[0]
 
-  if (dbUrl && (await isUrlAlive(dbUrl))) {
-    return { rootPath, containerName: extractContainerName(dbUrl), containerUrl: dbUrl }
+  if (dbUrl && dbContainerName && (await isUrlAlive(dbUrl))) {
+    return { rootPath, containerName: dbContainerName, containerUrl: dbUrl }
   }
 
   const rented = await rentContainerFromPool()
