@@ -722,6 +722,69 @@ export const startInstallPackagesTask = async (
   return taskId;
 };
 
+export const startInstallNodeDependenciesTask = async (
+  projectId: string,
+  creatorId: string,
+  packages: string[],
+  targetDir: 'app' | 'server' = 'app'
+): Promise<string> => {
+  const taskId = await createTask('Install Node Dependencies', creatorId, projectId);
+  console.log(`Starting node dependency installation task for project ${projectId} with packages:`, packages);
+
+  setImmediate(async () => {
+    try {
+      if (packages.length === 0) {
+        console.log(`No packages to install for project ${projectId}`);
+        await updateTaskStatus(taskId, 'succeed', 'No packages to install');
+        return;
+      }
+      
+      const containerName = await getContainerName(projectId);
+      
+      if (!containerName) {
+        throw new Error(`No container found for project ${projectId}`);
+      }
+      
+      const rootPathResult = await pool.query(
+        'SELECT name FROM solanaproject WHERE id = $1',
+        [projectId]
+      );
+      
+      let rootPath = '';
+      if (rootPathResult.rows.length > 0) {
+        rootPath = normalizeProjectName(rootPathResult.rows[0].name);
+      } else {
+        throw new Error(`Could not determine project name for project ${projectId}`);
+      }
+      
+      console.log(`Found container ${containerName} for project ${projectId}`);
+      
+      await updateTaskStatus(taskId, 'doing', `Installing ${packages.join(', ')} in ${targetDir}...`);
+      console.log(`Installing packages: ${packages.join(', ')} for project ${projectId} in ${targetDir}`);
+      
+      const installCommand = `npm install ${packages.join(' ')}`;
+      console.log(`Install command: ${installCommand}`);
+      
+      try {
+        const dockerInstallCmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath}/${targetDir} && ${installCommand}"`;
+        console.log(`Executing in container: ${dockerInstallCmd}`);
+        
+        await runCommand(dockerInstallCmd, '.', taskId);
+        console.log(`Successfully installed packages in container ${containerName} (${targetDir})`);
+        await updateTaskStatus(taskId, 'succeed', `Successfully installed dependencies in container ${containerName} (${targetDir})`);
+      } catch (error: any) {
+        console.error(`Failed to install packages in container. Error:`, error);
+        await updateTaskStatus(taskId, 'failed', `Error installing dependencies: ${error.message}`);
+      }
+    } catch (error: any) {
+      console.error(`Error in startInstallNodeDependenciesTask:`, error);
+      await updateTaskStatus(taskId, 'failed', `Error: ${error.message}`);
+    }
+  });
+
+  return taskId;
+};
+
 function hybridRootPackageJson(projectName: string, projectDesc: string = 'A React application') {
   return {
     name: projectName
