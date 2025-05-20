@@ -41,7 +41,8 @@ export const fileApi = {
   ): Promise<TaskResponse> => {
     try {
       const response = await api.get(
-        `/files/${projectId}/${encodeURIComponent(filePath)}`
+        `/files/${projectId}`, 
+        { params: { path: filePath } }
       );
       return response.data;
     } catch (error) {
