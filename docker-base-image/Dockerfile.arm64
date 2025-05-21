@@ -32,19 +32,21 @@ RUN mkdir -p /tmp/bootstrap && cd /tmp/bootstrap && \
 
 ENV NEXT_TELEMETRY_DISABLED=1 NEXT_SKIP_ESLINT=1
 RUN set -e; \
-    mkdir -p /usr/share/flowcode && \
-    CI=1 yarn create next-app /usr/share/flowcode/template-nextjs \
+    mkdir -p /usr/share/solanaflow && \
+    CI=1 yarn create next-app /usr/share/solanaflow/web \
         --typescript --eslint --tailwind --app --no-src-dir --no-interactive; \
-    yarn --cwd /usr/share/flowcode/template-nextjs add -E @tailwindcss/postcss@latest; \
+    yarn --cwd /usr/share/solanaflow/web add -E @tailwindcss/postcss@latest; \
     printf '\nmodule.exports = { output: "standalone" };\n' \
-      >> /usr/share/flowcode/template-nextjs/next.config.js; \
-    yarn --cwd /usr/share/flowcode/template-nextjs install --frozen-lockfile; \
-    yarn --cwd /usr/share/flowcode/template-nextjs build; \
-    yarn --cwd /usr/share/flowcode/template-nextjs install --production --ignore-scripts --prefer-offline && \
-    rm -rf /usr/share/flowcode/template-nextjs/.next/cache
+        >> /usr/share/solanaflow/web/next.config.js; \
+    yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile; \
+    yarn --cwd /usr/share/solanaflow/web build; \
+    yarn --cwd /usr/share/solanaflow/web install \
+            --production --ignore-scripts --prefer-offline && \
+    rm -rf /usr/share/solanaflow/web/.next/cache
 
 FROM builder AS runtime
 WORKDIR /workspace
 VOLUME /workspace
-COPY --from=builder /usr/share/flowcode /usr/share/flowcode
-CMD ["sleep","infinity"]
+COPY --from=builder /usr/share/solanaflow /usr/share/solanaflow
+EXPOSE 3000
+CMD ["node", ".next/standalone/server.js"]
