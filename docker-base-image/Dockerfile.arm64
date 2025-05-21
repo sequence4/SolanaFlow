@@ -31,6 +31,7 @@ RUN mkdir -p /tmp/bootstrap && cd /tmp/bootstrap && \
     anchor init dummy --no-git && cd dummy && anchor build -- --locked || true && rm -rf target
 
 ARG CACHEBUST=20250524
+RUN echo "$CACHEBUST"
 
 ENV NEXT_TELEMETRY_DISABLED=1 NEXT_SKIP_ESLINT=1
 RUN set -e; \
@@ -48,6 +49,7 @@ RUN set -e; \
 
 FROM builder AS runtime
 ARG  RUNTIME_BUST=20250524
+RUN echo "$RUNTIME_BUST"
 WORKDIR /usr/share/solanaflow/web  
 COPY --from=builder /usr/share/solanaflow /usr/share/solanaflow
 
