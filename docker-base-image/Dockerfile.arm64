@@ -30,21 +30,15 @@ RUN cargo install --git https://github.com/coral-xyz/anchor anchor-cli --tag v0.
 RUN mkdir -p /tmp/bootstrap && cd /tmp/bootstrap && \
     anchor init dummy --no-git && cd dummy && anchor build -- --locked || true && rm -rf target
 
-RUN mkdir -p /usr/share/flowcode \
-&& yarn create next-app /usr/share/flowcode/template-nextjs \
-        --typescript \
-        --eslint \
-        --tailwind \
-        --app \
-        --use-yarn \
-        --no-src-dir \
-        --no-interactive \
-&& printf '\nmodule.exports = { output: "standalone" };\n' \
-        >> /usr/share/flowcode/template-nextjs/next.config.js \
-&& yarn --cwd /usr/share/flowcode/template-nextjs \
-        install --frozen-lockfile --production \
-&& yarn --cwd /usr/share/flowcode/template-nextjs build \
-&& rm -rf /usr/share/flowcode/template-nextjs/.next/cache
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN mkdir -p /usr/share/flowcode && \
+    CI=1 yarn create next-app /usr/share/flowcode/template-nextjs \
+        --typescript --eslint --tailwind --app --no-src-dir --no-interactive && \
+    printf '\nmodule.exports = { output: "standalone" };\n' \
+      >> /usr/share/flowcode/template-nextjs/next.config.js && \
+    yarn --cwd /usr/share/flowcode/template-nextjs install --frozen-lockfile && \
+    yarn --cwd /usr/share/flowcode/template-nextjs build && \
+    rm -rf /usr/share/flowcode/template-nextjs/.next/cache
 
 FROM builder AS runtime
 WORKDIR /workspace
