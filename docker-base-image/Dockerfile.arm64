@@ -30,6 +30,8 @@ RUN cargo install --git https://github.com/coral-xyz/anchor anchor-cli --tag v0.
 RUN mkdir -p /tmp/bootstrap && cd /tmp/bootstrap && \
     anchor init dummy --no-git && cd dummy && anchor build -- --locked || true && rm -rf target
 
+ARG CACHEBUST=20250524
+
 ENV NEXT_TELEMETRY_DISABLED=1 NEXT_SKIP_ESLINT=1
 RUN set -e; \
     mkdir -p /usr/share/solanaflow && \
