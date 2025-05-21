@@ -51,6 +51,7 @@ FROM builder AS runtime
 ARG  RUNTIME_BUST=20250524
 RUN echo "$RUNTIME_BUST"
 ENV HOSTNAME 0.0.0.0
+ENV NEXT_DISABLE_SWC 1 
 WORKDIR /usr/share/solanaflow/web  
 COPY --from=builder /usr/share/solanaflow /usr/share/solanaflow
 EXPOSE 3000
