@@ -13,7 +13,7 @@ import {
   serverIndexContent, 
 } from '../data/templateFiles';
 
-const USER_WORKSPACE_IMAGE = "solanaflow:latest";
+const USER_WORKSPACE_IMAGE = "ghcr.io/sequence4/solanaflow:latest";
 
 function hasWarning(output: string): boolean {
   const lowercasedOutput = output.toLowerCase();
