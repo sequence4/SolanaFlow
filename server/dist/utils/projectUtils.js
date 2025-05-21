@@ -18,7 +18,7 @@ const uuid_1 = require("uuid");
 const stringUtils_1 = require("./stringUtils");
 const database_1 = __importDefault(require("../config/database"));
 const templateFiles_1 = require("../data/templateFiles");
-const USER_WORKSPACE_IMAGE = "ghcr.io/hhdgknsn/workspace:anchor";
+const USER_WORKSPACE_IMAGE = "solanaflow:latest";
 function hasWarning(output) {
     const lowercasedOutput = output.toLowerCase();
     if (lowercasedOutput.includes('no lockfile found') ||
