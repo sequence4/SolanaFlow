@@ -47,7 +47,8 @@ RUN set -e; \
     rm -rf /usr/share/solanaflow/web/.next/cache
 
 FROM builder AS runtime
-WORKDIR /usr/share/solanaflow/web     # point to the built Next.js app
+ARG  RUNTIME_BUST=20250524
+WORKDIR /usr/share/solanaflow/web  
 COPY --from=builder /usr/share/solanaflow /usr/share/solanaflow
 
 EXPOSE 3000
