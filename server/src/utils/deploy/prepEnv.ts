@@ -32,7 +32,7 @@ export async function prepEnv(projectId: string, userId: string): Promise<Worksp
   let containerName: string | undefined;
   try {
     containerName = rented?.name
-      ?? (await startProjectContainer(projectId, userId, rootPath));
+      ?? (await startProjectContainer(projectId));
 
     const containerUrl =
       rented?.url ?? (await resolveContainerUrl(containerName));

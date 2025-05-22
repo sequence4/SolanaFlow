@@ -958,7 +958,7 @@ export const startContainer = async (req: Request, res: Response, next: NextFunc
   }
 
   try {
-    const taskId = await startProjectContainer(id, userId);
+    const taskId = await startProjectContainer(id);
     
     res.status(200).json({
       message: 'Container start process initiated',

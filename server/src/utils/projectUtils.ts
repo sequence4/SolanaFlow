@@ -1293,7 +1293,7 @@ export const closeProjectContainer = async (
   return sanitizedTaskId;
 };
 
-export async function startProjectContainer(projectId: string, userId: string, rootPath: string): Promise<string> {
+export async function startProjectContainer(projectId: string): Promise<string> {
   const name = `failed-container-${projectId}`;
   try {
     const containerName = `userproj-${projectId}-$(date +%s)`;
