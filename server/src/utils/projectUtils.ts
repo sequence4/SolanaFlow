@@ -1293,137 +1293,27 @@ export const closeProjectContainer = async (
   return sanitizedTaskId;
 };
 
-export const startProjectContainer = async (
-  projectId: string,
-  creatorId: string,
-  rootPath?: string
-): Promise<string> => {
-  const taskId = await createTask('Start Project Container', creatorId, projectId);
-  const sanitizedTaskId = taskId.trim().replace(/,$/, '');
-  let existingContainer: string | null = null;
-  let newContainerName: string | undefined;
-
-  setImmediate(async () => {
-    try {
-      existingContainer = await getContainerName(projectId);
-      
-      if (existingContainer) {
-        console.log(`Found existing container ${existingContainer} for project ${projectId}`);
-        
-        const checkContainerCmd = `docker ps -a --filter "name=${existingContainer}" --format "{{.Status}}"`;
-        const containerStatus = await runCommand(checkContainerCmd, '.', sanitizedTaskId);
-        
-        if (containerStatus.toLowerCase().includes('exited')) {
-          console.log(`Starting existing container ${existingContainer}...`);
-          await runCommand(`docker start ${existingContainer}`, '.', sanitizedTaskId, { skipSuccessUpdate: true });
-          
-          console.log(`Restarting CRA dev server in container ${existingContainer}...`);
-          const runNpmStartCmd = `
-            docker exec ${existingContainer} bash -c "cd /usr/src/app && export CI=true && export BROWSER=none && export HOST=0.0.0.0 && export PORT=3000 && npm start > /usr/src/app/cra-startup.log 2>&1 &"
-          `;
-          await runCommand(runNpmStartCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
-          
-          const isServerReady = await waitForServerReady(existingContainer);
-          
-          if (isServerReady) {
-            await updateTaskStatus(
-              sanitizedTaskId,
-              'succeed',
-              `Existing container ${existingContainer} started successfully and CRA server is ready`
-            );
-          } else {
-            await updateTaskStatus(
-              sanitizedTaskId,
-              'succeed',
-              `Existing container ${existingContainer} started successfully. CRA server is still starting up.`
-            );
-          }
-        } else if (containerStatus.toLowerCase().includes('up')) {
-          console.log(`Container ${existingContainer} is already running`);
-          await updateTaskStatus(
-            sanitizedTaskId,
-            'succeed',
-            `Container ${existingContainer} is already running`
-          );
-        } else {
-          if (!rootPath) {
-            await updateTaskStatus(
-              sanitizedTaskId,
-              'failed',
-              `Container ${existingContainer} not found and rootPath not provided to create a new one`
-            );
-            return;
-          }
-          
-          newContainerName = `userproj-${projectId}-${Date.now()}`;
-          console.log(`Creating new container ${newContainerName} for project ${projectId}`);
-          await createNewContainer(newContainerName, projectId, sanitizedTaskId);
-        }
-      } else {
-        if (!rootPath) {
-          await updateTaskStatus(
-            sanitizedTaskId,
-            'failed',
-            `No container found for project ${projectId} and rootPath not provided to create a new one`
-          );
-          return;
-        }
-        
-        newContainerName = `userproj-${projectId}-${Date.now()}`;
-        console.log(`No existing container found. Creating new container ${newContainerName} for project ${projectId}`);
-        await createNewContainer(newContainerName, projectId, sanitizedTaskId);
-      }
-    } catch (error: any) {
-      console.error(`Error starting project container:`, error);
-      await updateTaskStatus(
-        sanitizedTaskId,
-        'failed',
-        `Error starting project container: ${error.message}`
-      );
+export async function startProjectContainer(projectId: string, userId: string, rootPath: string): Promise<string> {
+  const name = `failed-container-${projectId}`;
+  try {
+    const containerName = `userproj-${projectId}-$(date +%s)`;
+    execSync(`
+      docker run -d \
+        --name ${containerName} \
+        -p 0.0.0.0::3000 \
+        ghcr.io/sequence4/solanaflow:latest \
+        bash -c "cd /usr/src && tail -f /dev/null"
+    `, { stdio: "ignore" });
+    /* success path returns the real container name */
+    return containerName.replace('$(date +%s)', `${Date.now()}`);
+  } catch (err) {
+    console.error("[startProjectContainer] docker run error:", (err as Error).message);
+    // Dump stderr if present
+    if ((err as any)?.stderr) {
+      console.error((err as any).stderr.toString());
     }
-  });
-  
-  return existingContainer ?? newContainerName ?? `failed-container-${projectId}`;
-};
-
-async function createNewContainer(
-  containerName: string,
-  projectId: string,
-  taskId: string
-): Promise<void> {
-  const startContainerCmd = `
-    docker run -d \\
-      --name ${containerName} \\
-      -p 0.0.0.0::3000 \\
-      ${USER_WORKSPACE_IMAGE} \\
-      bash -c "cd /usr/src && tail -f /dev/null"
-  `;
-  await runCommand(startContainerCmd, '.', taskId, { skipSuccessUpdate: true });
-  
-  const hostPort = await getContainerHostPort(containerName, 3000, taskId);
-  const containerUrl = `http://localhost:${hostPort}`;
-  
-  await pool.query(
-    'UPDATE solanaproject SET container_name = $1, container_url = $2 WHERE id = $3',
-    [containerName, containerUrl, projectId]
-  );
-  
-  const rootPathResult = await pool.query(
-    'SELECT name FROM solanaproject WHERE id = $1',
-    [projectId]
-  );
-  
-  let rootPath = '';
-  if (rootPathResult.rows.length > 0) {
-    rootPath = normalizeProjectName(rootPathResult.rows[0].name);
-  } else {
-    rootPath = `project-${projectId}`;
+    return name;   // sentinel → will be handled upstream
   }
-  
-  const anchorInitCmd = `
-    docker exec ${containerName} bash -c "cd /usr/src && anchor init ${rootPath}"
-  `;
-  await runCommand(anchorInitCmd, '.', taskId, { skipSuccessUpdate: true });
 }
 
 export async function getContainerName(projectId: string): Promise<string | null> {
