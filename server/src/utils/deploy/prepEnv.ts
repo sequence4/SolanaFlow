@@ -15,15 +15,29 @@ export async function prepEnv(projectId: string, userId: string): Promise<Worksp
     [projectId]
   )
   if (res.rowCount === 0) throw new Error('Project not found')
-  const { root_path: rootPath, container_url: dbUrl, container_name: dbContainerName } = res.rows[0]
+  let { root_path: rootPath,
+        container_url: dbUrl,
+        container_name: dbContainerName } = res.rows[0]
+
+  if (dbContainerName?.startsWith('failed-container-')) {
+    dbContainerName = null;
+    dbUrl           = null;
+  }
 
   if (dbUrl && dbContainerName && (await isUrlAlive(dbUrl))) {
     return { rootPath, containerName: dbContainerName, containerUrl: dbUrl }
   }
 
-  const rented = await rentContainerFromPool()
-  const containerName = rented?.name ?? (await startProjectContainer(projectId, userId, rootPath))
-  const containerUrl = rented?.url ?? (await resolveContainerUrl(containerName))
+  const rented        = await rentContainerFromPool();
+  const containerName = rented?.name
+      ?? (await startProjectContainer(projectId, userId, rootPath));
+
+  let containerUrl: string;
+  try {
+    containerUrl = rented?.url ?? (await resolveContainerUrl(containerName));
+  } catch {
+    throw new Error(`Could not start container ${containerName}`);
+  }
 
   await pool.query(
     'UPDATE solanaproject SET container_url = $1, container_name = $2 WHERE id = $3',

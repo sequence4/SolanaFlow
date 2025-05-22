@@ -1,7 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { AppError } from "../middleware/errorHandler";
 import { runDeployPipeline } from "../utils/deploy/runDeployPipeline";
-import pool from "../config/database";
 
 export async function deployPipeline(
     req: Request,
@@ -65,6 +64,6 @@ export async function deployPipeline(
       console.error(`[API] Deploy pipeline error:`, err);
       send({ stage: "error", message: (err as Error).message });
       res.end();
-      next(err);
+      if (!res.headersSent) next(err); 
     }
   }
