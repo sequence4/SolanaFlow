@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import '@/styles/interface/interfaceStyle.css';
 import ProjectContext from "@/context/project/ProjectContext";
@@ -42,6 +42,25 @@ const Interface = () => {
             window.open(containerUrl, '_blank');
         }
     };
+
+    /* ───────── periodic health-check ───────── */
+    useEffect(() => {
+        if (!projectId) return;
+
+        const id = setInterval(async () => {
+            try {
+                const { containerUrl: newUrl } = await projectApi.fetchContainerUrl(projectId);
+                if (newUrl && newUrl !== containerUrl) {
+                    setProjectContext({ ...projectContext, containerUrl: newUrl });
+                    console.log("[Interface] container URL auto-updated →", newUrl);
+                }
+            } catch (err) {
+                console.warn("[Interface] auto-refresh failed:", err);
+            }
+        }, 30_000);            // every 30 s
+
+        return () => clearInterval(id);
+    }, [projectId, containerUrl, projectContext, setProjectContext]);
 
     return (
         <div className="relative w-full h-full">
