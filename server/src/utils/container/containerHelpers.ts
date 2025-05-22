@@ -6,18 +6,22 @@ export async function resolveContainerUrl(name: string): Promise<string> {
   }
 
   try {
-    // ensure container is running, or `docker port` prints nothing
     execSync(`docker start ${name}`, { stdio: "ignore" });
   } catch {
-    /* already running or start failed – ignore */
   }
 
   const out = execSync(`docker port ${name} 3000/tcp`, { encoding: "utf8" }).trim();
   if (!out) throw new Error(`port not found for ${name}`);
   const m = out.match(/:(\d+)$/);
   if (!m) throw new Error(`port parse fail for ${name}`);
-  const host = process.env.PUBLIC_FQDN ?? `${m[1]}.ws.solanaflow.dev`;
-  return `https://${host}`;
+
+  const port   = m[1]; 
+  const host   = process.env.PUBLIC_FQDN ?? `${port}.ws.solanaflow.dev`;
+  const scheme = process.env.CONTAINER_URL_SCHEME ?? "https";
+
+  return process.env.PUBLIC_FQDN
+    ? `${scheme}://${host}:${port}`
+    : `${scheme}://${host}`;
 }
 
 export async function isUrlAlive(url: string): Promise<boolean> {
