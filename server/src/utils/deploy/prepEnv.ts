@@ -1,6 +1,6 @@
 import pool from 'src/config/database'
 import { startProjectContainer, startCreateProjectDirectoryTask } from '../projectUtils'
-import { rentContainerFromPool } from '../container/rentContainerFromPool'
+import { rentContainerFromPool, releaseContainerToPool } from '../container/rentContainerFromPool'
 import { resolveContainerUrl } from '../container/containerHelpers'
 import { isUrlAlive, folderExists } from '../container/containerHelpers'
 import { WorkspaceHandle } from '../container/interfaces'
@@ -28,26 +28,32 @@ export async function prepEnv(projectId: string, userId: string): Promise<Worksp
     return { rootPath, containerName: dbContainerName, containerUrl: dbUrl }
   }
 
-  const rented        = await rentContainerFromPool();
-  const containerName = rented?.name
+  const rented               = await rentContainerFromPool();
+  let   containerName: string | undefined;
+  try {
+    containerName = rented?.name
       ?? (await startProjectContainer(projectId, userId, rootPath));
 
-  let containerUrl: string;
-  try {
-    containerUrl = rented?.url ?? (await resolveContainerUrl(containerName));
-  } catch {
-    throw new Error(`Could not start container ${containerName}`);
+    const containerUrl =
+      rented?.url ?? (await resolveContainerUrl(containerName));
+
+    await pool.query(
+      'UPDATE solanaproject SET container_url = $1, container_name = $2 WHERE id = $3',
+      [containerUrl, containerName, projectId]
+    );
+
+    const projectDir = `/usr/src/${rootPath}`;
+    if (!(await folderExists(containerName, projectDir))) {
+      await startCreateProjectDirectoryTask(userId, rootPath, projectId);
+    }
+
+    return { rootPath, containerName, containerUrl };
+
+  } catch (err) {
+    /* if we marked a pool container busy, release it on failure */
+    if (containerName?.startsWith('ws-')) {
+      await releaseContainerToPool(containerName);
+    }
+    throw err;
   }
-
-  await pool.query(
-    'UPDATE solanaproject SET container_url = $1, container_name = $2 WHERE id = $3',
-    [containerUrl, containerName, projectId]
-  )
-
-  const projectDir = `/usr/src/${rootPath}`
-  if (!(await folderExists(containerName, projectDir))) {
-    await startCreateProjectDirectoryTask(userId, rootPath, projectId)
-  }
-
-  return { rootPath, containerName, containerUrl }
 }
