@@ -16,7 +16,7 @@ export async function resolveContainerUrl(name: string): Promise<string> {
   if (!m) throw new Error(`port parse fail for ${name}`);
 
   const port   = m[1]; 
-  const host   = process.env.PUBLIC_FQDN ?? `${port}.ws.solanaflow.dev`;
+  const host   = process.env.PUBLIC_FQDN ?? `${port}.ws.solanaflow.io`;
   const scheme = process.env.CONTAINER_URL_SCHEME ?? "https";
 
   return process.env.PUBLIC_FQDN
