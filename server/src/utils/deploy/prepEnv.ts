@@ -28,8 +28,8 @@ export async function prepEnv(projectId: string, userId: string): Promise<Worksp
     return { rootPath, containerName: dbContainerName, containerUrl: dbUrl }
   }
 
-  const rented               = await rentContainerFromPool();
-  let   containerName: string | undefined;
+  const rented = await rentContainerFromPool();
+  let containerName: string | undefined;
   try {
     containerName = rented?.name
       ?? (await startProjectContainer(projectId, userId, rootPath));
@@ -50,9 +50,8 @@ export async function prepEnv(projectId: string, userId: string): Promise<Worksp
     return { rootPath, containerName, containerUrl };
 
   } catch (err) {
-    /* if we marked a pool container busy, release it on failure */
-    if (containerName?.startsWith('ws-')) {
-      await releaseContainerToPool(containerName);
+    if (rented?.name) {
+      await releaseContainerToPool(rented.name);
     }
     throw err;
   }
