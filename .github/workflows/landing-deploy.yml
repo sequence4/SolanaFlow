@@ -2,7 +2,7 @@ name: Landing package – build & deploy
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -16,10 +16,6 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: landing
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -37,23 +33,23 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        working-directory: landing
 
       - name: Build Next.js landing
         run: pnpm run build
+        working-directory: landing
 
       - name: Archive production build
         run: |
-          cd landing
-          tar -czf ../landing.tar.gz \
+          tar -czf landing.tar.gz \
             .next \
             public \
             next.config.* \
             ecosystem.config.cjs \
             package.json \
-            ../pnpm-lock.yaml \
+            pnpm-lock.yaml \
             docs \
             scripts
-          cd ..
 
       - name: Upload build artefact
         uses: actions/upload-artifact@v4
@@ -65,35 +61,60 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
-
     steps:
       - name: Download artefact
         uses: actions/download-artifact@v4
         with:
           name: landing-build
 
+      - name: Ensure remote dirs
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: 22
+          debug: true
+          script: |
+            set -e
+            mkdir -p /opt/solanaflow/tmp
+
       - name: Copy build to server (SCP)
         uses: appleboy/scp-action@v0.1.7
         with:
-          host:     ${{ secrets.STAGING_HOST }}
+          host: ${{ secrets.STAGING_HOST }}
           username: ${{ secrets.STAGING_USER }}
-          key:      ${{ secrets.STAGING_SSH_KEY }}
-          port:     22
-          source:   "landing.tar.gz"
-          target:   "/opt/solanaflow/tmp"
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: 22
+          debug: true
+          source: landing.tar.gz
+          target: /opt/solanaflow/tmp/
 
       - name: Unpack & reload (SSH)
         uses: appleboy/ssh-action@v0.1.7
+        env:
+          STAGING_DATABASE_URL:   ${{ secrets.STAGING_DATABASE_URL }}
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          ALLOWED_ORIGINS:        ${{ secrets.ALLOWED_ORIGINS }}
+          NEXT_PUBLIC_GTAG:       ${{ secrets.NEXT_PUBLIC_GTAG }}
+          NEXT_PUBLIC_API_URL:    ${{ secrets.NEXT_PUBLIC_API_URL }}
         with:
-          host:     ${{ secrets.STAGING_HOST }}
+          host: ${{ secrets.STAGING_HOST }}
           username: ${{ secrets.STAGING_USER }}
-          key:      ${{ secrets.STAGING_SSH_KEY }}
-          port:     22
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: 22
+          debug: true
+          script_stop: true
+          command_timeout: 30m
           envs: STAGING_DATABASE_URL,UPSTASH_REDIS_REST_URL,UPSTASH_REDIS_REST_TOKEN,ALLOWED_ORIGINS,NEXT_PUBLIC_GTAG,NEXT_PUBLIC_API_URL
           script: |
-            set -e
+            set -euxo pipefail
             cd /opt/solanaflow
+
+            # Backup existing
             [ -d landing ] && mv landing "landing-$(date +%Y%m%d%H%M)"
+
             mkdir -p landing
             tar -xzf tmp/landing.tar.gz -C landing --strip-components=0
             rm -f tmp/landing.tar.gz
@@ -107,7 +128,12 @@ jobs:
             NODE_ENV=staging
             EOF
             cd landing
-            pnpm install --prod --frozen-lockfile
+            pnpm install --prod --no-frozen-lockfile
+
+            # ensure pm2 is present and on PATH
+            command -v pm2 >/dev/null 2>&1 || sudo npm install -g pm2@latest
+            export PATH=$PATH:/usr/local/bin
+
             pm2 startOrReload ecosystem.config.cjs
             pm2 save
             echo "✅  Landing deployed & PM2 restarted"

@@ -27,8 +27,8 @@ export const listProjectTasks = async (
     let query = `
       SELECT t.id, t.name, t.created_at, t.last_updated, t.status, t.project_id, 
              sp.name as project_name
-      FROM Task t
-      JOIN SolanaProject sp ON t.project_id = sp.id
+      FROM task t
+      JOIN solanaproject sp ON t.project_id = sp.id
       WHERE sp.org_id = $1
     `;
     const queryParams: any[] = [orgId];
@@ -90,8 +90,8 @@ export const getTaskStatus = async (
       `
       SELECT t.id, t.name, t.created_at, t.last_updated, t.status, t.result, t.project_id, 
              sp.name as project_name
-      FROM Task t
-      JOIN SolanaProject sp ON t.project_id = sp.id
+      FROM task t
+      JOIN solanaproject sp ON t.project_id = sp.id
       WHERE t.id = $1 AND sp.org_id = $2
     `,
       [taskId, orgId]

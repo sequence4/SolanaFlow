@@ -5,20 +5,19 @@ import fs from 'fs';
 
 export async function createTask(
   name: string,
-  creatorId: string,
+  creatorId: string | null,
   projectId: string
 ): Promise<string> {
   const client = await pool.connect();
   try {
-    const taskId = uuidv4();
+    const id = uuidv4();
     await client.query(
-      'INSERT INTO Task (id, name, creator_id, project_id, status, created_at) VALUES ($1, $2, $3, $4, $5, NOW())',
-      [taskId, name, creatorId, projectId, 'queued']
+      `INSERT INTO task
+       (id,name,creator_id,project_id,status,created_at)
+       VALUES ($1,$2,$3,$4,'queued',NOW())`,
+      [id, name, creatorId, projectId]
     );
-    return taskId;
-  } catch (error) {
-    console.error('Error creating task:', error);
-    throw error;
+    return id;
   } finally {
     client.release();
   }
@@ -34,7 +33,7 @@ export async function updateTaskStatus(
   console.log(`[DEBUG_TASK_BACKEND] Updating task status to ${status} for taskId: ${sanitizedTaskId}`);
   try {
     await client.query(
-      'UPDATE Task SET status = $1, result = $2 WHERE id = $3',
+      'UPDATE task SET status = $1, result = $2 WHERE id = $3',
       [status, result, sanitizedTaskId]
     );
     console.log(`[DEBUG_TASK_BACKEND] Task status updated to ${status} for taskId: ${sanitizedTaskId}`);
@@ -96,7 +95,7 @@ export async function waitForTaskCompletion(
       const client = await pool.connect();
       try {
         const result = await client.query(
-          'SELECT status FROM Task WHERE id = $1',
+          'SELECT status FROM task WHERE id = $1',
           [taskId]
         );
         

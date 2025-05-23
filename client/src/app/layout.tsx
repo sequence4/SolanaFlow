@@ -22,7 +22,7 @@ const oxygenMono = Oxygen_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Solana FlowCode - Build Solana dApps Without Code",
+  title: "SolanaFlow - Build Solana dApps Without Code",
   description: "Visual AI developer tool for building and deploying Solana blockchain applications without writing code",
 };
 
@@ -32,7 +32,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         {/* Script to apply theme before hydration */}
         <script

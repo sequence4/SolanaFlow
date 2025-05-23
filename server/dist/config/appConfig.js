@@ -4,12 +4,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.APP_CONFIG = void 0;
-const dotenv_1 = __importDefault(require("dotenv"));
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const errorHandler_1 = require("../middleware/errorHandler");
-dotenv_1.default.config();
-// Function to check if ROOT_FOLDER exists and is writable
+const dotenv_flow_1 = __importDefault(require("dotenv-flow"));
+dotenv_flow_1.default.config({ purge_dotenv: true });
 const checkRootFolder = (folderPath) => {
     if (!fs_1.default.existsSync(folderPath)) {
         throw new errorHandler_1.AppError(`ROOT_FOLDER does not exist: ${folderPath}`, 500);
@@ -21,7 +20,6 @@ const checkRootFolder = (folderPath) => {
         throw new errorHandler_1.AppError(`ROOT_FOLDER is not writable: ${folderPath}`, 500);
     }
 };
-// Validate and normalize ROOT_FOLDER path
 const rootFolder = process.env.ROOT_FOLDER
     ? path_1.default.resolve(process.env.ROOT_FOLDER)
     : null;
@@ -36,10 +34,9 @@ exports.APP_CONFIG = {
     WALLETS_FOLDER: process.env.WALLETS_FOLDER,
     PASSWORD_SALT_ROUNDS: 10,
     TOKEN_EXPIRATION: '7d',
-    MAX_FILE_SIZE: 1024 * 1024 * 5, // 5MB
+    MAX_FILE_SIZE: 1024 * 1024 * 5,
     BETA_CODE: process.env.BETA_CODE,
 };
-// Validate required environment variables
 const requiredEnvVars = [
     'JWT_SECRET',
     'ROOT_FOLDER',

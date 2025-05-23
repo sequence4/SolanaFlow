@@ -1,8 +1,8 @@
-import { NextFunction, Request, Response, RequestHandler } from 'express';
+import { NextFunction, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/database';
 import { AppError } from '../middleware/errorHandler';
-import { getProjectRootPath, startDeleteProjectFolderTask } from '../utils/fileUtils';
+import { getProjectRootPath } from '../utils/fileUtils';
 import { startProjectContainer } from '../utils/projectUtils';
 import { normalizeProjectName } from '../utils/stringUtils';
 import {
@@ -24,8 +24,7 @@ import path from 'path';
 import { APP_CONFIG } from '../config/appConfig';
 import fs from 'fs';
 import { Keypair } from '@solana/web3.js';
-import { createTask, updateTaskStatus, waitForTaskCompletion } from '../utils/taskUtils';
-import os from 'os';
+import { waitForTaskCompletion } from '../utils/taskUtils';
 
 export const runCommandController = async (
   req: Request,
@@ -83,109 +82,46 @@ export const createProject = async (
   req: Request,
   res: Response,
   next: NextFunction
-): Promise<void> => {
-  const { 
-    name, 
-    description, 
-    details 
-  } = req.body;
-  const org_id = req.user?.org_id;
-  const userId = req.user?.id;
+) => {
+  let { name, description, details } = req.body;
+  const userId = req.user?.id ?? null;
 
-  console.log(`[DEBUG_CODE_ENDPOINT] Received request to createProject with name=${name}, description=${description?.substring(0, 20)}..., userId=${userId}, org_id=${org_id}`);
-
-  if (!org_id || !userId) {
-    console.log(`[DEBUG_CODE_ENDPOINT] createProject failed - missing org_id or userId`);
-    next(new AppError('User organization not found', 400));
-    return;
+  if (!name || name.trim() === '') {
+    name = `Untitled-${new Date().toISOString().slice(0,10)}`;
   }
 
   const client = await pool.connect();
-  let projectCreated = false;
-  let projectId: string | null = null;
-
   try {
     await client.query('BEGIN');
 
-    const normalizedName = normalizeProjectName(name);
-    const randomSuffix = uuidv4().slice(0, 8);
-    const root_path = `${normalizedName}-${randomSuffix}`;
-    console.log(`[DEBUG_CODE_ENDPOINT] Generated root_path=${root_path} for project name=${name}`);
+    const rootPath  = `${normalizeProjectName(name)}-${uuidv4().slice(0,8)}`;
+    const projectId = uuidv4();
+    const extended  = { ...(details||{}), isLite:true };
 
-    const extendedDetails = {
-      ...(details || {}),
-      isLite: true,
-    };
-
-    projectId = uuidv4();
-    console.log(`[DEBUG_CODE_ENDPOINT] Generated projectId=${projectId}`);
-
-    const result = await client.query(
-      'INSERT INTO solanaproject (id, name, description, org_id, root_path, details, last_updated, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $7) RETURNING *',
-      [projectId, name, description, org_id, root_path, JSON.stringify(extendedDetails), new Date()]
+    await client.query(
+      `INSERT INTO solanaproject
+       (id,name,description,root_path,details,last_updated,created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$6)`,
+      [projectId, name, description, rootPath, JSON.stringify(extended), new Date()]
     );
 
-    const newProject = result.rows[0];
-    console.log(`[DEBUG_CODE_ENDPOINT] Project inserted in DB, id=${newProject.id}, root_path=${newProject.root_path}`);
-    
     await client.query('COMMIT');
-    projectCreated = true;
-    console.log(`[DEBUG_CODE_ENDPOINT] Transaction committed for projectId=${projectId}`);
-    
-    let taskId: string;
-    try {
-      console.log(`[DEBUG_CODE_ENDPOINT] About to start createProjectDirectoryTask for projectId=${projectId}, root_path=${root_path}`);
-      taskId = await startCreateProjectDirectoryTask(userId, root_path, projectId);
-      console.log(`[DEBUG_CODE_ENDPOINT] Created directory task with taskId=${taskId} for projectId=${projectId}`);
-    } catch (taskError: any) {
-      console.error('[DEBUG_CODE_ENDPOINT] Error creating project directory task:', taskError);
-      res.status(201).json({
-        message: 'Project created successfully, but directory creation failed',
-        project: {
-          id: newProject.id.toString(),
-          name: newProject.name,
-          description: newProject.description,
-          org_id: newProject.org_id,
-          root_path: newProject.root_path,
-          details: newProject.details,
-          last_updated: newProject.last_updated,
-          created_at: newProject.created_at
-        },
-        directoryTaskError: taskError.message
-      });
-      return;
-    }
 
-    console.log(`[DEBUG_CODE_ENDPOINT] Responding with success for projectId=${projectId}, taskId=${taskId}`);
+    //const taskId = await startCreateProjectDirectoryTask(userId, rootPath, projectId);
+
     res.status(201).json({
-      message: 'Project created successfully',
-      project: {
-        id: newProject.id.toString(),
-        name: newProject.name,
-        description: newProject.description,
-        org_id: newProject.org_id,
-        root_path: newProject.root_path,
-        details: newProject.details,
-        last_updated: newProject.last_updated,
-        created_at: newProject.created_at
-      },
-      directoryTask: {
-        taskId: taskId,
-        message: 'Project directory creation started'
-      }
+      message:'Project created successfully',
+      project:{ id:projectId, name, description, root_path:rootPath, details:extended },
+      directoryTask:{ taskId:null, message:'Project directory creation started' }
     });
-
-  } catch (error) {
-    if (!projectCreated) {
-      await client.query('ROLLBACK');
-      console.log(`[DEBUG_CODE_ENDPOINT] Transaction rolled back due to error`);
-    }
-    console.error('[DEBUG_CODE_ENDPOINT] Error in createProject:', error);
-    next(error);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    next(err);
   } finally {
     client.release();
   }
 };
+
 
 export const createProjectDirectory = async (
   req: Request,
@@ -790,7 +726,7 @@ export const deployProjectEphemeral = async (
         const client = await pool.connect();
         try {
           const taskQuery = await client.query(
-            'SELECT result FROM Task WHERE id = $1',
+            'SELECT result FROM task WHERE id = $1',
             [taskId]
           );
           
@@ -1022,7 +958,7 @@ export const startContainer = async (req: Request, res: Response, next: NextFunc
   }
 
   try {
-    const taskId = await startProjectContainer(id, userId);
+    const taskId = await startProjectContainer(id);
     
     res.status(200).json({
       message: 'Container start process initiated',
@@ -1033,4 +969,30 @@ export const startContainer = async (req: Request, res: Response, next: NextFunc
   }
 };
 
+export async function getContainerUrl(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { id } = req.params;
+    
+    // Query the database to get the container URL
+    const { rows } = await pool.query(
+      "SELECT container_url FROM solanaproject WHERE id = $1",
+      [id]
+    );
 
+    if (!rows.length || !rows[0].container_url) {
+      res.status(404).json({ 
+        message: "Container URL not found for this project" 
+      });
+      return;
+    }
+
+    res.json({ containerUrl: rows[0].container_url });
+    return;
+  } catch (error) {
+    next(error);
+  }
+}

@@ -31,13 +31,14 @@ export interface TaskLogsContextType {
   addSystemLog: (log: string) => void;
   resetLogs: () => void;
   setSteps: (steps: Step[]) => void;
+  updateStage: (stage: string) => void;
 }
 
 const TaskLogsContext = createContext<TaskLogsContextType>({
   logs: [],
   isVisible: false,
   progress: 0,
-  currentStep: 0,
+  currentStep: -1,
   steps: [],
   showDetails: false,
   systemLogs: [],
@@ -53,6 +54,7 @@ const TaskLogsContext = createContext<TaskLogsContextType>({
   addSystemLog: () => {},
   resetLogs: () => {},
   setSteps: () => {},
+  updateStage: () => {},
 });
 
 export default TaskLogsContext; 

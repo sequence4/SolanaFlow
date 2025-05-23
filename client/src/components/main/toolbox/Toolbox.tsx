@@ -3,25 +3,16 @@
 import React, { useContext, useState, useRef, useEffect } from 'react';
 import '@/styles/toolbox/toolboxStyle.css';
 import { NodeItems } from '@/components/main/toolbox/workflowToolbox/NodeItems';
-import FileTree from '@/components/main/toolbox/codeToolbox/Filetree';
 import ProjectContext from '@/context/project/ProjectContext';
 import FileContext from '@/context/file/FileContext';
 import UxContext from '@/context/ux/UxContext';
-import SimpleBar from 'simplebar-react';
 import 'simplebar-react/dist/simplebar.min.css';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { NewProjectModal } from '@/components/ui/new-project-modal';
 import ProjectListPopover from '../workflow/ProjectListPopover';
-import { useSignAndSendTx } from '@/data/hooks/useSignAndSendTx';
-import { useWallet } from '@solana/wallet-adapter-react';
 import { toast } from "sonner";
-import { useColorModeValue } from '@/components/ui/color-mode';
 import PulseLoader from "react-spinners/PulseLoader";
-import { handleGenerateCode } from '@/utils/codeGeneration/handleGenerateCode';
-import { handleDeployProgram } from '@/utils/project/deployUpgradableProgram';
-import { handleDeployWithLogs } from '@/utils/project/handleDeployWithLogs';
-import { saveProject } from '@/utils/project/saveProject';
 import { handleConfirmNewProject, handleOpenProject, handleSaveClick } from '@/utils/project/projectUtils';
 import { useTaskLogs } from '@/context/logs/useTaskLogs';
 import {
@@ -30,28 +21,26 @@ import {
   Filter,
   Settings,
   Clock,
-  BookOpen,
   Edit3,
   ArrowRight,
   Info,
-  Tag,
   FolderOpen,
   Save,
   Plus,
-  Code,
-  Hammer,
   Rocket,
   ChevronRight,
 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator"
 import { Label } from "@/components/ui/label";
+import { runDeployPipelineWithLogs } from '@/utils/deploy/deployPipeline';
+import { useEnsureProjectId } from '@/hooks/useEnsureProjectId';
 
 export const Toolbox = () => {
     const [isExpanded] = useState(true);
     const { projectContext, setProjectContext } = useContext(ProjectContext);
     const { fileTree, setFileTree, setSelectedFile } = useContext(FileContext);
-    const { activeTab, setActiveTab, setUxOpenPanel } = useContext(UxContext);
+    const { activeTab, setUxOpenPanel } = useContext(UxContext);
     const [activeChainTab, setActiveChainTab] = useState<"on-chain" | "off-chain">("on-chain");
     const [projectName, setProjectName] = useState(projectContext.name || "My Token Project");
     const [isEditing, setIsEditing] = useState(false);
@@ -59,24 +48,18 @@ export const Toolbox = () => {
     const [isFocused, setIsFocused] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const nodeItemsRef = useRef<any>(null);
+    const esRef = useRef<ReturnType<typeof runDeployPipelineWithLogs> | null>(null);
     
     const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
     const [isProjectListModalOpen, setIsProjectListModalOpen] = useState(false);
     const [projectsRefreshCounter, setProjectsRefreshCounter] = useState(0);
     
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [isCodeReady, setIsCodeReady] = useState(false);
     const [isDeploying, setIsDeploying] = useState(false);
     const [showDeployModal, setShowDeployModal] = useState(false);
     const [selectedOption, setSelectedOption] = useState('user-wallet');
     
-    const signAndSendTx = useSignAndSendTx();
-    const { publicKey } = useWallet();
     const taskLogs = useTaskLogs();
-    
-    const deployModalBg = useColorModeValue('var(--toolbar-deploy-modal-bg-light)', 'var(--toolbar-deploy-modal-bg-dark)');
-    const deployModalBorderColor = useColorModeValue('var(--toolbar-deploy-modal-border-light)', 'var(--toolbar-deploy-modal-border-dark)');
-    const deployModalTextColor = useColorModeValue('var(--toolbar-deploy-modal-text-light)', 'var(--toolbar-deploy-modal-text-dark)');
+    const { ensureId, modalOpen, setModalOpen, handleModalSubmit } = useEnsureProjectId(projectContext, setProjectContext);
 
     useEffect(() => {
         setProjectName(projectContext.name || "My Token Project");
@@ -95,7 +78,6 @@ export const Toolbox = () => {
     };
 
     const handleCreateProject = (data: { name: string; description: string; repoUrl?: string }) => {
-        // Reset logs before starting new project creation
         taskLogs.resetLogs();
         
         handleConfirmNewProject(
@@ -126,36 +108,6 @@ export const Toolbox = () => {
         );
     };
     
-    const handleGenerateClick = async () => {
-        if (isGenerating) return;
-        try {
-            const saveResp = await saveProject(projectContext, setProjectContext);
-            if (!saveResp) {
-                console.log('No saveResp, cannot generate code');
-                return;
-            }
-            const projectId = saveResp.project?.id;  
-            setIsGenerating(true);
-            
-            await handleGenerateCode(
-                { ...projectContext, id: projectId },
-                setIsGenerating,
-                setIsCodeReady,
-                (tab: any) => setActiveTab(tab),
-                setFileTree,
-                setProjectContext,
-                taskLogs
-            );
-        } catch (error) {
-            console.error('Error generating code:', error);
-            setIsGenerating(false);
-        }
-    };
-    
-    const handleViewCode = () => { 
-        setActiveTab('code'); 
-    };
-    
     const handleOpenDeployModal = () => {
         setShowDeployModal(true);
     };
@@ -168,25 +120,34 @@ export const Toolbox = () => {
         if (isDeploying) return;
         setIsDeploying(true);
         
-        // CLOSE THE POPUP IMMEDIATELY
         setShowDeployModal(false);
+        console.log('[deploy] Starting deploy process...');
         
         try {
-            if (!publicKey) {
-                throw new Error('No wallet connected');
+            if (esRef.current) {
+                console.log('[deploy] Closing previous EventSource');
+                esRef.current.close();
+                esRef.current = null;
             }
             
-            await handleDeployWithLogs(
-                projectContext,
-                setProjectContext,
-                publicKey,
-                signAndSendTx,
-                'devnet',
-                selectedOption === 'user-wallet' ? 'fullWallet' : 'delegated',
-                taskLogs
+            console.log('[deploy] Calling ensureId()');
+            const id = await ensureId();
+            console.log(`[deploy] Project ID ensured: ${id}`);
+            
+            const graph = projectContext.details?.projectState ?? {};
+            console.log('[deploy] Graph data:', graph);
+
+            console.log('[deploy] Calling runDeployPipelineWithLogs');
+            esRef.current = runDeployPipelineWithLogs(
+              { ...projectContext, id },
+              graph,
+              taskLogs,
+              setProjectContext
             );
+            
+            console.log('[deploy] Deploy pipeline started with EventSource');
         } catch (err) {
-            console.error('Deployment error:', err);
+            console.error('[deploy] Deployment error:', err);
             toast("Deployment error", {
                 description: String(err),
                 style: { backgroundColor: "#f87171", color: "white" }
@@ -196,9 +157,7 @@ export const Toolbox = () => {
         }
     };
     
-    const nodesCount = projectContext?.details?.projectState?.nodes?.length || 0;
     const projectDeployed = !!projectContext?.details?.projectState?.deployed;
-    const canGenerateCode = nodesCount > 0;
     const canDeploy = fileTree !== null || projectDeployed;
 
     useEffect(() => {
@@ -211,6 +170,15 @@ export const Toolbox = () => {
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (esRef.current) {
+                console.log('[deploy] Closing EventSource on unmount');
+                esRef.current.close();
+            }
+        };
     }, []);
 
     return (
@@ -299,25 +267,7 @@ export const Toolbox = () => {
                         </button>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 mb-4">
-                        <button 
-                            className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center"
-                            onClick={fileTree ? handleViewCode : handleGenerateClick}
-                            disabled={!canGenerateCode}
-                        >
-                            {isGenerating ? (
-                                <PulseLoader
-                                    color="#80a3ff"
-                                    size={3}
-                                    cssOverride={{ display: 'inline-block', margin: '0' }}
-                                />
-                            ) : (
-                                <>
-                                    <Code className={`h-4 w-4 mr-2 ${fileTree ? "text-[#9de19f]" : ""}`} />
-                                    <span>{fileTree ? "View Code" : "Generate Code"}</span>
-                                </>
-                            )}
-                        </button>
+                    <div className="grid grid-cols-1 gap-2 mb-4">
                         <button 
                             className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center"
                             onClick={projectDeployed ? undefined : handleOpenDeployModal}
@@ -338,7 +288,6 @@ export const Toolbox = () => {
                         </button>
                     </div>
                     
-                    {/* Display Program ID with Solana Explorer link if deployed */}
                     {projectDeployed && projectContext.details?.projectState?.programId && (
                         <div className="bg-[#1e1e20] border border-[#2a2a2d] rounded-md p-2 mb-4">
                             <div className="flex items-center text-xs">
@@ -393,7 +342,6 @@ export const Toolbox = () => {
                 </div>
             </div>
 
-            {/* Search Bar */}
             <div className="p-4 border-b border-[#2a2a2d]">
                 <div className="relative">
                     <Search
@@ -444,7 +392,6 @@ export const Toolbox = () => {
                 )}
             </div>
 
-            {/* Main Content */}
             <div className="flex-1 overflow-hidden">
                 {isExpanded && activeTab === 'workflow' && (
                     <NodeItems 
@@ -454,46 +401,24 @@ export const Toolbox = () => {
                 )}
                 {activeTab === 'interface' && (
                     <div className="p-4 text-[#6e6e76]">
-                        {/* Interface-specific Toolbox content */}
                         <p>Interface Tab Toolbox Placeholder</p>
                     </div>
                 )}
-                {activeTab === 'code' && <FileTree />}
             </div>
 
-            {/* Bottom Section */}
-            {/*}
-            <div className="p-3 border-t border-[#2a2a2d]">
-                <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium">Documentation</span>
-                    <button className="text-xs text-[#4d7cfe] hover:text-[#4d7cfe]/90 transition-colors">View All</button>
-                </div>
-                <div className="bg-[#1e1e20] border border-[#2a2a2d] rounded-md p-3 hover:border-[#2a2a2d] transition-all cursor-pointer group">
-                    <div className="flex items-center">
-                        <BookOpen className="h-4 w-4 text-[#4d7cfe] mr-2" />
-                        <span className="text-xs font-medium text-white group-hover:text-white transition-colors">
-                            Token Program Guide
-                        </span>
-                    </div>
-                    <p className="mt-1 text-xs text-[#6e6e76] group-hover:text-[#6e6e76] transition-colors">
-                        Learn how to create and manage tokens
-                    </p>
-                    <div className="mt-2 flex items-center text-xs text-[#4d7cfe] group-hover:text-[#4d7cfe]/90 transition-colors">
-                        <span>Read more</span>
-                        <ArrowRight className="h-3 w-3 ml-1" />
-                    </div>
-                </div>
-            </div>
-            */}
-
-            {/* New Project Modal */}
             <NewProjectModal
                 open={isNewProjectModalOpen}
                 onOpenChange={setIsNewProjectModalOpen}
                 onSubmit={handleCreateProject}
             />
 
-            {/* Project List Modal */}
+            {/* Project creation modal triggered by ensureId() */}
+            <NewProjectModal
+                open={modalOpen}
+                onOpenChange={setModalOpen}
+                onSubmit={handleModalSubmit}
+            />
+
             <Dialog open={isProjectListModalOpen} onOpenChange={(open) => setIsProjectListModalOpen(open)}>
                 <DialogContent className="bg-[#111827] text-slate-100" 
                 style={{width: "fit-content", border: "1px solid rgb(36, 45, 68)"}}>
@@ -501,7 +426,7 @@ export const Toolbox = () => {
                         modalIsOpen={isProjectListModalOpen}
                         refreshTrigger={projectsRefreshCounter}
                         onProjectClick={(projectId, projectName) => {
-                            handleOpenProject(projectId, projectContext, setProjectContext, setFileTree);
+                            handleOpenProject(projectId, projectContext, setProjectContext, setSelectedFile);
                             setIsProjectListModalOpen(false);
                         }}
                         closePopover={() => setIsProjectListModalOpen(false)}
@@ -509,7 +434,6 @@ export const Toolbox = () => {
                 </DialogContent>
             </Dialog>
             
-            {/* Deploy Modal */}
             {showDeployModal && (
                 <Dialog open={showDeployModal} onOpenChange={handleDeployCancel}>
                     <DialogContent className="p-0 sm:max-w-md border border-[#2a2a2a] bg-[#121212] text-gray-200 rounded-md shadow-xl overflow-hidden [&>button]:hidden">

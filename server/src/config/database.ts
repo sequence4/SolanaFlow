@@ -1,14 +1,21 @@
-import { Pool } from 'pg';
-import dotenv from 'dotenv';
+import { Pool } from 'pg'
+import { config as loadEnv } from 'dotenv'
+import { resolve } from 'path'
 
-dotenv.config();
+loadEnv()  
 
-const pool = new Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
-  port: parseInt(process.env.DB_PORT || '5432'),
-});
+const envFile = `.env.${process.env.NODE_ENV || 'development'}`
+loadEnv({ path: resolve(process.cwd(), envFile) })
 
-export default pool;
+const pool =
+  process.env.DATABASE_URL
+    ? new Pool({ connectionString: process.env.DATABASE_URL })
+    : new Pool({
+        user:     process.env.DB_USER,
+        host:     process.env.DB_HOST,
+        database: process.env.DB_NAME,
+        password: process.env.DB_PASSWORD,
+        port:     Number(process.env.DB_PORT ?? 5432)
+      })
+
+export default pool

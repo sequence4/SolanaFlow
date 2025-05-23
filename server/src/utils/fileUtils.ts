@@ -46,7 +46,7 @@ export async function getProjectRootPath(projectId: string): Promise<string> {
   const client = await pool.connect();
   try {
     const result = await client.query(
-      'SELECT root_path FROM SolanaProject WHERE id = $1',
+      'SELECT root_path FROM solanaproject WHERE id = $1',
       [projectId]
     );
     if (result.rows.length === 0) throw new AppError('Project not found', 404);
@@ -88,7 +88,7 @@ export const startDeleteProjectFolderTask = async (
   try {
     const taskId = uuidv4();
     await client.query(
-      'INSERT INTO Task (id, name, created_at, creator_id, status) VALUES ($1, $2, NOW(), $3, $4)',
+      'INSERT INTO task (id, name, created_at, creator_id, status) VALUES ($1, $2, NOW(), $3, $4)',
       [taskId, 'Delete Project Folder', creatorId, 'doing']
     );
 
@@ -377,7 +377,7 @@ export const startGenerateFileTreeTask = async (
         let fileTree: FileNode[] = [];
         
         const containerQuery = await pool.query(
-          'SELECT container_name FROM SolanaProject WHERE id = $1',
+          'SELECT container_name FROM solanaproject WHERE id = $1',
           [projectId]
         );
         
@@ -427,7 +427,7 @@ export const startGetFileContentTask = async (
   setImmediate(async () => {
     try {
       const containerQuery = await pool.query(
-        'SELECT container_name FROM SolanaProject WHERE id = $1',
+        'SELECT container_name FROM solanaproject WHERE id = $1',
         [projectId]
       );
       
@@ -474,7 +474,7 @@ export const startCreateFileTask = async (
   setImmediate(async () => {
     try {
       const containerQuery = await pool.query(
-        'SELECT container_name FROM SolanaProject WHERE id = $1',
+        'SELECT container_name FROM solanaproject WHERE id = $1',
         [projectId]
       );
       
@@ -536,7 +536,7 @@ export const startUpdateFileTask = async (
   setImmediate(async () => {
     try {
       const containerQuery = await pool.query(
-        'SELECT container_name FROM SolanaProject WHERE id = $1',
+        'SELECT container_name FROM solanaproject WHERE id = $1',
         [projectId]
       );
       
@@ -590,7 +590,7 @@ export const startDeleteFileTask = async (
   setImmediate(async () => {
     try {
       const containerQuery = await pool.query(
-        'SELECT container_name FROM SolanaProject WHERE id = $1',
+        'SELECT container_name FROM solanaproject WHERE id = $1',
         [projectId]
       );
       
@@ -629,4 +629,22 @@ export const startDeleteFileTask = async (
   });
 
   return taskId;
+};
+
+export const getContainerName = async (projectId: string): Promise<string | null> => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT container_name FROM solanaproject WHERE id = $1',
+      [projectId]
+    );
+    
+    if (rows.length > 0) {
+      return rows[0].container_name;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error getting container name:', error);
+    return null;
+  }
 };

@@ -16,11 +16,13 @@ router.put('/update/:id', authMiddleware_1.authMiddleware, projectController_1.e
 router.get('/details/:id', authMiddleware_1.authMiddleware, projectController_1.getProjectDetails);
 router.delete('/:id', authMiddleware_1.authMiddleware, projectController_1.deleteProject);
 router.post('/:id/start-container', authMiddleware_1.authMiddleware, projectController_1.startContainer);
+router.get('/:id/container-url', authMiddleware_1.authMiddleware, projectController_1.getContainerUrl);
 router.post('/init', authMiddleware_1.authMiddleware, projectController_1.anchorInitProject);
 router.post('/:id/set-cluster', authMiddleware_1.authMiddleware, projectController_1.setCluster);
 router.post('/:id/build', authMiddleware_1.authMiddleware, projectController_2.buildProject);
 router.get('/:id/build-artifact', authMiddleware_1.authMiddleware, projectController_2.getBuildArtifact);
 router.post('/:id/deploy', authMiddleware_1.authMiddleware, projectController_1.deployProject);
+router.post('/:id/deploy-ephemeral', authMiddleware_1.authMiddleware, projectController_1.deployProjectEphemeral);
 router.post('/:id/test', authMiddleware_1.authMiddleware, projectController_2.testProject);
 router.post('/:id/run-command', authMiddleware_1.authMiddleware, projectController_1.runProjectCommand);
 router.post('/:id/run-script', authMiddleware_1.authMiddleware, projectController_1.runProjectCommand);

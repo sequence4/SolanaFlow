@@ -73,7 +73,7 @@ export default function LandingPage() {
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <div className="w-8 h-8 relative">
-              <img src="/assets/logo.png" alt="FlowCode Logo" className="w-full h-full" />
+              <img src="/assets/logo.png" alt="SolanaFlow Logo" className="w-full h-full" />
               <div className="absolute inset-0 bg-[#5580ff]/20 blur-xl rounded-full"></div>
             </div>
             <span className="text-xl font-bold tracking-tighter" style={{ fontFamily: '"DM Sans", sans-serif' }}>
@@ -510,7 +510,7 @@ export default function LandingPage() {
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center space-x-2 mb-6 md:mb-0">
               <div className="w-8 h-8 relative">
-                <img src="/assets/logo.png" alt="FlowCode Logo" className="w-full h-full" />
+                <img src="/assets/logo.png" alt="SolanaFlow Logo" className="w-full h-full" />
                 <div className="absolute inset-0 bg-[#5580ff]/20 blur-xl rounded-full"></div>
               </div>
               <span className="text-lg font-bold tracking-tighter" style={{ fontFamily: '"DM Sans", sans-serif' }}>
@@ -523,7 +523,7 @@ export default function LandingPage() {
                   style={{
                     backgroundSize: "300% 300%",
                     animation: "gradientFlow 3s ease infinite"
-                  }}>FlowCode</span>
+                  }}>Flow</span>
               </span>
             </div>
             <div className="flex flex-wrap justify-center gap-6 mb-6 md:mb-0">
@@ -553,7 +553,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="mt-8 pt-8 border-t border-[#1e2033] text-center text-gray-500 text-xs">
-            © {new Date().getFullYear()} Solana FlowCode. All rights reserved.
+            © {new Date().getFullYear()} Sequence4. All rights reserved.
           </div>
         </div>
       </footer>

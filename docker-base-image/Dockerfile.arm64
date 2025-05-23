@@ -1,0 +1,58 @@
+FROM --platform=linux/arm64 ubuntu:22.04 AS builder
+ARG DEBIAN_FRONTEND=noninteractive
+ARG NODE_VERSION="v20.18.0"
+ARG SOLANA_CHANNEL="stable"
+
+ENV HOME=/root
+ENV PATH=$HOME/.cargo/bin:$HOME/.local/share/solana/install/active_release/bin:$PATH
+ENV PATH=$HOME/.nvm/versions/node/${NODE_VERSION}/bin:$PATH
+
+RUN apt-get update -qq && apt-get install -y --no-install-recommends \
+    build-essential git curl wget jq pkg-config python3 \
+    libssl-dev libudev-dev zlib1g-dev llvm clang cmake make \
+    libprotobuf-dev protobuf-compiler ca-certificates && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN curl -sSf https://sh.rustup.rs | bash -s -- -y --profile minimal --default-toolchain stable && \
+    . "$HOME/.cargo/env" && rustup component add rustfmt clippy
+
+RUN curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+ENV NVM_DIR=$HOME/.nvm
+RUN . "$NVM_DIR/nvm.sh" && nvm install ${NODE_VERSION} && nvm use ${NODE_VERSION} && \
+    nvm alias default ${NODE_VERSION} && npm install -g yarn
+
+RUN (curl -sSfL "https://release.anza.xyz/solana/${SOLANA_CHANNEL}/install" | bash -s -- -y) || \
+    (curl -sSfL "https://release.solana.com/${SOLANA_CHANNEL}/install" | bash -s -- -y)
+
+RUN cargo install --git https://github.com/coral-xyz/anchor anchor-cli --tag v0.31.1 --locked --force && \
+    anchor --version
+
+RUN mkdir -p /tmp/bootstrap && cd /tmp/bootstrap && \
+    anchor init dummy --no-git && cd dummy && anchor build -- --locked || true && rm -rf target
+
+ARG CACHEBUST=20250524
+RUN echo "$CACHEBUST"
+
+ENV NEXT_TELEMETRY_DISABLED=1 NEXT_SKIP_ESLINT=1
+RUN set -e; \
+    mkdir -p /usr/share/solanaflow && \
+    CI=1 yarn create next-app /usr/share/solanaflow/web \
+        --typescript --eslint --tailwind --app --no-src-dir --no-interactive; \
+    yarn --cwd /usr/share/solanaflow/web add -E @tailwindcss/postcss@latest; \
+    printf '\nmodule.exports = { output: "standalone" };\n' \
+        >> /usr/share/solanaflow/web/next.config.js; \
+    yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile; \
+    yarn --cwd /usr/share/solanaflow/web build; \
+    yarn --cwd /usr/share/solanaflow/web install \
+            --production --ignore-scripts --prefer-offline && \
+    rm -rf /usr/share/solanaflow/web/.next/cache
+
+FROM builder AS runtime
+ARG  RUNTIME_BUST=20250524
+RUN echo "$RUNTIME_BUST"
+ENV HOSTNAME 0.0.0.0
+ENV NEXT_DISABLE_SWC 1 
+WORKDIR /usr/share/solanaflow/web  
+COPY --from=builder /usr/share/solanaflow /usr/share/solanaflow
+EXPOSE 3000
+CMD ["node", ".next/standalone/server.js"]

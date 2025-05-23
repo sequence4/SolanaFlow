@@ -146,7 +146,7 @@ export const getProjectFileTree = async (
 
   try {
     const projectCheck = await client.query(
-      'SELECT * FROM SolanaProject WHERE id = $1 AND org_id = $2',
+      'SELECT * FROM solanaproject WHERE id = $1 AND org_id = $2',
       [id, orgId]
     );
 
@@ -209,7 +209,7 @@ export const getFileContent = async (
 
   try {
     const projectCheck = await pool.query(
-      'SELECT * FROM SolanaProject WHERE id = $1 AND org_id = $2',
+      'SELECT * FROM solanaproject WHERE id = $1 AND org_id = $2',
       [projectId, orgId]
     );
 
@@ -243,7 +243,7 @@ export const createFile = async (
 
   try {
     const projectCheck = await pool.query(
-      'SELECT * FROM SolanaProject WHERE id = $1 AND org_id = $2',
+      'SELECT * FROM solanaproject WHERE id = $1 AND org_id = $2',
       [projectId, orgId]
     );
 
@@ -286,7 +286,7 @@ export const updateFile = async (
 
   try {
     const projectCheck = await pool.query(
-      'SELECT * FROM SolanaProject WHERE id = $1 AND org_id = $2',
+      'SELECT * FROM solanaproject WHERE id = $1 AND org_id = $2',
       [projectId, orgId]
     );
 
@@ -353,7 +353,7 @@ export const deleteFile = async (
 
   try {
     const projectCheck = await pool.query(
-      'SELECT * FROM SolanaProject WHERE id = $1 AND org_id = $2',
+      'SELECT * FROM solanaproject WHERE id = $1 AND org_id = $2',
       [projectId, orgId]
     );
 
