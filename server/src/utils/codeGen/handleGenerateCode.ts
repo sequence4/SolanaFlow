@@ -85,62 +85,32 @@ async function waitForAllTasks(taskIds: string[]): Promise<{ allSucceeded: boole
 
 const CODE_GEN_PROGRESS = [10, 25, 40, 55, 70, 80, 90, 100];
 
-export const handleGenerateCode = async (
-    projectContext: ProjectContextType,
-    setIsGenerating: (isGenerating: boolean) => void,
-    setIsCodeReady: (isCodeReady: boolean) => void,
-    setActiveTab: (activeTab: string) => void,
-    setFileTree: (tree: FileTreeItemType | null) => void,
-    setProjectContext: React.Dispatch<React.SetStateAction<ProjectContextType>>,
-    taskLogs: ReturnType<typeof useTaskLogs>
-) => {
-    if (!projectContext.id) { console.log('No project ID; cannot generate code.'); return; }
-    console.log("[DEBUG_GENERATE_CODE] Starting handleGenerateCode for project:", projectContext.id);
-    
-    taskLogs.resetLogs();
-    taskLogs.setSteps(codeGenerationSteps);
-    taskLogs.setIsVisible(true);
-    taskLogs.setProgress(CODE_GEN_PROGRESS[0]);
-    taskLogs.addSystemLog(`Starting code generation for project: ${projectContext.name || projectContext.id}`);
-    
-    setIsGenerating(true);
-
-    const isOnChainPresent = hasOnChainNodes(projectContext);
-    const allTaskIds: string[] = [];
-    let success = false;
-
+export const handleGenerateCode = async (nodes: any[]) => {    
     try {
-        taskLogs.addSystemLog("Analyzing project structure...");
-        taskLogs.setProgress(CODE_GEN_PROGRESS[1]);
-        taskLogs.addSystemLog(isOnChainPresent ? "On-chain components detected." : "Off-chain components detected.");
-
-        if (!isOnChainPresent) {
-            try {
-                console.log("[DEBUG_GENERATE_CODE] Creating off-chain function code...");
-                taskLogs.addSystemLog("Creating off-chain function code...");
-                
-                let functionCode = null;
-                if (projectContext.details?.projectState?.nodes) {
-                    const offChainNodes = projectContext.details.projectState.nodes.filter(node => 
-                        node.type === 'uploadMetadataNode' || 
-                        node.type === 'createNftNode' || 
-                        node.type === 'mintNftNode'
-                    );
-                                        
-                    if (offChainNodes.length > 0) {
-                        const functionParts = offChainNodes.map((node, index) => {
-                            if (node.data && node.data.code) return node.data.code;
-                            else return null;
-                        }).filter(Boolean);
-                        
-                        if (functionParts.length > 0) functionCode = functionParts.join('\n\n');
-                        else console.log('No valid function code found in off-chain nodes');
-                    }
-                } else console.log('No project state nodes found');
-            } catch (err) { 
-                console.error('Error extracting function code:', err); 
-                taskLogs.addSystemLog("Warning: Error extracting function code");
-            }
+        try {
+    
+            let functionCode = null;
+            if (projectContext.details?.projectState?.nodes) {
+                const offChainNodes = projectContext.details.projectState.nodes.filter(node => 
+                    node.type === 'uploadMetadataNode' || 
+                    node.type === 'createNftNode' || 
+                    node.type === 'mintNftNode'
+                );
+                                    
+                if (offChainNodes.length > 0) {
+                    const functionParts = offChainNodes.map((node, index) => {
+                        if (node.data && node.data.code) return node.data.code;
+                        else return null;
+                    }).filter(Boolean);
+                    
+                    if (functionParts.length > 0) functionCode = functionParts.join('\n\n');
+                    else console.log('No valid function code found in off-chain nodes');
+                }
+            } else console.log('No project state nodes found');
+        } catch (err) { 
+            console.error('Error extracting function code:', err); 
+            taskLogs.addSystemLog("Warning: Error extracting function code");
+        }
 
             const response = { taskId: '123' };
             console.log("[DEBUG_GENERATE_CODE] Starting poll for code-generation task with taskId=", response.taskId);
@@ -159,31 +129,29 @@ export const handleGenerateCode = async (
             } else {
                 throw new Error('No task ID received from createProjectDirectory');
             }
-        } else {
-            console.log('[DEBUG_GENERATE_CODE] Starting Anchor project code generation');
-            taskLogs.addSystemLog("Starting Anchor project code generation...");
-            taskLogs.setProgress(CODE_GEN_PROGRESS[2]);
-            
-            await saveProject(projectContext, setProjectContext);
-            
-            taskLogs.addSystemLog("Updating configuration files...");
-            taskLogs.setProgress(CODE_GEN_PROGRESS[3]);
-            
-            const cargoResponse = await amendConfigFile(projectContext.id, 'Cargo.toml', 'Cargo.toml');
-            if (cargoResponse && cargoResponse.taskId) {
-                console.log('[DEBUG_GENERATE_CODE] Cargo.toml amendment task started with taskId:', cargoResponse.taskId);
-                taskLogs.addSystemLog(`Cargo.toml update task submitted (ID: ${cargoResponse.taskId})`);
-                allTaskIds.push(cargoResponse.taskId);
-            }
-            
-            const anchorResponse = await amendConfigFile(projectContext.id, 'Anchor.toml', 'Anchor.toml');
-            if (anchorResponse && anchorResponse.taskId) {
-                console.log('[DEBUG_GENERATE_CODE] Anchor.toml amendment task started with taskId:', anchorResponse.taskId);
-                taskLogs.addSystemLog(`Anchor.toml update task submitted (ID: ${anchorResponse.taskId})`);
-                allTaskIds.push(anchorResponse.taskId);
-            }
+        console.log('[DEBUG_GENERATE_CODE] Starting Anchor project code generation');
+        taskLogs.addSystemLog("Starting Anchor project code generation...");
+        taskLogs.setProgress(CODE_GEN_PROGRESS[2]);
+        
+        await saveProject(projectContext, setProjectContext);
+        
+        taskLogs.addSystemLog("Updating configuration files...");
+        taskLogs.setProgress(CODE_GEN_PROGRESS[3]);
+        
+        const cargoResponse = await amendConfigFile(projectContext.id, 'Cargo.toml', 'Cargo.toml');
+        if (cargoResponse && cargoResponse.taskId) {
+            console.log('[DEBUG_GENERATE_CODE] Cargo.toml amendment task started with taskId:', cargoResponse.taskId);
+            taskLogs.addSystemLog(`Cargo.toml update task submitted (ID: ${cargoResponse.taskId})`);
+            allTaskIds.push(cargoResponse.taskId);
         }
         
+        const anchorResponse = await amendConfigFile(projectContext.id, 'Anchor.toml', 'Anchor.toml');
+        if (anchorResponse && anchorResponse.taskId) {
+            console.log('[DEBUG_GENERATE_CODE] Anchor.toml amendment task started with taskId:', anchorResponse.taskId);
+            taskLogs.addSystemLog(`Anchor.toml update task submitted (ID: ${anchorResponse.taskId})`);
+            allTaskIds.push(anchorResponse.taskId);
+        }
+    
         console.log("[DEBUG_GENERATE_CODE] Waiting for all initial tasks to complete:", allTaskIds.join(", "));
         taskLogs.addSystemLog("Processing initial code generation tasks...");
         taskLogs.setProgress(CODE_GEN_PROGRESS[4]);
