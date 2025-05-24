@@ -3,6 +3,7 @@ import { mintToContext } from "./mintToContext";
 import { mintToInput } from "./mintToInput";
 import { mintToErrorCodes } from "./mintToErrorCodes";
 import { mintToEvents } from "./mintToEvents";
+import { mintToUi } from "./mintToUi";
 
 const contextData = mintToContext.data.accounts || [];
 const inputsData = mintToInput.data.fields || [];
@@ -25,6 +26,7 @@ export const mintToFlow = {
         parameters: inputsData,
         errorCodes: errorCodesData,
         events: eventsData,
+        ui: mintToUi,
       },
     },
   ],

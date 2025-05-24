@@ -1,4 +1,9 @@
-import { containerFileApi } from "@/api/containerFileApi";
+import { 
+  updateFileInContainer, 
+  getFileContentFromContainer, 
+  installDependenciesInContainer, 
+  createFileInContainer 
+} from "../containerFileUtils";
 import { pollTaskStatus3 as pollTaskStatus } from "@/utils/task/taskUtils";
 import { 
   MINT_FORM_TSX, 
@@ -17,37 +22,12 @@ import {
 
 export const createOrUpdateFile = async (
   projectId: string,
+  userId: string,
   path: string,
   content: string
-): Promise<{ success: boolean, taskId?: string }> => {
-  try {
-    let response;
-    
-    try {
-      const checkResponse = await containerFileApi.getFileContent(projectId, path);
-      const updateResponse = await containerFileApi.updateFile(projectId, path, content);
-      response = updateResponse;
-      console.log(`File ${path} exists, updating it...`);
-    } catch (error) {
-      console.log(`File ${path} does not exist, creating it...`);
-      const createResponse = await containerFileApi.createFile(projectId, path, content);
-      response = createResponse;
-    }
-    
-    const result = await pollTaskStatus(response.taskId);
-    
-    const success = result.task.status === "succeed" || result.task.status === "finished" || result.task.status === "warning";
-    if (success) {
-      console.log(`Successfully ${response.message || "processed"} file: ${path}`);
-    } else {
-      console.error(`Failed to process file ${path}. Status: ${result.task.status}`);
-    }
-    
-    return { success, taskId: response.taskId };
-  } catch (error) {
-    console.error(`Error handling file ${path}:`, error);
-    return { success: false };
-  }
+) => {
+  await getFileContentFromContainer(projectId, path, userId);
+  await updateFileInContainer(projectId, path, content, userId);
 };
 
 export const updateAppFile = async (
