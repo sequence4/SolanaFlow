@@ -8,7 +8,7 @@ import { gatherPathsFromTree } from "../files/fileUtils";
 import { pollTaskStatus } from "../task/taskUtils";
 import { findProgramsSubdirectory } from './findProgramsDirectory';
 import { fetchFilesAndCodes } from "./fetchFilesAndCodes";
-import { amendConfigFile } from "./amendConfigFile";
+import { amendConfigFile } from "./amendConfigFiles";
 
 export async function mergeFileTree(
     projectContext: ProjectContextType,
@@ -22,15 +22,10 @@ export async function mergeFileTree(
         const id = projectContext.id;   
         if (!id) return allTaskIds;
 
-        console.log('[DEBUG_MERGE_FILE_TREE] Starting for project:', id);
-        console.log('[DEBUG_MERGE_FILE_TREE] isExplicitCodeGeneration:', isExplicitCodeGeneration);
-
         const response1 = await fileApi.getProjectFileTree(id);
-        console.log('[DEBUG_MERGE_FILE_TREE] Received file tree response, taskId=', response1.taskId);
         allTaskIds.push(response1.taskId);
         
         const existingTree = await pollTaskStatus(response1.taskId);
-        console.log('[DEBUG_MERGE_FILE_TREE] Fetched existing tree with length=', existingTree?.length || 0);
         
         const flattenTree = (tree: any[]): string[] => {
             const paths: string[] = [];
@@ -43,12 +38,10 @@ export async function mergeFileTree(
 
         const allPaths = flattenTree(existingTree || []);
         const instructionFiles = allPaths.filter(path => path.includes('/instructions/') && path.endsWith('.rs'));
-        console.log('[DEBUG_MERGE_FILE_TREE] Instruction files found in tree:', instructionFiles);
 
         const existingFilePaths = gatherPathsFromTree(existingTree || []);
 
         const subDirPath = findProgramsSubdirectory(existingTree || []);
-        console.log('[DEBUG_MERGE_FILE_TREE] subDirPath:', subDirPath);
 
         if (!subDirPath) {
             console.warn("No programs subdirectory found. Skipping Cargo.toml amendment.");
@@ -58,12 +51,8 @@ export async function mergeFileTree(
             console.log(`Attempting to use fallback path: ${fallbackPath}`);
             
             try {
-                console.log('[DEBUG_MERGE_FILE_TREE] About to amend Cargo.toml, Anchor.toml for fallback subDirPath=', fallbackPath);
                 const result = await amendConfigFile(id, 'Cargo.toml', `${fallbackPath}/Cargo.toml`);
-                console.log('[DEBUG_MERGE_FILE_TREE] amendConfigFile done for Cargo.toml with fallback path');
-                console.log('result from fallback path:', result);
                 await amendConfigFile(id, 'Anchor.toml', 'Anchor.toml');
-                console.log('[DEBUG_MERGE_FILE_TREE] amendConfigFile done for Anchor.toml with fallback path');
             } catch (fallbackError) {
                 console.error('Error using fallback path for Cargo.toml:', fallbackError);
             }

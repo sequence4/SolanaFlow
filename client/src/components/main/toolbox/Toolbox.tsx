@@ -134,8 +134,11 @@ export const Toolbox = () => {
             const id = await ensureId();
             console.log(`[deploy] Project ID ensured: ${id}`);
             
-            const graph = projectContext.details?.projectState ?? {};
-            console.log('[deploy] Graph data:', graph);
+            const graph = {
+                ...(projectContext.details?.projectState ?? {}),
+                nodes: projectContext.details?.projectState?.nodes ?? [],
+            };
+            console.log('[deploy] Graph data (with nodes):', graph);
 
             console.log('[deploy] Calling runDeployPipelineWithLogs');
             esRef.current = runDeployPipelineWithLogs(

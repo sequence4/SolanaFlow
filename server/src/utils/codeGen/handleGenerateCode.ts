@@ -1,23 +1,32 @@
 import { mergeFileTree } from './mergeFileTree';
-import { amendConfigFile } from './amendConfigFile';
-import { insertFrontendUIFiles } from './insertFrontendUIFiles';
+import { amendConfigFiles } from './amendConfigFiles';
+//import { genUi } from './genUi';
+import { getProjectFileTree } from 'src/controllers/fileController';
+import { getTaskStatus } from 'src/controllers/taskController';
 
-export const handleGenerateCode = async (nodes: any[]) => {    
+
+export const handleGenerateCode = async (nodes: any[], projectId: string) => {    
     try {
         if(nodes.length === 0) throw new Error('No nodes found');
         let functionCode = null;
+        
         const functionParts = nodes.map((node) => {
             if (node.data && node.data.code) return node.data.code;
             else return null;
         }).filter(Boolean);
+
         if (functionParts.length > 0) functionCode = functionParts.join('\n\n');
         else console.log('No valid function code found in nodes');
-        const frontendTaskId = await insertFrontendUIFiles(projectContext.id);                
-        const cargoResponse = await amendConfigFile(projectContext.id, 'Cargo.toml', 'Cargo.toml');        
-        const anchorResponse = await amendConfigFile(projectContext.id, 'Anchor.toml', 'Anchor.toml');
-        const fileTreeTaskIds = await mergeFileTree(projectContext, setFileTree, setProjectContext, true);
-        const fileTreeResponse = await fileApi.getProjectFileTree(projectContext.id);
-        const fileTreeResult = await taskApi.getTask(fileTreeResponse.taskId);
+
+        //const frontendTaskId = await genUi(nodes);   // possible skip this step if not working correctly (save til end) 
+                   
+        const { cargoTaskId, anchorTaskId } = await amendConfigFiles(projectId)
+
+        const fileTreeTaskIds = await mergeFileTree(projectId, true);
+        
+        const fileTreeResponse = await getProjectFileTree(projectId);
+        const fileTreeResult = await getTaskStatus(fileTreeResponse.taskId);
+
         const existingTree = fileTreeResult.task.result ? JSON.parse(fileTreeResult.task.result) : [];
         const flattenTree = (tree: any[]): string[] => {
             const paths: string[] = [];
