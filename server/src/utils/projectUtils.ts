@@ -987,7 +987,8 @@ export const closeProjectContainer = async (
 export async function startProjectContainer(projectId: string): Promise<string> {
   const name = `failed-container-${projectId}`;
   try {
-    const containerName = `userproj-${projectId}-$(date +%s)`;
+    const ts = Date.now();
+    const containerName = `userproj-${projectId}-${ts}`;
     execSync(`
       docker run -d \
         --name ${containerName} \
@@ -996,7 +997,7 @@ export async function startProjectContainer(projectId: string): Promise<string> 
         bash -c "cd /usr/src && tail -f /dev/null"
     `, { stdio: "ignore" });
     /* success path returns the real container name */
-    return containerName.replace('$(date +%s)', `${Date.now()}`);
+    return containerName;
   } catch (err) {
     console.error("[startProjectContainer] docker run error:", (err as Error).message);
     // Dump stderr if present
