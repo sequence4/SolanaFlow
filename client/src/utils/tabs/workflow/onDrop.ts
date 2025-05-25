@@ -4,7 +4,7 @@ import { UxOpenPanel } from "@/context/ux/UxContextTypes";
 import { duplicateFlowNodesAndEdges } from "./dropUtils";
 import { handleOnChainNodeOverrides } from "./handleOnChain";
 import { handleOffChainNodeOverrides } from "./handleOffChain";
-import { codeInjection } from "@/utils/codeGeneration/codeInjection";
+import { codeInjection } from "@/utils/files/codeInjection";
 import { NodeType } from "@/data/nodes/registryManager";
 
 function isOnChainData(draggedData: any): boolean {
