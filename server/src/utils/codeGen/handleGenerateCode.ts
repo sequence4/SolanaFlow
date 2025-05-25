@@ -4,7 +4,9 @@
 import { getProjectFileTree } from 'src/controllers/fileController';
 import { getTaskStatus } from 'src/controllers/taskController';
 
-export const handleGenerateCode = async (nodes: any[], projectId: string) => {    
+export const handleGenerateCode = async (nodes: any[], projectId: string) => {   
+    console.log('DEBUG handleGenerateCode function:', { nodesLen: nodes.length, projectId });
+ 
     try {
         if (nodes.length === 0) throw new Error('No nodes found');
         let functionCode = null;
@@ -16,9 +18,11 @@ export const handleGenerateCode = async (nodes: any[], projectId: string) => {
         if (functionParts.length > 0) functionCode = functionParts.join('\n\n');
         else console.log('No valid function code found in nodes');
 
-        //const frontendTaskId = await genUi(nodes);   // possible skip this step if not working correctly (save til end) 
-              
+        console.log('DEBUG handleGenerateCode functionCode:', functionCode);
+
         /*
+        const frontendTaskId = await genUi(nodes);   // possible skip this step if not working correctly (save til end) 
+        
         const { cargoTaskId, anchorTaskId } = await amendConfigFiles(projectId)
 
         const fileTreeTaskIds = await mergeFileTree(projectId, true);
