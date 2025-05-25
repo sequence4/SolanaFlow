@@ -6,7 +6,9 @@
         "start": "node -r module-alias/register dist/app.js",
         "dev": "ts-node -r tsconfig-paths/register src/app.ts",
         "lint": "eslint . --ext .ts",
-        "test": "echo \"(Server) No tests implemented yet.\" && exit 0"
+        "test": "NODE_OPTIONS=--experimental-vm-modules jest --runInBand",
+        "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watchAll",
+    "test:cov": "NODE_OPTIONS=--experimental-vm-modules jest --coverage"
     },
     "_moduleAliases": {
         "@": "dist"
