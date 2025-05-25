@@ -1,3 +1,4 @@
+/*
 import { ProjectContextType } from '@/context/project/ProjectContextTypes';
 
 const onChainNodeTypes = ["accountNode", "inputNode", "instructionGroupNode", "instructionNode"];
@@ -16,3 +17,8 @@ export function hasOnChainNodes(projectContext: ProjectContextType): boolean {
     return onChainNodeTypes.includes(node.type);
   });
 } 
+*/
+
+export const placeholder = () => {
+  return "placeholder"
+}

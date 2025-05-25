@@ -1,3 +1,4 @@
+/*
 import { execInContainer, installDependenciesInContainer } from "../containerFileUtils"
 import * as tpl from "./frontendUITemplates"
 import { createTarballBuffer } from "./tarUtils"
@@ -61,4 +62,9 @@ export async function genUi(
   const { taskId: depTask } = await installDependenciesInContainer(workspace, deps, "app", true)
 
   return [putTask, depTask].filter(Boolean) as string[]
+}
+*/
+
+export const placeholder = () => {
+  return "placeholder"
 }

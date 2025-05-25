@@ -1,3 +1,4 @@
+/*
 import React from "react";
 import { fileApi } from "@/api/fileApi";
 import { insertSrcFiles } from "./insertSrcFiles";
@@ -112,4 +113,9 @@ export async function mergeFileTree(
         console.error('Error merging instructions:', error);
         return allTaskIds;
     }
+}
+*/
+
+export const placeholder = () => {
+  return "placeholder"
 }

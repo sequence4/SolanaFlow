@@ -1,3 +1,4 @@
+/*  
 import {
     InstructionDetail,
     StateDetail,
@@ -353,4 +354,8 @@ import {
       instructions: instructions.map((instr) => instr.name),
     };
   }
-  
+  */
+
+export const placeholder = () => {
+  return "placeholder"
+}

@@ -1,3 +1,4 @@
+/*
 import { InstructionDetail, LibFileDetail, StateDetail } from '@/interfaces/fileDetailInterfaces';
 
 export const getModRsTemplate = (instructions: string[], additionalContext?: string): string => {
@@ -192,4 +193,9 @@ use anchor_lang::prelude::*;
 
 ${accounts}
 `;
+}
+*/
+
+export const placeholder = () => {
+  return "placeholder"
 }

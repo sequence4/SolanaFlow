@@ -1,3 +1,5 @@
+/*
+
 import React from 'react';
 import { taskApi } from '../../api/taskApi';
 import { toast } from 'sonner';
@@ -408,3 +410,8 @@ async function updateIndexExportsInContainer(projectId: string, filePaths: strin
     throw error;
   }
 } 
+*/
+
+export const placeholder = () => {
+  return "placeholder"
+}

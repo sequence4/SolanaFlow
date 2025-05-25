@@ -1,3 +1,4 @@
+/*
 import { projectApi } from '@/api/projectApi';
 import { toaster } from '@/components/ui/toaster';
 import { ProjectContextType } from '@/context/project/ProjectContextTypes';
@@ -21,3 +22,8 @@ export const initAnchorProject = async (
         return undefined;
     }
 };
+*/
+
+export const placeholder = () => {
+  return "placeholder"
+}

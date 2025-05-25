@@ -1,3 +1,4 @@
+/*
 import { FileTreeItemType } from "@/interfaces/FileTreeItemType";
 
 export function findProgramsSubdirectory(tree: FileTreeItemType[]): string | null {
@@ -20,4 +21,9 @@ export function findProgramsSubdirectory(tree: FileTreeItemType[]): string | nul
     }
   
     return null;
+}
+*/
+
+export const placeholder = () => {
+  return "placeholder"
 }

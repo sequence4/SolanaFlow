@@ -1,3 +1,4 @@
+/*
 import { FileTreeItemType } from '@/interfaces/FileTreeItemType';
 import { ProjectContextType } from '@/context/project/ProjectContextTypes';
 import { mapFileTreeNodeToItemType } from '@/utils/files/fileUtils';
@@ -72,4 +73,9 @@ export async function syncAnchorProject(
   } catch (error) {
     console.error('[DEBUG_SYNC_ANCHOR] Error syncing anchor project:', error);
   }
+}
+*/
+
+export const placeholder = () => {
+  return "placeholder"
 }

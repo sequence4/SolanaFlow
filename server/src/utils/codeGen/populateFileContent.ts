@@ -1,3 +1,4 @@
+/*
 import { fileApi } from '@/api/fileApi';
 import { FileTreeItemType } from '@/interfaces/FileTreeItemType';
 import { pollTaskStatus2 } from '@/utils/task/taskUtils';
@@ -78,4 +79,9 @@ export async function populateFileContent(
 
   console.debug(`[populateFileContent] Collected ${fileContentTaskIds.length} file content task IDs`);
   return fileContentTaskIds;
+}
+*/
+
+export const placeholder = () => {
+  return "placeholder"
 }

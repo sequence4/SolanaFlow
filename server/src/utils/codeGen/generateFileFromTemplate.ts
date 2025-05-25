@@ -1,4 +1,5 @@
-import { 
+/*
+  import { 
   getInstructionTemplate,
   getLibRsTemplate,
   getModRsTemplate,
@@ -82,3 +83,8 @@ export function generateFileFromTemplate(
 
   return { path: filePath, content: fileContent };
 }
+*/
+
+export const placeholder = () => {
+  return "placeholder"
+} 

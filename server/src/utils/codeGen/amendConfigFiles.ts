@@ -1,3 +1,5 @@
+/*
+
 import { getFileContent } from "src/controllers/fileController"
 
 interface AmendResult {
@@ -7,6 +9,13 @@ interface AmendResult {
   anchorTaskId: string
 }
 
+*/
+
+export const placeholder = () => {
+  return "placeholder"
+}
+
+/*
 export const amendConfigFiles = async (projectId: string): Promise<AmendResult> => {
   const cargoSrc = await getFileContent(projectId, "Cargo.toml")
   const cargoLines = cargoSrc.split("\n")
@@ -67,3 +76,4 @@ export const amendConfigFiles = async (projectId: string): Promise<AmendResult> 
   const anchorStatus = (await pollTaskStatus3(anchorTaskId)).task.status
   return { cargoStatus: "failed", cargoTaskId: "", anchorStatus, anchorTaskId }
 }
+*/
