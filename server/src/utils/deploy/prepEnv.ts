@@ -14,6 +14,8 @@ import {
 } from '../container/containerHelpers';
 import { WorkspaceHandle } from '../container/interfaces';
 
+const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
+
 export async function prepEnv(
   projectId: string,
   userId: string,
@@ -28,35 +30,31 @@ export async function prepEnv(
       WHERE id = $1`,
     [projectId],
   );
-
   if (res.rowCount === 0) throw new Error('Project not found');
 
-  const {
-    root_path: rootPath,
-    container_url: dbUrl,
-    container_name: dbContainerName,
-  } = res.rows[0];
+  const { root_path: rootPath } = res.rows[0];
+  let   { container_url: dbUrl, container_name: dbName } = res.rows[0];
 
-  if (
-    dbContainerName &&
-    !dbContainerName.startsWith('failed-container-') &&
-    dbUrl &&
-    (await isUrlAlive(dbUrl))
-  ) {
-    return { rootPath, containerName: dbContainerName, containerUrl: dbUrl };
+  if (dbName?.startsWith('failed-container-')) {
+    dbName = null;
+    dbUrl  = null;
+  }
+
+  if (dbName && dbUrl && (await isUrlAlive(dbUrl))) {
+    return { rootPath, containerName: dbName, containerUrl: dbUrl };
   }
 
   const rented = await rentContainerFromPool();
 
   let containerName: string;
-  let containerUrl: string;
+  let containerUrl:  string;
 
   if (rented) {
     containerName = rented.name;
-    containerUrl = rented.url;
+    containerUrl  = rented.url;
   } else {
     containerName = await startProjectContainer(projectId);
-    containerUrl = await resolveContainerUrl(containerName);
+    containerUrl  = await resolveContainerUrl(containerName);
   }
 
   try {
@@ -69,13 +67,23 @@ export async function prepEnv(
     );
 
     const projectDir = `/usr/src/${rootPath}`;
-    if (!(await folderExists(containerName, projectDir))) {
+    let   dirReady   = false;
+
+    for (let attempts = 0; attempts < 5 && !dirReady; attempts++) {
+      try {
+        dirReady = await folderExists(containerName, projectDir);
+      } catch {
+        await sleep(2000);
+      }
+    }
+
+    if (!dirReady) {
       await startCreateProjectDirectoryTask(userId, rootPath, projectId);
     }
 
     return { rootPath, containerName, containerUrl };
   } catch (err) {
-    if (rented) await releaseContainerToPool(rented.name);
+    if (rented) await releaseContainerToPool(rented.name); 
     throw err;
   }
 }
