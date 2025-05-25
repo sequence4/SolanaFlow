@@ -4,16 +4,14 @@
 import { getProjectFileTree } from 'src/controllers/fileController';
 import { getTaskStatus } from 'src/controllers/taskController';
 
-
 export const handleGenerateCode = async (nodes: any[], projectId: string) => {    
     try {
-        if(nodes.length === 0) throw new Error('No nodes found');
+        if (nodes.length === 0) throw new Error('No nodes found');
         let functionCode = null;
 
-        const functionParts = nodes.map((node) => {
-            if (node.data && node.data.code) return node.data.code;
-            else return null;
-        }).filter(Boolean);
+        const functionParts = nodes
+            .map(node => (node.data && node.data.code ? node.data.code : null))
+            .filter(Boolean);
 
         if (functionParts.length > 0) functionCode = functionParts.join('\n\n');
         else console.log('No valid function code found in nodes');
@@ -42,5 +40,6 @@ export const handleGenerateCode = async (nodes: any[], projectId: string) => {
         */
     } catch (err) {
         console.error('Error in handleGenerateCode:', err);
+        throw err;
     }
 };
