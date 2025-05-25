@@ -1,5 +1,5 @@
 import { prepEnv } from '../prepEnv'
-import pool from 'src/config/database'
+import pool from '../../../config/database'
 import * as projectUtils from '../../projectUtils'
 import * as containerPool from '../../container/rentContainerFromPool'
 import * as helpers from '../../container/containerHelpers'

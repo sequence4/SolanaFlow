@@ -1,8 +1,8 @@
 import { rentContainerFromPool } from '../rentContainerFromPool';
-import pool from 'src/config/database';
+import pool from '../../../config/database';
 import { execSync } from 'child_process';
 
-jest.mock('src/config/database', () => ({ query: jest.fn() }));
+jest.mock('../../../config/database', () => ({ query: jest.fn() }));
 jest.mock('child_process',   () => ({ execSync: jest.fn() }));
 
 const db   = pool as unknown as { query: jest.Mock };
@@ -19,8 +19,10 @@ describe('rentContainerFromPool()', () => {
 
     const res = await rentContainerFromPool();
 
-    expect(res).toEqual({ name: 'ws-6001', port: 6001, 
-                          url: 'https://6001.ws.solanaflow.dev' });
+    expect(res).toEqual({
+      name: 'ws-6001',
+      url : 'https://6001.ws.solanaflow.io'
+    });
     expect(exec).toHaveBeenCalledWith('docker start ws-6001', { stdio: 'ignore' });
   });
 
