@@ -2,6 +2,11 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
+  globals: {
+    'ts-jest': {
+      tsconfig: 'tsconfig.json'
+    }
+  },
   moduleNameMapper: {
     '^src/config/database$': '<rootDir>/tests/__mocks__/database.ts',
     '^src/(.*)$': '<rootDir>/src/$1',
@@ -12,5 +17,7 @@ module.exports = {
   transform: {
     '^.+\\.tsx?$': 'ts-jest'
   },
-  testPathIgnorePatterns: ['<rootDir>/dist', '/node_modules/']
+  testPathIgnorePatterns: ['<rootDir>/dist', '/node_modules/'],
+  resetMocks: true,
+  restoreMocks: true
 };

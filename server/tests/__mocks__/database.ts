@@ -7,9 +7,10 @@ const fakeClient = {
   rollback: jest.fn()
 };
 
-const __resetFakeClient = () => {
-  Object.values(fakeClient).forEach(fn => (fn as any).mockReset?.());
-};
+function reset() {
+  Object.values(fakeClient).forEach(fn => (fn as jest.Mock).mockReset?.());
+  (module.exports as any).query.mockReset();
+}
 
 export default {
   // code that calls pool.query(...)
@@ -17,5 +18,5 @@ export default {
   // code that calls pool.connect().query(...)
   connect: jest.fn().mockResolvedValue(fakeClient),
   // helper for tests
-  __resetFakeClient
+  __resetFakeClient: reset
 }; 

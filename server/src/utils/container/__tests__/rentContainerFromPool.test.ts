@@ -1,20 +1,19 @@
 import { rentContainerFromPool } from '../rentContainerFromPool';
-import pool from '../../../config/database';
+import poolDefault, { __resetFakeClient } from 'src/config/database';
 import { execSync } from 'child_process';
 
 jest.mock('child_process', () => ({ execSync: jest.fn() }));
 
-const exec = execSync as unknown as jest.Mock;
-const mockPool = pool as any;
+const exec = execSync as jest.Mock;
 
 afterEach(() => {
   jest.clearAllMocks();
-  mockPool.__resetFakeClient();
+  __resetFakeClient();
 });
 
 describe('rentContainerFromPool()', () => {
   it('returns first free row and starts docker', async () => {
-    const client = await mockPool.connect();
+    const client = await (poolDefault.connect() as Promise<jest.Mocked<any>>);
     client.query.mockResolvedValueOnce({
       rowCount: 1,
       rows: [{ name: 'ws-6001', port: 6001 }]
@@ -30,7 +29,7 @@ describe('rentContainerFromPool()', () => {
   });
 
   it('returns null when no rows free', async () => {
-    const client = await mockPool.connect();
+    const client = await (poolDefault.connect() as Promise<jest.Mocked<any>>);
     client.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
 
     const res = await rentContainerFromPool();
@@ -40,7 +39,7 @@ describe('rentContainerFromPool()', () => {
   });
 
   it('survives docker start error', async () => {
-    const client = await mockPool.connect();
+    const client = await (poolDefault.connect() as Promise<jest.Mocked<any>>);
     client.query.mockResolvedValueOnce({
       rowCount: 1,
       rows: [{ name: 'ws-6002', port: 6002 }]
@@ -54,7 +53,7 @@ describe('rentContainerFromPool()', () => {
   });
 
   it('never hands out the same row twice in parallel', async () => {
-    const client = await mockPool.connect();
+    const client = await (poolDefault.connect() as Promise<jest.Mocked<any>>);
     client.query
       .mockResolvedValueOnce({
         rowCount: 1,

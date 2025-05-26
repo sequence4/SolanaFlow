@@ -1,11 +1,10 @@
 import { prepEnv } from '../prepEnv'
-import pool from '../../../config/database'
+import poolDefault, { __resetFakeClient } from 'src/config/database'
 import * as projectUtils from '../../projectUtils'
 import * as containerPool from '../../container/rentContainerFromPool'
 import * as helpers from '../../container/containerHelpers'
-import * as resolver from '../../container/containerHelpers'
 
-jest.mock('../../../config/database', () => ({
+jest.mock('src/config/database', () => ({
   query: jest.fn()
 }))
 
@@ -17,34 +16,30 @@ jest.mock('../../container/rentContainerFromPool', () => ({
   rentContainerFromPool: jest.fn()
 }))
 
-jest.mock('../../container/containerHelpers', () => {
-  const real = jest.requireActual('../../container/containerHelpers')
+jest.mock('src/utils/container/containerHelpers', () => {
+  const real = jest.requireActual('src/utils/container/containerHelpers');
   return {
     ...real,
     isUrlAlive: jest.fn(),
-    folderExists: jest.fn()
-  }
-})
+    folderExists: jest.fn(),
+    resolveContainerUrl: jest.fn()
+  };
+});
 
-jest.mock('../../container/resolveContainerUrl', () => ({
-  resolveContainerUrl: jest.fn()
-}))
-
-const mockPool = pool as any;
 const startProjectContainer = projectUtils.startProjectContainer as jest.Mock
 const rentContainerFromPool = containerPool.rentContainerFromPool as jest.Mock
 const isUrlAlive = helpers.isUrlAlive as jest.Mock
 const folderExists = helpers.folderExists as jest.Mock
-const resolveContainerUrl = resolver.resolveContainerUrl as jest.Mock
+const resolveContainerUrl = helpers.resolveContainerUrl as jest.Mock
 
 describe('prepEnv()', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-    mockPool.__resetFakeClient()
+    jest.clearAllMocks();
+    __resetFakeClient();
   })
 
   it('returns existing alive container', async () => {
-    const client = await mockPool.connect();
+    const client = await (poolDefault.connect() as Promise<jest.Mocked<any>>);
     client.query.mockResolvedValue({
       rowCount: 1,
       rows: [{ root_path: 'demo', container_url: 'http://warm-1:3000' }]
@@ -63,7 +58,7 @@ describe('prepEnv()', () => {
   })
 
   it('rents warm container when none stored', async () => {
-    const client = await mockPool.connect();
+    const client = await (poolDefault.connect() as Promise<jest.Mocked<any>>);
     client.query.mockResolvedValueOnce({
       rowCount: 1,
       rows: [{ root_path: 'demo', container_url: null }]
@@ -79,7 +74,7 @@ describe('prepEnv()', () => {
   })
 
   it('cold-starts when pool empty', async () => {
-    const client = await mockPool.connect();
+    const client = await (poolDefault.connect() as Promise<jest.Mocked<any>>);
     client.query.mockResolvedValueOnce({
       rowCount: 1,
       rows: [{ root_path: 'demo', container_url: null }]
