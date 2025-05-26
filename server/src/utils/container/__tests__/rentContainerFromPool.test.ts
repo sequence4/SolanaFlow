@@ -1,6 +1,7 @@
 import { rentContainerFromPool } from '../rentContainerFromPool';
 import poolMock from '../../../../tests/__mocks__/@db';
 import { execSync } from 'child_process';
+import { mockNextQueryOnce } from '../../../../tests/test-helpers/mockDbQueries';
 
 jest.mock('child_process', () => ({ execSync: jest.fn() }));
 const exec = execSync as jest.Mock;
@@ -12,8 +13,7 @@ afterEach(() => {
 
 describe('rentContainerFromPool()', () => {
   it('returns first free row and starts docker', async () => {
-    const client = await (poolMock.connect() as Promise<jest.Mocked<any>>);
-    client.query.mockResolvedValueOnce({
+    await mockNextQueryOnce({
       rowCount: 1,
       rows: [{ name: 'ws-6001', port: 6001 }]
     });
@@ -28,8 +28,7 @@ describe('rentContainerFromPool()', () => {
   });
 
   it('returns null when no rows free', async () => {
-    const client = await (poolMock.connect() as Promise<jest.Mocked<any>>);
-    client.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+    await mockNextQueryOnce({ rowCount: 0, rows: [] });
 
     const res = await rentContainerFromPool();
 
@@ -38,8 +37,7 @@ describe('rentContainerFromPool()', () => {
   });
 
   it('survives docker start error', async () => {
-    const client = await (poolMock.connect() as Promise<jest.Mocked<any>>);
-    client.query.mockResolvedValueOnce({
+    await mockNextQueryOnce({
       rowCount: 1,
       rows: [{ name: 'ws-6002', port: 6002 }]
     });
@@ -52,13 +50,11 @@ describe('rentContainerFromPool()', () => {
   });
 
   it('never hands out the same row twice in parallel', async () => {
-    const client = await (poolMock.connect() as Promise<jest.Mocked<any>>);
-    client.query
-      .mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [{ name: 'ws-6003', port: 6003 }]
-      })
-      .mockResolvedValueOnce({ rowCount: 0, rows: [] });
+    await mockNextQueryOnce({
+      rowCount: 1,
+      rows: [{ name: 'ws-6003', port: 6003 }]
+    });
+    await mockNextQueryOnce({ rowCount: 0, rows: [] });
 
     const [a, b] = await Promise.all([
       rentContainerFromPool(),

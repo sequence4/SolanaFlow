@@ -14,9 +14,9 @@ function __resetFakeClient() {
   Object.values(fakeClient).forEach(fn => (fn as jest.Mock).mockReset());
   (poolMock.query as jest.Mock).mockReset();
 
-  /* after reset, make sure `connect` keeps returning our fake client */
-  (poolMock.connect as jest.Mock).mockReset();
-  (poolMock.connect as jest.Mock).mockResolvedValue(fakeClient);
+  /* ensure fakeClient keeps a fresh .query spy after every reset */
+  fakeClient.query = jest.fn();
+  (poolMock.connect as jest.Mock).mockReset().mockResolvedValue(fakeClient);
 }
 
 /* ---- exported pool substitute ---- */
