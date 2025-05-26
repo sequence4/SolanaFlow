@@ -3,7 +3,7 @@ import 'pg';
 declare module 'pg' {
   // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
   interface Pool {
-    /** ONLY AVAILABLE IN TESTS – erases spies on pool + fake client */
+    /** TEST-ONLY helper – wipes spies */
     __resetFakeClient: () => void;
   }
 }

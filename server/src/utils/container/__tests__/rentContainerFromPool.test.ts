@@ -1,5 +1,5 @@
 import { rentContainerFromPool } from '../rentContainerFromPool';
-import poolMock from 'src/config/database';
+import poolMock from '@db';
 import { execSync } from 'child_process';
 
 jest.mock('child_process', () => ({ execSync: jest.fn() }));
@@ -7,7 +7,7 @@ const exec = execSync as jest.Mock;
 
 afterEach(() => {
   jest.clearAllMocks();
-  (poolMock as any).__resetFakeClient();
+  poolMock.__resetFakeClient();
 });
 
 describe('rentContainerFromPool()', () => {

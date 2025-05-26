@@ -1,5 +1,5 @@
 import { prepEnv } from '../prepEnv'
-import poolMock from 'src/config/database'
+import poolMock from '@db'
 import * as projectUtils from '../../projectUtils'
 import * as containerPool from '../../container/rentContainerFromPool'
 import * as helpers from '../../container/containerHelpers'
@@ -31,7 +31,7 @@ const resolveContainerUrl = helpers.resolveContainerUrl as jest.Mock
 describe('prepEnv()', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (poolMock as any).__resetFakeClient();
+    poolMock.__resetFakeClient();
   })
 
   it('returns existing alive container', async () => {

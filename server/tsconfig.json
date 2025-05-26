@@ -15,7 +15,8 @@
       "paths": {
         "*": ["node_modules/*"],
         "src/*": ["src/*"],
-        "@/*": ["src/*"]
+        "@/*": ["src/*"],
+        "@db": ["src/config/database"]
       },
       "typeRoots": ["./node_modules/@types", "./tests/types"],
       "skipLibCheck": true,

@@ -10,7 +10,8 @@ module.exports = {
   moduleNameMapper: {
     '^src/config/database$': '<rootDir>/tests/__mocks__/database.ts',
     '^src/(.*)$': '<rootDir>/src/$1',
-    '^@/(.*)$': '<rootDir>/src/$1'
+    '^@/(.*)$': '<rootDir>/src/$1',
+    '^@db$': '<rootDir>/tests/__mocks__/database.ts'
   },
   roots: ['<rootDir>/src'],
   testMatch: ['**/__tests__/**/*.test.ts'],
