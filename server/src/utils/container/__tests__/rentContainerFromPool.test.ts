@@ -1,5 +1,5 @@
 import { rentContainerFromPool } from '../rentContainerFromPool';
-import poolMock from '../../../../tests/__mocks__/@db';
+import poolMock from '@db';
 import { execSync } from 'child_process';
 import { mockNextQueryOnce } from '../../../../tests/test-helpers/mockDbQueries';
 

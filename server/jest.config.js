@@ -3,7 +3,6 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   moduleNameMapper: {
-    '^src/config/database$': '<rootDir>/tests/__mocks__/@db.ts',
     '^@db$': '<rootDir>/tests/__mocks__/@db.ts',
     '^src/(.*)$': '<rootDir>/src/$1',
     '^@/(.*)$': '<rootDir>/src/$1'

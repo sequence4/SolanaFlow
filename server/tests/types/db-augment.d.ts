@@ -1,11 +1,13 @@
-import 'pg';
-
+/* Tell TypeScript what the @db module looks like.
+   - no runtime import/exports
+   - no duplicate identifiers
+*/
 declare module '@db' {
   import type { Pool } from 'pg';
-  const pool: Pool & { __resetFakeClient(): void };
-  export default pool;
-}
 
-/* Next line makes TS treat the default export in our mock as a Pool */
-declare const poolMock: import('pg').Pool;
-export default poolMock; 
+  /** the mock Pool instance returned at runtime */
+  const poolMock: Pool & { __resetFakeClient(): void };
+
+  /* CommonJS-style export so `import poolMock from "@db"` works */
+  export = poolMock;
+}
