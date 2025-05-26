@@ -1,9 +1,10 @@
 import type { Pool } from 'pg';
+import type { Mock } from 'jest-mock';  // Get the jest.Mock type
 
 /* Shared mock returned whenever code imports "src/config/database" */
 
 /* ---------- internal fake client ---------- */
-type FakeFn = jest.Mock<any, any>;
+type FakeFn = Mock;
 
 const fakeClient = {
   query   : jest.fn() as FakeFn,
@@ -20,10 +21,10 @@ function __resetFakeClient() {
 }
 
 /* ---------- pool mock ---------- */
-const poolMock: Pool & { __resetFakeClient: () => void } = {
-  // @ts-expect-error – we only implement the bits we use
+type PartialPool = Pick<Pool, 'query' | 'connect'>;
+
+const poolMock: PartialPool & { __resetFakeClient: () => void } = {
   query  : jest.fn(),
-  // @ts-expect-error
   connect: jest.fn().mockResolvedValue(fakeClient),
   /** expose the reset helper as a METHOD (runtime) */
   __resetFakeClient,

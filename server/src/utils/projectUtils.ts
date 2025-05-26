@@ -6,7 +6,7 @@ import path from 'path';
 import { getProjectRootPath } from './fileUtils';
 import { v4 as uuidv4 } from 'uuid';
 import { normalizeProjectName } from './stringUtils';
-import pool from '../config/database';
+import pool from 'src/config/database';
 import { pruneContainerResources } from './container/pruneContainer';
 
 //const USER_WORKSPACE_IMAGE = "ghcr.io/sequence4/solanaflow:latest";

@@ -17,9 +17,7 @@ function __resetFakeClient() {
 
 /* ---- exported pool substitute ---- */
 const poolMock: Pool & { __resetFakeClient: () => void } = {
-  // @ts-expect-error – only the members we actually call are implemented
   query  : jest.fn(),
-  // @ts-expect-error
   connect: jest.fn().mockResolvedValue(fakeClient),
   __resetFakeClient,
 };

@@ -1,5 +1,5 @@
 import { execSync } from 'child_process';
-import pool from '../../config/database';
+import pool from 'src/config/database';
 import { resolveContainerUrl } from './containerHelpers';
 
 interface RentedContainer {

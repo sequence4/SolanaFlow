@@ -1,5 +1,5 @@
 import { rentContainerFromPool } from '../rentContainerFromPool';
-import poolMock from '@db';
+import poolMock from '../../../../tests/__mocks__/@db';
 import { execSync } from 'child_process';
 
 jest.mock('child_process', () => ({ execSync: jest.fn() }));
