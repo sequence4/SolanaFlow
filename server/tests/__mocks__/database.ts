@@ -7,16 +7,19 @@ const fakeClient = {
   rollback: jest.fn()
 };
 
-function reset() {
-  Object.values(fakeClient).forEach(fn => (fn as jest.Mock).mockReset?.());
-  (module.exports as any).query.mockReset();
-}
+// ──────────────────────────────────────────────────────────────
+// helper that actually wipes spies on every test
+export const __resetFakeClient = () => {
+  Object.values(fakeClient).forEach(fn => (fn as any).mockReset?.());
+  (pool.query as jest.Mock).mockReset();
+};
 
-export default {
+const pool = {
   // code that calls pool.query(...)
   query  : jest.fn(),
   // code that calls pool.connect().query(...)
   connect: jest.fn().mockResolvedValue(fakeClient),
-  // helper for tests
-  __resetFakeClient: reset
-}; 
+  __resetFakeClient,               // keep as property (runtime)
+};
+
+export default pool; 

@@ -1,5 +1,5 @@
 import { rentContainerFromPool } from '../rentContainerFromPool';
-import poolDefault, { __resetFakeClient } from '../../../config/database';
+import poolDefault, { __resetFakeClient } from 'src/config/database';
 import { execSync } from 'child_process';
 
 jest.mock('child_process', () => ({ execSync: jest.fn() }));

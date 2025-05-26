@@ -1,5 +1,5 @@
 import { prepEnv } from '../prepEnv'
-import poolDefault, { __resetFakeClient } from '../../../config/database'
+import poolDefault, { __resetFakeClient } from 'src/config/database'
 import * as projectUtils from '../../projectUtils'
 import * as containerPool from '../../container/rentContainerFromPool'
 import * as helpers from '../../container/containerHelpers'
