@@ -58,8 +58,16 @@ export async function prepEnv(
     containerUrl = rented.url;
   } else {
     // cold-start fallback: spin up a brand-new workspace
-    containerName = await startProjectContainer(projectId);
-    containerUrl = await resolveContainerUrl(containerName);
+    try {
+      containerName = await startProjectContainer(projectId);
+      if (!containerName) {
+        throw new Error('No warm containers available and cold-start disabled');
+      }
+      containerUrl = await resolveContainerUrl(containerName);
+    } catch (err: any) {
+      console.error('[prepEnv] Cold-start failed:', err.message);
+      throw new Error(`Container creation failed: ${err.message}`);
+    }
   }
 
   try {

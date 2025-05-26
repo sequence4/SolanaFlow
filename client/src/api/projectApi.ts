@@ -6,6 +6,7 @@ import {
   ProjectContextType,
 } from '../context/project/ProjectContextTypes';
 import { TaskResponse } from './interfaces/Task';
+import axios from 'axios';
 
 export const projectApi = {
 
@@ -34,9 +35,16 @@ export const projectApi = {
       const response = await api.post(`/projects/${projectId}/start-container`);
       console.log(`[DEBUG_API] startContainer - Response:`, response.data);
       return response.data;
-    } catch (error) {
-      console.error('[DEBUG_API] Error starting container:', error);
-      throw error;
+    } catch (err) {
+      console.error('[DEBUG_API] Error starting container:', err);
+      if (axios.isAxiosError(err) && err.response?.status === 503) {
+        console.error('All workers busy - try again in a minute');
+      } else {
+        console.error('Container start failed:', 
+          axios.isAxiosError(err) ? err.response?.data?.message : "Unknown error"
+        );
+      }
+      throw err;
     }
   },
 

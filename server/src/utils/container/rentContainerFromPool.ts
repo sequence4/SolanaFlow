@@ -1,51 +1,80 @@
-import pool from '@/config/database';
 import { execSync } from 'child_process';
+import pool from '../../config/database';
+import { resolveContainerUrl } from './containerHelpers';
 
-export interface RentedContainer {
+interface RentedContainer {
   name: string;
-  url:  string;
+  url: string;
 }
 
 export async function rentContainerFromPool(): Promise<RentedContainer | null> {
-  const { rows } = await pool.query<{ name: string; port: number }>(`
-    WITH candidate AS (
-      SELECT name
-        FROM warm_container_pool
-       WHERE busy = false
-       ORDER BY last_used ASC          -- least-recently-used first
-       LIMIT 1
-       FOR UPDATE SKIP LOCKED
-    )
-    UPDATE warm_container_pool
-       SET busy      = true,
-           last_used = now()
-     WHERE name IN (SELECT name FROM candidate)
-    RETURNING name, port;
-  `);
-
-  if (rows.length === 0) return null;
-
-  const { name, port } = rows[0];
-
+  const client = await pool.connect();
   try {
-    execSync(`docker start ${name}`, { stdio: 'ignore' });
-  } catch {
-    await pool.query(
-      'UPDATE warm_container_pool SET busy = false WHERE name = $1',
-      [name]
-    );
-    return null;
-  }
+    await client.query('BEGIN');
 
-  return {
-    name,
-    url: `https://${port}.ws.solanaflow.dev`,
-  };
+    // Get a free container from the pool
+    const result = await client.query(
+      `UPDATE warm_container_pool
+         SET busy = true,
+             last_used = now()
+        WHERE name = (
+          SELECT name
+            FROM warm_container_pool
+           WHERE busy = false
+           ORDER BY last_used DESC
+           LIMIT 1
+        )
+      RETURNING name`,
+    );
+
+    if (result.rows.length === 0) {
+      await client.query('COMMIT');
+      return null;
+    }
+
+    const { name } = result.rows[0];
+
+    // Check if container actually exists and is healthy
+    try {
+      execSync(`docker inspect ${name}`, { stdio: 'ignore' });
+    } catch (err) {
+      // Container doesn't exist or is unhealthy, mark it as not busy
+      await client.query(
+        'UPDATE warm_container_pool SET busy = false WHERE name = $1',
+        [name]
+      );
+      await client.query('COMMIT');
+      return null;
+    }
+
+    // Start the container if it exists but is stopped
+    try {
+      execSync(`docker start ${name}`, { stdio: 'ignore' });
+    } catch (err) {
+      console.error(`Failed to start container ${name}:`, err);
+      await client.query(
+        'UPDATE warm_container_pool SET busy = false WHERE name = $1',
+        [name]
+      );
+      await client.query('COMMIT');
+      return null;
+    }
+
+    await client.query('COMMIT');
+
+    const url = await resolveContainerUrl(name);
+    return { name, url };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 export async function releaseContainerToPool(name: string): Promise<void> {
   await pool.query(
-    'UPDATE warm_container_pool SET busy = false, last_used = now() WHERE name = $1',
+    'UPDATE warm_container_pool SET busy = false WHERE name = $1',
     [name]
   );
 }

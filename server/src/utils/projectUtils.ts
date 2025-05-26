@@ -831,9 +831,6 @@ function hybridRootPackageJson(projectName: string, projectDesc: string = 'A Rea
   };
 }
 
-
-
-
 export const closeProjectContainer = async (
   projectId: string,
   creatorId: string,
@@ -909,27 +906,37 @@ export const closeProjectContainer = async (
   return sanitizedTaskId;
 };
 
-export async function startProjectContainer(projectId: string): Promise<string> {
-  const name = `failed-container-${projectId}`;
+export async function startProjectContainer(projId: string): Promise<string> {
+  const name = `userproj-${projId}-${Date.now()}`.slice(0, 63);  // 64-char max
+  const image = 'ghcr.io/sequence4/solanaflow:latest';
+
   try {
-    const ts = Date.now();
-    const containerName = `userproj-${projectId}-${ts}`;
-    execSync(`
-      docker run -d \
-        --name ${containerName} \
-        -p 0.0.0.0::3000 \
-        ghcr.io/sequence4/solanaflow:latest \
-        bash -c "cd /usr/src && tail -f /dev/null"
-    `, { stdio: "ignore" });
-    /* success path returns the real container name */
-    return containerName;
-  } catch (err) {
-    console.error("[startProjectContainer] docker run error:", (err as Error).message);
-    // Dump stderr if present
-    if ((err as any)?.stderr) {
-      console.error((err as any).stderr.toString());
-    }
-    return name;   // sentinel → will be handled upstream
+    /* 1 ─ make sure image exists & matches host arch */
+    execSync(`docker pull --platform linux/arm64 ${image}`, { stdio: 'inherit' });
+
+    /* 2 ─ run with explicit platform + retry-safe port mapping */
+    execSync(
+      `docker run -d --platform linux/arm64 --name ${name} -p 0.0.0.0::3000 ` +
+      `${image} bash -c "cd /usr/src && tail -f /dev/null"`,
+      { stdio: 'inherit' }
+    );
+
+    return name;
+  } catch (err: any) {
+    // capture stderr for logs *and* db debugging
+    const reason = err.stderr?.toString() || err.message || 'unknown';
+    console.error('[startProjectContainer] docker run failed:', reason);
+
+    // tag sentinel so prepEnv will skip it next time
+    const failed = `failed-container-${name}`;
+    try { execSync(`docker rm -f ${name}`); } catch { /* ignore */ }
+    await pool.query(
+      `INSERT INTO warm_container_pool (name,image,busy,port,last_used)
+         VALUES ($1,$2,false,0,now())
+       ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name`,  // idempotent
+      [failed, image]
+    );
+    throw new Error(reason);
   }
 }
 
