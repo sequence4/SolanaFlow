@@ -31,9 +31,19 @@ export const handleGenerateCode = async ({
         if (graph.nodes.length === 0) throw new Error('No nodes found');
         let functionCode = null;
 
+        // ───────────────── collect code blocks ───────────────────────────
         const functionParts = graph.nodes
-            .map(node => (node.config.code as string || null))
-            .filter(Boolean);
+          .map(n => {
+            const maybeCode =
+              // new schema
+              (n as any).config?.code ??
+              // old/basic schema
+              (n as any).data?.code ??
+              null;
+
+            return typeof maybeCode === 'string' ? maybeCode : null;
+          })
+          .filter(Boolean) as string[];
 
         console.log('[GEN] raw snippet count =', functionParts.length);
         if (functionParts.length) {
