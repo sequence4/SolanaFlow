@@ -2,11 +2,13 @@
 //import { startAnchorInitTask } from "./projectUtils";
 //import { waitForTaskCompletion } from "./taskUtils";
 import { prepEnv } from "./prepEnv";
+import { Graph } from '../../types/graph';
+import { handleGenerateCode } from "../codeGen/handleGenerateCode";
 
 interface PipelineArgs {
     projectId: string;
     userId: string;
-    graph: unknown;
+    graph: Graph;
     sendProgress: (data: unknown) => void;
   }
 
@@ -28,11 +30,11 @@ interface PipelineArgs {
       message: "Container is up"
     });
  
-    /*
+    
     // 2 ─ code generation ─────────────────────────────────────────────────
     sendProgress({ stage: "code-gen", message: "Generating Anchor code…" });
-    await handleGenerateCode(projectId, graph, workspace);
- 
+    await handleGenerateCode(graph.nodes, projectId);
+    /*
     // 3 ─ anchor init (skip for lite) ─────────────────────────────────────
     const { isLite } = await fetchProjectFlags(projectId);
     if (!isLite) {
