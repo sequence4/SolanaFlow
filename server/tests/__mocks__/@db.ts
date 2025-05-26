@@ -16,7 +16,9 @@ function __resetFakeClient() {
 }
 
 /* ---- exported pool substitute ---- */
-const poolMock: Pool & { __resetFakeClient: () => void } = {
+type PartialPool = Pick<Pool, 'query' | 'connect'>;
+
+const poolMock: PartialPool & { __resetFakeClient: () => void } = {
   query  : jest.fn(),
   connect: jest.fn().mockResolvedValue(fakeClient),
   __resetFakeClient,
