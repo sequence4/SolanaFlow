@@ -14,6 +14,8 @@ import {
 import { WorkspaceHandle } from '../container/interfaces';
 import { execSync } from 'child_process';
 
+export type { WorkspaceHandle } from '../container/interfaces';
+
 const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
 
 export async function prepEnv(

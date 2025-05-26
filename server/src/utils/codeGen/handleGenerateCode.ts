@@ -3,16 +3,30 @@
 //import { genUi } from './genUi';
 import { getProjectFileTree } from 'src/controllers/fileController';
 import { getTaskStatus } from 'src/controllers/taskController';
+import { Graph } from '../../types/graph';
+import type { WorkspaceHandle } from '../deploy/prepEnv';
 
-export const handleGenerateCode = async (nodes: any[], projectId: string) => {   
-    console.log('DEBUG handleGenerateCode function:', { nodesLen: nodes.length, projectId });
+interface Args {
+  projectId: string;
+  graph: Graph;
+  workspace: WorkspaceHandle;
+  sendProgress: (data: unknown) => void;
+}
+
+export const handleGenerateCode = async ({
+  projectId,
+  graph,
+  workspace,
+  sendProgress,
+}: Args): Promise<void> => {   
+    console.log('DEBUG handleGenerateCode function:', { nodesLen: graph.nodes.length, projectId });
  
     try {
-        if (nodes.length === 0) throw new Error('No nodes found');
+        if (graph.nodes.length === 0) throw new Error('No nodes found');
         let functionCode = null;
 
-        const functionParts = nodes
-            .map(node => (node.data && node.data.code ? node.data.code : null))
+        const functionParts = graph.nodes
+            .map(node => (node.config.code as string || null))
             .filter(Boolean);
 
         if (functionParts.length > 0) functionCode = functionParts.join('\n\n');

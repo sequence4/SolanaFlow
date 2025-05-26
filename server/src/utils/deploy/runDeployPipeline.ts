@@ -1,19 +1,18 @@
 //import { getBuildArtifactTask, startAnchorBuildTask, startAnchorDeployTask } from "./projectUtils";
 //import { startAnchorInitTask } from "./projectUtils";
 //import { waitForTaskCompletion } from "./taskUtils";
-import { prepEnv } from "./prepEnv";
+import { prepEnv } from './prepEnv';
+import type { WorkspaceHandle } from './prepEnv';
 import { Graph } from '../../types/graph';
 import { handleGenerateCode } from "../codeGen/handleGenerateCode";
 
 interface PipelineArgs {
-    projectId: string;
-    userId: string;
-    graph: Graph;
-    sendProgress: (data: unknown) => void;
-  }
+  projectId: string;
+  userId: string;
+  graph: Graph; 
+  sendProgress: (data: unknown) => void;
+}
 
-  
- 
   export async function runDeployPipeline({
     projectId,
     userId,
@@ -33,7 +32,7 @@ interface PipelineArgs {
     
     // 2 ─ code generation ─────────────────────────────────────────────────
     sendProgress({ stage: "code-gen", message: "Generating Anchor code…" });
-    await handleGenerateCode(graph.nodes, projectId);
+    await handleGenerateCode({ projectId, graph, workspace, sendProgress });
     /*
     // 3 ─ anchor init (skip for lite) ─────────────────────────────────────
     const { isLite } = await fetchProjectFlags(projectId);
