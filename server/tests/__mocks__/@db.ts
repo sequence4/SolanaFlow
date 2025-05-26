@@ -13,6 +13,10 @@ const fakeClient = {
 function __resetFakeClient() {
   Object.values(fakeClient).forEach(fn => (fn as jest.Mock).mockReset());
   (poolMock.query as jest.Mock).mockReset();
+
+  /* after reset, make sure `connect` keeps returning our fake client */
+  (poolMock.connect as jest.Mock).mockReset();
+  (poolMock.connect as jest.Mock).mockResolvedValue(fakeClient);
 }
 
 /* ---- exported pool substitute ---- */
@@ -20,6 +24,7 @@ type PartialPool = Pick<Pool, 'query' | 'connect'>;
 
 const poolMock: PartialPool & { __resetFakeClient: () => void } = {
   query  : jest.fn(),
+  /** always resolve to the same fake client */
   connect: jest.fn().mockResolvedValue(fakeClient),
   __resetFakeClient,
 };
