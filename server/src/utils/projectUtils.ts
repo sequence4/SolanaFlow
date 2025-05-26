@@ -911,39 +911,47 @@ export const closeProjectContainer = async (
 };
 
 export async function startProjectContainer(projId: string): Promise<string> {
-  const name = `userproj-${projId}-${Date.now()}`.slice(0, 63);  // 64-char max
+  const name  = `userproj-${projId}-${Date.now()}`.slice(0, 63);        // 64-char limit
   const image = 'ghcr.io/sequence4/solanaflow:latest';
 
   try {
-    /* 1 ─ make sure image exists & matches host arch */
+    /* 1 ─ ensure image is present & host-arch-compatible */
     execSync(`docker pull --platform linux/arm64 ${image}`, { stdio: 'inherit' });
 
-    /* 2 ─ run with explicit platform + retry-safe port mapping */
+    /* 2 ─ run container with explicit platform, project label & random host-port */
     execSync(
       `docker run -d --platform linux/arm64 \
-       --name ${name} \
+       --name  ${name} \
        --label solanaflow.project=${projId} \
-       -p 0.0.0.0::3000 ${image} \
+       -p 0.0.0.0::3000 \
+       ${image} \
        bash -c "cd /usr/src && tail -f /dev/null"`,
       { stdio: 'inherit' }
     );
 
     return name;
   } catch (err: any) {
-    // capture stderr for logs *and* db debugging
+    /* ---------- quarantine on failure ---------- */
     const reason = err.stderr?.toString() || err.message || 'unknown';
     console.error('[startProjectContainer] docker run failed:', reason);
 
-    // tag sentinel so prepEnv will skip it next time
-    const failed = `failed-container-${name}`;
+    /* Attempt best-effort cleanup of half-created container */
     try { execSync(`docker rm -f ${name}`); } catch { /* ignore */ }
+
+    /* Tag a sentinel row: port = 0  ➜ excluded from partial-unique index */
+    const failed = `failed-container-${name}`;
     await pool.query(
-      `INSERT INTO warm_container_pool (name,image,busy,port,last_used)
-         VALUES ($1,$2,false,0,now())
-       ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name`,  // idempotent
+      `INSERT INTO warm_container_pool (name, image, busy, port, last_used)
+             VALUES ($1,      $2,    false, 0,    now())
+         ON CONFLICT (name) DO UPDATE
+                   SET image = EXCLUDED.image,
+                       busy  = false,
+                       port  = 0,
+                       last_used = now()`,
       [failed, image]
     );
-    throw new Error(reason);
+
+    throw new Error(`Container creation failed: ${reason}`);
   }
 }
 
