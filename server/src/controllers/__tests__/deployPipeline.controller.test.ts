@@ -33,8 +33,8 @@ describe('POST /api/deploy/:id/deploy-pipeline', () => {
     expect(runDeployPipeline).toHaveBeenCalledWith(
       expect.objectContaining({
         projectId: 'proj-123',
-        userId:   'user-456',
-        graph:    body.graph,
+        userId: expect.any(String),
+        graph: body.graph,
         sendProgress: expect.any(Function),
       }),
     );

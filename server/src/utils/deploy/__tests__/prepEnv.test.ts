@@ -31,7 +31,7 @@ const resolveContainerUrl = helpers.resolveContainerUrl as jest.Mock
 describe('prepEnv()', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    poolMock.__resetFakeClient();
+    (poolMock as any).__resetFakeClient();
   })
 
   it('returns existing alive container', async () => {

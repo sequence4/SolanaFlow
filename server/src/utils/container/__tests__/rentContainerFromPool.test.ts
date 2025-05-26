@@ -7,7 +7,7 @@ const exec = execSync as jest.Mock;
 
 afterEach(() => {
   jest.clearAllMocks();
-  poolMock.__resetFakeClient();
+  (poolMock as any).__resetFakeClient();
 });
 
 describe('rentContainerFromPool()', () => {
