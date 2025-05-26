@@ -27,8 +27,9 @@ RUN (curl -sSfL "https://release.anza.xyz/solana/${SOLANA_CHANNEL}/install" | ba
 RUN cargo install --git https://github.com/coral-xyz/anchor anchor-cli --tag v0.31.1 --locked --force && \
     anchor --version
 
-RUN mkdir -p /tmp/bootstrap && cd /tmp/bootstrap && \
-    anchor init dummy --no-git && cd dummy && anchor build -- --locked || true && rm -rf target
+RUN anchor init /usr/src/anchor-template --no-git && \
+    (cd /usr/src/anchor-template && anchor build -- --locked || true) && \
+    rm -rf /usr/src/anchor-template/target
 
 ARG CACHEBUST=20250524
 RUN echo "$CACHEBUST"
