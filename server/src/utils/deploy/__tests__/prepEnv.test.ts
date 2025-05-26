@@ -4,6 +4,7 @@ import * as projectUtils from '../../projectUtils'
 import * as containerPool from '../../container/rentContainerFromPool'
 import * as helpers from '../../container/containerHelpers'
 import * as resolver from '../../container/containerHelpers'
+import { createProject as createProjectUtil } from '../../project/createProject';
 
 jest.mock('src/config/database', () => ({
   query: jest.fn()
@@ -33,7 +34,7 @@ jest.mock('../src/utils/container/resolveContainerUrl', () => ({
 
 const db = pool as unknown as { query: jest.Mock }
 const startProjectContainer = projectUtils.startProjectContainer as jest.Mock
-const startCreateProjectDirectoryTask = projectUtils.startCreateProjectDirectoryTask as jest.Mock
+const createProject = createProjectUtil as jest.Mock
 const rentContainerFromPool = containerPool.rentContainerFromPool as jest.Mock
 const isUrlAlive = helpers.isUrlAlive as jest.Mock
 const folderExists = helpers.folderExists as jest.Mock
@@ -95,6 +96,6 @@ describe('prepEnv()', () => {
 
     expect(ws.containerName).toBe('cold-1')
     expect(startProjectContainer).toHaveBeenCalledWith('p3', 'u3')
-    expect(startCreateProjectDirectoryTask).toHaveBeenCalledWith('u3', 'demo', 'p3')
+    expect(createProject).toHaveBeenCalledWith('u3', 'demo', 'p3')
   })
 })
