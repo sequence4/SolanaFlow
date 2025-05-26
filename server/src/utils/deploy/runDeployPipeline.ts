@@ -32,7 +32,7 @@ interface PipelineArgs {
     
     // 2 ─ code generation ─────────────────────────────────────────────────
     sendProgress({ stage: "code-gen", message: "Generating Anchor code…" });
-    await handleGenerateCode({ projectId, graph, workspace, sendProgress });
+    await handleGenerateCode({ projectId, graph, workspace, sendProgress, userId });
     /*
     // 3 ─ anchor init (skip for lite) ─────────────────────────────────────
     const { isLite } = await fetchProjectFlags(projectId);

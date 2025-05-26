@@ -128,3 +128,40 @@ export async function waitForTaskCompletion(
   console.log(`[DEBUG_TASK_BACKEND] Task ${taskId} did not complete within the maximum retries (${maxRetries})`);
   return 'timeout';
 }
+
+/**
+ * Repeatedly queries the `task` table until the task reaches
+ * one of the final states or we run out of retries.
+ *
+ * Returns the full row as `{ task: { status: string; result: string } }`
+ * so it’s a drop-in replacement for the client’s pollTaskStatus3.
+ */
+export async function pollTaskStatus(
+  taskId: string,
+  maxRetries = 60,         // 2 min @ 2 s interval
+  intervalMs = 2_000,
+): Promise<{ task: { status: string; result: string } }> {
+  const finals = ['succeed', 'failed', 'finished', 'warning'];
+
+  for (let n = 0; n < maxRetries; n++) {
+    const { rows } = await pool.query<{ status: string; result: string }>(
+      'SELECT status, result FROM task WHERE id = $1',
+      [taskId],
+    );
+
+    if (rows.length === 0) {
+      throw new Error(`pollTaskStatus: task ${taskId} not found`);
+    }
+
+    const task = rows[0];
+
+    if (finals.includes(task.status)) return { task };
+
+    await new Promise(r => setTimeout(r, intervalMs));
+  }
+
+  throw new Error(
+    `pollTaskStatus: task ${taskId} did not finish within ${maxRetries * intervalMs /
+      1000}s`,
+  );
+}

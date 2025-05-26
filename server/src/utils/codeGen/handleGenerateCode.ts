@@ -1,16 +1,17 @@
 //import { mergeFileTree } from './mergeFileTree';
-//import { amendConfigFiles } from './amendConfigFiles';
 //import { genUi } from './genUi';
 import { getProjectFileTree } from 'src/controllers/fileController';
 import { getTaskStatus } from 'src/controllers/taskController';
 import { Graph } from '../../types/graph';
 import type { WorkspaceHandle } from '../deploy/prepEnv';
+import { amendConfigFiles } from './amendConfigFiles';
 
 interface Args {
   projectId: string;
   graph: Graph;
   workspace: WorkspaceHandle;
   sendProgress: (data: unknown) => void;
+  userId: string;
 }
 
 export const handleGenerateCode = async ({
@@ -18,6 +19,7 @@ export const handleGenerateCode = async ({
   graph,
   workspace,
   sendProgress,
+  userId,
 }: Args): Promise<void> => {   
     console.log('DEBUG handleGenerateCode function:', { nodesLen: graph.nodes.length, projectId });
  
@@ -34,11 +36,11 @@ export const handleGenerateCode = async ({
 
         console.log('DEBUG handleGenerateCode functionCode:', functionCode);
 
-        /*
-        const frontendTaskId = await genUi(nodes);   // possible skip this step if not working correctly (save til end) 
+        //const frontendTaskId = await genUi(nodes);   // possible skip this step if not working correctly (save til end) 
         
-        const { cargoTaskId, anchorTaskId } = await amendConfigFiles(projectId)
-
+        const { cargoTaskId, anchorTaskId } = await amendConfigFiles(projectId, userId)
+        
+        /*
         const fileTreeTaskIds = await mergeFileTree(projectId, true);
         
         const fileTreeResponse = await getProjectFileTree(projectId);
