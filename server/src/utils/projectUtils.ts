@@ -7,13 +7,8 @@ import { getProjectRootPath } from './fileUtils';
 import { v4 as uuidv4 } from 'uuid';
 import { normalizeProjectName } from './stringUtils';
 import pool from '../config/database';
-import { 
-  serverEnvContent, 
-  serverGitignoreContent, 
-  serverIndexContent, 
-} from '../data/templateFiles';
 
-const USER_WORKSPACE_IMAGE = "ghcr.io/sequence4/solanaflow:latest";
+//const USER_WORKSPACE_IMAGE = "ghcr.io/sequence4/solanaflow:latest";
 
 function hasWarning(output: string): boolean {
   const lowercasedOutput = output.toLowerCase();
@@ -836,77 +831,7 @@ function hybridRootPackageJson(projectName: string, projectDesc: string = 'A Rea
   };
 }
 
-/**
- * Create the Anchor / CRA / Express directory tree **inside an already-running
- * container** (warm or freshly-started) instead of launching a brand-new one.
- *
- * - `containerName` is looked-up from the DB; if it is missing we abort
- *   instead of falling back to `docker run` – prepEnv is responsible for
- *   guaranteeing a container exists before we get here.
- */
-export const startCreateProjectDirectoryTask = async (
-  creatorId   : string,
-  rootPath    : string,
-  projectId   : string,
-  projectDesc = 'A React application'
-): Promise<string> => {
 
-  if (!projectId) throw new Error('Project ID is required');
-
-  const taskId          = await createTask('Create Project Directory', creatorId, projectId);
-  const sanitizedTaskId = taskId.trim().replace(/,$/, '');
-
-  setImmediate(async () => {
-    try {
-      /* --------------------------------------------------------- *
-       * 1. reuse the container that prepEnv (or rentContainer…)   *
-       *    already recorded in `solanaproject`                    *
-       * --------------------------------------------------------- */
-      const containerName = await getContainerName(projectId);
-      if (!containerName) throw new Error(`No container recorded for project ${projectId}`);
-
-      /* --------------------------------------------------------- *
-       * 2. Anchor + CRA scaffolding **inside** that container     *
-       * --------------------------------------------------------- */
-      await runCommand(
-        `docker exec ${containerName} bash -c "cd /usr/src && anchor init ${rootPath}"`,
-        '.',
-        sanitizedTaskId,
-        { skipSuccessUpdate: true }
-      );
-
-      /* CRA (frontend) --------------------------------------------------- */
-      await runCommand(
-        `docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && npx create-react-app@latest app --template typescript"`,
-        '.',
-        sanitizedTaskId,
-        { skipSuccessUpdate: true }
-      );
-
-      /* Express (server) -------------------------------------------------- */
-      await runCommand(
-        `docker exec ${containerName} bash -c "mkdir -p /usr/src/${rootPath}/server/src"`,
-        '.',
-        sanitizedTaskId,
-        { skipSuccessUpdate: true }
-      );
-
-      /* You can keep the rest of the file-creation logic exactly as before.
-         Everything now runs inside the single, already-running container  */
-
-      await updateTaskStatus(
-        sanitizedTaskId,
-        'succeed',
-        `Project directories created inside container ${containerName}`
-      );
-    } catch (err: any) {
-      await updateTaskStatus(sanitizedTaskId, 'failed', err.message);
-      console.error('[startCreateProjectDirectoryTask] error:', err);
-    }
-  });
-
-  return sanitizedTaskId;
-};
 
 
 export const closeProjectContainer = async (

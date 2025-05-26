@@ -1,8 +1,8 @@
 import pool from 'src/config/database';
 import {
   startProjectContainer,
-  startCreateProjectDirectoryTask,
 } from '../projectUtils';
+import { startCreateProjectDirectoryTask } from '../project/createProject';
 import {
   rentContainerFromPool,
   releaseContainerToPool,

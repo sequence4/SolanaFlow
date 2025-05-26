@@ -15,7 +15,6 @@ import {
   getBuildArtifactTask,
   startSetClusterTask,
   runCommand,
-  startCreateProjectDirectoryTask,
   startInstallNodeDependenciesTask,
   compileTs,
   closeProjectContainer,
@@ -25,6 +24,7 @@ import { APP_CONFIG } from '../config/appConfig';
 import fs from 'fs';
 import { Keypair } from '@solana/web3.js';
 import { waitForTaskCompletion } from '../utils/taskUtils';
+import { startCreateProjectDirectoryTask } from '../utils/project/createProject';
 
 export const runCommandController = async (
   req: Request,
