@@ -21,8 +21,12 @@ export const handleGenerateCode = async ({
   sendProgress,
   userId,
 }: Args): Promise<void> => {   
-    console.log('DEBUG handleGenerateCode function:', { nodesLen: graph.nodes.length, projectId });
- 
+    console.log('[GEN] projectId   =', projectId);
+    console.log('[GEN] userId      =', userId);
+    console.log('[GEN] workspace   =', workspace);
+    console.log('[GEN] nodes.len   =', graph.nodes.length);
+    console.log('[GEN] first node  =', graph.nodes[0]);
+    
     try {
         if (graph.nodes.length === 0) throw new Error('No nodes found');
         let functionCode = null;
@@ -31,6 +35,12 @@ export const handleGenerateCode = async ({
             .map(node => (node.config.code as string || null))
             .filter(Boolean);
 
+        console.log('[GEN] raw snippet count =', functionParts.length);
+        if (functionParts.length) {
+            console.log('[GEN] first 200 chars of combined code:\n',
+                functionParts.join('\n\n').slice(0, 200));
+        }
+
         if (functionParts.length > 0) functionCode = functionParts.join('\n\n');
         else console.log('No valid function code found in nodes');
 
@@ -38,7 +48,10 @@ export const handleGenerateCode = async ({
 
         //const frontendTaskId = await genUi(nodes);   // possible skip this step if not working correctly (save til end) 
         
-        const { cargoTaskId, anchorTaskId } = await amendConfigFiles(projectId, userId)
+        console.log('[GEN] calling amendConfigFiles…');
+        const { cargoTaskId, anchorTaskId } = await amendConfigFiles(projectId, userId);
+        console.log('[GEN] amendConfigFiles result:', { cargoTaskId, anchorTaskId });
+        sendProgress({ stage: 'debug', message: '[handleGenerateCode] Amend done' });
         
         /*
         const fileTreeTaskIds = await mergeFileTree(projectId, true);
