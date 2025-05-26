@@ -2,7 +2,6 @@ import pool from 'src/config/database';
 import {
   startProjectContainer,
 } from '../projectUtils';
-import { startCreateProjectDirectoryTask } from '../project/createProject';
 import {
   rentContainerFromPool,
   releaseContainerToPool,
@@ -13,6 +12,7 @@ import {
   folderExists,
 } from '../container/containerHelpers';
 import { WorkspaceHandle } from '../container/interfaces';
+import { execSync } from 'child_process';
 
 const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
 
@@ -85,7 +85,13 @@ export async function prepEnv(
     }
 
     if (!dirReady) {
-      await startCreateProjectDirectoryTask(userId, rootPath, projectId);
+      // ensure the root directory exists … nothing heavier than this
+      await pool.query('SELECT container_name FROM solanaproject WHERE id = $1', [projectId])
+        .then(({ rows }) => {
+          const name = rows[0]?.container_name;
+          if (!name) throw new Error(`No container for project ${projectId}`);
+          execSync(`docker exec ${name} bash -c "mkdir -p /usr/src/${rootPath}"`);
+        });
     }
 
     return { rootPath, containerName, containerUrl };
