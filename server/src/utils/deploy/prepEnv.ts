@@ -33,31 +33,37 @@ export async function prepEnv(
   if (res.rowCount === 0) throw new Error('Project not found');
 
   const { root_path: rootPath } = res.rows[0];
-  let   { container_url: dbUrl, container_name: dbName } = res.rows[0];
+  let { container_url: dbUrl, container_name: dbName } = res.rows[0];
 
+  // ignore broken sentinel names from earlier failures
   if (dbName?.startsWith('failed-container-')) {
     dbName = null;
-    dbUrl  = null;
+    dbUrl = null;
   }
 
+  // fast path –- already linked to a healthy container
   if (dbName && dbUrl && (await isUrlAlive(dbUrl))) {
     return { rootPath, containerName: dbName, containerUrl: dbUrl };
   }
 
+  // try to grab a warm container from the pool
   const rented = await rentContainerFromPool();
 
   let containerName: string;
-  let containerUrl:  string;
+  let containerUrl: string;
 
   if (rented) {
+    // warm-start: use the container as-is
     containerName = rented.name;
-    containerUrl  = rented.url;
+    containerUrl = rented.url;
   } else {
+    // cold-start fallback: spin up a brand-new workspace
     containerName = await startProjectContainer(projectId);
-    containerUrl  = await resolveContainerUrl(containerName);
+    containerUrl = await resolveContainerUrl(containerName);
   }
 
   try {
+    // persist assignment
     await pool.query(
       `UPDATE solanaproject
           SET container_url  = $1,
@@ -67,8 +73,9 @@ export async function prepEnv(
     );
 
     const projectDir = `/usr/src/${rootPath}`;
-    let   dirReady   = false;
+    let dirReady = false;
 
+    // check up to 5× for the project directory before kicking off creation task
     for (let attempts = 0; attempts < 5 && !dirReady; attempts++) {
       try {
         dirReady = await folderExists(containerName, projectDir);
@@ -83,7 +90,7 @@ export async function prepEnv(
 
     return { rootPath, containerName, containerUrl };
   } catch (err) {
-    if (rented) await releaseContainerToPool(rented.name); 
+    if (rented) await releaseContainerToPool(rented.name);
     throw err;
   }
 }
