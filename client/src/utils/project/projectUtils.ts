@@ -7,7 +7,6 @@ import { fetchFilesAndCodes } from "@/utils/files/fetchFilesAndCodes";
 import { FileTreeItemType } from "@/interfaces/FileTreeItemType";
 import { UxOpenPanel } from "@/context/ux/UxContextTypes";
 import { pollTaskStatus4 } from "@/utils/task/taskUtils";
-import { useTaskLogs } from "@/context/logs/useTaskLogs";
 import { Step } from '@/context/logs/TaskLogsContext';
 
 export const fetchProjects = async (

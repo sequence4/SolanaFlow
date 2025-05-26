@@ -6,9 +6,9 @@
         "start": "node -r module-alias/register dist/app.js",
         "dev": "ts-node -r tsconfig-paths/register src/app.ts",
         "lint": "eslint . --ext .ts",
-        "test":       "jest --runInBand --config jest.config.js",
+        "test": "jest --runInBand --config jest.config.js",
         "test:watch": "jest --watchAll   --config jest.config.js",
-        "test:cov":   "jest --coverage   --config jest.config.js"
+        "test:cov": "jest --coverage   --config jest.config.js"
     },
     "_moduleAliases": {
         "@": "dist"
@@ -33,6 +33,7 @@
         "module-alias": "^2.2.3",
         "openai": "^4.85.4",
         "pg": "^8.13.3",
+        "slugify": "^1.6.6",
         "ts-node": "^10.9.2",
         "tweetnacl": "^1.0.3",
         "uuid": "^11.1.0"
