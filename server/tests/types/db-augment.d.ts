@@ -1,11 +1,9 @@
 import 'pg';
 
-declare module 'pg' {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
-  interface Pool {
-    /** TEST-ONLY helper – wipes spies */
-    __resetFakeClient: () => void;
-  }
+declare module '@db' {
+  import type { Pool } from 'pg';
+  const pool: Pool & { __resetFakeClient(): void };
+  export default pool;
 }
 
 /* Next line makes TS treat the default export in our mock as a Pool */

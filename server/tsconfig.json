@@ -11,12 +11,12 @@
       "esModuleInterop": true,
       "resolveJsonModule": true,
       "moduleResolution": "node",
-      "baseUrl": ".",
+      "baseUrl": "src",
       "paths": {
-        "*": ["node_modules/*"],
-        "src/*": ["src/*"],
-        "@/*": ["src/*"],
-        "@db": ["src/config/database"]
+        "*": ["../node_modules/*"],
+        "src/*": ["*"],
+        "@/*": ["*"],
+        "@db": ["../tests/__mocks__/@db.ts"]
       },
       "typeRoots": ["./node_modules/@types", "./tests/types"],
       "skipLibCheck": true,
