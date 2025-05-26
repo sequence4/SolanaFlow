@@ -73,8 +73,11 @@ export async function rentContainerFromPool(): Promise<RentedContainer | null> {
 }
 
 export async function releaseContainerToPool(name: string): Promise<void> {
-  await pool.query(
-    'UPDATE warm_container_pool SET busy = false WHERE name = $1',
-    [name]
-  );
+  // if the container row was wiped by prune, ignore the update
+  try {
+    await pool.query(
+      'UPDATE warm_container_pool SET busy = false WHERE name = $1',
+      [name]
+    );
+  } catch {/* ignore */}
 }

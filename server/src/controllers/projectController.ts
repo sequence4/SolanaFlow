@@ -345,6 +345,12 @@ export const deleteProject = async (
     await client.query('DELETE FROM solanaproject WHERE id = $1', [id]);
     
     await client.query('COMMIT');
+
+    // Release any occupied warm-pool slot
+    await pool.query(
+      'UPDATE warm_container_pool SET busy = false WHERE name = $1',
+      [ projectCheck.rows[0].container_name ]
+    );
     
     res.status(200).json({
       message: 'Project deleted successfully',

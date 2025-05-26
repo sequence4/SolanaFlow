@@ -7,6 +7,7 @@ import { getProjectRootPath } from './fileUtils';
 import { v4 as uuidv4 } from 'uuid';
 import { normalizeProjectName } from './stringUtils';
 import pool from '../config/database';
+import { pruneContainerResources } from './container/pruneContainer';
 
 //const USER_WORKSPACE_IMAGE = "ghcr.io/sequence4/solanaflow:latest";
 
@@ -876,16 +877,19 @@ export const closeProjectContainer = async (
       }
       
       if (removeContainer) {
-        await runCommand(`docker rm -f ${containerName}`, '.', sanitizedTaskId);
-        console.log(`Container ${containerName} forcibly stopped and removed`);
-        
+        pruneContainerResources(containerName, projectId);
+        // clear DB pointer – keep row for audit
         await pool.query(
-          'UPDATE solanaproject SET container_name = NULL WHERE id = $1',
+          `UPDATE solanaproject
+              SET container_name = NULL,
+                  container_url  = NULL
+            WHERE id = $1`,
           [projectId]
         );
+        console.log(`Container ${containerName} and all project-labelled resources pruned`);
       } else {
         await runCommand(`docker stop ${containerName}`, '.', sanitizedTaskId);
-        console.log(`Container ${containerName} stopped successfully`);
+        console.log(`Container ${containerName} stopped (kept for warm pool)`);
       }
       
       await updateTaskStatus(
@@ -916,8 +920,11 @@ export async function startProjectContainer(projId: string): Promise<string> {
 
     /* 2 ─ run with explicit platform + retry-safe port mapping */
     execSync(
-      `docker run -d --platform linux/arm64 --name ${name} -p 0.0.0.0::3000 ` +
-      `${image} bash -c "cd /usr/src && tail -f /dev/null"`,
+      `docker run -d --platform linux/arm64 \
+       --name ${name} \
+       --label solanaflow.project=${projId} \
+       -p 0.0.0.0::3000 ${image} \
+       bash -c "cd /usr/src && tail -f /dev/null"`,
       { stdio: 'inherit' }
     );
 
