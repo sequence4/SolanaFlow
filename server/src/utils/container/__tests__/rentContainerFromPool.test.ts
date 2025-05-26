@@ -2,17 +2,20 @@ import { rentContainerFromPool } from '../rentContainerFromPool';
 import pool from '../../../config/database';
 import { execSync } from 'child_process';
 
-jest.mock('../../../config/database', () => ({ query: jest.fn() }));
-jest.mock('child_process',   () => ({ execSync: jest.fn() }));
+jest.mock('child_process', () => ({ execSync: jest.fn() }));
 
-const db   = pool as unknown as { query: jest.Mock };
 const exec = execSync as unknown as jest.Mock;
+const mockPool = pool as any;
 
-afterEach(() => jest.clearAllMocks());
+afterEach(() => {
+  jest.clearAllMocks();
+  mockPool.__resetFakeClient();
+});
 
 describe('rentContainerFromPool()', () => {
   it('returns first free row and starts docker', async () => {
-    db.query.mockResolvedValueOnce({
+    const client = await mockPool.connect();
+    client.query.mockResolvedValueOnce({
       rowCount: 1,
       rows: [{ name: 'ws-6001', port: 6001 }]
     });
@@ -21,13 +24,14 @@ describe('rentContainerFromPool()', () => {
 
     expect(res).toEqual({
       name: 'ws-6001',
-      url : 'https://6001.ws.solanaflow.io'
+      url : 'https://6001.ws.solanaflow.dev'
     });
     expect(exec).toHaveBeenCalledWith('docker start ws-6001', { stdio: 'ignore' });
   });
 
   it('returns null when no rows free', async () => {
-    db.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+    const client = await mockPool.connect();
+    client.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
 
     const res = await rentContainerFromPool();
 
@@ -36,7 +40,8 @@ describe('rentContainerFromPool()', () => {
   });
 
   it('survives docker start error', async () => {
-    db.query.mockResolvedValueOnce({
+    const client = await mockPool.connect();
+    client.query.mockResolvedValueOnce({
       rowCount: 1,
       rows: [{ name: 'ws-6002', port: 6002 }]
     });
@@ -49,7 +54,8 @@ describe('rentContainerFromPool()', () => {
   });
 
   it('never hands out the same row twice in parallel', async () => {
-    db.query
+    const client = await mockPool.connect();
+    client.query
       .mockResolvedValueOnce({
         rowCount: 1,
         rows: [{ name: 'ws-6003', port: 6003 }]

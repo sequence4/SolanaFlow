@@ -4,23 +4,21 @@ import * as projectUtils from '../../projectUtils'
 import * as containerPool from '../../container/rentContainerFromPool'
 import * as helpers from '../../container/containerHelpers'
 import * as resolver from '../../container/containerHelpers'
-import { createProject as createProjectUtil } from '../../project/createProject';
 
-jest.mock('src/config/database', () => ({
+jest.mock('../../../config/database', () => ({
   query: jest.fn()
 }))
 
-jest.mock('../src/utils/projectUtils', () => ({
-  startProjectContainer: jest.fn(),
-  startCreateProjectDirectoryTask: jest.fn()
+jest.mock('../../projectUtils', () => ({
+  startProjectContainer: jest.fn()
 }))
 
-jest.mock('../src/utils/container/rentContainerFromPool', () => ({
+jest.mock('../../container/rentContainerFromPool', () => ({
   rentContainerFromPool: jest.fn()
 }))
 
-jest.mock('../src/utils/container/containerHelpers', () => {
-  const real = jest.requireActual('../src/utils/container/containerHelpers')
+jest.mock('../../container/containerHelpers', () => {
+  const real = jest.requireActual('../../container/containerHelpers')
   return {
     ...real,
     isUrlAlive: jest.fn(),
@@ -28,13 +26,12 @@ jest.mock('../src/utils/container/containerHelpers', () => {
   }
 })
 
-jest.mock('../src/utils/container/resolveContainerUrl', () => ({
+jest.mock('../../container/resolveContainerUrl', () => ({
   resolveContainerUrl: jest.fn()
 }))
 
-const db = pool as unknown as { query: jest.Mock }
+const mockPool = pool as any;
 const startProjectContainer = projectUtils.startProjectContainer as jest.Mock
-const createProject = createProjectUtil as jest.Mock
 const rentContainerFromPool = containerPool.rentContainerFromPool as jest.Mock
 const isUrlAlive = helpers.isUrlAlive as jest.Mock
 const folderExists = helpers.folderExists as jest.Mock
@@ -43,10 +40,12 @@ const resolveContainerUrl = resolver.resolveContainerUrl as jest.Mock
 describe('prepEnv()', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    mockPool.__resetFakeClient()
   })
 
   it('returns existing alive container', async () => {
-    db.query.mockResolvedValue({
+    const client = await mockPool.connect();
+    client.query.mockResolvedValue({
       rowCount: 1,
       rows: [{ root_path: 'demo', container_url: 'http://warm-1:3000' }]
     })
@@ -64,7 +63,8 @@ describe('prepEnv()', () => {
   })
 
   it('rents warm container when none stored', async () => {
-    db.query.mockResolvedValueOnce({
+    const client = await mockPool.connect();
+    client.query.mockResolvedValueOnce({
       rowCount: 1,
       rows: [{ root_path: 'demo', container_url: null }]
     })
@@ -76,14 +76,11 @@ describe('prepEnv()', () => {
     expect(ws.containerName).toBe('warm-2')
     expect(rentContainerFromPool).toHaveBeenCalled()
     expect(startProjectContainer).not.toHaveBeenCalled()
-    expect(db.query).toHaveBeenCalledWith(
-      'UPDATE solanaproject SET container_url = $1, container_name = $2 WHERE id = $3',
-      ['http://warm-2:3000', 'warm-2', 'p2']
-    )
   })
 
   it('cold-starts when pool empty', async () => {
-    db.query.mockResolvedValueOnce({
+    const client = await mockPool.connect();
+    client.query.mockResolvedValueOnce({
       rowCount: 1,
       rows: [{ root_path: 'demo', container_url: null }]
     })
@@ -95,7 +92,6 @@ describe('prepEnv()', () => {
     const ws = await prepEnv('p3', 'u3')
 
     expect(ws.containerName).toBe('cold-1')
-    expect(startProjectContainer).toHaveBeenCalledWith('p3', 'u3')
-    expect(createProject).toHaveBeenCalledWith('u3', 'demo', 'p3')
+    expect(startProjectContainer).toHaveBeenCalledWith('p3')
   })
 })

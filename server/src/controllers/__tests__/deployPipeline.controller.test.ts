@@ -3,7 +3,7 @@ import express from 'express';
 import router from '../../routes/deployRoutes';
 import { runDeployPipeline } from '../../utils/deploy/runDeployPipeline';
 
-jest.mock('../../../utils/deploy/runDeployPipeline', () => ({
+jest.mock('../../utils/deploy/runDeployPipeline', () => ({
   runDeployPipeline: jest.fn().mockResolvedValue(undefined),
 }));
 
