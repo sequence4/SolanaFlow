@@ -62,7 +62,7 @@ export const handleGenerateCode = async ({
         sendProgress({ stage: 'debug', message: '[handleGenerateCode] Amend done' });
         
        
-        const fileTreeTaskIds = await mergeFileTree(projectId, userId, true);
+        const fileTreeTaskIds = await mergeFileTree(projectId, userId);
          /*
         const fileTreeResponse = await getProjectFileTree(projectId);
         const fileTreeResult = await getTaskStatus(fileTreeResponse.taskId);

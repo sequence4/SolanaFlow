@@ -7,12 +7,10 @@ import { pollTaskStatus } from '../taskUtils';
  *
  * @param projectId         UUID of the SolanaFlow project
  * @param userId            User ID for task creation
- * @param afterCodeGen      true when called right after code-gen (kept for API parity)
  */
 export async function mergeFileTree(
   projectId: string,
   userId: string,
-  afterCodeGen: boolean = true,
 ): Promise<string[]> {
 
   const allTaskIds: string[] = [];
