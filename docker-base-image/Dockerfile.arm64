@@ -55,7 +55,10 @@ RUN set -e; \
     yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile && \
     yarn --cwd /usr/share/solanaflow/web build && \
     yarn --cwd /usr/share/solanaflow/web install --production --ignore-scripts --prefer-offline && \
-    rm -rf /usr/share/solanaflow/web/.next/cache
+    rm -rf /usr/share/solanaflow/web/.next/cache && \
+    # ---- CLEAN BUILD CACHES ----------------------------------------------
+    yarn --cwd /usr/share/solanaflow/web cache clean --all && \
+    rm -rf /usr/local/share/.cache/yarn  /root/.cache/yarn  "$NVM_DIR/.cache"
 
 # Guarantee Solana bin dir exists (defensive)
 RUN mkdir -p /root/.local/share/solana/install/active_release/bin
