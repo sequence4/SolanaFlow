@@ -3,7 +3,32 @@ import { mergeFileTree } from './mergeFileTree';
 import { Graph } from '../../types/graph';
 import type { WorkspaceHandle } from '../deploy/prepEnv';
 import { amendConfigFiles } from './amendConfigFiles';
+import { pollTaskStatus } from '../taskUtils';
 
+/** Block until every task-id is in a final state. */
+async function waitForAll(taskIds: string[]): Promise<{
+  succeeded: string[];
+  failed: string[];
+}> {
+  const finals = ['succeed', 'finished', 'failed', 'warning'];
+  const succeeded: string[] = [];
+  const failed: string[] = [];
+
+  for (const id of taskIds) {
+    if (!id) continue;
+    try {
+      const { task } = await pollTaskStatus(id);
+      (task.status === 'succeed' || task.status === 'finished'
+        ? succeeded
+        : failed
+      ).push(id);
+    } catch (err) {
+      console.error(`[GEN] pollTaskStatus error for ${id}:`, err);
+      failed.push(id);
+    }
+  }
+  return { succeeded, failed };
+}
 
 interface Args {
   projectId: string;
@@ -62,8 +87,24 @@ export const handleGenerateCode = async ({
         console.log('[GEN] amendConfigFiles result:', { anchorTaskId });
         sendProgress({ stage: 'debug', message: '[handleGenerateCode] Amend done' });
         
-       
+        sendProgress({ stage: 'file-tree', message: 'Refreshing file tree…' });
         const fileTreeTaskIds = await mergeFileTree(projectId, userId);
+        console.log('[GEN] mergeFileTree triggered, taskIds =', fileTreeTaskIds);
+        sendProgress({ stage: 'file-tree', message: 'Waiting for file-tree refresh…' });
+
+        const { succeeded, failed } = await waitForAll(fileTreeTaskIds);
+
+        console.log('[GEN] file-tree tasks done → ok:', succeeded, 'fail:', failed);
+        sendProgress({
+          stage: failed.length ? 'file-tree-failed' : 'file-tree-done',
+          message: failed.length
+            ? `File-tree refresh: ${failed.length} task(s) failed`
+            : 'File-tree refresh complete'
+        });
+
+        if (failed.length) {
+          throw new Error(`File-tree task(s) failed: ${failed.join(', ')}`);
+        }
     } catch (err) {
         console.error('Error in handleGenerateCode:', err);
         throw err;
