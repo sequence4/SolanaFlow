@@ -4,7 +4,7 @@ ARG NODE_VERSION="v20.18.0"
 ARG SOLANA_CHANNEL="stable"
 
 ENV HOME=/root
-ENV PATH=$HOME/.cargo/bin:$HOME/.local/share/solana/install/active_release/bin:$HOME/.nvm/versions/node/${NODE_VERSION}/bin:$PATH
+ENV PATH=/usr/local/bin:$HOME/.cargo/bin:$HOME/.local/share/solana/install/active_release/bin:$HOME/.nvm/versions/node/${NODE_VERSION}/bin:$PATH
 
 # ── base packages ──────────────────────────────────────────────────────────
 RUN set -e; \
@@ -28,16 +28,14 @@ RUN . "$NVM_DIR/nvm.sh" && nvm install ${NODE_VERSION} && nvm use ${NODE_VERSION
 
 # ── Solana CLI ───────────────────────────────────────────────────────────
 # 1) download (auto-detect arm64, -s = skip prompt)
-RUN (curl -sSfL "https://release.anza.xyz/solana/${SOLANA_CHANNEL}/install" \
-        | bash -s -- -y -s) || \
-    (curl -sSfL "https://release.solana.com/${SOLANA_CHANNEL}/install" \
-        | bash -s -- -y -s)
+RUN set -e && \
+    (curl -sSfL "https://release.anza.xyz/solana/${SOLANA_CHANNEL}/install"  | bash -s -- -y -s) || \
+    (curl -sSfL "https://release.solana.com/${SOLANA_CHANNEL}/install"       | bash -s -- -y -s)
 
-# 2) activate the release → creates the *active_release* symlink
-RUN /root/.local/share/solana/install/solana-install init --no-modify-path
-
-# 3) sanity-check (fail fast if wrong arch or missing binary)
-RUN /root/.local/share/solana/install/active_release/bin/solana --version
+# 2) activate (creates active_release) + 3) probe
+RUN set -e && \
+    "/root/.local/share/solana/install/solana-install" init --no-modify-path && \
+    /root/.local/share/solana/install/active_release/bin/solana --version
 
 # Clean up build artifacts to reduce image size
 RUN apt-get clean && \
