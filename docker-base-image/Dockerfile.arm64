@@ -26,9 +26,12 @@ ENV NVM_DIR=$HOME/.nvm
 RUN . "$NVM_DIR/nvm.sh" && nvm install ${NODE_VERSION} && nvm use ${NODE_VERSION} && \
     nvm alias default ${NODE_VERSION} && npm install -g yarn
 
-# Solana CLI
-RUN (curl -sSfL "https://release.anza.xyz/solana/${SOLANA_CHANNEL}/install" | bash -s -- -y) || \
-    (curl -sSfL "https://release.solana.com/${SOLANA_CHANNEL}/install" | bash -s -- -y)
+# Solana CLI – force aarch64 build
+RUN (curl -sSfL "https://release.anza.xyz/solana/${SOLANA_CHANNEL}/install" | bash -s -- -y -a aarch64) || \
+    (curl -sSfL "https://release.solana.com/${SOLANA_CHANNEL}/install" | bash -s -- -y -a aarch64)
+
+# Verify the download right away (fail early if wrong binary)
+RUN /root/.local/share/solana/install/active_release/bin/solana --version
 
 # Anchor CLI
 RUN cargo install --git https://github.com/coral-xyz/anchor anchor-cli --tag v0.31.1 --locked --force && \
@@ -86,14 +89,10 @@ COPY --from=builder /root/.cargo/bin          /root/.cargo/bin
 COPY --from=builder /usr/local/bin/anchor     /usr/local/bin/anchor
 
 # 🔑 expose Solana CLI (and any helpers) universally
-# 1) explicit "solana" + "solana-keygen" – these are what Anchor/Scripts call
-RUN ln -sf /root/.local/share/solana/install/active_release/bin/solana        /usr/local/bin/solana  && \
-    ln -sf /root/.local/share/solana/install/active_release/bin/solana-keygen /usr/local/bin/solana-keygen && \
-    # 2) catch-all for any other helper binaries (validator, install, etc.)
-    ln -sf /root/.local/share/solana/install/active_release/bin/solana*       /usr/local/bin/ || true
+RUN ln -sf /root/.local/share/solana/install/active_release/bin/solana* /usr/local/bin/
 
-# Put the Solana bin dir into PATH *before* we smoke-test
-ENV PATH=/root/.local/share/solana/install/active_release/bin:/root/.cargo/bin:/usr/local/bin:$PATH
+# Put /usr/local/bin first in PATH *then* smoke-test
+ENV PATH=/usr/local/bin:/root/.local/share/solana/install/active_release/bin:/root/.cargo/bin:$PATH
 
 # Smoke-test: abort build early if any tool disappeared
 RUN solana --version && anchor --version && rustc --version
