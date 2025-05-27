@@ -4,6 +4,7 @@ import { Graph } from '../../types/graph';
 import type { WorkspaceHandle } from '../deploy/prepEnv';
 import { amendConfigFiles } from './amendConfigFiles';
 
+
 interface Args {
   projectId: string;
   graph: Graph;
@@ -63,22 +64,6 @@ export const handleGenerateCode = async ({
         
        
         const fileTreeTaskIds = await mergeFileTree(projectId, userId);
-         /*
-        const fileTreeResponse = await getProjectFileTree(projectId);
-        const fileTreeResult = await getTaskStatus(fileTreeResponse.taskId);
-
-        const existingTree = fileTreeResult.task.result ? JSON.parse(fileTreeResult.task.result) : [];
-        const flattenTree = (tree: any[]): string[] => {
-            const paths: string[] = [];
-            for (const item of tree || []) {
-                if (item.path) paths.push(item.path);
-                if (item.children) paths.push(...flattenTree(item.children));
-            }
-            return paths;
-        };
-        const allPaths = flattenTree(existingTree);
-        const instructionFiles = allPaths.filter(path => path.includes('/instructions/') && path.endsWith('.rs'));
-        */
     } catch (err) {
         console.error('Error in handleGenerateCode:', err);
         throw err;
