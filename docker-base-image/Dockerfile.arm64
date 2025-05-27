@@ -52,12 +52,21 @@ RUN set -e; \
             --production --ignore-scripts --prefer-offline && \
     rm -rf /usr/share/solanaflow/web/.next/cache
 
+# ─────────────── runtime stage ────────────────────────────────────────────────
 FROM builder AS runtime
-ARG  RUNTIME_BUST=20240319
+
+# bump this every rebuild to dodge the cache
+ARG RUNTIME_BUST=20250527
 RUN echo "$RUNTIME_BUST"
-ENV HOSTNAME 0.0.0.0
-ENV NEXT_DISABLE_SWC 1 
-WORKDIR /usr/share/solanaflow/web  
-COPY --from=builder /usr/share/solanaflow /usr/share/solanaflow
+
+ENV HOSTNAME=0.0.0.0
+ENV NEXT_DISABLE_SWC=1
+
+WORKDIR /usr/share/solanaflow/web
+
+# copy runtime artefacts *and* the pre-built Anchor template
+COPY --from=builder /usr/share/solanaflow   /usr/share/solanaflow
+COPY --from=builder /usr/src/anchor-template /usr/src/anchor-template
+
 EXPOSE 3000
 CMD ["node", ".next/standalone/server.js"]
