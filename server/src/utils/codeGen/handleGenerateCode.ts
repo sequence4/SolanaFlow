@@ -119,11 +119,12 @@ export const handleGenerateCode = async ({
         const programId = '11111111111111111111111111111111'; // TODO: fetch real ID
         
         // 3) build in-memory src/ tree
-        const srcTree = genSrcFiles({ nodes: graph.nodes }, programName, programId);
+        const srcTree = genSrcFiles({ nodes: graph.nodes, edges: graph.edges || [] }, programName, programId);
         if (!srcTree) throw new Error('genSrcFiles returned null');
         
         sendProgress({ stage: 'src-gen', message: 'Generating Rust sources…' });
         console.log('[GEN] Generated src tree:', JSON.stringify(srcTree, null, 2));
+        console.dir(srcTree, { depth: 4 });
         
         // 4) TODO: implement insertSrcFiles to actually write files to container
         // For now, just log what would be written
