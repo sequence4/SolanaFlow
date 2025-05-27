@@ -2,6 +2,22 @@ import { startGetFileContentTask } from '../fileUtils';          // helper that 
 import { startUpdateFileTask } from '../fileUtils';
 import { pollTaskStatus } from '../taskUtils';
 
+/**
+ * Helper function to block until file content is ready and return it
+ */
+async function getFileContentBlocking(
+  projectId: string,
+  filePath:  string,
+  userId:    string,
+): Promise<string> {
+  const taskId = await startGetFileContentTask(projectId, filePath, userId);
+  const { task } = await pollTaskStatus(taskId);           // waits until succeed|failed
+  if (task.status !== 'succeed' || typeof task.result !== 'string') {
+    throw new Error(`getFileContentBlocking: ${filePath} read failed (${task.status})`);
+  }
+  return task.result;
+}
+
 interface AmendResult {
   cargoStatus:  string;
   cargoTaskId:  string;
@@ -18,10 +34,13 @@ export const amendConfigFiles = async (
   userId:    string,
 ): Promise<AmendResult> => {
   /* ------------------------------------------------------------------ *
-   * 1. Read both files (blocking helper already waits for task success)
+   * 1. Read both files (blocking helper waits for actual content)
    * ------------------------------------------------------------------ */
-  const cargoSrc  = await startGetFileContentTask(projectId, 'Cargo.toml',  userId);
-  const anchorSrc = await startGetFileContentTask(projectId, 'Anchor.toml', userId);
+  const cargoSrc  = await getFileContentBlocking(projectId, 'Cargo.toml',  userId);
+  const anchorSrc = await getFileContentBlocking(projectId, 'Anchor.toml', userId);
+
+  console.log('[AMEND] Loaded Cargo.toml bytes:', cargoSrc.length);
+  console.log('[AMEND] Loaded Anchor.toml bytes:', anchorSrc.length);
 
   /* ------------------------------------------------------------------ *
    * 2. Patch Cargo.toml
@@ -30,7 +49,7 @@ export const amendConfigFiles = async (
   const depHeader  = cargoLines.findIndex(l => l.trim() === '[dependencies]');
 
   if (depHeader === -1) {
-    // Dependencies header missing → can’t patch Cargo.toml, but still push anchor changes
+    // Dependencies header missing → can't patch Cargo.toml, but still push anchor changes
     const anchorTaskId = await startUpdateFileTask(projectId, 'Anchor.toml', anchorSrc, userId);
     const anchorStatus = (await pollTaskStatus(anchorTaskId)).task.status;
     return { cargoStatus: 'failed', cargoTaskId: '', anchorStatus, anchorTaskId };
