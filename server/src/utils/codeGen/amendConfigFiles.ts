@@ -19,67 +19,26 @@ async function getFileContentBlocking(
 }
 
 interface AmendResult {
-  cargoStatus:  string;
-  cargoTaskId:  string;
   anchorStatus: string;
   anchorTaskId: string;
 }
 
 /**
- * Ensures Cargo.toml and Anchor.toml have the correct Anchor/cluster settings.
- * Returns the task-ids and final statuses of the two update-file tasks.
+ * Ensures Anchor.toml has the correct cluster settings (Devnet).
+ * Returns the task-id and final status of the update operation.
  */
 export const amendConfigFiles = async (
   projectId: string,
   userId:    string,
 ): Promise<AmendResult> => {
   /* ------------------------------------------------------------------ *
-   * 1. Read both files (blocking helper waits for actual content)
+   * 1. Read Anchor.toml (blocking helper waits for actual content)
    * ------------------------------------------------------------------ */
-  const cargoSrc  = await getFileContentBlocking(projectId, 'Cargo.toml',  userId);
   const anchorSrc = await getFileContentBlocking(projectId, 'Anchor.toml', userId);
-
-  console.log('[AMEND] Loaded Cargo.toml bytes:', cargoSrc.length);
   console.log('[AMEND] Loaded Anchor.toml bytes:', anchorSrc.length);
 
   /* ------------------------------------------------------------------ *
-   * 2. Patch Cargo.toml
-   * ------------------------------------------------------------------ */
-  const cargoLines = cargoSrc.split('\n');
-  const depHeader  = cargoLines.findIndex(l => l.trim() === '[dependencies]');
-
-  if (depHeader === -1) {
-    // Dependencies header missing → can't patch Cargo.toml, but still push anchor changes
-    const anchorTaskId = await startUpdateFileTask(projectId, 'Anchor.toml', anchorSrc, userId);
-    const anchorStatus = (await pollTaskStatus(anchorTaskId)).task.status;
-    return { cargoStatus: 'failed', cargoTaskId: '', anchorStatus, anchorTaskId };
-  }
-
-  const filtered = cargoLines.filter((l, idx) => {
-    if (idx <= depHeader) return true;
-    const t = l.trim();
-    return !t.startsWith('anchor-lang') && !t.startsWith('anchor-spl');
-  });
-
-  filtered.splice(
-    depHeader + 1,
-    0,
-    'anchor-spl = "0.30.1"',
-    'anchor-lang = { version = "0.30.1", features = ["init-if-needed"] }',
-  );
-
-  const newCargo    = filtered.join('\n');
-  // 🔎 preview – first 12 lines of the outgoing Cargo.toml
-  console.log('[AMEND] ─ Cargo.toml preview ─────────────');
-  console.log(newCargo.split('\n').slice(0, 12).join('\n'));
-  console.log('[AMEND] ────────────────────────────────');
-
-  const cargoTaskId = await startUpdateFileTask(projectId, 'Cargo.toml', newCargo, userId);
-  const cargoStatus = (await pollTaskStatus(cargoTaskId)).task.status;
-  console.log(`[AMEND] Cargo.toml write → ${cargoStatus}`);
-
-  /* ------------------------------------------------------------------ *
-   * 3. Patch Anchor.toml
+   * 2. Patch Anchor.toml
    * ------------------------------------------------------------------ */
   let anchorLines = anchorSrc.split('\n').map(l =>
     l.trim() === '[programs.localnet]' ? '[programs.devnet]' : l,
@@ -121,5 +80,5 @@ export const amendConfigFiles = async (
   console.log(`[AMEND] Anchor.toml write → ${anchorStatus}`);
 
   /* ------------------------------------------------------------------ */
-  return { cargoStatus, cargoTaskId, anchorStatus, anchorTaskId };
+  return { anchorStatus, anchorTaskId };
 };

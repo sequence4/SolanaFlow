@@ -59,8 +59,8 @@ export const handleGenerateCode = async ({
         //const frontendTaskId = await genUi(nodes);   // possible skip this step if not working correctly (save til end) 
         
         console.log('[GEN] calling amendConfigFiles…');
-        const { cargoTaskId, anchorTaskId } = await amendConfigFiles(projectId, userId);
-        console.log('[GEN] amendConfigFiles result:', { cargoTaskId, anchorTaskId });
+        const { anchorTaskId } = await amendConfigFiles(projectId, userId);
+        console.log('[GEN] amendConfigFiles result:', { anchorTaskId });
         sendProgress({ stage: 'debug', message: '[handleGenerateCode] Amend done' });
         
         /*
