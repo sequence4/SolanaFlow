@@ -26,9 +26,9 @@ ENV NVM_DIR=$HOME/.nvm
 RUN . "$NVM_DIR/nvm.sh" && nvm install ${NODE_VERSION} && nvm use ${NODE_VERSION} && \
     nvm alias default ${NODE_VERSION} && npm install -g yarn
 
-# Solana CLI – force aarch64 build
-RUN (curl -sSfL "https://release.anza.xyz/solana/${SOLANA_CHANNEL}/install" | bash -s -- -y -a aarch64) || \
-    (curl -sSfL "https://release.solana.com/${SOLANA_CHANNEL}/install" | bash -s -- -y -a aarch64)
+# Solana CLI  (installer autodetects arm64; -s = skip prompt)
+RUN (curl -sSfL "https://release.anza.xyz/solana/${SOLANA_CHANNEL}/install" | bash -s -- -y -s) || \
+    (curl -sSfL "https://release.solana.com/${SOLANA_CHANNEL}/install" | bash -s -- -y -s)
 
 # Verify the download right away (fail early if wrong binary)
 RUN /root/.local/share/solana/install/active_release/bin/solana --version
