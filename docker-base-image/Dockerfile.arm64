@@ -85,6 +85,12 @@ COPY --from=builder /root/.local/share/solana /root/.local/share/solana
 COPY --from=builder /root/.cargo/bin          /root/.cargo/bin
 COPY --from=builder /usr/local/bin/anchor     /usr/local/bin/anchor
 
+# 🔑 expose Solana CLI (and any helpers) universally
+RUN ln -sf /root/.local/share/solana/install/active_release/bin/solana* /usr/local/bin/
+
+# Smoke-test: ensure all tools are accessible
+RUN solana --version && anchor --version && rustc --version
+
 ENV PATH=/root/.local/share/solana/install/active_release/bin:/root/.cargo/bin:$PATH
 
 EXPOSE 3000

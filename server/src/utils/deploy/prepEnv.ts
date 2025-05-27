@@ -1,4 +1,5 @@
 import pool from 'src/config/database';
+import { v4 as uuidv4 } from 'uuid';
 import {
   startProjectContainer,
   runCommand,
@@ -125,7 +126,7 @@ export async function prepEnv(
     // ─── quick probes so handleGenerateCode can trust the env ───
     try {
       // temporary task ID for health probes (won't pollute task system)
-      const probeTaskId = `probe-${Date.now()}`;
+      const probeTaskId = uuidv4();
       
       // 1) show container status
       const psOutput = await runCommand(
