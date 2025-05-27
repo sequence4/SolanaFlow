@@ -53,11 +53,12 @@ RUN set -e; \
     rm -rf /usr/share/solanaflow/web/.next/cache
 
 FROM builder AS runtime
-ARG  RUNTIME_BUST=20250524
+ARG  RUNTIME_BUST=20240319
 RUN echo "$RUNTIME_BUST"
 ENV HOSTNAME 0.0.0.0
 ENV NEXT_DISABLE_SWC 1 
 WORKDIR /usr/share/solanaflow/web  
 COPY --from=builder /usr/share/solanaflow /usr/share/solanaflow
+COPY --from=builder /usr/src/anchor-template /usr/src/anchor-template
 EXPOSE 3000
 CMD ["node", ".next/standalone/server.js"]
