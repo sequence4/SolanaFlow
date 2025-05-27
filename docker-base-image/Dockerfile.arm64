@@ -4,10 +4,9 @@ ARG NODE_VERSION="v20.18.0"
 ARG SOLANA_CHANNEL="stable"
 
 ENV HOME=/root
-ENV PATH=$HOME/.cargo/bin:$HOME/.local/share/solana/install/active_release/bin:$PATH
-ENV PATH=$HOME/.nvm/versions/node/${NODE_VERSION}/bin:$PATH
+ENV PATH=$HOME/.cargo/bin:$HOME/.local/share/solana/install/active_release/bin:$HOME/.nvm/versions/node/${NODE_VERSION}/bin:$PATH
 
-# ---- base packages (robust mirror handling) -----------------------
+# ── base packages ──────────────────────────────────────────────────────────
 RUN set -e; \
     echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80retry; \
     apt-get update -o Acquire::AllowReleaseInfoChange=true -qq && \
@@ -17,76 +16,72 @@ RUN set -e; \
         libprotobuf-dev protobuf-compiler ca-certificates && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Rust
 RUN curl -sSf https://sh.rustup.rs | bash -s -- -y --profile minimal --default-toolchain stable && \
     . "$HOME/.cargo/env" && rustup component add rustfmt clippy
 
+# Node + Yarn
 RUN curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
 ENV NVM_DIR=$HOME/.nvm
 RUN . "$NVM_DIR/nvm.sh" && nvm install ${NODE_VERSION} && nvm use ${NODE_VERSION} && \
     nvm alias default ${NODE_VERSION} && npm install -g yarn
 
+# Solana CLI
 RUN (curl -sSfL "https://release.anza.xyz/solana/${SOLANA_CHANNEL}/install" | bash -s -- -y) || \
     (curl -sSfL "https://release.solana.com/${SOLANA_CHANNEL}/install" | bash -s -- -y)
 
+# Anchor CLI
 RUN cargo install --git https://github.com/coral-xyz/anchor anchor-cli --tag v0.31.1 --locked --force && \
     anchor --version
 
-# ---- Anchor template (build once, stash under /opt) --------------
+# Anchor template (cache-warm)
 RUN set -e; \
     mkdir -p /usr/src /opt && \
-    cd /usr/src && \
-    anchor init anchor-template --no-git && \
-    cd anchor-template && \
-    anchor build -- --locked || true && \
-    rm -rf target && \
-    mv /usr/src/anchor-template /opt/anchor-template
+    cd /usr/src && anchor init anchor-template --no-git && \
+    cd anchor-template && anchor build -- --locked || true && \
+    rm -rf target && mv /usr/src/anchor-template /opt/anchor-template
 
 ARG CACHEBUST=20250524
 RUN echo "$CACHEBUST"
 
+# Minimal Next.js scaffold (for web playground)
 ENV NEXT_TELEMETRY_DISABLED=1 NEXT_SKIP_ESLINT=1
 RUN set -e; \
     mkdir -p /usr/share/solanaflow && \
     CI=1 yarn create next-app /usr/share/solanaflow/web \
-        --typescript --eslint --tailwind --app --no-src-dir --no-interactive; \
-    yarn --cwd /usr/share/solanaflow/web add -E @tailwindcss/postcss@latest; \
-    printf '\nmodule.exports = { output: "standalone" };\n' \
-        >> /usr/share/solanaflow/web/next.config.js; \
-    yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile; \
-    yarn --cwd /usr/share/solanaflow/web build; \
-    yarn --cwd /usr/share/solanaflow/web install \
-            --production --ignore-scripts --prefer-offline && \
+      --typescript --eslint --tailwind --app --no-src-dir --no-interactive && \
+    yarn --cwd /usr/share/solanaflow/web add -E @tailwindcss/postcss@latest && \
+    printf '\nmodule.exports = { output: "standalone" };\n' >> /usr/share/solanaflow/web/next.config.js && \
+    yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile && \
+    yarn --cwd /usr/share/solanaflow/web build && \
+    yarn --cwd /usr/share/solanaflow/web install --production --ignore-scripts --prefer-offline && \
     rm -rf /usr/share/solanaflow/web/.next/cache
 
-# make sure Solana install dir is present even if the installer skipped it
+# Guarantee Solana bin dir exists (defensive)
 RUN mkdir -p /root/.local/share/solana/install/active_release/bin
 
-# --- make Solana & Anchor binaries easy to copy later -----------------
-RUN ln -s $HOME/.cargo/bin/anchor /usr/local/bin/anchor && \
-    ln -s $HOME/.local/share/solana/install/active_release/bin/solana* /usr/local/bin/ || true
+# Expose tools via universally-searched path
+RUN ln -sf /root/.cargo/bin/anchor /usr/local/bin/anchor && \
+    ln -sf /root/.local/share/solana/install/active_release/bin/solana* /usr/local/bin/ || true
 
-# ─────────────── runtime stage ────────────────────────────────────────────────
+# ── runtime stage ─────────────────────────────────────────────────────────
 FROM builder AS runtime
-
-# bump this every rebuild to dodge the cache
 ARG RUNTIME_BUST=20250527
 RUN echo "$RUNTIME_BUST"
 
 ENV HOSTNAME=0.0.0.0
 ENV NEXT_DISABLE_SWC=1
-
 WORKDIR /usr/share/solanaflow/web
 
-# copy runtime artefacts *and* the pre-built Anchor template
+# app + template
 COPY --from=builder /usr/share/solanaflow   /usr/share/solanaflow
 COPY --from=builder /opt/anchor-template    /usr/src/anchor-template
 
-# --- copy Solana tool-chain & Anchor CLI into runtime -----------------
+# Solana + Anchor tool-chain
 COPY --from=builder /root/.local/share/solana /root/.local/share/solana
 COPY --from=builder /root/.cargo/bin          /root/.cargo/bin
 COPY --from=builder /usr/local/bin/anchor     /usr/local/bin/anchor
 
-# expose the tools
 ENV PATH=/root/.local/share/solana/install/active_release/bin:/root/.cargo/bin:$PATH
 
 EXPOSE 3000
