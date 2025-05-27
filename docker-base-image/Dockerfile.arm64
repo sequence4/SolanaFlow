@@ -30,8 +30,12 @@ RUN . "$NVM_DIR/nvm.sh" && nvm install ${NODE_VERSION} && nvm use ${NODE_VERSION
 RUN (curl -sSfL "https://release.anza.xyz/solana/${SOLANA_CHANNEL}/install" | bash -s -- -y -s) || \
     (curl -sSfL "https://release.solana.com/${SOLANA_CHANNEL}/install" | bash -s -- -y -s)
 
-# Verify the download right away (fail early if wrong binary)
+# Fail fast if the binary is missing or wrong arch
 RUN /root/.local/share/solana/install/active_release/bin/solana --version
+
+# Clean up build artifacts to reduce image size
+RUN apt-get clean && \
+    rm -rf /root/.cargo/registry /root/.cargo/git /var/lib/apt/lists/*
 
 # Anchor CLI
 RUN cargo install --git https://github.com/coral-xyz/anchor anchor-cli --tag v0.31.1 --locked --force && \
@@ -44,7 +48,7 @@ RUN set -e; \
     cd anchor-template && anchor build -- --locked || true && \
     rm -rf target && mv /usr/src/anchor-template /opt/anchor-template
 
-ARG CACHEBUST=20250524
+ARG CACHEBUST=20250525
 RUN echo "$CACHEBUST"
 
 # Minimal Next.js scaffold (for web playground)
