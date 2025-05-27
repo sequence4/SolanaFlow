@@ -1,4 +1,3 @@
-/*
 import { updateOrCreateFile } from '@/utils/files/fileUtils';
 import { FileTreeItemType } from '@/interfaces/FileTreeItemType';
 
@@ -75,9 +74,4 @@ export async function insertSrcFiles(
 
   console.log(`[DEBUG_INSERT_SRC] Returning ${fileTaskIds.length} task IDs from ${thisPath}`);
   return fileTaskIds;
-}
-*/
-
-export const placeholder = () => {
-  return "placeholder"
 }

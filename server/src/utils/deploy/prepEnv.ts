@@ -1,6 +1,7 @@
 import pool from 'src/config/database';
 import {
   startProjectContainer,
+  runCommand,
 } from '../projectUtils';
 import {
   rentContainerFromPool,
@@ -120,6 +121,54 @@ export async function prepEnv(
       console.error('[prepEnv] template copy failed:', copyErr);
       throw copyErr;
     }
+
+    // ─── quick probes so handleGenerateCode can trust the env ───
+    try {
+      // temporary task ID for health probes (won't pollute task system)
+      const probeTaskId = `probe-${Date.now()}`;
+      
+      // 1) show container status
+      const psOutput = await runCommand(
+        `docker ps --filter "name=${containerName}" --format "{{.Names}}|{{.Status}}"`,
+        '.',
+        probeTaskId,
+        { skipSuccessUpdate: true }
+      );
+      console.log(`[ENV] container ${containerName} status:`, psOutput.trim());
+
+      // 2) check solana / anchor versions inside
+      const solanaVer = await runCommand(
+        `docker exec ${containerName} solana --version`,
+        '.',
+        probeTaskId,
+        { skipSuccessUpdate: true }
+      );
+      const anchorVer = await runCommand(
+        `docker exec ${containerName} anchor --version`,
+        '.',
+        probeTaskId,
+        { skipSuccessUpdate: true }
+      );
+      console.log('[ENV] solana:', solanaVer.trim(), '| anchor:', anchorVer.trim());
+
+      // 3) quick rust+cargo sanity
+      const rustcVer = await runCommand(
+        `docker exec ${containerName} rustc --version`,
+        '.',
+        probeTaskId,
+        { skipSuccessUpdate: true }
+      );
+      const cargoVer = await runCommand(
+        `docker exec ${containerName} cargo --version`,
+        '.',
+        probeTaskId,
+        { skipSuccessUpdate: true }
+      );
+      console.log('[ENV] rustc:', rustcVer.trim(), '| cargo:', cargoVer.trim());
+    } catch (probeErr) {
+      console.warn('[ENV] health-probe failed:', probeErr);
+    }
+    // ────────────────────────────────────────────────────────────
 
     return { rootPath, containerName, containerUrl };
   } catch (err) {

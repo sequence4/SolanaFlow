@@ -1,4 +1,5 @@
 /*
+
 import { FileTreeItemType } from "@/interfaces/FileTreeItemType";
 import { ProjectStateType } from "@/context/project/ProjectContextTypes";
 import { parseNodeDetails } from "./parseNodeDetails";
@@ -79,7 +80,7 @@ export function genSrcFiles(
     console.error("Error in genSrcFiles:", error);
     return null;
   }
-}    
+}     
 */
 
 export const placeholder = () => {

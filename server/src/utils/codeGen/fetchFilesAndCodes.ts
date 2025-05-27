@@ -1,4 +1,3 @@
-/*
 import React from "react";
 import { fileApi } from "@/api/fileApi";
 import { buildSingleRootNode } from "../files/fileUtils";
@@ -135,8 +134,4 @@ export const fetchFilesAndCodes = async (
   console.log(`[DEBUG_FETCH_FILES] Returning ${allFileContentTaskIds.length} file content task IDs`);
   return { fileContentTaskIds: allFileContentTaskIds };
 };
-*/
 
-export const placeholder = () => {
-  return "placeholder"
-}
