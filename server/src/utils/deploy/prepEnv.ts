@@ -104,6 +104,23 @@ export async function prepEnv(
         });
     }
 
+    // ---- bootstrap template if Cargo.toml is still missing ----------------
+    try {
+      const hasCargo = await folderExists(containerName, `${projectDir}/Cargo.toml`);
+      if (!hasCargo) {
+        console.log(`[prepEnv] Bootstrapping template into ${projectDir}`);
+        // copy baked Anchor template (added at /usr/src/anchor-template by Dockerfile)
+        execSync(
+          `docker exec ${containerName} bash -c ` +
+          `"cp -r /usr/src/anchor-template/* '${projectDir}' && ` +
+          `chown -R 1000:1000 '${projectDir}'"`,  // 1000:1000 == node user in image
+        );
+      }
+    } catch (copyErr) {
+      console.error('[prepEnv] template copy failed:', copyErr);
+      throw copyErr;
+    }
+
     return { rootPath, containerName, containerUrl };
   } catch (err) {
     if (rented) await releaseContainerToPool(rented.name);
