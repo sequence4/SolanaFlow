@@ -34,7 +34,8 @@ RUN cargo install --git https://github.com/coral-xyz/anchor anchor-cli --tag v0.
 RUN anchor init /usr/src/anchor-template --no-git && \
     (cd /usr/src/anchor-template && anchor build -- --locked || true) && \
     rm -rf /usr/src/anchor-template/target && \
-    mkdir -p /opt && cp -r /usr/src/anchor-template /opt/anchor-template
+    mkdir -p /opt && \
+    mv /usr/src/anchor-template /opt/anchor-template
 
 ARG CACHEBUST=20250524
 RUN echo "$CACHEBUST"
