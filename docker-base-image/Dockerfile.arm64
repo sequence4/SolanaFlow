@@ -33,7 +33,8 @@ RUN cargo install --git https://github.com/coral-xyz/anchor anchor-cli --tag v0.
 
 RUN anchor init /usr/src/anchor-template --no-git && \
     (cd /usr/src/anchor-template && anchor build -- --locked || true) && \
-    rm -rf /usr/src/anchor-template/target
+    rm -rf /usr/src/anchor-template/target && \
+    mkdir -p /opt && cp -r /usr/src/anchor-template /opt/anchor-template
 
 ARG CACHEBUST=20250524
 RUN echo "$CACHEBUST"
@@ -66,7 +67,7 @@ WORKDIR /usr/share/solanaflow/web
 
 # copy runtime artefacts *and* the pre-built Anchor template
 COPY --from=builder /usr/share/solanaflow   /usr/share/solanaflow
-COPY --from=builder /usr/src/anchor-template /usr/src/anchor-template
+COPY --from=builder /opt/anchor-template    /usr/src/anchor-template
 
 EXPOSE 3000
 CMD ["node", ".next/standalone/server.js"]
