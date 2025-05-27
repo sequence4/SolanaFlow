@@ -4,6 +4,7 @@ import { Graph } from '../../types/graph';
 import type { WorkspaceHandle } from '../deploy/prepEnv';
 import { amendConfigFiles } from './amendConfigFiles';
 import { pollTaskStatus } from '../taskUtils';
+import { genSrcFiles } from './genSrcFiles';
 
 /** Block until every task-id is in a final state. */
 async function waitForAll(taskIds: string[]): Promise<{
@@ -105,8 +106,41 @@ export const handleGenerateCode = async ({
         if (failed.length) {
           throw new Error(`File-tree task(s) failed: ${failed.join(', ')}`);
         }
+
+        // ───────────────────────── write graph-derived Rust sources ──────────────
+        // 1) get the file tree result to check for existing program directory
+        const treeTaskId = fileTreeTaskIds[0];
+        const treeResult = await pollTaskStatus(treeTaskId);
+        const initialTree = JSON.parse(treeResult.task.result ?? '[]');
+        
+        // 2) for now, assume a basic program structure exists or will be created
+        // TODO: implement findProgramsDirectory and initAnchorProject when available
+        const programName = 'my_program'; // TODO: derive from project context
+        const programId = '11111111111111111111111111111111'; // TODO: fetch real ID
+        
+        // 3) build in-memory src/ tree
+        const srcTree = genSrcFiles({ nodes: graph.nodes }, programName, programId);
+        if (!srcTree) throw new Error('genSrcFiles returned null');
+        
+        sendProgress({ stage: 'src-gen', message: 'Generating Rust sources…' });
+        console.log('[GEN] Generated src tree:', JSON.stringify(srcTree, null, 2));
+        
+        // 4) TODO: implement insertSrcFiles to actually write files to container
+        // For now, just log what would be written
+        console.log('[GEN] Source files generated (writing to container not yet implemented)');
+        
+        sendProgress({ stage: 'src-gen-done', message: 'Rust sources ready' });
     } catch (err) {
         console.error('Error in handleGenerateCode:', err);
         throw err;
     }
 };
+
+function flattenPaths(tree: any[]): string[] {
+  const out: string[] = [];
+  for (const n of tree ?? []) {
+    if (n?.path) out.push(n.path);
+    if (Array.isArray(n?.children)) out.push(...flattenPaths(n.children));
+  }
+  return out;
+}
