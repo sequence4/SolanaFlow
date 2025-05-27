@@ -69,8 +69,14 @@ export const amendConfigFiles = async (
   );
 
   const newCargo    = filtered.join('\n');
+  // 🔎 preview – first 12 lines of the outgoing Cargo.toml
+  console.log('[AMEND] ─ Cargo.toml preview ─────────────');
+  console.log(newCargo.split('\n').slice(0, 12).join('\n'));
+  console.log('[AMEND] ────────────────────────────────');
+
   const cargoTaskId = await startUpdateFileTask(projectId, 'Cargo.toml', newCargo, userId);
   const cargoStatus = (await pollTaskStatus(cargoTaskId)).task.status;
+  console.log(`[AMEND] Cargo.toml write → ${cargoStatus}`);
 
   /* ------------------------------------------------------------------ *
    * 3. Patch Anchor.toml
@@ -105,8 +111,14 @@ export const amendConfigFiles = async (
   }
 
   const newAnchor    = anchorLines.join('\n');
+  // 🔎 preview – first 20 lines of the outgoing Anchor.toml
+  console.log('[AMEND] ─ Anchor.toml preview ───────────');
+  console.log(newAnchor.split('\n').slice(0, 20).join('\n'));
+  console.log('[AMEND] ────────────────────────────────');
+
   const anchorTaskId = await startUpdateFileTask(projectId, 'Anchor.toml', newAnchor, userId);
   const anchorStatus = (await pollTaskStatus(anchorTaskId)).task.status;
+  console.log(`[AMEND] Anchor.toml write → ${anchorStatus}`);
 
   /* ------------------------------------------------------------------ */
   return { cargoStatus, cargoTaskId, anchorStatus, anchorTaskId };
