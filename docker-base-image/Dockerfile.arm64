@@ -58,6 +58,11 @@ RUN set -e; \
             --production --ignore-scripts --prefer-offline && \
     rm -rf /usr/share/solanaflow/web/.next/cache
 
+# --- make Solana & Anchor binaries easy to copy later -----------------
+# (they already live in $HOME/.local/share/solana and $HOME/.cargo/bin)
+RUN ln -s $HOME/.cargo/bin/anchor /usr/local/bin/anchor && \
+    ln -s $HOME/.local/share/solana/install/active_release/bin/solana* /usr/local/bin/ || true
+
 # ─────────────── runtime stage ────────────────────────────────────────────────
 FROM builder AS runtime
 
@@ -73,6 +78,13 @@ WORKDIR /usr/share/solanaflow/web
 # copy runtime artefacts *and* the pre-built Anchor template
 COPY --from=builder /usr/share/solanaflow   /usr/share/solanaflow
 COPY --from=builder /opt/anchor-template    /usr/src/anchor-template
+
+# --- copy Solana tool-chain & Anchor CLI into runtime -----------------
+COPY --from=builder /root/.local        /root/.local
+COPY --from=builder /root/.cargo/bin    /root/.cargo/bin
+
+# expose the tools
+ENV PATH=/root/.local/share/solana/install/active_release/bin:/root/.cargo/bin:$PATH
 
 EXPOSE 3000
 CMD ["node", ".next/standalone/server.js"]
