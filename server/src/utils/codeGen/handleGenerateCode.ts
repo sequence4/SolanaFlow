@@ -1,7 +1,5 @@
-//import { mergeFileTree } from './mergeFileTree';
+import { mergeFileTree } from './mergeFileTree';
 //import { genUi } from './genUi';
-import { getProjectFileTree } from 'src/controllers/fileController';
-import { getTaskStatus } from 'src/controllers/taskController';
 import { Graph } from '../../types/graph';
 import type { WorkspaceHandle } from '../deploy/prepEnv';
 import { amendConfigFiles } from './amendConfigFiles';
@@ -63,9 +61,9 @@ export const handleGenerateCode = async ({
         console.log('[GEN] amendConfigFiles result:', { anchorTaskId });
         sendProgress({ stage: 'debug', message: '[handleGenerateCode] Amend done' });
         
-        /*
-        const fileTreeTaskIds = await mergeFileTree(projectId, true);
-        
+       
+        const fileTreeTaskIds = await mergeFileTree(projectId, userId, true);
+         /*
         const fileTreeResponse = await getProjectFileTree(projectId);
         const fileTreeResult = await getTaskStatus(fileTreeResponse.taskId);
 
