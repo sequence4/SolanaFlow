@@ -1,77 +1,63 @@
-/*
-
-import { FileTreeItemType } from "@/interfaces/FileTreeItemType";
-import { ProjectStateType } from "@/context/project/ProjectContextTypes";
-import { parseNodeDetails } from "./parseNodeDetails";
-import { generateFileFromTemplate } from "./generateFileFromTemplate";
-import {
-  InstructionDetail,
-  StateDetail,
-  LibFileDetail,
-  ModFileDetail,
-} from "@/interfaces/fileDetailInterfaces";
+import { FileTreeItem } from "../../types/FileTreeItem";
+import { ServerProjectState } from "../../types/ServerProjectState";
 
 export function genSrcFiles(
-  projectState: ProjectStateType,
+  projectState: ServerProjectState,
   programName: string,
   programId: string
-): FileTreeItemType | null {
+): FileTreeItem | null {
   try {
-    const { instructions, state, lib, mod } = parseNodeDetails(projectState);
-
-    const srcDir: FileTreeItemType = {
+    // For now, create a minimal src structure until helper functions are implemented
+    const srcDir: FileTreeItem = {
       name: "src",
       path: "./src",
       type: "directory",
       children: [],
     };
 
-    const libFile = generateFileFromTemplate("lib", lib, programName, programId);
+    // Basic lib.rs file
     srcDir.children?.push({
       name: "lib.rs",
       path: "./src/lib.rs",
       type: "file",
-      code: libFile.content,
+      code: `use anchor_lang::prelude::*;
+
+declare_id!("${programId}");
+
+#[program]
+pub mod ${programName} {
+    use super::*;
+
+    // Generated instructions will be added here
+}`,
     });
 
-    const instrDir: FileTreeItemType = {
+    // Instructions directory with mod.rs
+    const instrDir: FileTreeItem = {
       name: "instructions",
       path: "./src/instructions",
       type: "directory",
       children: [],
     };
 
-    const modFile = generateFileFromTemplate("mod", mod, programName);
     instrDir.children?.push({
       name: "mod.rs",
       path: "./src/instructions/mod.rs",
       type: "file",
-      code: modFile.content,
-    });
-
-    instructions.forEach((instrDetail) => {
-      const instrFile = generateFileFromTemplate(
-        "instruction",
-        instrDetail,
-        programName
-      );
-      instrDir.children?.push({
-        name: `${instrDetail.name}.rs`,
-        path: `./src/instructions/${instrDetail.name}.rs`,
-        type: "file",
-        code: instrFile.content,
-      });
+      code: "// Generated instruction modules will be declared here",
     });
 
     srcDir.children?.push(instrDir);
 
-    if (state.length > 0) {
-      const stateFile = generateFileFromTemplate("state", state, programName);
+    // Basic state.rs if needed
+    if (projectState.nodes && projectState.nodes.length > 0) {
       srcDir.children?.push({
         name: "state.rs",
         path: "./src/state.rs",
         type: "file",
-        code: stateFile.content,
+        code: `use anchor_lang::prelude::*;
+
+// Generated state structures will be added here`,
       });
     }
 
@@ -80,9 +66,4 @@ export function genSrcFiles(
     console.error("Error in genSrcFiles:", error);
     return null;
   }
-}     
-*/
-
-export const placeholder = () => {
-  return "placeholder"
 }

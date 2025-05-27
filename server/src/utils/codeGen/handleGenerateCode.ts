@@ -1,4 +1,4 @@
-import { mergeFileTree } from './mergeFileTree';
+import { refreshWorkspaceTree } from './refreshWorkspaceTree';
 //import { genUi } from './genUi';
 import { Graph } from '../../types/graph';
 import type { WorkspaceHandle } from '../deploy/prepEnv';
@@ -88,8 +88,8 @@ export const handleGenerateCode = async ({
         sendProgress({ stage: 'debug', message: '[handleGenerateCode] Amend done' });
         
         sendProgress({ stage: 'file-tree', message: 'Refreshing file tree…' });
-        const fileTreeTaskIds = await mergeFileTree(projectId, userId);
-        console.log('[GEN] mergeFileTree triggered, taskIds =', fileTreeTaskIds);
+        const fileTreeTaskIds = await refreshWorkspaceTree(projectId, userId);
+        console.log('[GEN] refreshWorkspaceTree triggered, taskIds =', fileTreeTaskIds);
         sendProgress({ stage: 'file-tree', message: 'Waiting for file-tree refresh…' });
 
         const { succeeded, failed } = await waitForAll(fileTreeTaskIds);
