@@ -58,8 +58,10 @@ RUN set -e; \
             --production --ignore-scripts --prefer-offline && \
     rm -rf /usr/share/solanaflow/web/.next/cache
 
+# make sure Solana install dir is present even if the installer skipped it
+RUN mkdir -p /root/.local/share/solana/install/active_release/bin
+
 # --- make Solana & Anchor binaries easy to copy later -----------------
-# (they already live in $HOME/.local/share/solana and $HOME/.cargo/bin)
 RUN ln -s $HOME/.cargo/bin/anchor /usr/local/bin/anchor && \
     ln -s $HOME/.local/share/solana/install/active_release/bin/solana* /usr/local/bin/ || true
 
@@ -80,8 +82,9 @@ COPY --from=builder /usr/share/solanaflow   /usr/share/solanaflow
 COPY --from=builder /opt/anchor-template    /usr/src/anchor-template
 
 # --- copy Solana tool-chain & Anchor CLI into runtime -----------------
-COPY --from=builder /root/.local        /root/.local
-COPY --from=builder /root/.cargo/bin    /root/.cargo/bin
+COPY --from=builder /root/.local/share/solana /root/.local/share/solana
+COPY --from=builder /root/.cargo/bin          /root/.cargo/bin
+COPY --from=builder /usr/local/bin/anchor     /usr/local/bin/anchor
 
 # expose the tools
 ENV PATH=/root/.local/share/solana/install/active_release/bin:/root/.cargo/bin:$PATH
