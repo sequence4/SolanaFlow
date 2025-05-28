@@ -13,7 +13,8 @@ RUN set -e; \
     apt-get install -y --no-install-recommends \
         build-essential git curl wget jq pkg-config python3 \
         libssl-dev libudev-dev zlib1g-dev llvm clang cmake make \
-        libprotobuf-dev protobuf-compiler ca-certificates && \
+        libprotobuf-dev protobuf-compiler ca-certificates \
+        xz-utils bzip2 && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Rust
@@ -34,14 +35,12 @@ ARG SOLANA_CACHEBUST=20250527
 RUN echo "$SOLANA_CACHEBUST" > /dev/null
 
 # ── Solana CLI ───────────────────────────────────────────────────────────
-# 1) download (auto-detect arm64, -s = skip prompt)
+# 1) download & install – **no flags**
 RUN set -e && \
-    (curl -sSfL "https://release.anza.xyz/solana/${SOLANA_CHANNEL}/install"  | bash -s -- -y -s) || \
-    (curl -sSfL "https://release.solana.com/${SOLANA_CHANNEL}/install"       | bash -s -- -y -s)
+    curl -sSfL "https://release.anza.xyz/solana/${SOLANA_CHANNEL}/install" | bash -s -- -y || \
+    curl -sSfL "https://release.solana.com/${SOLANA_CHANNEL}/install"      | bash -s -- -y
 
-# 2) activate (creates active_release) + 3) probe
-#    In Anza ≥1.18 the stub lives only inside *releases/*;
-#    this find-and-exec works for both old and new layouts.
+# 2) activate + probe (old+new layouts)
 RUN set -e && \
     find /root/.local/share/solana/install -maxdepth 3 -type f -name solana-install -exec {} init --no-modify-path \; && \
     /root/.local/share/solana/install/active_release/bin/solana --version
