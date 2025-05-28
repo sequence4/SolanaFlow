@@ -24,19 +24,15 @@ export async function insertSrcFiles(
 
     if (node.type === 'directory') {
       console.log(`[DEBUG_INSERT_SRC] Processing directory: ${projectRelativePath}`);
-      // create dir even if it ends up empty
+      // ── ensure empty dir is materialised ──
       if (!node.children?.length) {
-        const keepFileTaskId = await updateOrCreateFile(
+        await updateOrCreateFile(
           projectId,
           path.join(projectRelativePath, '.keep'),
-          '', // zero-byte file
+          '',
           existingFilePaths,
           creatorId
         );
-        if (keepFileTaskId) {
-          // Optionally, add to fileTaskIds if tracking .keep file creation matters
-          // fileTaskIds.push(keepFileTaskId);
-        }
       }
       // mkdir -p is handled by startCreateFileTask if a file is created in a new dir
       // If we need to ensure empty dirs are created, a separate mechanism or specific call would be needed.

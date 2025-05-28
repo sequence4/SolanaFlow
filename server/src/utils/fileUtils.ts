@@ -159,12 +159,10 @@ async function generateFileTreeInContainer(
     try {
       let output = await runCommand(command, '.', tempTaskId);
       
-      // prevent gigantic payloads – hard-cap to first 10k lines
       const MAX_LINES = 10_000;
-      const linesArray = output.split('\n');
-      if (linesArray.length > MAX_LINES) {
+      if (output.split('\n').length > MAX_LINES) {
         console.warn('[FILE_UTILS] Truncating find output – too many lines');
-        output = linesArray.slice(0, MAX_LINES).join('\n');
+        output = output.split('\n').slice(0, MAX_LINES).join('\n');
       }
       
       const lines = output.split('\n').filter(Boolean);
