@@ -135,6 +135,8 @@ export const handleGenerateCode = async ({
           srcTree,
           projectId,
           existing,
+          /* basePath */ undefined,
+          /* creatorId */ null,
         );
 
         console.log('[GEN] insertSrcFiles returned taskIds =', writeTaskIds);

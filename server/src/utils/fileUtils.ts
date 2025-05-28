@@ -467,7 +467,7 @@ export const startCreateFileTask = async (
   projectId: string,
   filePath: string,
   content: string,
-  creatorId: string
+  creatorId: string | null
 ): Promise<string> => {
   const taskId = await createTask('Create File', creatorId, projectId);
 
@@ -529,7 +529,7 @@ export const startUpdateFileTask = async (
   projectId: string,
   filePath: string,
   content: string,
-  creatorId: string
+  creatorId: string | null
 ): Promise<string> => {
   const taskId = await createTask('Update File', creatorId, projectId);
 
@@ -640,7 +640,12 @@ export async function updateOrCreateFile(
   filePath: string,
   content: string,
   existingFilePaths: Set<string>,
-  creatorId = 'system',
+  /**
+   * When auth/user management is disabled we just pass `null` so the
+   * INSERT … creator_id column receives SQL NULL instead of an invalid
+   * UUID string.  Once auth is restored you can forward the real userId.
+   */
+  creatorId: string | null = null,
 ): Promise<string | null> {
   // normalise "./foo.rs" → "foo.rs" so the Set lookup matches Docker paths
   const normalised = filePath.replace(/^\.?\//, '');

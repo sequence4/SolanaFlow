@@ -5,7 +5,8 @@ export async function insertSrcFiles(
   node: FileTreeItem,
   projectId: string,
   existingFilePaths: Set<string>,
-  basePath?: string
+  basePath?: string,
+  creatorId: string | null = null,
 ): Promise<string[]> {
   const thisPath = basePath ?? node.path;
   const fileTaskIds: string[] = [];
@@ -41,11 +42,23 @@ export async function insertSrcFiles(
         continue;
       }
       
-      const childTaskIds = await insertSrcFiles(child, projectId, existingFilePaths, childPath);
+      const childTaskIds = await insertSrcFiles(
+        child,
+        projectId,
+        existingFilePaths,
+        childPath,
+        creatorId,
+      );
       fileTaskIds.push(...childTaskIds);
     }
   } else if (node.type === 'file' && thisPath && !(thisPath.includes('/instructions/') && thisPath.endsWith('.rs'))) {
-    const taskId = await updateOrCreateFile(projectId, thisPath, node.code || '', existingFilePaths);
+    const taskId = await updateOrCreateFile(
+      projectId,
+      thisPath,
+      node.code || '',
+      existingFilePaths,
+      creatorId,
+    );
     if (taskId) {
       console.log(`[DEBUG_INSERT_SRC] Added taskId ${taskId} for non-instruction file: ${thisPath}`);
       fileTaskIds.push(taskId);
@@ -58,7 +71,13 @@ export async function insertSrcFiles(
     
     for (const file of instructionFiles) {
       console.log(`[DEBUG_INSERT_SRC] Creating instruction file: ${file.path}`);
-      const taskId = await updateOrCreateFile(projectId, file.path, file.code, existingFilePaths);
+      const taskId = await updateOrCreateFile(
+        projectId,
+        file.path,
+        file.code,
+        existingFilePaths,
+        creatorId,
+      );
       if (taskId) {
         console.log(`[DEBUG_INSERT_SRC] Added taskId ${taskId} for instruction file: ${file.path}`);
         fileTaskIds.push(taskId);
