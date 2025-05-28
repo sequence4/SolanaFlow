@@ -3,9 +3,10 @@ import { refreshWorkspaceTree } from './refreshWorkspaceTree';
 import { Graph } from '../../types/graph';
 import type { WorkspaceHandle } from '../deploy/prepEnv';
 import { amendConfigFiles } from './amendConfigFiles';
-import { pollTaskStatus } from '../taskUtils';
+import { pollTaskStatus, createTask, updateTaskStatus } from '../taskUtils';
 import { genSrcFiles } from './genSrcFiles';
 import { insertSrcFiles } from './insertSrcFiles';
+import { debugDumpContainerTree } from '../containerUtils';
 
 /** Block until every task-id is in a final state. */
 async function waitForAll(taskIds: string[]): Promise<{
@@ -158,6 +159,24 @@ export const handleGenerateCode = async ({
         }
 
         sendProgress({ stage: 'src-gen-done', message: 'Rust sources ready' });
+
+        // ─────────── Debug: dump container tree ───────────
+        try {
+          const dumpTaskId = await createTask(
+            'Dump Container Tree',
+            /* creatorId */ null,
+            projectId,
+          );
+          await debugDumpContainerTree(
+            workspace.containerName,
+            workspace.rootPath,
+            dumpTaskId,
+          );
+          sendProgress({ stage: 'debug', message: 'Container tree dump written to logs' });
+          await updateTaskStatus(dumpTaskId, 'succeed', 'Tree dumped');
+        } catch (err) {
+          console.warn('[DEBUG] Failed to dump container tree:', err);
+        }
     } catch (err) {
         console.error('Error in handleGenerateCode:', err);
         throw err;
