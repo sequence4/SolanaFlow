@@ -23,13 +23,14 @@ function generateLibRs(programName: string, programId: string, instructions: Ins
   
   const instructionDefs = instructions.map(inst => {
     const ctx = inst.context_name ?? `${toPascal(inst.name)}Context`;
+    const param = inst.params_name ?? `${toPascal(inst.name)}Params`;
     // Each instruction string is formatted here.
     // Ensure no unescaped backticks if this were a template literal itself.
     // Newlines are preserved.
     const rustCode = [
-      `    pub fn ${inst.name}(ctx: Context<${ctx}>) -> Result<()> {`,
+      `    pub fn ${inst.name}(ctx: Context<${ctx}>, params: ${param}) -> Result<()> {`,
       `        // instruction file already exports \\\`${inst.name}\\\``,
-      `        instructions::${inst.name}::${inst.name}(ctx)`,
+      `        instructions::${inst.name}::${inst.name}(ctx, params)`,
       `    }`
     ].join('\n');
     return rustCode;
