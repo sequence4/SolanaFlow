@@ -33,9 +33,10 @@ RUN set -e && \
     (curl -sSfL "https://release.solana.com/${SOLANA_CHANNEL}/install"       | bash -s -- -y -s)
 
 # 2) activate (creates active_release) + 3) probe
+#    In Anza ≥1.18 the stub lives only inside *releases/*;
+#    this find-and-exec works for both old and new layouts.
 RUN set -e && \
-    /root/.local/share/solana/install/solana-install \
-        init --no-modify-path && \
+    find /root/.local/share/solana/install -maxdepth 3 -type f -name solana-install -exec {} init --no-modify-path \; && \
     /root/.local/share/solana/install/active_release/bin/solana --version
 
 # Clean up build artifacts to reduce image size
