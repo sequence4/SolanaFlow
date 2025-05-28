@@ -34,8 +34,8 @@ RUN set -e && \
 
 # 2) activate (creates active_release) + 3) probe
 RUN set -e && \
-    /root/.local/share/solana/install/active_release/bin/solana-install \
-      init --no-modify-path && \
+    /root/.local/share/solana/install/solana-install \
+        init --no-modify-path && \
     /root/.local/share/solana/install/active_release/bin/solana --version
 
 # Clean up build artifacts to reduce image size
