@@ -7,6 +7,7 @@ import {
   ModFileDetail,
 } from "../../types/fileDetailInterfaces";
 import { parseNodeDetails } from "./parseNodeDetails";
+import { templates } from './templates';
 
 export function genSrcFiles(
   projectState: ServerProjectState,
@@ -28,7 +29,7 @@ export function genSrcFiles(
     };
 
     // Generate lib.rs with proper program structure
-    const libCode = generateLibRs(programName, programId, instructions);
+    const libCode = generateLibRs(programName, programId, instructions, state);
     srcDir.children?.push({
       name: "lib.rs",
       path: `${programRoot}/src/lib.rs`,
@@ -76,6 +77,14 @@ export function genSrcFiles(
       });
     }
 
+    // ───────────────── Cargo.toml ─────────────────
+    srcDir.children?.push({
+      name: "Cargo.toml",
+      path: `${programRoot}/Cargo.toml`,
+      type: "file",
+      code: templates.programCargoToml(programName),
+    });
+
     return srcDir;
   } catch (error) {
     console.error("Error in genSrcFiles:", error);
@@ -83,7 +92,7 @@ export function genSrcFiles(
   }
 }
 
-function generateLibRs(programName: string, programId: string, instructions: InstructionDetail[]): string {
+function generateLibRs(programName: string, programId: string, instructions: InstructionDetail[], state: StateDetail[]): string {
   const instructionImports = instructions.map(inst => `pub use instructions::${inst.name}::*;`).join('\n');
   
   return `use anchor_lang::prelude::*;
@@ -91,7 +100,7 @@ function generateLibRs(programName: string, programId: string, instructions: Ins
 declare_id!("${programId}");
 
 pub mod instructions;
-${instructions.length > 0 ? 'pub mod state;' : ''}
+${state.length > 0 ? 'pub mod state;' : ''}
 
 ${instructionImports}
 
@@ -100,7 +109,7 @@ pub mod ${programName} {
     use super::*;
 
 ${instructions.map(inst => `    pub fn ${inst.name}(ctx: Context<${inst.context_name}>) -> Result<()> {
-        instructions::${inst.name}::handler(ctx)
+        instructions::${inst.name}::${inst.name}(ctx)
     }`).join('\n\n')}
 }`;
 }

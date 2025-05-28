@@ -1,96 +1,64 @@
 import { updateOrCreateFile } from '../fileUtils';
 import type { FileTreeItem } from '../../types/FileTreeItem';
+import { ensureDirectoryExists } from '../taskUtils'; // Assuming ensureDirectoryExists is in taskUtils or similar
 
 export async function insertSrcFiles(
-  node: FileTreeItem,
+  rootNode: FileTreeItem,
   projectId: string,
   existingFilePaths: Set<string>,
-  basePath?: string,
+  baseContainerPath: string, // e.g., /usr/src/project_root
   creatorId: string | null = null,
+  containerName: string // Needed for ensureDirectoryExists
 ): Promise<string[]> {
-  const thisPath = basePath ?? node.path;
   const fileTaskIds: string[] = [];
+  const queue: { node: FileTreeItem; currentPath: string }[] = [
+    { node: rootNode, currentPath: baseContainerPath },
+  ];
 
-  console.log(`[DEBUG_INSERT_SRC] Starting insertion of source files at base path: ${thisPath}`);
+  console.log(`[DEBUG_INSERT_SRC] Starting insertion at base container path: ${baseContainerPath}`);
 
-  const instructionFiles: {path: string, code: string}[] = [];
-  
-  const gatherInstructionFiles = (node: FileTreeItem, path: string) => {
-    if (node.type === 'file' && path.includes('/instructions/') && path.endsWith('.rs')) {
-      instructionFiles.push({path, code: node.code || ''});
-    } else if (node.type === 'directory' && node.children) {
-      for (const child of node.children) {
-        gatherInstructionFiles(child, `${path}/${child.name}`);
+  while (queue.length > 0) {
+    const { node, currentPath } = queue.shift()!;
+    const nodeAbsolutePath = `${currentPath}/${node.name}`.replace(/\/\//g, '/'); // Normalize path
+
+    if (node.type === 'directory') {
+      console.log(`[DEBUG_INSERT_SRC] Ensuring directory: ${nodeAbsolutePath}`);
+      // ensureDirectoryExists needs the absolute path within the container
+      await ensureDirectoryExists(nodeAbsolutePath, containerName);
+
+      if (node.children) {
+        for (const child of node.children) {
+          queue.push({ node: child, currentPath: nodeAbsolutePath });
+        }
       }
-    }
-  };
-  
-  if (node.type === 'directory' && node.children) {
-    for (const child of node.children) {
-      gatherInstructionFiles(child, `${thisPath}/${child.name}`);
-    }
-  } else if (node.type === 'file' && thisPath && thisPath.includes('/instructions/') && thisPath.endsWith('.rs')) {
-    instructionFiles.push({path: thisPath, code: node.code || ''});
-  }
-  
-  if (node.type === 'directory' && node.children) {
-    for (const child of node.children) {
-      const childPath = `${thisPath}/${child.name}`;
+    } else if (node.type === 'file') {
+      // updateOrCreateFile expects a path relative to the project root for existingFilePaths check,
+      // but an absolute path for the actual write command (handled internally by updateOrCreateFile based on its needs)
+      // Here, node.path is relative like "./programs/my_program/src/lib.rs"
+      // We need to adjust how existingFilePaths are checked or how paths are passed.
+      // For simplicity, let's assume node.path is what existingFilePaths expects.
+      // The actual write will be to nodeAbsolutePath by updateOrCreateFile, which gets it via its filePath param.
       
-      if (childPath.includes('/instructions/') && childPath.endsWith('.rs')) {
-        console.log(`[DEBUG_INSERT_SRC] Deferring instruction file for later processing: ${childPath}`);
-        continue;
-      }
-      
-      const childTaskIds = await insertSrcFiles(
-        child,
-        projectId,
-        existingFilePaths,
-        childPath,
-        creatorId,
-      );
-      fileTaskIds.push(...childTaskIds);
-    }
-  } else if (node.type === 'file' && thisPath && !(thisPath.includes('/instructions/') && thisPath.endsWith('.rs'))) {
-    const taskId = await updateOrCreateFile(
-      projectId,
-      thisPath,
-      node.code || '',
-      existingFilePaths,
-      creatorId,
-    );
-    if (taskId) {
-      console.log(`[DEBUG_INSERT_SRC] Added taskId ${taskId} for non-instruction file: ${thisPath}`);
-      fileTaskIds.push(taskId);
-    }
-    console.log(`[DEBUG_INSERT_SRC] Successfully processed non-instruction file: ${thisPath}`);
-  }
-  
-  if (instructionFiles.length > 0) {
-    console.log(`[DEBUG_INSERT_SRC] Processing ${instructionFiles.length} instruction files with special handling`);
-    
-    for (const file of instructionFiles) {
-      console.log(`[DEBUG_INSERT_SRC] Creating instruction file: ${file.path}`);
+      const relativePathForCheck = node.path.startsWith('./') ? node.path.substring(2) : node.path;
+      const projectRelativePath = nodeAbsolutePath.replace(baseContainerPath + '/', '');
+
+      console.log(`[DEBUG_INSERT_SRC] Processing file: ${projectRelativePath} (abs: ${nodeAbsolutePath})`);
+      console.log(`[DEBUG_INSERT_SRC] Code to write (first 50 chars): ${node.code?.substring(0,50)}`);
+
       const taskId = await updateOrCreateFile(
         projectId,
-        file.path,
-        file.code,
+        projectRelativePath, // This path should match what's in existingFilePaths and be relative to project root
+        node.code || '',
         existingFilePaths,
-        creatorId,
+        creatorId
       );
       if (taskId) {
-        console.log(`[DEBUG_INSERT_SRC] Added taskId ${taskId} for instruction file: ${file.path}`);
+        console.log(`[DEBUG_INSERT_SRC] Added taskId ${taskId} for file: ${projectRelativePath}`);
         fileTaskIds.push(taskId);
       }
-      console.log(`[DEBUG_INSERT_SRC] Waiting after creating instruction file: ${file.path}`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
     }
-    
-    console.log('[DEBUG_INSERT_SRC] All instruction files processed. Waiting for filesystem stability...');
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    console.log('[DEBUG_INSERT_SRC] Done waiting for filesystem stability');
   }
 
-  console.log(`[DEBUG_INSERT_SRC] Returning ${fileTaskIds.length} task IDs from ${thisPath}`);
+  console.log(`[DEBUG_INSERT_SRC] Completed. Returning ${fileTaskIds.length} task IDs.`);
   return fileTaskIds;
 }

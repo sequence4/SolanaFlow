@@ -19,15 +19,7 @@ export async function debugDumpContainerTree(
    */
   const prune = "-path '*/node_modules*' -o -path '*/.git*' -o -path '*/target*'";
   const cmd = `
-    docker exec ${containerName} bash -c '
-      find /usr/src/${rootPath} \\( ${prune} \\) -prune -o -maxdepth 3 -print |
-      sed "s#/usr/src/${rootPath}##" |
-      awk -F"/" "
-        NF==1{print \$0;next}
-        {printf \"%*s└── %s\\n\", (NF-1)*2, \"\", \$NF}
-      "
-    '
-  `;
+    docker exec ${containerName} bash -c '\n      find /usr/src/${rootPath} \\( ${prune} \\) -prune -o -maxdepth 3 -print |\n      sed "s#/usr/src/${rootPath}##" |\n      awk -F"/" "\n        NF==1{print \$0;next}\n        {printf \"%%*s└── %s\\n\", (NF-1)*2, \"\", \$NF}\n      "\n    '\n  `;
   const output = await runCommand(cmd, '.', taskId);
   console.log('[TREE DUMP]\n' + output);
 }

@@ -7,6 +7,8 @@ import { pollTaskStatus, createTask, updateTaskStatus } from '../taskUtils';
 import { genSrcFiles } from './genSrcFiles';
 import { insertSrcFiles } from './insertSrcFiles';
 import { debugDumpContainerTree, debugPrintFiles } from '../containerUtils';
+import { ensureAnchorTomlProgram, ensureRootWorkspaceMembers } from './ensureConfigHelpers';
+import { parseNodeDetails } from './parseNodeDetails';
 
 /** Block until every task-id is in a final state. */
 async function waitForAll(taskIds: string[]): Promise<{
@@ -124,6 +126,10 @@ export const handleGenerateCode = async ({
         const programName = 'my_program'; // TODO: derive from project context
         const programId = '11111111111111111111111111111111'; // TODO: fetch real ID
         
+        // Call ensure config helpers BEFORE refreshing the tree
+        await ensureAnchorTomlProgram(workspace, programName, programId);
+        await ensureRootWorkspaceMembers(workspace);
+
         // 3) build in-memory src/ tree
         const srcTree = genSrcFiles({ nodes: graph.nodes, edges: graph.edges || [] }, programName, programId);
         if (!srcTree) throw new Error('genSrcFiles returned null');
@@ -140,8 +146,9 @@ export const handleGenerateCode = async ({
           srcTree,
           projectId,
           existing,
-          /* basePath */ undefined,
+          /* basePath */ `${workspace.rootPath}/programs/${programName}`,
           /* creatorId */ null,
+          workspace.containerName
         );
 
         console.log('[GEN] insertSrcFiles returned taskIds =', writeTaskIds);
@@ -165,21 +172,16 @@ export const handleGenerateCode = async ({
         sendProgress({ stage: 'src-gen-done', message: 'Rust sources ready' });
 
         // ─────────── Debug: dump container tree ───────────
+        const dumpTaskId = await createTask(
+            'Dump Container Tree', null, projectId);
         try {
-          const dumpTaskId = await createTask(
-            'Dump Container Tree',
-            /* creatorId */ null,
-            projectId,
-          );
           await debugDumpContainerTree(
             workspace.containerName,
             workspace.rootPath,
             dumpTaskId,
           );
-          sendProgress({ stage: 'debug', message: 'Container tree dump written to logs' });
-          await updateTaskStatus(dumpTaskId, 'succeed', 'Tree dumped');
-
-          // --- NEW: print key files ---
+        } finally {
+          // --- Print key files (always run) ---
           try {
             const important = [
               "Anchor.toml",
@@ -189,6 +191,12 @@ export const handleGenerateCode = async ({
               `programs/${programName}/src/instructions/mod.rs`,
               ...instructions.map(i => `programs/${programName}/src/instructions/${i.name}.rs`),
             ];
+            // Add state.rs to important files if state exists
+            const { state } = parseNodeDetails({ nodes: graph.nodes, edges: graph.edges || [] });
+            if (state.length > 0) {
+              important.push(`programs/${programName}/src/state.rs`);
+            }
+
             await debugPrintFiles(
               workspace.containerName,
               workspace.rootPath,
@@ -198,8 +206,7 @@ export const handleGenerateCode = async ({
           } catch (e) {
             console.warn("[DEBUG] failed to print file contents:", e);
           }
-        } catch (err) {
-          console.warn('[DEBUG] Failed to dump container tree:', err);
+          await updateTaskStatus(dumpTaskId, 'succeed', 'Tree dumped and files printed');
         }
     } catch (err) {
         console.error('Error in handleGenerateCode:', err);
