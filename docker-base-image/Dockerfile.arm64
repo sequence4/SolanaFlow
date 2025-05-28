@@ -26,6 +26,13 @@ ENV NVM_DIR=$HOME/.nvm
 RUN . "$NVM_DIR/nvm.sh" && nvm install ${NODE_VERSION} && nvm use ${NODE_VERSION} && \
     nvm alias default ${NODE_VERSION} && npm install -g yarn
 
+ARG CACHEBUST=20250525
+RUN echo "$CACHEBUST"
+
+# bump this any time you need to invalidate the Solana-download layer
+ARG SOLANA_CACHEBUST=20250527
+RUN echo "$SOLANA_CACHEBUST" > /dev/null
+
 # ── Solana CLI ───────────────────────────────────────────────────────────
 # 1) download (auto-detect arm64, -s = skip prompt)
 RUN set -e && \
@@ -53,9 +60,6 @@ RUN set -e; \
     cd /usr/src && anchor init anchor-template --no-git && \
     cd anchor-template && anchor build -- --locked || true && \
     rm -rf target && mv /usr/src/anchor-template /opt/anchor-template
-
-ARG CACHEBUST=20250525
-RUN echo "$CACHEBUST"
 
 # Minimal Next.js scaffold (for web playground)
 ENV NEXT_TELEMETRY_DISABLED=1 NEXT_SKIP_ESLINT=1
