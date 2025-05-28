@@ -148,11 +148,11 @@ async function generateFileTreeInContainer(
   try {
     const tempTaskId = await createTempTask('find-command', projectId, userId);
     
-    const excludePaths = SKIP_FOLDERS.map(folder => 
-      `-path '*/\\${folder}' -prune`
-    ).join(' -o ');
+    const excludePaths = SKIP_FOLDERS
+      .map(folder => `-path '*/${folder}/*' -prune`)
+      .join(' -o ');
     
-    const command = `docker exec ${containerName} bash -c "find /usr/src/${rootPath} \( ${excludePaths} \) -o -printf '%y %p\n"`;
+    const command = `docker exec ${containerName} bash -c "find /usr/src/${rootPath} \\( ${excludePaths} \\) -o -printf '%y %p\\n'"`;
     
     console.log(`Executing Docker find command: ${command}`);
     

@@ -28,7 +28,7 @@ export async function insertSrcFiles(
       if (!node.children?.length) {
         await updateOrCreateFile(
           projectId,
-          path.join(projectRelativePath, '.keep'),
+          path.posix.join(projectRelativePath, '.keep'),
           '',
           existingFilePaths,
           creatorId
