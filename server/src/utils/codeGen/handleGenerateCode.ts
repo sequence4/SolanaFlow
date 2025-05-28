@@ -142,9 +142,19 @@ export const handleGenerateCode = async ({
         );
 
         // 3) build in-memory src/ tree
-        const srcTree = genSrcFiles({ nodes: graph.nodes, edges: graph.edges || [] }, programName, programId);
+        const projectState = { nodes: graph.nodes, edges: graph.edges || [] };
+        const srcTree = genSrcFiles(projectState, programName, programId);
         if (!srcTree) throw new Error('genSrcFiles returned null');
         
+        // Parse details again to get canonical instruction names for debug logging
+        const { instructions: canonicalInstructions, state: canonicalState } = parseNodeDetails(projectState);
+        // The canonicalization of inst.name based on fnMatch happens *inside* genSrcFiles
+        // and also inside parseNodeDetails if we were to enhance it.
+        // For now, assume parseNodeDetails provides the names needed for paths,
+        // and genSrcFiles internally uses the fnMatch for generation.
+        // To be perfectly correct, we might need genSrcFiles to return canonicalInstructions
+        // or re-run the fnMatch logic here. For debugPrintFiles, this should be sufficient.
+
         /* --------------------------------------------------------------- *
          * 4 ─ write the src tree into the workspace
          * --------------------------------------------------------------- */
@@ -198,11 +208,10 @@ export const handleGenerateCode = async ({
               // generated program files
               `programs/${programName}/src/lib.rs`,
               `programs/${programName}/src/instructions/mod.rs`,
-              ...instructions.map(i => `programs/${programName}/src/instructions/${i.name}.rs`),
+              ...canonicalInstructions.map(i => `programs/${programName}/src/instructions/${i.name}.rs`),
             ];
             // Add state.rs to important files if state exists
-            const { state } = parseNodeDetails({ nodes: graph.nodes, edges: graph.edges || [] });
-            if (state.length > 0) {
+            if (canonicalState.length > 0) {
               important.push(`programs/${programName}/src/state.rs`);
             }
 

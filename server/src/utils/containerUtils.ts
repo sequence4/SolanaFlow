@@ -10,6 +10,7 @@ export async function debugDumpContainerTree(
   basePath: string, 
   taskId: string
 ): Promise<void> {
+  if (process.env.DEBUG !== 'true') return;
   const treeCmd = `
     docker exec ${containerName} bash -c \
       "cd /usr/src/${basePath} && \
@@ -23,13 +24,14 @@ export async function debugDumpContainerTree(
        grep -vE '^target/|^.git/|^node_modules/|programs/.*/target/' | \
        sort | \
        awk -F'/' '\''\
-          NF==1 { print; next }\
-          {\
-            indent=\"\";\
-            for (i = 1; i < NF; i++) indent = indent \"  \";\
-            print indent \"└── \" $NF;\
-          }\
-       '\'' \
+NF==1 { print; next }\
+{\
+  indent="";\
+  for (i = 1; i < NF; i++) \
+    indent = indent "  ";\
+  print indent "└── " $NF;\
+}\
+'\'' \
       "
   `;
   console.log('[DEBUG] Tree dump command:\n', treeCmd);
@@ -57,6 +59,7 @@ export async function debugPrintFiles(
   paths: string[],
   taskId: string,
 ): Promise<void> {
+  if (process.env.DEBUG !== 'true') return;
   for (const rel of paths) {
     const full = `/usr/src/${rootPath}/${rel.replace(/^\.?\/?/, "")}`;
     const cmd = `docker exec ${containerName} bash -c "printf '\\n===== ${rel} =====\\n'; cat ${full}"`;
