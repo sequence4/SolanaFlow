@@ -34,16 +34,17 @@ RUN echo "$CACHEBUST"
 ARG SOLANA_CACHEBUST=20250527
 RUN echo "$SOLANA_CACHEBUST" > /dev/null
 
-# ── Solana CLI (build from source - works on ARM64) ──────────────────────
-ARG SOLANA_CLI_VERSION="2.2.12"   # <-- pin to any published crate version
+# ── Solana CLI (build from source – works on ARM64) ──────────────────────
+# Latest crate on crates.io is 2.2.7  → 2.2.12 is **not** published
+ARG SOLANA_CLI_VERSION="2.2.7"
 RUN set -eux; \
-    # 1) compile the CLI only (takes ~4-5 min on Graviton t4g.large)
+    # 1) compile just the CLI crate (≈5 min on t4g.large)
     cargo install solana-cli --version "${SOLANA_CLI_VERSION}" --locked --force; \
     # 2) hard-fail if the binary is missing
     if ! command -v solana >/dev/null; then \
         echo "❌  solana binary not found after cargo install" >&2; exit 1; \
     fi; \
-    # 3) show version (useful in CI logs)
+    # 3) show the version in build logs
     solana --version
 # make it globally discoverable for later COPY
 RUN ln -sf /root/.cargo/bin/solana /usr/local/bin/solana
