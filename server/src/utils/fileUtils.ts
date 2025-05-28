@@ -631,6 +631,30 @@ export const startDeleteFileTask = async (
   return taskId;
 };
 
+/** ------------------------------------------------------------------ *
+ * Idempotent helper – create the file if it doesn't exist,
+ * otherwise update it. Returns the task-id (or null on error).
+ * ------------------------------------------------------------------ */
+export async function updateOrCreateFile(
+  projectId: string,
+  filePath: string,
+  content: string,
+  existingFilePaths: Set<string>,
+  creatorId = 'system',
+): Promise<string | null> {
+  // normalise "./foo.rs" → "foo.rs" so the Set lookup matches Docker paths
+  const normalised = filePath.replace(/^\.?\//, '');
+
+  try {
+    return existingFilePaths.has(normalised)
+      ? await startUpdateFileTask(projectId, normalised, content, creatorId)
+      : await startCreateFileTask(projectId, normalised, content, creatorId);
+  } catch (err) {
+    console.error('[FILE_UTILS] updateOrCreateFile failed:', err);
+    return null;
+  }
+}
+
 export const getContainerName = async (projectId: string): Promise<string | null> => {
   try {
     const { rows } = await pool.query(

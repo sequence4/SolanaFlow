@@ -1,8 +1,8 @@
-import { updateOrCreateFile } from '@/utils/files/fileUtils';
-import { FileTreeItemType } from '@/interfaces/FileTreeItemType';
+import { updateOrCreateFile } from '../fileUtils';
+import type { FileTreeItem } from '../../types/FileTreeItem';
 
 export async function insertSrcFiles(
-  node: FileTreeItemType,
+  node: FileTreeItem,
   projectId: string,
   existingFilePaths: Set<string>,
   basePath?: string
@@ -14,7 +14,7 @@ export async function insertSrcFiles(
 
   const instructionFiles: {path: string, code: string}[] = [];
   
-  const gatherInstructionFiles = (node: FileTreeItemType, path: string) => {
+  const gatherInstructionFiles = (node: FileTreeItem, path: string) => {
     if (node.type === 'file' && path.includes('/instructions/') && path.endsWith('.rs')) {
       instructionFiles.push({path, code: node.code || ''});
     } else if (node.type === 'directory' && node.children) {
