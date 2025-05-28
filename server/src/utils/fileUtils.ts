@@ -152,7 +152,7 @@ async function generateFileTreeInContainer(
       `-path '*/\\${folder}' -prune`
     ).join(' -o ');
     
-    const command = `docker exec ${containerName} bash -c \"find /usr/src/${rootPath} \\\\( ${excludePaths} \\\\) -o -printf '%y %p\\\\n'\"`;
+    const command = `docker exec ${containerName} bash -c "find /usr/src/${rootPath} \( ${excludePaths} \) -o -printf '%y %p\n"`;
     
     console.log(`Executing Docker find command: ${command}`);
     

@@ -10,14 +10,14 @@ export async function insertSrcFiles(
   creatorId: string | null = null,
 ): Promise<string[]> {
   const fileTaskIds: string[] = [];
-  const queue: { node: FileTreeItem; parentRelativePath: string }[] = [
-    { node: rootNode, parentRelativePath: '.' }, // Start with parent as root
+  const queue: { node: FileTreeItem }[] = [
+    { node: rootNode },
   ];
 
   console.log(`[DEBUG_INSERT_SRC] Starting insertion for project: ${projectId}`);
 
   while (queue.length > 0) {
-    const { node, parentRelativePath } = queue.shift()!;
+    const { node } = queue.shift()!;
     // node.path is already like "./programs/my_program/src/lib.rs"
     // We need a clean relative path for existingFilePaths check and for updateOrCreateFile
     const projectRelativePath = node.path.replace(/^\.?\//, ''); 
@@ -40,7 +40,7 @@ export async function insertSrcFiles(
       if (node.children) {
         for (const child of node.children) {
           // Children paths are relative to their parent, but node.path should be full relative path
-          queue.push({ node: child, parentRelativePath: projectRelativePath });
+          queue.push({ node: child });
         }
       }
     } else if (node.type === 'file') {
