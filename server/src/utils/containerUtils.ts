@@ -62,7 +62,7 @@ export async function debugPrintFiles(
   if (process.env.DEBUG !== 'true') return;
   for (const rel of paths) {
     const full = `/usr/src/${rootPath}/${rel.replace(/^\.?\/?/, "")}`;
-    const cmd = `docker exec ${containerName} bash -c "printf '\\n===== ${rel} =====\\n'; cat ${full}"`;
+    const cmd = `docker exec ${containerName} bash -c "printf '\\n===== ${rel} =====\\n'"`; // ; cat ${full}"
     try {
       await runCommand(cmd, ".", taskId);
     } catch (err) {
