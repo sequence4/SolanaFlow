@@ -13,17 +13,17 @@ export async function debugDumpContainerTree(
   const treeCmd = `
     docker exec ${containerName} bash -c \
       "cd /usr/src/${basePath} && \
-       find . -type d \( \
+       find . \\( \
          -path './target' -o \
          -path './.git' -o \
          -path './node_modules' -o \
          -path './programs/*/target' \
-       \) -prune -o \
+       \\) -prune -o \
        -type f -print | \
        sed 's|^./||g' | \
        grep -vE '^target/|^.git/|^node_modules/|programs/.*/target/' | \
        sort | \
-       awk -F\"/\" '\n        # Root (depth 0) – print as-is\n        NF==1 { print $0; next }\n\n        # All others: build an indent that works on any awk (mawk / busybox / gawk)\n        {\n          indent = \"\"\n          for (i = 1; i < NF; i++) { indent = indent \"  \" }   # 2 spaces per level\n          print indent \"└── \" $NF\n        }\n      ' \
+       awk -F'/' '\n          NF==1 { print; next }\n          {\n            indent=\"\"\n            for (i = 1; i < NF; i++) indent = indent \"  \"\n            print indent \"└── \" $NF\n          }\n       ' \
       "
   `;
   console.log('[DEBUG] Tree dump command:\n', treeCmd);
