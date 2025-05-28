@@ -88,8 +88,13 @@ export function genSrcFiles(
   programId: string
 ): FileTreeItem | null {
   try {
-    // Parse the project state to get structured data
-    const { instructions, state, lib, mod } = parseNodeDetails(projectState);
+    // Parse & canonicalise first so downstream generators see final names
+    const { instructions, state } = parseNodeDetails(projectState);
+
+    for (const inst of instructions) {
+      const m = inst.code.match(/pub\s+fn\s+([a-zA-Z0-9_]+)/);
+      if (m) inst.name = m[1];          // canonical symbol overrides draft
+    }
 
     // Anchor expects: programs/<programName>/src/…
     const programRoot = `./programs/${programName}`;
@@ -101,7 +106,7 @@ export function genSrcFiles(
       children: [],
     };
 
-    // Generate lib.rs with proper program structure
+    // Now all helpers see the *final* instruction names
     const libCode = generateLibRs(programName, programId, instructions, state);
     srcDir.children?.push({
       name: "lib.rs",

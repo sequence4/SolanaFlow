@@ -13,17 +13,23 @@ export async function debugDumpContainerTree(
   const treeCmd = `
     docker exec ${containerName} bash -c \
       "cd /usr/src/${basePath} && \
-       find . \\( \
+       # BusyBox ash requires escaped parens *and* no stray \"-type d\"\n       find . \\\\( \
          -path './target' -o \
          -path './.git' -o \
          -path './node_modules' -o \
          -path './programs/*/target' \
-       \\) -prune -o \
-       -type f -print | \
+       \\\\) -prune -o -type f -print | \
        sed 's|^./||g' | \
        grep -vE '^target/|^.git/|^node_modules/|programs/.*/target/' | \
        sort | \
-       awk -F'/' '\n          NF==1 { print; next }\n          {\n            indent=\"\"\n            for (i = 1; i < NF; i++) indent = indent \"  \"\n            print indent \"└── \" $NF\n          }\n       ' \
+       awk -F'/' '\''\
+          NF==1 { print; next };\
+          {\
+            indent=\"\";\
+            for (i = 1; i < NF; i++) indent = indent \"  \";\
+            print indent \"└── \" $NF;\
+          }\
+       '\'' \
       "
   `;
   console.log('[DEBUG] Tree dump command:\n', treeCmd);
