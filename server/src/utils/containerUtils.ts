@@ -38,10 +38,10 @@ export async function debugDumpContainerTree(
   try {
     treeDump = await runCommand(treeCmd, '.', taskId);
   } catch (err) {
-    console.warn('[DEBUG] tree-dump command failed:', err);
-    await updateTaskStatus(taskId, 'warning', 
-      'Tree dump skipped – non-fatal (see server logs)');
-    return; // keep the main pipeline alive
+    console.error('[DEBUG] tree-dump command failed:', err);
+    await updateTaskStatus(taskId, 'failed', 
+      'Tree dump failed – see server logs for details');
+    throw err;
   }
 
   console.log('[TREE DUMP]\n' + treeDump);
@@ -60,6 +60,13 @@ export async function debugPrintFiles(
   for (const rel of paths) {
     const full = `/usr/src/${rootPath}/${rel.replace(/^\.?\/?/, "")}`;
     const cmd = `docker exec ${containerName} bash -c "printf '\\n===== ${rel} =====\\n'; cat ${full}"`;
-    await runCommand(cmd, ".", taskId); 
+    try {
+      await runCommand(cmd, ".", taskId);
+    } catch (err) {
+      console.error(`[DEBUG] print ${rel} failed:`, err);
+      await updateTaskStatus(taskId, 'failed',
+        `Printing ${rel} failed – see logs`);
+      throw err;
+    }
   }
 }
