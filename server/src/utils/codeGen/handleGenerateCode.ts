@@ -5,6 +5,7 @@ import type { WorkspaceHandle } from '../deploy/prepEnv';
 import { amendConfigFiles } from './amendConfigFiles';
 import { pollTaskStatus } from '../taskUtils';
 import { genSrcFiles } from './genSrcFiles';
+import { insertSrcFiles } from './insertSrcFiles';
 
 /** Block until every task-id is in a final state. */
 async function waitForAll(taskIds: string[]): Promise<{
@@ -122,14 +123,38 @@ export const handleGenerateCode = async ({
         const srcTree = genSrcFiles({ nodes: graph.nodes, edges: graph.edges || [] }, programName, programId);
         if (!srcTree) throw new Error('genSrcFiles returned null');
         
+        /* --------------------------------------------------------------- *
+         * 4 ─ write the src tree into the workspace
+         * --------------------------------------------------------------- */
         sendProgress({ stage: 'src-gen', message: 'Generating Rust sources…' });
         console.log('[GEN] Generated src tree:', JSON.stringify(srcTree, null, 2));
-        console.dir(srcTree, { depth: 4 });
-        
-        // 4) TODO: implement insertSrcFiles to actually write files to container
-        // For now, just log what would be written
-        console.log('[GEN] Source files generated (writing to container not yet implemented)');
-        
+
+        // Gather existing paths so insertSrcFiles can decide create vs update
+        const existing = new Set(flattenPaths(initialTree));
+        const writeTaskIds = await insertSrcFiles(
+          srcTree,
+          projectId,
+          existing,
+        );
+
+        console.log('[GEN] insertSrcFiles returned taskIds =', writeTaskIds);
+
+        if (writeTaskIds.length) {
+          sendProgress({ stage: 'src-write', message: 'Writing Rust files…' });
+          const { succeeded, failed } = await waitForAll(writeTaskIds);
+          console.log('[GEN] src-write tasks done → ok:', succeeded, 'fail:', failed);
+
+          if (failed.length) {
+            sendProgress({
+              stage: 'src-write-failed',
+              message: `Rust write: ${failed.length} task(s) failed`,
+            });
+            throw new Error(`insertSrcFiles failed for ${failed.join(', ')}`);
+          }
+        } else {
+          console.log('[GEN] insertSrcFiles produced no work (tree empty?)');
+        }
+
         sendProgress({ stage: 'src-gen-done', message: 'Rust sources ready' });
     } catch (err) {
         console.error('Error in handleGenerateCode:', err);
