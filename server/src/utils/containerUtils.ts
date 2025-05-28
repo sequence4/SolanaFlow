@@ -12,11 +12,22 @@ export async function debugDumpContainerTree(
   rootPath: string,
   taskId: string,
 ): Promise<void> {
+  /**
+   * - limit depth to 3
+   * - skip noisy dirs (node_modules, .git, target, etc.)
+   * - show a pretty tree-like indent so it's readable in one glance
+   */
+  const prune = "-path '*/node_modules*' -o -path '*/.git*' -o -path '*/target*'";
   const cmd = `
-    docker exec ${containerName} bash -c \
-    "find /usr/src/${rootPath} -maxdepth 3 -printf '%y %P\\n' | sort"
+    docker exec ${containerName} bash -c '
+      find /usr/src/${rootPath} \\( ${prune} \\) -prune -o -maxdepth 3 -print |
+      sed "s#/usr/src/${rootPath}##" |
+      awk -F"/" "
+        NF==1{print \$0;next}
+        {printf \"%*s└── %s\\n\", (NF-1)*2, \"\", \$NF}
+      "
+    '
   `;
-  // We reuse runCommand so output is attached to the same task log.
   const output = await runCommand(cmd, '.', taskId);
   console.log('[TREE DUMP]\n' + output);
 } 
