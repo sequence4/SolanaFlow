@@ -583,7 +583,7 @@ EOF`;
 export const startDeleteFileTask = async (
   projectId: string,
   filePath: string,
-  creatorId: string
+  creatorId: string | null
 ): Promise<string> => {
   const taskId = await createTask('Delete File', creatorId, projectId);
 
