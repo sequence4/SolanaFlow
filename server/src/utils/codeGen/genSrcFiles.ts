@@ -132,20 +132,32 @@ export function genSrcFiles(
       code: modCode,
     });
 
-    // Choose the canonical Rust symbol by inspecting the snippet itself.
-    for (const inst of instructions) {
-      const fnMatch = inst.code.match(/pub\s+fn\s+([a-zA-Z0-9_]+)/);
-      const canonical = fnMatch ? fnMatch[1] : inst.name;  // fallback
+    // The following block is to be deleted as per user instruction
+    // // Choose the canonical Rust symbol by inspecting the snippet itself.
+    // for (const inst of instructions) {
+    //   const fnMatch = inst.code.match(/pub\s+fn\s+([a-zA-Z0-9_]+)/);
+    //   const canonical = fnMatch ? fnMatch[1] : inst.name;  // fallback
+    // 
+    //   instrDir.children?.push({
+    //     name: `${canonical}.rs`,
+    //     path: `${programRoot}/src/instructions/${canonical}.rs`,
+    //     type: "file",
+    //     code: inst.code,
+    //   });
+    // 
+    //   // overwrite inst.name so later helpers (mod.rs/lib.rs) stay in sync
+    //   inst.name = canonical;
+    // }
 
+    // This loop should be the one that writes individual instruction files
+    // using the already canonicalized inst.name from the earlier loop.
+    for (const inst of instructions) {
       instrDir.children?.push({
-        name: `${canonical}.rs`,
-        path: `${programRoot}/src/instructions/${canonical}.rs`,
+        name: `${inst.name}.rs`, // Uses inst.name which was canonicalized at the top
+        path: `${programRoot}/src/instructions/${inst.name}.rs`,
         type: "file",
         code: inst.code,
       });
-
-      // overwrite inst.name so later helpers (mod.rs/lib.rs) stay in sync
-      inst.name = canonical;
     }
 
     srcDir.children?.push(instrDir);
