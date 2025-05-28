@@ -18,12 +18,12 @@ export async function debugDumpContainerTree(
          -path './.git' -o \
          -path './node_modules' -o \
          -path './programs/*/target' \
-       \\\\) -prune -o -type f -print | \
+       \\\\) -prune -o \\\\( -type f -o -type d \\\\) -print | \
        sed 's|^./||g' | \
        grep -vE '^target/|^.git/|^node_modules/|programs/.*/target/' | \
        sort | \
        awk -F'/' '\''\
-          NF==1 { print; next };\
+          NF==1 { print; next }\
           {\
             indent=\"\";\
             for (i = 1; i < NF; i++) indent = indent \"  \";\
