@@ -1,110 +1,115 @@
 import type { WorkspaceHandle } from '../deploy/prepEnv';
-// import toml from 'toml'; // Would be needed for actual TOML parsing
-// import { readFileFromContainer, updateFileInContainer } from '../fileUtils'; // Assuming these exist
+import { parse as parseToml, stringify as iarnaTomlStringify } from '@iarna/toml';
+import { startGetFileContentTask, startUpdateFileTask } from '../fileUtils'; // Assuming these are the actual helpers
+import { pollTaskStatus } from '../taskUtils'; // For waiting on file tasks
 
-// Mocked file operations for demonstration as actual implementations are not provided
-async function readFileFromContainer(ws: WorkspaceHandle, filePath: string): Promise<string> {
-  console.log(`[MOCK_ENSURE_CONFIG] Reading ${filePath} from ${ws.containerName}`);
-  if (filePath === 'Anchor.toml') {
-    return `[features]\nskip-lint = false\n[programs.localnet]\n# my_program = "placeholder"\n[provider]\ncluster = "Localnet"`;
+// Helper to get file content using task system
+async function getFileContent(ws: WorkspaceHandle, filePath: string, projectId: string, creatorId: string | null): Promise<string | null> {
+  const taskId = await startGetFileContentTask(projectId, filePath, creatorId);
+  const result = await pollTaskStatus(taskId);
+  if (result.task.status === 'succeed') {
+    return result.task.result;
   }
-  if (filePath === 'Cargo.toml') {
-    return `[workspace]\n# members = [\"programs/*\"]\n`;
-  }
-  return '';
+  console.error(`[ENSURE_CONFIG] Failed to get content of ${filePath} for project ${projectId}. Task status: ${result.task.status}`);
+  return null;
 }
 
-async function updateFileInContainer(ws: WorkspaceHandle, filePath: string, content: string): Promise<void> {
-  console.log(`[MOCK_ENSURE_CONFIG] Updating ${filePath} in ${ws.containerName} with content:\n${content}`);
+// Helper to update file content using task system
+async function updateFile(ws: WorkspaceHandle, filePath: string, content: string, projectId: string, creatorId: string | null): Promise<boolean> {
+  const taskId = await startUpdateFileTask(projectId, filePath, content, creatorId);
+  const result = await pollTaskStatus(taskId);
+  if (result.task.status === 'succeed') {
+    return true;
+  }
+  console.error(`[ENSURE_CONFIG] Failed to update ${filePath} for project ${projectId}. Task status: ${result.task.status}`);
+  return false;
 }
-
 
 export async function ensureAnchorTomlProgram(
     ws: WorkspaceHandle, 
     programName: string, 
-    programId: string
+    programId: string,
+    projectId: string, // projectId needed for file operations
+    creatorId: string | null = null // creatorId for file operations
 ): Promise<void> {
   const anchorTomlPath = 'Anchor.toml';
   try {
-    let anchorTomlContent = await readFileFromContainer(ws, anchorTomlPath);
-    // const parsedToml = toml.parse(anchorTomlContent); // Actual parsing
-    const parsedToml: any = { programs: { localnet: {} }, provider: {}, features: {} }; // Mock parsing
+    const anchorTomlContent = await getFileContent(ws, anchorTomlPath, projectId, creatorId);
+    if (anchorTomlContent === null) {
+        console.error(`[ENSURE_CONFIG] Could not read ${anchorTomlPath}. Aborting ensureAnchorTomlProgram.`);
+        return;
+    }
+
+    const parsedToml: any = parseToml(anchorTomlContent); // Use any for parsedToml as @iarna/toml type might be broad
     
     const cluster = parsedToml.provider?.cluster?.toLowerCase() || 'localnet';
     const programsClusterKey = `programs.${cluster}`;
 
     if (!parsedToml.programs) parsedToml.programs = {};
-    if (!parsedToml.programs[cluster]) parsedToml.programs[cluster] = {};
+    let clusterPrograms = parsedToml.programs[cluster];
+    if (typeof clusterPrograms !== 'object' || clusterPrograms === null) {
+        clusterPrograms = {};
+        parsedToml.programs[cluster] = clusterPrograms;
+    }
 
     let changed = false;
-    if (parsedToml.programs[cluster][programName] !== programId) {
-      parsedToml.programs[cluster][programName] = programId;
+    if (clusterPrograms[programName] !== programId) {
+      clusterPrograms[programName] = programId;
       changed = true;
-      console.log(`[ENSURE_CONFIG] Updated Anchor.toml: ${programsClusterKey}.${programName} = ${programId}`);
+      console.log(`[ENSURE_CONFIG] Anchor.toml: Setting ${programsClusterKey}.${programName} = ${programId}`);
     }
 
     if (changed) {
-      // This is a simplified way to reconstruct TOML. A proper library should be used.
-      let newTomlContent = '';
-      if (parsedToml.features) {
-        newTomlContent += `[features]\n`;
-        for (const key in parsedToml.features) newTomlContent += `${key} = ${parsedToml.features[key]}\n`;
-        newTomlContent += '\n';
-      }
-      newTomlContent += `[programs.${cluster}]\n`;
-      for (const key in parsedToml.programs[cluster]) newTomlContent += `${key} = "${parsedToml.programs[cluster][key]}"\n`;
-      if (parsedToml.provider) {
-        newTomlContent += '\n[provider]\n';
-        for (const key in parsedToml.provider) newTomlContent += `${key} = "${parsedToml.provider[key]}"\n`;
-      }
-      // ... (add other sections like [scripts] if they exist and need to be preserved)
-      await updateFileInContainer(ws, anchorTomlPath, newTomlContent);
+      console.log(`[ENSURE_CONFIG] Updating ${anchorTomlPath}`);
+      await updateFile(ws, anchorTomlPath, iarnaTomlStringify(parsedToml), projectId, creatorId);
+    } else {
+      console.log(`[ENSURE_CONFIG] ${anchorTomlPath} already up-to-date for program ${programName}.`);
     }
   } catch (error) {
-    console.error(`[ENSURE_CONFIG] Error processing Anchor.toml:`, error);
-    // Decide if to throw or continue
+    console.error(`[ENSURE_CONFIG] Error processing ${anchorTomlPath}:`, error);
   }
 }
 
-export async function ensureRootWorkspaceMembers(ws: WorkspaceHandle): Promise<void> {
-  const cargoTomlPath = 'Cargo.toml'; // Assuming at the root of the workspace
+export async function ensureRootWorkspaceMembers(
+    ws: WorkspaceHandle,
+    projectId: string, // projectId needed for file operations
+    creatorId: string | null = null // creatorId for file operations
+): Promise<void> {
+  const cargoTomlPath = 'Cargo.toml'; 
   try {
-    let cargoTomlContent = await readFileFromContainer(ws, cargoTomlPath);
+    const cargoTomlContent = await getFileContent(ws, cargoTomlPath, projectId, creatorId);
+    if (cargoTomlContent === null) {
+        console.error(`[ENSURE_CONFIG] Could not read ${cargoTomlPath}. Aborting ensureRootWorkspaceMembers.`);
+        return;
+    }
+
+    const parsedToml: any = parseToml(cargoTomlContent); // Use any for parsedToml
     const workspaceMemberEntry = 'programs/*';
     let changed = false;
 
-    // Simplified check/update - a proper TOML parser/writer is better
-    if (!cargoTomlContent.includes('[workspace.members]') && !cargoTomlContent.includes('[workspace]\nmembers')) {
-        cargoTomlContent += '\n[workspace]\nmembers = ["programs/*"]\n';
-        changed = true;
-        console.log('[ENSURE_CONFIG] Added [workspace] members to Cargo.toml');
-    } else if (cargoTomlContent.match(/^members\s*=\s*\[(.*)\]/m)) {
-        const membersLine = cargoTomlContent.match(/^members\s*=\s*\[(.*)\]/m)![0];
-        const currentMembers = cargoTomlContent.match(/^members\s*=\s*\[(.*)\]/m)![1]
-            .split(',').map(m => m.trim().replace(/"/g, ''));
-        if (!currentMembers.includes(workspaceMemberEntry)) {
-            currentMembers.push(workspaceMemberEntry);
-            const newMembersLine = `members = [${currentMembers.map(m => `"${m}"`).join(', ')}]`;
-            cargoTomlContent = cargoTomlContent.replace(membersLine, newMembersLine);
-            changed = true;
-            console.log('[ENSURE_CONFIG] Updated Cargo.toml workspace members');
-        }
+    if (!parsedToml.workspace) {
+      parsedToml.workspace = { members: [workspaceMemberEntry] };
+      changed = true;
+      console.log(`[ENSURE_CONFIG] Cargo.toml: Added [workspace] with members = ["${workspaceMemberEntry}"]`);
     } else {
-        // Case where [workspace] exists but members might be missing or in a different format
-        // This simplistic approach might not cover all TOML syntax variations.
-        if (!cargoTomlContent.includes(`members = ["${workspaceMemberEntry}"]`)){
-             // Attempt to add it, could be risky without proper parsing
-            cargoTomlContent = cargoTomlContent.replace('[workspace]', `[workspace]\nmembers = ["${workspaceMemberEntry}"]`);
-            changed = true;
-            console.log('[ENSURE_CONFIG] Attempted to add members to existing [workspace] in Cargo.toml');
-        }
+      if (!parsedToml.workspace.members) {
+        parsedToml.workspace.members = [workspaceMemberEntry];
+        changed = true;
+        console.log(`[ENSURE_CONFIG] Cargo.toml: Initialized members = ["${workspaceMemberEntry}"] under [workspace]`);
+      } else if (Array.isArray(parsedToml.workspace.members) && !parsedToml.workspace.members.includes(workspaceMemberEntry)) {
+        parsedToml.workspace.members.push(workspaceMemberEntry);
+        changed = true;
+        console.log(`[ENSURE_CONFIG] Cargo.toml: Added "${workspaceMemberEntry}" to workspace.members`);
+      }
     }
 
     if (changed) {
-      await updateFileInContainer(ws, cargoTomlPath, cargoTomlContent);
+      console.log(`[ENSURE_CONFIG] Updating ${cargoTomlPath}`);
+      await updateFile(ws, cargoTomlPath, iarnaTomlStringify(parsedToml), projectId, creatorId);
+    } else {
+      console.log(`[ENSURE_CONFIG] ${cargoTomlPath} already includes "${workspaceMemberEntry}" in workspace.members.`);
     }
   } catch (error) {
-    console.error(`[ENSURE_CONFIG] Error processing Cargo.toml:`, error);
-    // Decide if to throw or continue
+    console.error(`[ENSURE_CONFIG] Error processing ${cargoTomlPath}:`, error);
   }
 } 

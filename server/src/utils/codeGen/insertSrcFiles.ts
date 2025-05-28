@@ -1,53 +1,59 @@
 import { updateOrCreateFile } from '../fileUtils';
 import type { FileTreeItem } from '../../types/FileTreeItem';
-import { ensureDirectoryExists } from '../taskUtils'; // Assuming ensureDirectoryExists is in taskUtils or similar
+import path from 'path';
 
 export async function insertSrcFiles(
   rootNode: FileTreeItem,
   projectId: string,
   existingFilePaths: Set<string>,
-  baseContainerPath: string, // e.g., /usr/src/project_root
+  // basePath?: string, // Keep original basePath if needed by calling logic, or remove if rootPath from handleGenerateCode is always project root
   creatorId: string | null = null,
-  containerName: string // Needed for ensureDirectoryExists
 ): Promise<string[]> {
   const fileTaskIds: string[] = [];
-  const queue: { node: FileTreeItem; currentPath: string }[] = [
-    { node: rootNode, currentPath: baseContainerPath },
+  const queue: { node: FileTreeItem; parentRelativePath: string }[] = [
+    { node: rootNode, parentRelativePath: '.' }, // Start with parent as root
   ];
 
-  console.log(`[DEBUG_INSERT_SRC] Starting insertion at base container path: ${baseContainerPath}`);
+  console.log(`[DEBUG_INSERT_SRC] Starting insertion for project: ${projectId}`);
 
   while (queue.length > 0) {
-    const { node, currentPath } = queue.shift()!;
-    const nodeAbsolutePath = `${currentPath}/${node.name}`.replace(/\/\//g, '/'); // Normalize path
+    const { node, parentRelativePath } = queue.shift()!;
+    // node.path is already like "./programs/my_program/src/lib.rs"
+    // We need a clean relative path for existingFilePaths check and for updateOrCreateFile
+    const projectRelativePath = node.path.replace(/^\.?\//, ''); 
 
     if (node.type === 'directory') {
-      console.log(`[DEBUG_INSERT_SRC] Ensuring directory: ${nodeAbsolutePath}`);
-      // ensureDirectoryExists needs the absolute path within the container
-      await ensureDirectoryExists(nodeAbsolutePath, containerName);
-
+      console.log(`[DEBUG_INSERT_SRC] Processing directory: ${projectRelativePath}`);
+      // create dir even if it ends up empty
+      if (!node.children?.length) {
+        const keepFileTaskId = await updateOrCreateFile(
+          projectId,
+          path.join(projectRelativePath, '.keep'),
+          '', // zero-byte file
+          existingFilePaths,
+          creatorId
+        );
+        if (keepFileTaskId) {
+          // Optionally, add to fileTaskIds if tracking .keep file creation matters
+          // fileTaskIds.push(keepFileTaskId);
+        }
+      }
+      // mkdir -p is handled by startCreateFileTask if a file is created in a new dir
+      // If we need to ensure empty dirs are created, a separate mechanism or specific call would be needed.
+      // For now, relying on file creation to make parent dirs.
       if (node.children) {
         for (const child of node.children) {
-          queue.push({ node: child, currentPath: nodeAbsolutePath });
+          // Children paths are relative to their parent, but node.path should be full relative path
+          queue.push({ node: child, parentRelativePath: projectRelativePath });
         }
       }
     } else if (node.type === 'file') {
-      // updateOrCreateFile expects a path relative to the project root for existingFilePaths check,
-      // but an absolute path for the actual write command (handled internally by updateOrCreateFile based on its needs)
-      // Here, node.path is relative like "./programs/my_program/src/lib.rs"
-      // We need to adjust how existingFilePaths are checked or how paths are passed.
-      // For simplicity, let's assume node.path is what existingFilePaths expects.
-      // The actual write will be to nodeAbsolutePath by updateOrCreateFile, which gets it via its filePath param.
-      
-      const relativePathForCheck = node.path.startsWith('./') ? node.path.substring(2) : node.path;
-      const projectRelativePath = nodeAbsolutePath.replace(baseContainerPath + '/', '');
-
-      console.log(`[DEBUG_INSERT_SRC] Processing file: ${projectRelativePath} (abs: ${nodeAbsolutePath})`);
+      console.log(`[DEBUG_INSERT_SRC] Processing file: ${projectRelativePath}`);
       console.log(`[DEBUG_INSERT_SRC] Code to write (first 50 chars): ${node.code?.substring(0,50)}`);
 
       const taskId = await updateOrCreateFile(
         projectId,
-        projectRelativePath, // This path should match what's in existingFilePaths and be relative to project root
+        projectRelativePath, 
         node.code || '',
         existingFilePaths,
         creatorId

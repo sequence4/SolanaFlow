@@ -3,11 +3,84 @@ import { ServerProjectState } from "../../types/ServerProjectState";
 import {
   InstructionDetail,
   StateDetail,
-  LibFileDetail,
-  ModFileDetail,
+  // LibFileDetail, // Not used directly in the moved functions
+  // ModFileDetail, // Not used directly in the moved functions
 } from "../../types/fileDetailInterfaces";
 import { parseNodeDetails } from "./parseNodeDetails";
 import { templates } from './templates';
+
+// -------------------- Helper Function Definitions --------------------
+
+function toPascal(str: string): string {
+  return str
+    .split(/[^a-zA-Z0-9]+/)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join('');
+}
+
+function generateLibRs(programName: string, programId: string, instructions: InstructionDetail[], state: StateDetail[]): string {
+  const instructionImports = instructions.map(inst => `pub use instructions::${inst.name}::*;`).join('\n');
+  
+  const instructionDefs = instructions.map(inst => {
+    const ctx = inst.context_name ?? `${toPascal(inst.name)}Context`;
+    // Each instruction string is formatted here.
+    // Ensure no unescaped backticks if this were a template literal itself.
+    // Newlines are preserved.
+    const rustCode = [
+      `    pub fn ${inst.name}(ctx: Context<${ctx}>) -> Result<()> {`,
+      `        // instruction file already exports \\\`${inst.name}\\\``,
+      `        instructions::${inst.name}::${inst.name}(ctx)`,
+      `    }`
+    ].join('\n');
+    return rustCode;
+  }).join('\n\n');
+
+  return `use anchor_lang::prelude::*;
+
+declare_id!("${programId}");
+
+pub mod instructions;
+${state.length > 0 ? 'pub mod state;' : ''}
+
+${instructionImports}
+
+#[program]
+pub mod ${programName} {
+    use super::*;
+
+${instructionDefs}
+}`;
+}
+
+function generateModRs(instructions: InstructionDetail[]): string {
+  if (instructions.length === 0) {
+    return "// No instructions generated";
+  }
+  
+  return instructions.map(inst => `pub mod ${inst.name};`).join('\n') + 
+    '\n\n' + 
+    instructions.map(inst => `pub use ${inst.name}::*;`).join('\n');
+}
+
+function generateStateRs(state: StateDetail[]): string {
+  const stateStructs = state.map(s => {
+    const fields = s.fields.map(f => `    pub ${f.name}: ${f.type},`).join('\n');
+    // Struct definition string
+    const structCode = [
+      `#[account]`,
+      `pub struct ${toPascal(s.struct_name)} {`,
+      fields,
+      `}`
+    ].join('\n');
+    return structCode;
+  }).join('\n\n');
+
+  return `use anchor_lang::prelude::*;
+
+${stateStructs}`;
+}
+
+// -------------------- Main Exported Function --------------------
 
 export function genSrcFiles(
   projectState: ServerProjectState,
@@ -90,50 +163,4 @@ export function genSrcFiles(
     console.error("Error in genSrcFiles:", error);
     return null;
   }
-}
-
-function generateLibRs(programName: string, programId: string, instructions: InstructionDetail[], state: StateDetail[]): string {
-  const instructionImports = instructions.map(inst => `pub use instructions::${inst.name}::*;`).join('\n');
-  
-  return `use anchor_lang::prelude::*;
-
-declare_id!("${programId}");
-
-pub mod instructions;
-${state.length > 0 ? 'pub mod state;' : ''}
-
-${instructionImports}
-
-#[program]
-pub mod ${programName} {
-    use super::*;
-
-${instructions.map(inst => `    pub fn ${inst.name}(ctx: Context<${inst.context_name}>) -> Result<()> {
-        instructions::${inst.name}::${inst.name}(ctx)
-    }`).join('\n\n')}
-}`;
-}
-
-function generateModRs(instructions: InstructionDetail[]): string {
-  if (instructions.length === 0) {
-    return "// No instructions generated";
-  }
-  
-  return instructions.map(inst => `pub mod ${inst.name};`).join('\n') + 
-    '\n\n' + 
-    instructions.map(inst => `pub use ${inst.name}::*;`).join('\n');
-}
-
-function generateStateRs(state: StateDetail[]): string {
-  const stateStructs = state.map(s => {
-    const fields = s.fields.map(f => `    pub ${f.name}: ${f.type},`).join('\n');
-    return `#[account]
-pub struct ${s.struct_name} {
-${fields}
-}`;
-  }).join('\n\n');
-
-  return `use anchor_lang::prelude::*;
-
-${stateStructs}`;
 }

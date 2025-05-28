@@ -152,15 +152,23 @@ async function generateFileTreeInContainer(
       `-path '*/\\${folder}' -prune`
     ).join(' -o ');
     
-    const command = `docker exec ${containerName} bash -c "find /usr/src/${rootPath} \\( ${excludePaths} \\) -o -printf '%y %p\\n'"`;
+    const command = `docker exec ${containerName} bash -c \"find /usr/src/${rootPath} \\\\( ${excludePaths} \\\\) -o -printf '%y %p\\\\n'\"`;
     
     console.log(`Executing Docker find command: ${command}`);
     
     try {
-      const output = await runCommand(command, '.', tempTaskId);
+      let output = await runCommand(command, '.', tempTaskId);
+      
+      // prevent gigantic payloads – hard-cap to first 10k lines
+      const MAX_LINES = 10_000;
+      const linesArray = output.split('\n');
+      if (linesArray.length > MAX_LINES) {
+        console.warn('[FILE_UTILS] Truncating find output – too many lines');
+        output = linesArray.slice(0, MAX_LINES).join('\n');
+      }
       
       const lines = output.split('\n').filter(Boolean);
-      console.log(`Docker find command returned ${lines.length} lines`);
+      console.log(`Docker find command returned ${lines.length} lines (after potential truncation)`);
       
       console.log(`[DEBUG_FILES] Raw Docker find output (first 20 lines):`, lines.slice(0, 20));
       
@@ -421,7 +429,7 @@ export const startGenerateFileTreeTask = async (
 export const startGetFileContentTask = async (
   projectId: string,
   filePath: string,
-  creatorId: string 
+  creatorId: string | null 
 ): Promise<string> => {
   const taskId = await createTask('Get File Content', creatorId, projectId);
   setImmediate(async () => {

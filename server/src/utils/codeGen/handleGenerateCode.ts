@@ -127,8 +127,19 @@ export const handleGenerateCode = async ({
         const programId = '11111111111111111111111111111111'; // TODO: fetch real ID
         
         // Call ensure config helpers BEFORE refreshing the tree
-        await ensureAnchorTomlProgram(workspace, programName, programId);
-        await ensureRootWorkspaceMembers(workspace);
+        await ensureAnchorTomlProgram(
+          workspace,
+          programName,
+          programId,
+          projectId,
+          /* creatorId */ null
+        );
+
+        await ensureRootWorkspaceMembers(
+          workspace,
+          projectId,
+          /* creatorId */ null
+        );
 
         // 3) build in-memory src/ tree
         const srcTree = genSrcFiles({ nodes: graph.nodes, edges: graph.edges || [] }, programName, programId);
@@ -146,9 +157,7 @@ export const handleGenerateCode = async ({
           srcTree,
           projectId,
           existing,
-          /* basePath */ `${workspace.rootPath}/programs/${programName}`,
-          /* creatorId */ null,
-          workspace.containerName
+          /* creatorId */ null
         );
 
         console.log('[GEN] insertSrcFiles returned taskIds =', writeTaskIds);
