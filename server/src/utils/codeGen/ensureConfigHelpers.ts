@@ -2,6 +2,8 @@ import type { WorkspaceHandle } from '../deploy/prepEnv';
 import { parse as parseToml, stringify as iarnaTomlStringify } from '@iarna/toml';
 import { startGetFileContentTask, startUpdateFileTask } from '../fileUtils'; // Assuming these are the actual helpers
 import { pollTaskStatus } from '../taskUtils'; // For waiting on file tasks
+import fs from 'fs';
+import path from 'path';
 
 // Helper to get file content using task system
 async function getFileContent(ws: WorkspaceHandle, filePath: string, projectId: string, creatorId: string | null): Promise<string | null> {
@@ -75,41 +77,56 @@ export async function ensureRootWorkspaceMembers(
     projectId: string, // projectId needed for file operations
     creatorId: string | null = null // creatorId for file operations
 ): Promise<void> {
-  const cargoTomlPath = 'Cargo.toml'; 
-  try {
-    const cargoTomlContent = await getFileContent(ws, cargoTomlPath, projectId, creatorId);
-    if (cargoTomlContent === null) {
-        console.error(`[ENSURE_CONFIG] Could not read ${cargoTomlPath}. Aborting ensureRootWorkspaceMembers.`);
-        return;
-    }
+  // --- 1. locate the real programs folder ---------------------------------
+  const rootPath   = ws.rootPath;                 // e.g. "/usr/src/<proj>"
+  const programsDir = path.join(rootPath, 'programs');
 
-    const parsedToml: any = parseToml(cargoTomlContent); // Use any for parsedToml
-    const workspaceMemberEntry = 'programs/*';
-    let changed = false;
-
-    if (!parsedToml.workspace) {
-      parsedToml.workspace = { members: [workspaceMemberEntry] };
-      changed = true;
-      console.log(`[ENSURE_CONFIG] Cargo.toml: Added [workspace] with members = ["${workspaceMemberEntry}"]`);
-    } else {
-      if (!parsedToml.workspace.members) {
-        parsedToml.workspace.members = [workspaceMemberEntry];
-        changed = true;
-        console.log(`[ENSURE_CONFIG] Cargo.toml: Initialized members = ["${workspaceMemberEntry}"] under [workspace]`);
-      } else if (Array.isArray(parsedToml.workspace.members) && !parsedToml.workspace.members.includes(workspaceMemberEntry)) {
-        parsedToml.workspace.members.push(workspaceMemberEntry);
-        changed = true;
-        console.log(`[ENSURE_CONFIG] Cargo.toml: Added "${workspaceMemberEntry}" to workspace.members`);
-      }
-    }
-
-    if (changed) {
-      console.log(`[ENSURE_CONFIG] Updating ${cargoTomlPath}`);
-      await updateFile(ws, cargoTomlPath, iarnaTomlStringify(parsedToml), projectId, creatorId);
-    } else {
-      console.log(`[ENSURE_CONFIG] ${cargoTomlPath} already includes "${workspaceMemberEntry}" in workspace.members.`);
-    }
-  } catch (error) {
-    console.error(`[ENSURE_CONFIG] Error processing ${cargoTomlPath}:`, error);
+  // If the directory is missing (new project), just keep the wildcard entry.
+  let memberDirs: string[] = [];
+  if (fs.existsSync(programsDir)) {
+    memberDirs = fs
+      .readdirSync(programsDir, { withFileTypes: true })
+      .filter(d => d.isDirectory())
+      .map(d => d.name)
+      // —— drop the legacy scaffold ——
+      .filter(name => name !== 'anchor-template');
   }
+
+  // Build an explicit member list like ["programs/my_program", …]
+  // Fallback to wildcard if nothing found (rare but safe).
+  const desiredMembers =
+    memberDirs.length ? memberDirs.map(d => `programs/${d}`) : ['programs/*'];
+
+  // --- 2. read Cargo.toml --------------------------------------------------
+  const cargoTomlPath = 'Cargo.toml';
+  const cargoTomlContent = await getFileContent(ws, cargoTomlPath, projectId, creatorId);
+  if (cargoTomlContent === null) {
+    console.error(`[ENSURE_CONFIG] Could not read ${cargoTomlPath}.`);
+    return;
+  }
+  const parsedToml: any = parseToml(cargoTomlContent);
+
+  // --- 3. synchronise the member list -------------------------------------
+  parsedToml.workspace ||= {};
+  parsedToml.workspace.members ||= [];
+
+  const current: string[] = parsedToml.workspace.members;
+  const next: string[] = [...desiredMembers].sort();
+
+  current.sort();
+  const changed =
+    current.length !== next.length ||
+    current.some((m, i) => m !== next[i]);
+
+  if (!changed) {
+    console.log('[ENSURE_CONFIG] Cargo.toml workspace.members already up-to-date.');
+    return;
+  }
+
+  // Strip any stale "anchor-template" entry that might linger.
+  parsedToml.workspace.members = next;
+  console.log('[ENSURE_CONFIG] Cargo.toml: set workspace.members =', next);
+
+  // --- 4. write back if modified ------------------------------------------
+  await updateFile(ws, cargoTomlPath, iarnaTomlStringify(parsedToml), projectId, creatorId);
 } 
