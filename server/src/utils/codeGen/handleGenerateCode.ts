@@ -6,7 +6,7 @@ import { amendConfigFiles } from './amendConfigFiles';
 import { pollTaskStatus, createTask, updateTaskStatus } from '../taskUtils';
 import { genSrcFiles } from './genSrcFiles';
 import { insertSrcFiles } from './insertSrcFiles';
-import { debugDumpContainerTree } from '../containerUtils';
+import { debugDumpContainerTree, debugPrintFiles } from '../containerUtils';
 
 /** Block until every task-id is in a final state. */
 async function waitForAll(taskIds: string[]): Promise<{
@@ -71,6 +71,10 @@ export const handleGenerateCode = async ({
             return typeof maybeCode === 'string' ? maybeCode : null;
           })
           .filter(Boolean) as string[];
+
+        // Find instructions for debugPrintFiles - this is a simplified assumption
+        // A more robust approach would be to get this from parsed node details like in genSrcFiles.ts
+        const instructions = graph.nodes.map(n => ({ name: ((n as any).data)?.label?.replace(/\s+/g, '').toLowerCase() || 'unknown' })).filter(i => i.name !== 'unknown');
 
         console.log('[GEN] raw snippet count =', functionParts.length);
         if (functionParts.length) {
@@ -174,6 +178,26 @@ export const handleGenerateCode = async ({
           );
           sendProgress({ stage: 'debug', message: 'Container tree dump written to logs' });
           await updateTaskStatus(dumpTaskId, 'succeed', 'Tree dumped');
+
+          // --- NEW: print key files ---
+          try {
+            const important = [
+              "Anchor.toml",
+              "Cargo.toml",
+              // generated program files
+              `programs/${programName}/src/lib.rs`,
+              `programs/${programName}/src/instructions/mod.rs`,
+              ...instructions.map(i => `programs/${programName}/src/instructions/${i.name}.rs`),
+            ];
+            await debugPrintFiles(
+              workspace.containerName,
+              workspace.rootPath,
+              important,
+              dumpTaskId,
+            );
+          } catch (e) {
+            console.warn("[DEBUG] failed to print file contents:", e);
+          }
         } catch (err) {
           console.warn('[DEBUG] Failed to dump container tree:', err);
         }

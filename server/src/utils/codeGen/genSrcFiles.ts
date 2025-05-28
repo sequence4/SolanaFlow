@@ -17,10 +17,12 @@ export function genSrcFiles(
     // Parse the project state to get structured data
     const { instructions, state, lib, mod } = parseNodeDetails(projectState);
 
-    // Create the src directory structure
+    // Anchor expects: programs/<programName>/src/…
+    const programRoot = `./programs/${programName}`;
+
     const srcDir: FileTreeItem = {
       name: "src",
-      path: "./src",
+      path: `${programRoot}/src`,
       type: "directory",
       children: [],
     };
@@ -29,7 +31,7 @@ export function genSrcFiles(
     const libCode = generateLibRs(programName, programId, instructions);
     srcDir.children?.push({
       name: "lib.rs",
-      path: "./src/lib.rs",
+      path: `${programRoot}/src/lib.rs`,
       type: "file",
       code: libCode,
     });
@@ -37,7 +39,7 @@ export function genSrcFiles(
     // Generate instructions directory
     const instrDir: FileTreeItem = {
       name: "instructions",
-      path: "./src/instructions",
+      path: `${programRoot}/src/instructions`,
       type: "directory",
       children: [],
     };
@@ -46,7 +48,7 @@ export function genSrcFiles(
     const modCode = generateModRs(instructions);
     instrDir.children?.push({
       name: "mod.rs",
-      path: "./src/instructions/mod.rs",
+      path: `${programRoot}/src/instructions/mod.rs`,
       type: "file",
       code: modCode,
     });
@@ -55,7 +57,7 @@ export function genSrcFiles(
     for (const inst of instructions) {
       instrDir.children?.push({
         name: `${inst.name}.rs`,
-        path: `./src/instructions/${inst.name}.rs`,
+        path: `${programRoot}/src/instructions/${inst.name}.rs`,
         type: "file",
         code: inst.code,
       });
@@ -68,7 +70,7 @@ export function genSrcFiles(
       const stateCode = generateStateRs(state);
       srcDir.children?.push({
         name: "state.rs",
-        path: "./src/state.rs",
+        path: `${programRoot}/src/state.rs`,
         type: "file",
         code: stateCode,
       });

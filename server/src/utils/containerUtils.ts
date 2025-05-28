@@ -30,4 +30,21 @@ export async function debugDumpContainerTree(
   `;
   const output = await runCommand(cmd, '.', taskId);
   console.log('[TREE DUMP]\n' + output);
+}
+
+/**
+ * Print the contents of each file in `paths` (relative to rootPath) so we can
+ * eyeball that they were written exactly as expected.
+ */
+export async function debugPrintFiles(
+  containerName: string,
+  rootPath: string,
+  paths: string[],
+  taskId: string,
+): Promise<void> {
+  for (const rel of paths) {
+    const full = `/usr/src/${rootPath}/${rel.replace(/^\.?\/?/, "")}`;
+    const cmd = `docker exec ${containerName} bash -c "printf '\\n===== ${rel} =====\\n'; cat ${full}"`;
+    await runCommand(cmd, ".", taskId);
+  }
 } 
