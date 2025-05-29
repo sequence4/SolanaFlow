@@ -21,7 +21,7 @@ export async function runDeployPipeline({
   userId,
   graph,
   sendProgress,
-}: PipelineArgs) {
+}: PipelineArgs): Promise<void> {
   sendProgress({ stage: "environment", message: "Preparing your build environment…" });
 
   // declare outside try so `finally` can see it
@@ -66,11 +66,7 @@ export async function runDeployPipeline({
     await new Promise(resolve => setTimeout(resolve, 1000));
     sendProgress({ stage: "done", message: "Deployment complete" });
 
-    // value that the API handler will send back as the HTTP response body
-    return {
-      containerUrl : workspace?.containerUrl ?? null,
-      artifactBase64: base64So ?? null,
-    };
+    /* nothing to return – everything was streamed via SSE */
 
   } finally {
     /* ----------------------------------------------------------------

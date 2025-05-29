@@ -48,10 +48,11 @@ export async function deployPipeline(
    * Execute the long-running pipeline
    * ------------------------------------------------------------------ */
   try {
-    const result = await runDeployPipeline({ projectId: id, userId, graph, sendProgress: send });
-    
-    // send final artefacts once the pipeline resolves
-    res.json(result);          // => { containerUrl, artifactBase64 }
+    await runDeployPipeline({ projectId: id, userId, graph, sendProgress: send });
+
+    // let the client know we're done, then close the SSE stream
+    send({ stage: 'completed', message: 'Pipeline finished' });
+    res.end();
   } catch (err) {
     console.error('[API] Deploy pipeline error:', err);
     send({ stage: 'error', message: (err as Error).message });
