@@ -11,6 +11,7 @@ export function runDeployPipelineWithLogs(
     updateStage: (stage: string) => void;
   },
   setProjectContext: React.Dispatch<React.SetStateAction<ProjectContextType>>,
+  setArtifactUrl?: (url: string) => void,
 ) {
   
   taskLogs.resetLogs();
@@ -29,6 +30,21 @@ export function runDeployPipelineWithLogs(
       console.log(`[deployPipeline] Received containerUrl: ${msg.containerUrl}`);
       taskLogs.addSystemLog(`🌐 Container URL: ${msg.containerUrl}`);
       setProjectContext(prev => ({ ...prev, containerUrl: msg.containerUrl }));
+    }
+
+    if (msg.artifact) {
+      try {
+        const binary  = atob(msg.artifact as string);
+        const bytes   = Uint8Array.from(binary, c => c.charCodeAt(0));
+        const blob    = new Blob([bytes], { type: "application/octet-stream" });
+        const url     = URL.createObjectURL(blob);
+
+        taskLogs.addSystemLog(`🗄️  Build artefact ready – click to download`);
+        if (setArtifactUrl) setArtifactUrl(url);
+      } catch (err) {
+        console.error("[deployPipeline] failed to decode artefact:", err);
+        taskLogs.addSystemLog("⚠️  Unable to create download link for artefact");
+      }
     }
 
     if (msg.stage === 'deploy-done' || msg.stage === 'done') {
