@@ -54,10 +54,10 @@ SHELL ["/bin/bash", "-euxo", "pipefail", "-c"]
 
 # --- SBF build + test plugins (match CLI version) ------------------------
 RUN cargo install --git https://github.com/solana-labs/solana.git \
-        --tag v${SOLANA_CLI_VERSION} --locked -p cargo-build-sbf && \
-    cargo install --git https://github.com/solana-labs/solana.git \
-        --tag v${SOLANA_CLI_VERSION} --locked -p cargo-test-sbf && \
-    rm -rf /root/.cargo/registry /root/.cargo/git
+        --tag v${SOLANA_CLI_VERSION} --locked cargo-build-sbf \
+ && cargo install --git https://github.com/solana-labs/solana.git \
+        --tag v${SOLANA_CLI_VERSION} --locked cargo-test-sbf \
+ && rm -rf /root/.cargo/registry /root/.cargo/git
 
 # Anchor CLI
 RUN cargo install --git https://github.com/coral-xyz/anchor anchor-cli --tag v0.31.1 --locked --force && \
