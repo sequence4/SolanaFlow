@@ -6,7 +6,7 @@ import type { WorkspaceHandle } from './prepEnv';
 import { Graph } from '../../types/graph';
 import { handleGenerateCode } from "../codeGen/handleGenerateCode";
 import { pruneContainerResources } from '../container/pruneContainer';
-import { startAnchorBuildTask } from "../projectUtils";
+import { startAnchorBuildTask, getBuildArtifactTask } from "../projectUtils";
 import { waitForTaskCompletion } from "../taskUtils";
 
 interface PipelineArgs {
@@ -44,9 +44,16 @@ export async function runDeployPipeline({
 
     /* 3 ─ build program --------------------------------------------------- */
     sendProgress({ stage: "build", message: "Building program…" });
-    const buildTask = await startAnchorBuildTask(projectId, userId);
-    await waitForTaskCompletion(buildTask, 120_000);  // 2-min guard
-    sendProgress({ stage: "build-done", message: "Build finished" });
+    const buildTask   = await startAnchorBuildTask(projectId, userId);
+    await waitForTaskCompletion(buildTask, 120_000);               // 2-min guard
+
+    /* 3b ─ fetch artefact ------------------------------------------------ */
+    const { base64So } = await getBuildArtifactTask(projectId);
+    sendProgress({
+      stage   : "build-done",
+      message : "Build finished",
+      artifact: base64So,                // front-end can create a download link
+    });
 
     // Keep deployment simulation for now
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -54,6 +61,12 @@ export async function runDeployPipeline({
     
     await new Promise(resolve => setTimeout(resolve, 1000));
     sendProgress({ stage: "done", message: "Deployment complete" });
+
+    // value that the API handler will send back as the HTTP response body
+    return {
+      containerUrl : workspace?.containerUrl ?? null,
+      artifactBase64: base64So ?? null,
+    };
 
   } finally {
     /* ----------------------------------------------------------------
