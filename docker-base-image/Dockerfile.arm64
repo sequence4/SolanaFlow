@@ -52,11 +52,12 @@ RUN ln -sf /root/.cargo/bin/solana /usr/local/bin/solana
 # ---------- switch default shell from dash to bash -------------------
 SHELL ["/bin/bash", "-euxo", "pipefail", "-c"]
 
+# Solana 2.x (Agave) repository
+ARG SOLANA_GIT_REPO=https://github.com/anza-xyz/agave.git
+
 # --- SBF build + test plugins (match CLI version) ------------------------
-RUN cargo install --git https://github.com/solana-labs/solana.git \
-        --tag v${SOLANA_CLI_VERSION} --locked cargo-build-sbf \
- && cargo install --git https://github.com/solana-labs/solana.git \
-        --tag v${SOLANA_CLI_VERSION} --locked cargo-test-sbf \
+RUN cargo install --git ${SOLANA_GIT_REPO} --tag v${SOLANA_CLI_VERSION} --locked cargo-build-sbf \
+ && cargo install --git ${SOLANA_GIT_REPO} --tag v${SOLANA_CLI_VERSION} --locked cargo-test-sbf \
  && rm -rf /root/.cargo/registry /root/.cargo/git
 
 # Anchor CLI
