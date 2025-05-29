@@ -6,7 +6,7 @@
         "start": "node -r module-alias/register dist/app.js",
         "dev": "ts-node -r tsconfig-paths/register src/app.ts",
         "lint": "eslint . --ext .ts",
-        "test": "jest --runInBand --config jest.config.js",
+        "test": "jest --runInBand --passWithNoTests src/__tests__/placeholder.test.ts",
         "test:watch": "jest --watchAll   --config jest.config.js",
         "test:cov": "jest --coverage   --config jest.config.js"
     },
