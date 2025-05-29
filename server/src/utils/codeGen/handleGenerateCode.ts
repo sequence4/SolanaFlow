@@ -54,7 +54,7 @@ export const handleGenerateCode = async ({
     console.log('[GEN] userId      =', userId);
     console.log('[GEN] workspace   =', workspace);
     console.log('[GEN] nodes.len   =', graph.nodes.length);
-    console.log('[GEN] first node  =', graph.nodes[0]);
+    //console.log('[GEN] first node  =', graph.nodes[0]);
     
     try {
         if (graph.nodes.length === 0) throw new Error('No nodes found');
@@ -80,8 +80,8 @@ export const handleGenerateCode = async ({
 
         console.log('[GEN] raw snippet count =', functionParts.length);
         if (functionParts.length) {
-            console.log('[GEN] first 200 chars of combined code:\n',
-                functionParts.join('\n\n').slice(0, 200));
+            //console.log('[GEN] first 200 chars of combined code:\n',
+            //    functionParts.join('\n\n').slice(0, 200));
         }
 
         if (functionParts.length > 0) functionCode = functionParts.join('\n\n');

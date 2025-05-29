@@ -71,9 +71,9 @@ export const amendConfigFiles = async (
 
   const newAnchor    = anchorLines.join('\n');
   // 🔎 preview – first 20 lines of the outgoing Anchor.toml
-  console.log('[AMEND] ─ Anchor.toml preview ───────────');
-  console.log(newAnchor.split('\n').slice(0, 20).join('\n'));
-  console.log('[AMEND] ────────────────────────────────');
+  //console.log('[AMEND] ─ Anchor.toml preview ───────────');
+  //console.log(newAnchor.split('\n').slice(0, 20).join('\n'));
+  //console.log('[AMEND] ────────────────────────────────');
 
   const anchorTaskId = await startUpdateFileTask(projectId, 'Anchor.toml', newAnchor, userId);
   const anchorStatus = (await pollTaskStatus(anchorTaskId)).task.status;
