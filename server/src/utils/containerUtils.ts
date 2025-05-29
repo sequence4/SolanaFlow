@@ -1,3 +1,4 @@
+/* eslint-disable no-useless-escape */
 import { runCommand } from './projectUtils';
 import { updateTaskStatus } from './taskUtils';
 
