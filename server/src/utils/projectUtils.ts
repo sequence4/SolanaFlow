@@ -190,6 +190,8 @@ export const getBuildArtifactTask = async (projectId: string): Promise<{ status:
       throw new Error(`No container found for project ${projectId}`);
     }
     
+    console.log(`[ARTIFACT] Looking for compiled .so file in container ${containerName} for project ${projectId}`);
+    
     // Create a temporary task ID for the command execution
     const tempTaskId = uuidv4();
     
@@ -201,16 +203,21 @@ export const getBuildArtifactTask = async (projectId: string): Promise<{ status:
     const fileExists = await runCommand(fileExistsCmd, '.', tempTaskId, { skipSuccessUpdate: true });
     
     if (fileExists.trim() !== 'exists') {
+      console.error(`[ARTIFACT] ❌ Built artifact not found in container at path: ${containerSoPath}`);
       throw new Error(`Built artifact not found in container at path: ${containerSoPath}`);
     }
+    
+    console.log(`[ARTIFACT] ✓ Found .so file at ${containerSoPath}, extracting...`);
     
     // Read and encode the file directly from the container
     const base64Cmd = `docker exec ${containerName} bash -c "cat '${containerSoPath}' | base64 -w 0"`;
     const base64So = await runCommand(base64Cmd, '.', tempTaskId, { skipSuccessUpdate: true });
     
+    console.log(`[ARTIFACT] ✓ Successfully encoded .so file to base64 (${base64So.length} bytes)`);
+    
     return { status: 'success', base64So };
   } catch (error) {
-    console.error('Error retrieving built artifact:', error);
+    console.error('[ARTIFACT] Error retrieving built artifact:', error);
     return { status: 'failed', base64So: '' };
   }
 };
@@ -231,7 +238,7 @@ export const startAnchorBuildTask = async (
       
       const rootPath = await getProjectRootPath(projectId);
       
-      console.log(`Starting anchor build for project ${projectId} in container ${containerName}...`);
+      console.log(`[BUILD] Running anchor build in ${containerName} (root=${rootPath}) for project ${projectId}`);
       
       const buildScriptContent = `#!/bin/bash
 set -euo pipefail
@@ -250,14 +257,14 @@ anchor build
       const buildScriptPath = path.join(tempDir, `build-${projectId}.sh`);
       fs.writeFileSync(buildScriptPath, buildScriptContent, 'utf8');
       
-      console.log(`Created build script locally at ${tempDir}`);
+      console.log(`[BUILD] Created build script locally at ${tempDir}`);
 
-      console.log(`Starting anchor build for project ${projectId}...`);
+      console.log(`[BUILD] Starting anchor build for project ${projectId}...`);
       
       try {
         await updateTaskStatus(sanitizedTaskId, 'doing', 'Anchor build in progress...');
         
-        console.log(`Copying build script to container ${containerName}...`);
+        console.log(`[BUILD] Copying build script to container ${containerName}...`);
         await runCommand(
           `docker cp ${buildScriptPath} ${containerName}:/tmp/build.sh`,
           '.',
@@ -265,7 +272,7 @@ anchor build
           { skipSuccessUpdate: true }
         );
         
-        console.log(`Making build script executable...`);
+        console.log(`[BUILD] Making build script executable...`);
         await runCommand(
           `docker exec ${containerName} chmod +x /tmp/build.sh`,
           '.',
@@ -273,7 +280,7 @@ anchor build
           { skipSuccessUpdate: true }
         );
         
-        console.log(`Executing build script in container ${containerName}...`);
+        console.log(`[BUILD] Executing build script in container ${containerName}...`);
         const buildOutput = await runCommand(
           `docker exec ${containerName} /bin/bash /tmp/build.sh`,
           '.',
@@ -292,18 +299,19 @@ anchor build
         try {
           fs.unlinkSync(buildScriptPath);
         } catch (cleanupError: any) {
-          console.log(`Non-critical error cleaning up temp files: ${cleanupError.message}`);
+          console.log(`[BUILD] Non-critical error cleaning up temp files: ${cleanupError.message}`);
         }
         
         if (soFileCheck.includes('BUILD_SUCCESS')) {
+          console.log("[BUILD] ✔️  anchor build finished & .so produced");
           await updateTaskStatus(sanitizedTaskId, 'succeed', `Build completed successfully. .so file was created.`);
         } else {
-          const fullBuildError = `Build process completed but no .so file was created.\n\nBuild output: ${buildOutput}`;
+          const fullBuildError = `[BUILD] ❌  Build finished but no .so was created.\n\nBuild output:\n${buildOutput}`;
           console.error(fullBuildError);
           await updateTaskStatus(sanitizedTaskId, 'failed', fullBuildError);
         }
       } catch (buildError: any) {
-        console.error(`Anchor build failed with error: ${buildError.message}`);
+        console.error(`[BUILD] Anchor build failed with error: ${buildError.message}`);
         await updateTaskStatus(
           sanitizedTaskId,
           'failed',
@@ -313,11 +321,11 @@ anchor build
         try {
           fs.unlinkSync(buildScriptPath);
         } catch (cleanupError: any) {
-          console.log(`Non-critical error cleaning up temp files: ${cleanupError.message}`);
+          console.log(`[BUILD] Non-critical error cleaning up temp files: ${cleanupError.message}`);
         }
       }
     } catch (error: any) {
-      console.error(`Error in anchor build task: ${error.message}`);
+      console.error(`[BUILD] Error in anchor build task: ${error.message}`);
       await updateTaskStatus(sanitizedTaskId, 'failed', `Error: ${error.message}`);
     }
   });

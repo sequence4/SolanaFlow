@@ -43,12 +43,16 @@ export async function runDeployPipeline({
     await handleGenerateCode({ projectId, graph, workspace, sendProgress, userId });
 
     /* 3 ─ build program --------------------------------------------------- */
+    console.log("[PIPELINE] ⏳ anchor build started…");
     sendProgress({ stage: "build", message: "Building program…" });
     const buildTask   = await startAnchorBuildTask(projectId, userId);
     await waitForTaskCompletion(buildTask, 120_000);               // 2-min guard
+    console.log("[PIPELINE] ✅ build task", buildTask, "completed");
 
     /* 3b ─ fetch artefact ------------------------------------------------ */
+    console.log("[PIPELINE] 📦 fetching artefact (.so) from container");
     const { base64So } = await getBuildArtifactTask(projectId);
+    console.log("[PIPELINE] 📦 artefact length:", base64So?.length ?? 0);
     sendProgress({
       stage   : "build-done",
       message : "Build finished",
