@@ -6,6 +6,8 @@ import type { WorkspaceHandle } from './prepEnv';
 import { Graph } from '../../types/graph';
 import { handleGenerateCode } from "../codeGen/handleGenerateCode";
 import { pruneContainerResources } from '../container/pruneContainer';
+import { startAnchorBuildTask } from "../projectUtils";
+import { waitForTaskCompletion } from "../taskUtils";
 
 interface PipelineArgs {
   projectId: string;
@@ -39,41 +41,14 @@ export async function runDeployPipeline({
     // 2 ─ code generation ─────────────────────────────────────────────────
     sendProgress({ stage: "code-gen", message: "Generating Anchor code…" });
     await handleGenerateCode({ projectId, graph, workspace, sendProgress, userId });
-    /*
-    // 3 ─ anchor init (skip for lite) ─────────────────────────────────────
-    const { isLite } = await fetchProjectFlags(projectId);
-    if (!isLite) {
-      sendProgress({ stage: "init", message: "Running anchor init…" });
-      const initTask = await startAnchorInitTask(projectId, workspace, userId);
-      await waitForTaskCompletion(initTask);
-    }
- 
-    // 4 ─ build  (skip if binary unchanged) ───────────────────────────────
-    if (await needsBuild(projectId)) {
-      sendProgress({ stage: "build", message: "Building program…" });
-      const buildTask = await startAnchorBuildTask(projectId, userId);
-      await waitForTaskCompletion(buildTask, 120000); // 2-min timeout
-    } else {
-      sendProgress({ stage: "build-skip", message: "Cached build reused." });
-    }
- 
-    // 5 ─ deploy ──────────────────────────────────────────────────────────
-    sendProgress({ stage: "deploy", message: "Deploying / upgrading…" });
-    const deployTask = await startAnchorDeployTask(projectId, userId);
-    await waitForTaskCompletion(deployTask, 120000);
- 
-    // 6 ─ fetch txSig & report ────────────────────────────────────────────
-    const txSig = await getTxSigFromTask(deployTask);
-    sendProgress({ stage: "deploy-done", txSig });
-    */
-    
-    // For testing purposes, let's simulate the pipeline stages
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    sendProgress({ stage: "code-gen", message: "Generating Anchor code…" });
-    
-    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    /* 3 ─ build program --------------------------------------------------- */
     sendProgress({ stage: "build", message: "Building program…" });
-    
+    const buildTask = await startAnchorBuildTask(projectId, userId);
+    await waitForTaskCompletion(buildTask, 120_000);  // 2-min guard
+    sendProgress({ stage: "build-done", message: "Build finished" });
+
+    // Keep deployment simulation for now
     await new Promise(resolve => setTimeout(resolve, 1000));
     sendProgress({ stage: "deploy", message: "Deploying / upgrading…" });
     
