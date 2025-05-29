@@ -34,35 +34,31 @@ RUN echo "$CACHEBUST"
 ARG SOLANA_CACHEBUST=20250527
 RUN echo "$SOLANA_CACHEBUST" > /dev/null
 
-# ── Solana CLI (build from source – works on ARM64) ──────────────────────
-# Latest crate on crates.io is 2.2.7  → 2.2.12 is **not** published
-ARG SOLANA_CLI_VERSION="2.2.7"
-RUN set -eux; \
-    # 1) compile just the CLI crate (≈5 min on t4g.large)
-    cargo install solana-cli --version "${SOLANA_CLI_VERSION}" --locked --force; \
-    # 2) hard-fail if the binary is missing
-    if ! command -v solana >/dev/null; then \
-        echo "❌  solana binary not found after cargo install" >&2; exit 1; \
-    fi; \
-    # 3) show the version in build logs
-    solana --version
-# make it globally discoverable for later COPY
-RUN ln -sf /root/.cargo/bin/solana /usr/local/bin/solana
-
 # ---------- switch default shell from dash to bash -------------------
 SHELL ["/bin/bash", "-euxo", "pipefail", "-c"]
 
-# Solana 2.x (Agave) repository
-ARG SOLANA_GIT_REPO=https://github.com/anza-xyz/agave.git
+###############################################################################
+# --- Solana / Anchor tool-chain ---------------------------------------------
+###############################################################################
+ARG SOLANA_VERSION=v2.2.14        # latest Devnet-recommended tag
+ARG SOLANA_REPO=https://github.com/anza-xyz/agave.git
 
-# --- SBF build + test plugins (match CLI version) ------------------------
-RUN cargo install --git ${SOLANA_GIT_REPO} --tag v${SOLANA_CLI_VERSION} --locked cargo-build-sbf \
- && cargo install --git ${SOLANA_GIT_REPO} --tag v${SOLANA_CLI_VERSION} --locked cargo-test-sbf \
- && rm -rf /root/.cargo/registry /root/.cargo/git
+# 1.  Build the full Agave tool-chain (CLI + SBF helpers) from source
+RUN git clone --depth 1 --branch ${SOLANA_VERSION} ${SOLANA_REPO} /solana-src \
+ && cd /solana-src \
+ && ./scripts/cargo-install-all.sh . \
+ && cp -v ./bin/* /usr/local/bin/ \
+ && cd / && rm -rf /solana-src
 
-# Anchor CLI
+# 2.  Ensure the Rust BPF/SBF target is available
+RUN rustup target add bpfel-unknown-unknown   # required by cargo-build-sbf
+
+# 3.  Anchor CLI (still fine at 0.31.1)
 RUN cargo install --git https://github.com/coral-xyz/anchor anchor-cli --tag v0.31.1 --locked --force && \
     anchor --version
+
+# 4.  (optional) smoke-test
+RUN solana --version && cargo build-sbf --version && anchor --version
 
 # Anchor template (cache-warm)
 RUN set -e; \
