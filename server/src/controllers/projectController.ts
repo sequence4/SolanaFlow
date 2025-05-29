@@ -15,7 +15,6 @@ import {
   getBuildArtifactTask,
   startSetClusterTask,
   runCommand,
-  startCreateProjectDirectoryTask,
   startInstallNodeDependenciesTask,
   compileTs,
   closeProjectContainer,
@@ -25,6 +24,7 @@ import { APP_CONFIG } from '../config/appConfig';
 import fs from 'fs';
 import { Keypair } from '@solana/web3.js';
 import { waitForTaskCompletion } from '../utils/taskUtils';
+import { createProject as createProjectDb } from '../utils/project/createProject';
 
 export const runCommandController = async (
   req: Request,
@@ -83,45 +83,25 @@ export const createProject = async (
   res: Response,
   next: NextFunction
 ) => {
-  let { name, description, details } = req.body;
-  const userId = req.user?.id ?? null;
-
-  if (!name || name.trim() === '') {
-    name = `Untitled-${new Date().toISOString().slice(0,10)}`;
-  }
-
-  const client = await pool.connect();
   try {
-    await client.query('BEGIN');
+    const { name, description, details } = req.body;
+    const safeName = (name && name.trim()) ? name : `Untitled-${new Date().toISOString().slice(0,10)}`;
 
-    const rootPath  = `${normalizeProjectName(name)}-${uuidv4().slice(0,8)}`;
-    const projectId = uuidv4();
-    const extended  = { ...(details||{}), isLite:true };
-
-    await client.query(
-      `INSERT INTO solanaproject
-       (id,name,description,root_path,details,last_updated,created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$6)`,
-      [projectId, name, description, rootPath, JSON.stringify(extended), new Date()]
-    );
-
-    await client.query('COMMIT');
-
-    //const taskId = await startCreateProjectDirectoryTask(userId, rootPath, projectId);
+    const project = await createProjectDb({ 
+      name: safeName, 
+      description, 
+      details 
+    });
 
     res.status(201).json({
-      message:'Project created successfully',
-      project:{ id:projectId, name, description, root_path:rootPath, details:extended },
-      directoryTask:{ taskId:null, message:'Project directory creation started' }
+      message: 'Project created successfully',
+      project,
+      directoryTask: { taskId: null, message: 'No directory work required' }
     });
   } catch (err) {
-    await client.query('ROLLBACK');
     next(err);
-  } finally {
-    client.release();
   }
 };
-
 
 export const createProjectDirectory = async (
   req: Request,
@@ -160,14 +140,10 @@ export const createProjectDirectory = async (
       }
     }
     
-    console.log("user id", userId);
-    console.log("root path", root_path);
-    const taskId = await startCreateProjectDirectoryTask(userId, root_path, projectId);
-    
     res.status(200).json({
-      message: 'Project directory creation started',
+      message: 'Project directory creation is no longer required',
       rootPath: root_path,
-      taskId: taskId
+      taskId: null
     });
   } catch (error) {
     console.error('Error in createProjectDirectory:', error);
@@ -369,6 +345,12 @@ export const deleteProject = async (
     await client.query('DELETE FROM solanaproject WHERE id = $1', [id]);
     
     await client.query('COMMIT');
+
+    // Release any occupied warm-pool slot
+    await pool.query(
+      'UPDATE warm_container_pool SET busy = false WHERE name = $1',
+      [ projectCheck.rows[0].container_name ]
+    );
     
     res.status(200).json({
       message: 'Project deleted successfully',

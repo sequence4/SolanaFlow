@@ -1,69 +1,59 @@
-import { NextFunction, Request, Response } from "express";
-import { AppError } from "../middleware/errorHandler";
-import { runDeployPipeline } from "../utils/deploy/runDeployPipeline";
+import { NextFunction, Request, Response } from 'express';
+import { AppError } from '../middleware/errorHandler';
+import { runDeployPipeline } from '../utils/deploy/runDeployPipeline';
+import { Graph } from '../types/graph'; 
 
+/**
+ * POST /api/deploy/:id/deploy-pipeline
+ * Streams Server-Sent Events while the build/deploy pipeline runs.
+ */
 export async function deployPipeline(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ) {
-    const { id } = req.params;
-    const { graph } = req.body;
-    const userId = req.user?.id;
-  
-    console.log(`[API] Deploy pipeline called for project: ${id}, userId: ${userId}`);
-    console.log(`[API] Graph data received:`, JSON.stringify(graph).substring(0, 200) + '...');
-  
-    if (!userId) {
-      console.log(`[API] Deploy failed - no userId found`);
-      return next(new AppError("User not found", 400));
-    }
-  
-    console.log(`[API] Setting up SSE response headers`);
-    res.writeHead(200, {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    });
-    
-    const send = (data: unknown) => {
-      console.log(`[API] Sending SSE event:`, data);
-      res.write(`data: ${JSON.stringify(data)}\n\n`);
-    }
-  
-    try {
-      console.log(`[API] Starting deploy pipeline process`);
-      
-      await runDeployPipeline({
-        projectId: id,
-        userId,
-        graph,
-        sendProgress: send,
-      });
-      
-      /*
-      // Send some simulated progress events for testing
-      send({ stage: "environment", message: "Preparing your build environment…" });
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      send({ stage: "code-gen", message: "Generating Anchor code…" });
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      send({ stage: "build", message: "Building program…" });
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      send({ stage: "deploy", message: "Deploying / upgrading…" });
-      await new Promise(resolve => setTimeout(resolve, 1000));
-  
-      send({ stage: "done" });
-      */
-      
-      console.log(`[API] Deploy pipeline completed successfully`);
-      res.end();
-    } catch (err) {
-      console.error(`[API] Deploy pipeline error:`, err);
-      send({ stage: "error", message: (err as Error).message });
-      res.end();
-      if (!res.headersSent) next(err); 
-    }
+  req: Request<{ id: string }, unknown, { graph: Graph }>, // ← TYPED generics :contentReference[oaicite:0]{index=0}
+  res: Response,
+  next: NextFunction,
+) {
+  const { id }    = req.params;
+  const { graph } = req.body;
+  const userId    = (req.user as { id?: string } | undefined)?.id; // keep optional-chaining safe
+
+  console.log(`[API] Deploy pipeline called for project: ${id}, userId: ${userId}`);
+  console.log(`[API] Graph data received:`, JSON.stringify(graph).substring(0, 200) + '…');
+
+  /* ------------------------------------------------------------------ *
+   * Guards – bail out fast on bad input
+   * ------------------------------------------------------------------ */
+  if (!userId) return next(new AppError('User not found', 400));
+
+  // Basic shape validation so runDeployPipeline never receives garbage
+  if (!graph?.nodes || !Array.isArray(graph.nodes) || graph.nodes.length === 0) {
+    return next(new AppError('Graph must include at least one node', 400)); // :contentReference[oaicite:1]{index=1}
   }
+
+  /* ------------------------------------------------------------------ *
+   * Setup Server-Sent Events response
+   * ------------------------------------------------------------------ */
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream', // official MIME type for SSE :contentReference[oaicite:2]{index=2}
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  });
+
+  // Generic helper keeps TypeScript happy for every event payload
+  const send = <T = unknown>(data: T): void => {
+    console.log('[API] Sending SSE event:', data);
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
+  /* ------------------------------------------------------------------ *
+   * Execute the long-running pipeline
+   * ------------------------------------------------------------------ */
+  try {
+    await runDeployPipeline({ projectId: id, userId, graph, sendProgress: send });
+    res.end();
+  } catch (err) {
+    console.error('[API] Deploy pipeline error:', err);
+    send({ stage: 'error', message: (err as Error).message });
+    res.end();
+    if (!res.headersSent) next(err);
+  }
+}

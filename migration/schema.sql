@@ -88,3 +88,11 @@ END$$;
 
 CREATE INDEX IF NOT EXISTS idx_warm_pool_busy_port
     ON warm_container_pool (busy, port);
+
+-- Add partial-unique index for non-zero ports
+ALTER TABLE warm_container_pool
+    DROP CONSTRAINT IF EXISTS warm_container_pool_port_key;
+
+CREATE UNIQUE INDEX IF NOT EXISTS warm_pool_port_nonzero_uniq
+           ON warm_container_pool (port)
+        WHERE port <> 0;

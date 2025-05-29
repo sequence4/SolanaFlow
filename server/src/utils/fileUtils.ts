@@ -148,19 +148,25 @@ async function generateFileTreeInContainer(
   try {
     const tempTaskId = await createTempTask('find-command', projectId, userId);
     
-    const excludePaths = SKIP_FOLDERS.map(folder => 
-      `-path '*/\\${folder}' -prune`
-    ).join(' -o ');
+    const excludePaths = SKIP_FOLDERS
+      .map(folder => `-path '*/${folder}/*' -prune`)
+      .join(' -o ');
     
     const command = `docker exec ${containerName} bash -c "find /usr/src/${rootPath} \\( ${excludePaths} \\) -o -printf '%y %p\\n'"`;
     
     console.log(`Executing Docker find command: ${command}`);
     
     try {
-      const output = await runCommand(command, '.', tempTaskId);
+      let output = await runCommand(command, '.', tempTaskId);
+      
+      const MAX_LINES = 10_000;
+      if (output.split('\n').length > MAX_LINES) {
+        console.warn('[FILE_UTILS] Truncating find output – too many lines');
+        output = output.split('\n').slice(0, MAX_LINES).join('\n');
+      }
       
       const lines = output.split('\n').filter(Boolean);
-      console.log(`Docker find command returned ${lines.length} lines`);
+      console.log(`Docker find command returned ${lines.length} lines (after potential truncation)`);
       
       console.log(`[DEBUG_FILES] Raw Docker find output (first 20 lines):`, lines.slice(0, 20));
       
@@ -421,7 +427,7 @@ export const startGenerateFileTreeTask = async (
 export const startGetFileContentTask = async (
   projectId: string,
   filePath: string,
-  creatorId: string 
+  creatorId: string | null 
 ): Promise<string> => {
   const taskId = await createTask('Get File Content', creatorId, projectId);
   setImmediate(async () => {
@@ -467,7 +473,7 @@ export const startCreateFileTask = async (
   projectId: string,
   filePath: string,
   content: string,
-  creatorId: string
+  creatorId: string | null
 ): Promise<string> => {
   const taskId = await createTask('Create File', creatorId, projectId);
 
@@ -529,7 +535,7 @@ export const startUpdateFileTask = async (
   projectId: string,
   filePath: string,
   content: string,
-  creatorId: string
+  creatorId: string | null
 ): Promise<string> => {
   const taskId = await createTask('Update File', creatorId, projectId);
 
@@ -583,7 +589,7 @@ EOF`;
 export const startDeleteFileTask = async (
   projectId: string,
   filePath: string,
-  creatorId: string
+  creatorId: string | null
 ): Promise<string> => {
   const taskId = await createTask('Delete File', creatorId, projectId);
 
@@ -630,6 +636,35 @@ export const startDeleteFileTask = async (
 
   return taskId;
 };
+
+/** ------------------------------------------------------------------ *
+ * Idempotent helper – create the file if it doesn't exist,
+ * otherwise update it. Returns the task-id (or null on error).
+ * ------------------------------------------------------------------ */
+export async function updateOrCreateFile(
+  projectId: string,
+  filePath: string,
+  content: string,
+  existingFilePaths: Set<string>,
+  /**
+   * When auth/user management is disabled we just pass `null` so the
+   * INSERT … creator_id column receives SQL NULL instead of an invalid
+   * UUID string.  Once auth is restored you can forward the real userId.
+   */
+  creatorId: string | null = null,
+): Promise<string | null> {
+  // normalise "./foo.rs" → "foo.rs" so the Set lookup matches Docker paths
+  const normalised = filePath.replace(/^\.?\//, '');
+
+  try {
+    return existingFilePaths.has(normalised)
+      ? await startUpdateFileTask(projectId, normalised, content, creatorId)
+      : await startCreateFileTask(projectId, normalised, content, creatorId);
+  } catch (err) {
+    console.error('[FILE_UTILS] updateOrCreateFile failed:', err);
+    return null;
+  }
+}
 
 export const getContainerName = async (projectId: string): Promise<string | null> => {
   try {

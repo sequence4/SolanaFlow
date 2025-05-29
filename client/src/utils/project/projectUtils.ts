@@ -3,11 +3,10 @@ import { toast } from "sonner";
 import { projectApi } from "@/api/projectApi";
 import { ProjectContextType, ProjectStateUpdater, SaveProjectResponse } from "@/context/project/ProjectContextTypes";
 import { saveProject } from "./saveProject";
-import { fetchFilesAndCodes } from "@/utils/codeGeneration/fetchFilesAndCodes";
+import { fetchFilesAndCodes } from "@/utils/files/fetchFilesAndCodes";
 import { FileTreeItemType } from "@/interfaces/FileTreeItemType";
 import { UxOpenPanel } from "@/context/ux/UxContextTypes";
 import { pollTaskStatus4 } from "@/utils/task/taskUtils";
-import { useTaskLogs } from "@/context/logs/useTaskLogs";
 import { Step } from '@/context/logs/TaskLogsContext';
 
 export const fetchProjects = async (

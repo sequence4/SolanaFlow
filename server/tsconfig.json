@@ -1,26 +1,44 @@
 {
-    "compilerOptions": {
-      "target": "ES2022",
-      "module": "commonjs",
-      "lib": ["ES2022"],
-      "allowJs": true,
-      "outDir": "dist",
-      "rootDir": "src",
-      "strict": true,
-      "noImplicitAny": true,
-      "esModuleInterop": true,
-      "resolveJsonModule": true,
-      "moduleResolution": "node",
-      "baseUrl": ".",
-      "paths": {
-        "*": ["node_modules/*"],
-        "src/*": ["src/*"],
-        "@/*": ["src/*"]
-      },
-      "typeRoots": ["./node_modules/@types", "./@types"],
-      "skipLibCheck": false
+  "compilerOptions": {
+    /* ---------- language / emit ---------- */
+    "target": "ES2022",
+    "module": "commonjs",
+    "lib": ["ES2022"],
+    "allowJs": true,
+
+    /* ---------- folders ---------- */
+    /* rootDir removed so both src/ and tests/ are valid */
+    "outDir": "dist",
+
+    /* ---------- type-checking ---------- */
+    "strict": true,
+    "noImplicitAny": true,
+    "skipLibCheck": false,
+    "forceConsistentCasingInFileNames": true,
+
+    /* ---------- module resolution ---------- */
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@db": ["tests/__mocks__/@db.ts"],
+      "src/*": ["src/*"],
+      "@/*": ["src/*"],
+      "*": ["node_modules/*"]
     },
-    "include": ["src/**/*", "@types/**/*.d.ts"],
-    "exclude": ["node_modules", "**/*.spec.ts"]
-  }
-  
+
+    /* ---------- ambient types ---------- */
+    "typeRoots": ["node_modules/@types", "tests/types"]
+  },
+
+  "include": [
+    "src/**/*",
+    "tests/**/*",
+    "@types/**/*.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}

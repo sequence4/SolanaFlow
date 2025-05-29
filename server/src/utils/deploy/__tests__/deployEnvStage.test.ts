@@ -15,7 +15,7 @@ describe('runDeployPipeline - environment stage', () => {
     await runDeployPipeline({
       projectId: 'p',
       userId: 'u',
-      graph: {},
+      graph: { nodes: [], edges: [] },
       sendProgress: (m) => logs.push(m)
     })
 

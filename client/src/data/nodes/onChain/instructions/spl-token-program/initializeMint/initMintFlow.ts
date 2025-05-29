@@ -3,6 +3,7 @@ import { initMintContextNode } from "./initMintContext";
 import { initMintInputNode } from "./initMintInputNode";
 import { initMintErrorCodesNode } from "./initMintErrorCodes";
 import { initMintEventsNode } from "./initMintEvents";
+import { initMintUi } from "./initMintUi";
 
 const contextData = initMintContextNode.data.accounts || [];
 const inputsData = initMintInputNode.data.fields || [];
@@ -24,6 +25,7 @@ export const initMintFlow = {
         parameters: inputsData,
         errorCodes: errorCodesData,
         events: eventsData,
+        ui: initMintUi,
       },
     },
   ],

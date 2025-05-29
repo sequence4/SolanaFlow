@@ -1,0 +1,14 @@
+export const templates = {
+  programCargoToml: (pkg: string) => `[package]
+name = "${pkg}"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+anchor-lang = "0.31.1"
+anchor-spl  = "0.31.1"
+`,
+}; 

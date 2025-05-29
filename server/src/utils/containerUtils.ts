@@ -1,0 +1,76 @@
+/* eslint-disable no-useless-escape */
+import { runCommand } from './projectUtils';
+import { updateTaskStatus } from './taskUtils';
+
+/**
+ * Print the directory tree inside the project's container so we can
+ * eyeball that `src/`, `Cargo.toml`, etc. were written correctly.
+ */
+export async function debugDumpContainerTree(
+  containerName: string,
+  basePath: string, 
+  taskId: string
+): Promise<void> {
+  if (process.env.DEBUG !== 'true') return;
+  const treeCmd = `
+    docker exec ${containerName} bash -c \
+      "cd /usr/src/${basePath} && \
+       # BusyBox ash requires escaped parens *and* no stray "-type d"\n       find . \\\\( \
+         -path './target' -o \
+         -path './.git' -o \
+         -path './node_modules' -o \
+         -path './programs/*/target' \
+       \\\\) -prune -o \\\\( -type f -o -type d \\\\) -print | \
+       sed 's|^./||g' | \
+       grep -vE '^target/|^.git/|^node_modules/|programs/.*/target/' | \
+       sort | \
+       awk -F'/' '\
+NF==1 { print; next }\
+{\
+  indent="";\
+  for (i = 1; i < NF; i++) \
+    indent = indent "  ";\
+  print indent "└── " $NF;\
+}\
+'\'' \
+      "
+  `;
+  console.log('[DEBUG] Tree dump command:\n', treeCmd);
+
+  let treeDump = '';
+  try {
+    treeDump = await runCommand(treeCmd, '.', taskId);
+  } catch (err) {
+    console.error('[DEBUG] tree-dump command failed:', err);
+    await updateTaskStatus(taskId, 'failed', 
+      'Tree dump failed – see server logs for details');
+    throw err;
+  }
+
+  console.log('[TREE DUMP]\n' + treeDump);
+}
+
+/**
+ * Print the contents of each file in `paths` (relative to rootPath) so we can
+ * eyeball that they were written exactly as expected.
+ */
+export async function debugPrintFiles(
+  containerName: string,
+  rootPath: string, 
+  paths: string[],
+  taskId: string,
+): Promise<void> {
+  if (process.env.DEBUG !== 'true') return;
+  for (const rel of paths) {
+    const full = `/usr/src/${rootPath}/${rel.replace(/^\.?\/?/, "")}`;
+    const cmd = `docker exec ${containerName} bash -c "printf '\\n===== ${rel} =====\\n'"`; // ; cat ${full}"
+    try {
+      await runCommand(cmd, ".", taskId);
+    } catch (err) {
+      console.error(`[DEBUG] print ${rel} failed:`, err);
+      await updateTaskStatus(taskId, 'failed',
+        `Printing ${rel} failed – see logs`);
+      throw err;
+    }
+  }
+}

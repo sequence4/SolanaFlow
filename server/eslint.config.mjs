@@ -45,4 +45,20 @@ export default [
       '@typescript-eslint/no-namespace': 'off',
     },
   },
+
+  // ------------------------------------------------------------------
+  // Jest / build config files — CommonJS, Node globals allowed
+  // ------------------------------------------------------------------
+  {
+    files: ['server/jest.config.js'],   // add more *.cjs or *.config.js here if needed
+    languageOptions: {
+      sourceType: 'script',             // treat as CommonJS
+      globals: {
+        ...globals.node,                // expose `module`, `require`, etc.
+      },
+    },
+    rules: {
+      'no-undef': 'off',                // Node CJS globals are fine
+    },
+  },
 ]
