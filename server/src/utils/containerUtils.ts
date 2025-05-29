@@ -14,7 +14,7 @@ export async function debugDumpContainerTree(
   const treeCmd = `
     docker exec ${containerName} bash -c \
       "cd /usr/src/${basePath} && \
-       # BusyBox ash requires escaped parens *and* no stray \"-type d\"\n       find . \\\\( \
+       # BusyBox ash requires escaped parens *and* no stray "-type d"\n       find . \\\\( \
          -path './target' -o \
          -path './.git' -o \
          -path './node_modules' -o \
@@ -23,7 +23,8 @@ export async function debugDumpContainerTree(
        sed 's|^./||g' | \
        grep -vE '^target/|^.git/|^node_modules/|programs/.*/target/' | \
        sort | \
-       awk -F'/' '\''\
+       // eslint-disable-next-line no-useless-escape
+       awk -F'/' '\
 NF==1 { print; next }\
 {\
   indent="";\
