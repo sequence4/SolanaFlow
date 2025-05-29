@@ -2,7 +2,7 @@
     "name": "server",
     "version": "1.0.0",
     "scripts": {
-        "build": "tsc",
+        "build": "tsc -p tsconfig.build.json",
         "start": "node -r module-alias/register dist/app.js",
         "dev": "ts-node -r tsconfig-paths/register src/app.ts",
         "lint": "eslint . --ext .ts",
