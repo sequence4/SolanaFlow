@@ -50,9 +50,11 @@ RUN set -eux; \
 RUN ln -sf /root/.cargo/bin/solana /usr/local/bin/solana
 
 # --- SBF build + test plugins (match CLI version) ------------------------
-RUN cargo install --git https://github.com/solana-labs/solana.git \
-        --tag v${SOLANA_CLI_VERSION} \
-        cargo-build-sbf cargo-test-sbf && \
+RUN set -euo pipefail; \
+    cargo install --git https://github.com/solana-labs/solana.git \
+        --tag v${SOLANA_CLI_VERSION} --locked cargo-build-sbf && \
+    cargo install --git https://github.com/solana-labs/solana.git \
+        --tag v${SOLANA_CLI_VERSION} --locked cargo-test-sbf && \
     rm -rf /root/.cargo/registry /root/.cargo/git
 
 # Anchor CLI
