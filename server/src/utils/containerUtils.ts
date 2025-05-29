@@ -24,7 +24,6 @@ export async function debugDumpContainerTree(
        sed 's|^./||g' | \
        grep -vE '^target/|^.git/|^node_modules/|programs/.*/target/' | \
        sort | \
-       // eslint-disable-next-line no-useless-escape
        awk -F'/' '\
 NF==1 { print; next }\
 {\
