@@ -69,38 +69,3 @@ export async function runDeployPipeline({
     }
   }
 }
- 
-/*
-async function needsBuild(projectId: string): Promise<boolean> {
-  const artifact = await getBuildArtifactTask(projectId);
-  // quick checksum against latest code hash (implement as you like)
-  return !artifact?.sha256 || artifact.sha256 !== (await currentCodeHash(projectId));
-}
-
-async function currentCodeHash(projectId: string): Promise<string> {
-  // tiny helper that SHA-256's lib.rs + instruction/*.rs inside container
-  // implement with `docker exec sh -c 'sha256sum …'` or Node hashing
-  return "dummy-hash"; // placeholder
-}
-
-async function fetchProjectFlags(projectId: string) {
-  const r = await pool.query<{
-    details: any;
-  }>("SELECT details FROM solanaproject WHERE id = $1", [projectId]);
-  const details =
-    typeof r.rows[0].details === "string"
-      ? JSON.parse(r.rows[0].details)
-      : r.rows[0].details || {};
-  return {
-    isLite: !!details.isLite,
-  };
-}
-
-async function getTxSigFromTask(taskId: string): Promise<string | null> {
-  const r = await pool.query<{ result: string }>(
-    "SELECT result FROM task WHERE id=$1",
-    [taskId]
-  );
-  return r.rows[0]?.result || null;
-}
-*/
