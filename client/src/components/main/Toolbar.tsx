@@ -9,10 +9,12 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { LuSave, LuPlus } from "react-icons/lu";
 import { FaRegFolderOpen } from "react-icons/fa";
+import { Settings2 } from 'lucide-react';
 import ProjectListPopover from './workflow/ProjectListPopover';
 import '@/styles/toolbar/ToolbarStyle.css';
 import { useColorModeValue } from '@/components/ui/color-mode';
 import { NewProjectModal } from '@/components/ui/new-project-modal';
+import { ApiKeySettingsDialog } from '@/components/settings/ApiKeySettingsDialog';
 
 export const ProjectInfo: React.FC = () => {
     const { projectContext, setProjectContext } = useContext(ProjectContext);
@@ -21,6 +23,7 @@ export const ProjectInfo: React.FC = () => {
     const [projectsRefreshCounter, setProjectsRefreshCounter] = useState(0);
     const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
     const [isProjectListModalOpen, setIsProjectListModalOpen] = useState(false);
+    const [isSettingsOpen, setSettingsOpen] = useState(false);
     const { resetLogs, setSteps, setProgress, setIsVisible, addSystemLog } = useTaskLogs();
 
     const buttonTextColor = useColorModeValue('var(--toolbar-button-text-light)', 'var(--toolbar-button-text-dark)');
@@ -104,6 +107,18 @@ export const ProjectInfo: React.FC = () => {
                             <span>Save</span>
                         </Button>
                     </Tooltip>
+
+                    {/* Settings Button */}
+                    <Tooltip content="Settings">
+                        <Button
+                            variant="ghost"
+                            onClick={() => setSettingsOpen(true)}
+                            className="flex items-center justify-center text-sm rounded-md"
+                            style={{ color: buttonTextColor }}
+                        >
+                            <Settings2 size={18}/>
+                        </Button>
+                    </Tooltip>
                 </div>
             </div>
 
@@ -129,6 +144,9 @@ export const ProjectInfo: React.FC = () => {
                     />
                 </DialogContent>
             </Dialog>
+
+            {/* Settings Dialog */}
+            <ApiKeySettingsDialog open={isSettingsOpen} onOpenChange={setSettingsOpen}/>
         </div>
     );
 };
