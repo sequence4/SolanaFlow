@@ -10,7 +10,7 @@ import aiRoutes from '@/routes/aiRoutes';
 import { errorHandler } from '@/middleware/errorHandler';
 import containerRoutes from '@/routes/containerRoutes';
 import cookieParser from 'cookie-parser';
-import 'dotenv-flow/config'; 
+import 'dotenv/config'; 
 import deployRoutes from '@/routes/deployRoutes';
 import workspaceRoutes from '@/routes/workspaceRoutes';
 import poolRoutes from '@/routes/poolRoutes';
