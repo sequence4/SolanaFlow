@@ -14,9 +14,6 @@ export interface ChatRequestBody {
    */
   provider?: string;
 
-  /** User-supplied API key for that provider (optional) */
-  userApiKey?: string;
-
   /** Optional Solana pubkey forwarded from the client */
   userPublicKey?: string;
 } 

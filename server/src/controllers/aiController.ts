@@ -7,6 +7,7 @@ import { OpenAI } from 'openai';
 import type { ChatCompletionMessageParam, ChatCompletionRole } from 'openai/resources/chat';
 import { getWalletBalanceSol, functionDefs } from '../utils/getWalletBalanceSol';
 import { callModel, deduceProvider } from '../utils/callModel';
+import { Provider } from '../utils/modelProviderMap';
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
 export const generateAIResponse = async (
@@ -14,14 +15,14 @@ export const generateAIResponse = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  const { messages, model, provider, userApiKey, _schema } = req.body;
+  const { messages, model, provider, _schema } = req.body;
   const _schema_name = 'function_logic_schema';
 
   console.log('messages', messages);
   console.log('model', model);
   console.log('_schema', _schema);
   console.log('provider', provider);
-  console.log('userApiKey provided', Boolean(userApiKey));
+  console.log('aiKeys provided', !!req.aiKeys);
 
   if (!model) {
     next(new AppError('Model is required', 400));
@@ -42,9 +43,13 @@ export const generateAIResponse = async (
   try {
     console.log('Calling AI with:', { model, requestBody: transformMessages });
 
+    // Cast to ensure proper type safety with the Provider type
+    const resolvedProvider = (provider ? provider : deduceProvider(model)) as Provider;
+    const apiKey = req.aiKeys?.[resolvedProvider];
+
     const answer = await callModel({
-      provider: provider ? provider as any : deduceProvider(model),
-      apiKey: userApiKey,
+      provider: resolvedProvider,
+      apiKey,
       model,
       messages: transformMessages,
     });
@@ -64,16 +69,19 @@ export const handleAIChat = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  const { messages, fileContext, userPublicKey, provider, userApiKey, model } = req.body;
+  const { messages, fileContext, userPublicKey, provider, model } = req.body;
 
   console.log("Request received - messages:", messages);
   console.log("Request received - fileContext exists:", !!fileContext, "length:", fileContext?.length || 0);
   console.log('provider', provider);
-  console.log('userApiKey provided', Boolean(userApiKey));
+  console.log('aiKeys provided', !!req.aiKeys);
   console.log('model', model);
   
   if (!model) return next(new AppError('Model is required', 400));
-  const resolvedProvider = provider ? provider as any : deduceProvider(model);
+  
+  // Cast to ensure proper type safety with the Provider type
+  const resolvedProvider = (provider ? provider : deduceProvider(model)) as Provider;
+  const apiKey = req.aiKeys?.[resolvedProvider];
 
   if (!Array.isArray(messages) || messages.length === 0) {
     next(new AppError('Invalid messages format', 400));
@@ -128,7 +136,7 @@ export const handleAIChat = async (
       // First try using the unified model dispatcher
       const content = await callModel({
         provider: resolvedProvider,
-        apiKey: userApiKey,
+        apiKey,
         model,
         messages: apiMessages,
       });
@@ -140,8 +148,8 @@ export const handleAIChat = async (
       console.log("callModel failed, trying fallback:", error.message);
       
       // Temporary: allow per-request override until we refactor openaiClient.
-      const openaiClient = userApiKey
-        ? new OpenAI({ apiKey: userApiKey })
+      const openaiClient = apiKey
+        ? new OpenAI({ apiKey })
         : openai;                    // existing singleton
 
       const response = await openaiClient.chat.completions.create({
