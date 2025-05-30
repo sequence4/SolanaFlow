@@ -19,12 +19,15 @@ RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
 
 # --- Rust + sccache ------------------------------------------------------------
 RUN curl -sSf https://sh.rustup.rs | bash -s -- -y --profile minimal
-# ⬇️  make Cargo visible in *all* subsequent layers
-ENV PATH="/root/.cargo/bin:/usr/local/bin:${PATH}" \
-    RUSTC_WRAPPER=/usr/local/bin/sccache \
-    SCCACHE_DIR=/opt/sccache
+# 1️⃣ add Cargo to PATH for every later layer
+ENV PATH="/root/.cargo/bin:/usr/local/bin:${PATH}"
 
+# 2️⃣ install sccache (wrapper not active yet)
 RUN cargo install sccache --locked
+
+# 3️⃣ now turn it on for the rest of the build
+ENV RUSTC_WRAPPER=/usr/local/bin/sccache \
+    SCCACHE_DIR=/opt/sccache
 
 # --- clone Agave once (separate layer so Git is cached) ------------------------
 ARG SOLANA_VERSION=v2.2.14
