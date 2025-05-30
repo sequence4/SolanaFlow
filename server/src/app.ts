@@ -7,6 +7,7 @@ import fileRoutes from '@/routes/fileRoutes';
 import orgRoutes from '@/routes/orgRoutes';
 import taskRoutes from '@/routes/taskRoutes';
 import aiRoutes from '@/routes/aiRoutes';
+import apiKeyRoutes from '@/routes/apiKeyRoutes';
 import { errorHandler } from '@/middleware/errorHandler';
 import { authMiddleware } from '@/middleware/authMiddleware';
 import { attachApiKey } from '@/middleware/attachApiKey';
@@ -52,6 +53,8 @@ app.use('/api/deploy', deployRoutes);
 app.use('/workspace', workspaceRoutes);
 app.use('/api/pool', poolRoutes); 
 app.use(internalCertRoute);
+// API key management with required middleware
+app.use('/user/api-keys', authMiddleware, attachApiKey, apiKeyRoutes);
 
 app.get('/health', (req, res) => {
   res.status(200).json({ message: 'Server is running' });
