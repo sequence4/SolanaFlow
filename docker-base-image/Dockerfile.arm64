@@ -45,7 +45,9 @@ RUN --mount=type=cache,id=cargo-registry,target=/root/.cargo/registry \
 RUN find /solana-src/bin -maxdepth 1 -type f -exec install -m 0755 -t /usr/local/bin {} + \
     && rm -rf /solana-src
 
-RUN rustup target add bpfel-unknown-unknown
+# rust-src lets Cargo build BPF std-libs on ARM64
+RUN rustup component add rust-src
+
 RUN cargo install anchor-cli --version 0.31.1 --locked
 RUN solana --version && cargo build-sbf --version && anchor --version
 
