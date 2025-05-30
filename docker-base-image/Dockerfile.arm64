@@ -25,7 +25,8 @@ ENV PATH="/root/.cargo/bin:/usr/local/bin:${PATH}"
 # 2️⃣ install sccache (wrapper not active yet)
 RUN cargo install sccache --locked
 
-# 3️⃣ now turn it on for the rest of the build
+# 3️⃣ expose sccache globally and turn it on
+RUN ln -s /root/.cargo/bin/sccache /usr/local/bin/sccache
 ENV RUSTC_WRAPPER=/usr/local/bin/sccache \
     SCCACHE_DIR=/opt/sccache
 
