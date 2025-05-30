@@ -37,9 +37,30 @@ import {
   Image, 
   Paperclip,
   Plus,
-  Trash2
+  Trash2,
+  ChevronDown
 } from "lucide-react";
 import MarkdownRenderer from '@/components/main/code/markdown/MarkdownRenderer';
+
+/** All models that Cursor exposes in "Models & Pricing". */
+const AVAILABLE_MODELS = [
+  { label: "GPT-4o",           value: "gpt-4o"   },
+  { label: "GPT-4.1",          value: "gpt-4.1"  },
+  { label: "Claude 4 Sonnet",  value: "claude-4-sonnet" },
+  { label: "Claude 4 Opus",    value: "claude-4-opus"   },
+  { label: "Claude 3.7 Sonnet",value: "claude-3.7-sonnet"},
+  { label: "Claude 3.5 Sonnet",value: "claude-3.5-sonnet"},
+  { label: "Gemini 2.5 Pro",   value: "gemini-2.5-pro"  },
+  { label: "Gemini 2.5 Flash", value: "gemini-2.5-flash"},
+  { label: "o3",               value: "o3" },
+  { label: "o4-mini",          value: "o4-mini" },
+  { label: "Grok 3 Beta",      value: "grok-3-beta" },
+  { label: "Grok 3 Mini",      value: "grok-3-mini" },
+  { label: "Auto-select",      value: "auto" }          // Cursor's smart picker
+] as const;
+
+const getModelLabel = (val: string) =>
+  AVAILABLE_MODELS.find(m => m.value === val)?.label ?? val;
 
 export interface AIMessageType {
   text: string;
@@ -186,7 +207,12 @@ const Chat: React.FC = () => {
                     )
                 );
 
-                const response = await chatAI(input, fileContexts, userPublicKeyString);
+                const response = await chatAI(
+                  input, 
+                  fileContexts, 
+                  userPublicKeyString,
+                  selectedModel
+                );
                 const responseText = await response;
 
                 setIsTyping(false);
@@ -288,6 +314,7 @@ const Chat: React.FC = () => {
                     <div className="flex items-center space-x-2">
                         <div className="w-2 h-2 rounded-full bg-green-500"></div>
                         <h4 className="font-medium text-sm text-gray-300">AI Assistant</h4>
+                        <span className="text-xs text-gray-500 ml-2">{getModelLabel(selectedModel)}</span>
                     </div>
                     <div className="flex items-center space-x-1">
                         <Button
@@ -435,8 +462,35 @@ const Chat: React.FC = () => {
                                 <Plus size={14} />
                             </Button>
                             <div className="flex-1"></div>
-                            <div className="text-xs text-gray-500 font-mono">
-                                {input.length > 0 ? `${input.length} chars` : "gpt-4o"}
+                            <div className="flex items-center gap-2 text-xs text-gray-500 font-mono">
+                              {/* live char counter */}
+                              <span>{input.length > 0 ? `${input.length} chars` : getModelLabel(selectedModel)}</span>
+
+                              {/* model selector */}
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5 rounded-full hover:bg-[#232329]"
+                                    aria-label="Select AI model"
+                                  >
+                                    <ChevronDown size={12} className="opacity-70" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+
+                                <DropdownMenuContent align="end" className="max-h-64 overflow-y-auto">
+                                  {AVAILABLE_MODELS.map(model => (
+                                    <DropdownMenuItem
+                                      key={model.value}
+                                      onClick={() => setSelectedModel(model.value)}
+                                      className={model.value === selectedModel ? "font-medium" : ""}
+                                    >
+                                      {model.label}
+                                    </DropdownMenuItem>
+                                  ))}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                         </div>
 

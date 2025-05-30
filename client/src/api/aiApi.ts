@@ -71,16 +71,19 @@ export const promptAI_v2 = async (
 export const chatAI = async (
   message: string, 
   fileContexts: { path: string; content: string }[] = [], 
-  userPublicKey?: string
+  userPublicKey?: string,
+  model: string = 'gpt-4o'
 ) => {
   const body = { 
     messages: [{ role: "user", content: message }],
     fileContext: fileContexts,
     apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY,
-    userPublicKey: userPublicKey
+    userPublicKey: userPublicKey,
+    model: model
   };
 
   console.log('Sending request to AI chat API with message:', message);
+  console.log('Using model:', model);
   console.log('File contexts included:', fileContexts.length);
   console.log('User public key provided:', userPublicKey ? 'Yes' : 'No');
   if (userPublicKey) {
