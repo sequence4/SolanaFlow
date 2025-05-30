@@ -6,6 +6,7 @@ import { openai } from '../utils/openaiClient';
 import { OpenAI } from 'openai';
 import type { ChatCompletionMessageParam, ChatCompletionRole } from 'openai/resources/chat';
 import { getWalletBalanceSol, functionDefs } from '../utils/getWalletBalanceSol';
+import { callModel, deduceProvider } from '../utils/callModel';
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
 export const generateAIResponse = async (
@@ -39,26 +40,18 @@ export const generateAIResponse = async (
   }));
 
   try {
-    console.log('Calling OpenAI with:', { model, requestBody: transformMessages });
+    console.log('Calling AI with:', { model, requestBody: transformMessages });
 
-    // Temporary: allow per-request override until we refactor openaiClient.
-    const openaiClient = userApiKey
-      ? new OpenAI({ apiKey: userApiKey })
-      : openai;                    // existing singleton
-
-    const completion = await openaiClient.chat.completions.create({
+    const answer = await callModel({
+      provider: provider ? provider as any : deduceProvider(model),
+      apiKey: userApiKey,
       model,
       messages: transformMessages,
-      max_tokens: 3000,
-      temperature: 0.2,
     });
-
-    const responseData = completion.choices[0]?.message?.content || '';
-    console.log('OpenAI response:', responseData);
-
+    
     res.status(200).json({
       message: 'AI response generated successfully',
-      data: responseData,
+      data: answer,
     });
   } catch (error) {
     console.error('Error generating AI response:', error);
@@ -71,13 +64,17 @@ export const handleAIChat = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  const { messages, fileContext, userPublicKey, provider, userApiKey } = req.body;
+  const { messages, fileContext, userPublicKey, provider, userApiKey, model } = req.body;
 
   console.log("Request received - messages:", messages);
   console.log("Request received - fileContext exists:", !!fileContext, "length:", fileContext?.length || 0);
   console.log('provider', provider);
   console.log('userApiKey provided', Boolean(userApiKey));
+  console.log('model', model);
   
+  if (!model) return next(new AppError('Model is required', 400));
+  const resolvedProvider = provider ? provider as any : deduceProvider(model);
+
   if (!Array.isArray(messages) || messages.length === 0) {
     next(new AppError('Invalid messages format', 400));
     return;
@@ -121,54 +118,70 @@ export const handleAIChat = async (
 
     console.log("Calling OpenAI with functionDefs:", JSON.stringify(functionDefs.map(def => def.function)));
 
-    // Temporary: allow per-request override until we refactor openaiClient.
-    const openaiClient = userApiKey
-      ? new OpenAI({ apiKey: userApiKey })
-      : openai;                    // existing singleton
-
     // Convert messages to the format OpenAI expects
     const apiMessages = chatMessages.map(m => ({
       role: m.role as any,  // Pragmatic type assertion to satisfy the compiler
       content: m.content
     }));
 
-    const response = await openaiClient.chat.completions.create({
-      model: 'gpt-4-0613',  // Model that supports function calling
-      messages: apiMessages,
-      temperature: 0.7,
-      max_tokens: 1000,
-      top_p: 1,
-      frequency_penalty: 0,
-      presence_penalty: 0,
-      functions: functionDefs.map(def => def.function),  // Extract just the function part
-      function_call: 'auto',  // Let the model decide when to call functions
-    });
+    try {
+      // First try using the unified model dispatcher
+      const content = await callModel({
+        provider: resolvedProvider,
+        apiKey: userApiKey,
+        model,
+        messages: apiMessages,
+      });
 
-    const msg = response.choices[0].message;
-    console.log("OpenAI response:", JSON.stringify(msg));
-
-    if (msg?.function_call) {
-      console.log("Function call detected:", JSON.stringify(msg.function_call));
-      const name = msg.function_call.name;
-      const argsStr = msg.function_call.arguments;
-
-      if (name === 'getWalletBalance') {
-        const args = JSON.parse(argsStr || '{}');
-        console.log("Function args:", args);
-        console.log("User public key:", userPublicKey);
-        args.address = userPublicKey || args.address;
-        
-        const solBalance = await getWalletBalanceSol(args.address);
-        console.log("SOL balance:", solBalance);
-        
-        res.status(200).json({
-          response: `Your wallet at address ${args.address} has a balance of ${solBalance} SOL.`,
-        });
-        return;
-      }
-    } else {
-      const content = msg?.content || '';
       res.status(200).json({ response: content });
+      return;
+    } catch (error: any) {
+      // Fallback to original code if callModel fails
+      console.log("callModel failed, trying fallback:", error.message);
+      
+      // Temporary: allow per-request override until we refactor openaiClient.
+      const openaiClient = userApiKey
+        ? new OpenAI({ apiKey: userApiKey })
+        : openai;                    // existing singleton
+
+      const response = await openaiClient.chat.completions.create({
+        model: 'gpt-4-0613',  // Model that supports function calling
+        messages: apiMessages,
+        temperature: 0.7,
+        max_tokens: 1000,
+        top_p: 1,
+        frequency_penalty: 0,
+        presence_penalty: 0,
+        functions: functionDefs.map(def => def.function),  // Extract just the function part
+        function_call: 'auto',  // Let the model decide when to call functions
+      });
+
+      const msg = response.choices[0].message;
+      console.log("OpenAI response:", JSON.stringify(msg));
+
+      if (msg?.function_call) {
+        console.log("Function call detected:", JSON.stringify(msg.function_call));
+        const name = msg.function_call.name;
+        const argsStr = msg.function_call.arguments;
+
+        if (name === 'getWalletBalance') {
+          const args = JSON.parse(argsStr || '{}');
+          console.log("Function args:", args);
+          console.log("User public key:", userPublicKey);
+          args.address = userPublicKey || args.address;
+          
+          const solBalance = await getWalletBalanceSol(args.address);
+          console.log("SOL balance:", solBalance);
+          
+          res.status(200).json({
+            response: `Your wallet at address ${args.address} has a balance of ${solBalance} SOL.`,
+          });
+          return;
+        }
+      } else {
+        const content = msg?.content || '';
+        res.status(200).json({ response: content });
+      }
     }
   } catch (error) {
     console.error('Error generating AI chat response:', error);
