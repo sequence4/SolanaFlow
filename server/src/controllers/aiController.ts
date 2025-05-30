@@ -1,26 +1,29 @@
 import { Request, Response, NextFunction } from 'express';
+import { ChatRequestBody } from '../types/chat';
 import { AppError } from '../middleware/errorHandler';
 import { logMessages } from '../utils/aiLog';
 import { openai } from '../utils/openaiClient';
-import type { ChatCompletionMessageParam } from 'openai/resources/chat';
+import { OpenAI } from 'openai';
+import type { ChatCompletionMessageParam, ChatCompletionRole } from 'openai/resources/chat';
 import { getWalletBalanceSol, functionDefs } from '../utils/getWalletBalanceSol';
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
 export const generateAIResponse = async (
-  req: Request,
+  req: Request<{}, {}, ChatRequestBody & { _schema?: any }>,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  const { messages, model, _schema } = req.body;
+  const { messages, model, provider, userApiKey, _schema } = req.body;
   const _schema_name = 'function_logic_schema';
 
   console.log('messages', messages);
   console.log('model', model);
   console.log('_schema', _schema);
+  console.log('provider', provider);
+  console.log('userApiKey provided', Boolean(userApiKey));
 
-  if (model !== 'gpt-4o') {
-    console.error(`Unsupported model: ${model}`);
-    next(new AppError('Unsupported model', 400));
+  if (!model) {
+    next(new AppError('Model is required', 400));
     return;
   }
 
@@ -30,21 +33,21 @@ export const generateAIResponse = async (
     return;
   }
 
-  const transformMessages: ChatCompletionMessageParam[] = messages.map((message) => ({
-    role: 'user',
-    content: [
-      {
-        type: 'text',
-        text: message,
-      },
-    ],
+  const transformMessages: ChatCompletionMessageParam[] = messages.map((m) => ({
+    role: m.role as any,   // Pragmatic type assertion to satisfy the compiler
+    content: m.content     // plain string is fine
   }));
 
   try {
     console.log('Calling OpenAI with:', { model, requestBody: transformMessages });
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
+    // Temporary: allow per-request override until we refactor openaiClient.
+    const openaiClient = userApiKey
+      ? new OpenAI({ apiKey: userApiKey })
+      : openai;                    // existing singleton
+
+    const completion = await openaiClient.chat.completions.create({
+      model,
       messages: transformMessages,
       max_tokens: 3000,
       temperature: 0.2,
@@ -64,14 +67,16 @@ export const generateAIResponse = async (
 };
 
 export const handleAIChat = async (
-  req: Request,
+  req: Request<{}, {}, ChatRequestBody>,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  const { messages, fileContext, userPublicKey } = req.body;
+  const { messages, fileContext, userPublicKey, provider, userApiKey } = req.body;
 
   console.log("Request received - messages:", messages);
   console.log("Request received - fileContext exists:", !!fileContext, "length:", fileContext?.length || 0);
+  console.log('provider', provider);
+  console.log('userApiKey provided', Boolean(userApiKey));
   
   if (!Array.isArray(messages) || messages.length === 0) {
     next(new AppError('Invalid messages format', 400));
@@ -116,9 +121,20 @@ export const handleAIChat = async (
 
     console.log("Calling OpenAI with functionDefs:", JSON.stringify(functionDefs.map(def => def.function)));
 
-    const response = await openai.chat.completions.create({
+    // Temporary: allow per-request override until we refactor openaiClient.
+    const openaiClient = userApiKey
+      ? new OpenAI({ apiKey: userApiKey })
+      : openai;                    // existing singleton
+
+    // Convert messages to the format OpenAI expects
+    const apiMessages = chatMessages.map(m => ({
+      role: m.role as any,  // Pragmatic type assertion to satisfy the compiler
+      content: m.content
+    }));
+
+    const response = await openaiClient.chat.completions.create({
       model: 'gpt-4-0613',  // Model that supports function calling
-      messages: chatMessages,
+      messages: apiMessages,
       temperature: 0.7,
       max_tokens: 1000,
       top_p: 1,
