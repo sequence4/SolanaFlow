@@ -1,122 +1,83 @@
-FROM --platform=linux/arm64 ubuntu:22.04 AS builder
-ARG DEBIAN_FRONTEND=noninteractive
-ARG NODE_VERSION="v20.18.0"
-ARG SOLANA_CHANNEL="stable"
+# syntax=docker/dockerfile:1.7
+ARG BUILDKIT_INLINE_CACHE=1
 
-ENV HOME=/root
-ENV PATH=/usr/local/bin:$HOME/.cargo/bin:$HOME/.local/share/solana/install/active_release/bin:$HOME/.nvm/versions/node/${NODE_VERSION}/bin:$PATH
+################################################################################
+# 1.  Compile Solana/Agave + SBF once, cache forever
+################################################################################
+FROM --platform=linux/arm64 ubuntu:22.04 AS solana-toolchain
+LABEL stage=toolchain
 
-# ── base packages ──────────────────────────────────────────────────────────
-RUN set -e; \
-    echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80retry; \
-    apt-get update -o Acquire::AllowReleaseInfoChange=true -qq && \
+# --- base packages (APT caches) ------------------------------------------------
+RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked \
+    apt-get update -qq && \
+    DEBIAN_FRONTEND=noninteractive \
     apt-get install -y --no-install-recommends \
-        build-essential git curl wget jq pkg-config python3 \
-        libssl-dev libudev-dev zlib1g-dev llvm clang cmake make \
-        libprotobuf-dev protobuf-compiler ca-certificates \
-        xz-utils bzip2 && \
+      build-essential git curl pkg-config llvm clang cmake protobuf-compiler \
+      libssl-dev libudev-dev zlib1g-dev xz-utils bzip2 ca-certificates && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Rust
-RUN curl -sSf https://sh.rustup.rs | bash -s -- -y --profile minimal --default-toolchain stable && \
-    . "$HOME/.cargo/env" && rustup component add rustfmt clippy
+# --- Rust + sccache ------------------------------------------------------------
+RUN curl -sSf https://sh.rustup.rs | bash -s -- -y --profile minimal
+ENV PATH="$HOME/.cargo/bin:/usr/local/bin:$PATH" \
+    RUSTC_WRAPPER=/usr/local/bin/sccache \
+    SCCACHE_DIR=/opt/sccache
+RUN cargo install sccache --locked
 
-# Node + Yarn
-RUN curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-ENV NVM_DIR=$HOME/.nvm
-RUN . "$NVM_DIR/nvm.sh" && nvm install ${NODE_VERSION} && nvm use ${NODE_VERSION} && \
-    nvm alias default ${NODE_VERSION} && npm install -g yarn
-
-ARG CACHEBUST=20250525
-RUN echo "$CACHEBUST"
-
-# bump this any time you need to invalidate the Solana-download layer
-ARG SOLANA_CACHEBUST=20250527
-RUN echo "$SOLANA_CACHEBUST" > /dev/null
-
-# ---------- switch default shell from dash to bash -------------------
-SHELL ["/bin/bash", "-euxo", "pipefail", "-c"]
-
-###############################################################################
-# --- Solana / Anchor tool-chain ---------------------------------------------
-###############################################################################
-ARG SOLANA_VERSION=v2.2.14        # latest Devnet-recommended tag
+# --- clone Agave once (separate layer so Git is cached) ------------------------
+ARG SOLANA_VERSION=v2.2.14
 ARG SOLANA_REPO=https://github.com/anza-xyz/agave.git
+RUN git clone --depth 1 --branch ${SOLANA_VERSION} ${SOLANA_REPO} /solana-src
+WORKDIR /solana-src
 
-# 1.  Build the full Agave tool-chain (CLI + SBF helpers) from source
-RUN git clone --depth 1 --branch ${SOLANA_VERSION} ${SOLANA_REPO} /solana-src \
- && cd /solana-src \
- && ./scripts/cargo-install-all.sh . \
- && cp -v ./bin/* /usr/local/bin/ \
- && cd / && rm -rf /solana-src
+# --- build all CLI + SBF helpers (cached Cargo & sccache) ----------------------
+RUN --mount=type=cache,id=cargo-registry,target=/root/.cargo/registry \
+    --mount=type=cache,id=cargo-git,target=/root/.cargo/git \
+    --mount=type=cache,id=sccache,target=/opt/sccache \
+    ./scripts/cargo-install-all.sh . || true
 
-# 2.  Ensure the Rust BPF/SBF target is available
-RUN rustup target add bpfel-unknown-unknown   # required by cargo-build-sbf
-
-# 3.  Anchor CLI (still fine at 0.31.1)
-RUN cargo install --git https://github.com/coral-xyz/anchor anchor-cli --tag v0.31.1 --locked --force && \
-    anchor --version
-
-# 4.  (optional) smoke-test
+RUN cp -v /solana-src/bin/* /usr/local/bin && rm -rf /solana-src
+RUN rustup target add bpfel-unknown-unknown
+RUN cargo install anchor-cli --version 0.31.1 --locked
 RUN solana --version && cargo build-sbf --version && anchor --version
 
-# Anchor template (cache-warm)
-RUN set -e; \
-    mkdir -p /usr/src /opt && \
-    cd /usr/src && anchor init anchor-template --no-git && \
-    cd anchor-template && anchor build -- --locked || true && \
-    rm -rf target && mv /usr/src/anchor-template /opt/anchor-template
+################################################################################
+# 2.  Builder stage – inherits tool-chain, builds app
+################################################################################
+FROM --platform=linux/arm64 solana-toolchain AS builder
+ARG NODE_VERSION="v20.18.0"
+ENV HOME=/root
+ENV PATH=/usr/local/bin:$HOME/.cargo/bin:$PATH
 
-# Minimal Next.js scaffold (for web playground)
+# --- Node + Yarn ---------------------------------------------------------------
+RUN curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+ENV NVM_DIR=$HOME/.nvm
+RUN . "$NVM_DIR/nvm.sh" && nvm install ${NODE_VERSION} && nvm alias default ${NODE_VERSION} && npm i -g yarn
+
+# minimal Next.js scaffold (cached Yarn)
 ENV NEXT_TELEMETRY_DISABLED=1 NEXT_SKIP_ESLINT=1
-RUN set -e; \
+RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing=locked \
     mkdir -p /usr/share/solanaflow && \
     CI=1 yarn create next-app /usr/share/solanaflow/web \
       --typescript --eslint --tailwind --app --no-src-dir --no-interactive && \
-    yarn --cwd /usr/share/solanaflow/web add -E @tailwindcss/postcss@latest && \
     printf '\nmodule.exports = { output: "standalone" };\n' >> /usr/share/solanaflow/web/next.config.js && \
     yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile && \
     yarn --cwd /usr/share/solanaflow/web build && \
-    yarn --cwd /usr/share/solanaflow/web install --production --ignore-scripts --prefer-offline && \
-    rm -rf /usr/share/solanaflow/web/.next/cache && \
-    # ---- CLEAN BUILD CACHES ----------------------------------------------
-    yarn --cwd /usr/share/solanaflow/web cache clean --all && \
-    rm -rf /usr/local/share/.cache/yarn  /root/.cache/yarn  "$NVM_DIR/.cache"
+    yarn cache clean && rm -rf /usr/local/share/.cache/yarn
 
-# Guarantee Solana bin dir exists (defensive)
-RUN mkdir -p /root/.local/share/solana/install/active_release/bin
-
-# Expose tools via universally-searched path
-RUN ln -sf /root/.cargo/bin/anchor /usr/local/bin/anchor && \
-    ln -sf /root/.local/share/solana/install/active_release/bin/solana* /usr/local/bin/ || true
-
-# ── runtime stage ─────────────────────────────────────────────────────────
-FROM builder AS runtime
-ARG RUNTIME_BUST=20250527
-RUN echo "$RUNTIME_BUST"
-
-ENV HOSTNAME=0.0.0.0
-ENV NEXT_DISABLE_SWC=1
+################################################################################
+# 3.  Runtime – slim final image
+################################################################################
+FROM ubuntu:22.04 AS runtime
+ENV PATH=/usr/local/bin:/root/.cargo/bin:$PATH \
+    HOSTNAME=0.0.0.0 NEXT_DISABLE_SWC=1
 WORKDIR /usr/share/solanaflow/web
 
-# app + template
-COPY --from=builder /usr/share/solanaflow   /usr/share/solanaflow
-COPY --from=builder /opt/anchor-template    /usr/src/anchor-template
+# bring in compiled CLI + app
+COPY --from=solana-toolchain /usr/local/bin /usr/local/bin
+COPY --from=builder /usr/share/solanaflow /usr/share/solanaflow
 
-# Solana + Anchor tool-chain
-COPY --from=builder /root/.local/share/solana /root/.local/share/solana
-COPY --from=builder /root/.cargo/bin          /root/.cargo/bin
-COPY --from=builder /usr/local/bin/anchor     /usr/local/bin/anchor
-COPY --from=builder /usr/local/bin/solana     /usr/local/bin/solana
-
-# 🔑 expose Solana CLI (and any helpers) universally
-RUN ln -sf /root/.local/share/solana/install/active_release/bin/solana* /usr/local/bin/
-
-# Put /usr/local/bin first in PATH *then* smoke-test
-ENV PATH=/usr/local/bin:/root/.local/share/solana/install/active_release/bin:/root/.cargo/bin:$PATH
-
-# Smoke-test: abort build early if any tool disappeared
-RUN solana --version && anchor --version && rustc --version
+RUN solana --version && anchor --version   # final smoke-test
 
 EXPOSE 3000
 CMD ["node", ".next/standalone/server.js"]
