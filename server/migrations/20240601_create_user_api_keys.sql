@@ -1,6 +1,6 @@
 -- Stores one encrypted vendor key per user & provider
 CREATE TABLE IF NOT EXISTS user_api_keys (
-  user_id      UUID      REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL,
   provider     TEXT      NOT NULL,
   key_cipher   BYTEA     NOT NULL,
   created_at   TIMESTAMPTZ DEFAULT NOW(),
