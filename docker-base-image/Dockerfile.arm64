@@ -42,8 +42,9 @@ RUN --mount=type=cache,id=cargo-registry,target=/root/.cargo/registry \
     --mount=type=cache,id=sccache,target=/opt/sccache \
     ./scripts/cargo-install-all.sh . || true
 
-# copy only executables, skip deps/ dir
+# copy CLI executables **and** the SBF SDK expected by cargo-build-sbf
 RUN find /solana-src/bin -maxdepth 1 -type f -exec install -m 0755 -t /usr/local/bin {} + \
+    && cp -r /solana-src/platform-tools-sdk /usr/local/bin/platform-tools-sdk \
     && rm -rf /solana-src
 
 # rust-src lets Cargo build BPF std-libs on ARM64
