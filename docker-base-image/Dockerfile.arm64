@@ -50,6 +50,16 @@ RUN find /solana-src/bin -maxdepth 1 -type f -exec install -m 0755 -t /usr/local
 RUN rustup component add rust-src
 
 RUN cargo install anchor-cli --version 0.31.1 --locked
+
+# Install a minimal Node just for anchor init (no Yarn download needed)
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+ && apt-get update -qq \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs \
+ && anchor init anchor-template --no-git --no-install \
+ && rm -rf anchor-template/node_modules \
+ && mv /solana-src/anchor-template /usr/src/anchor-template \
+ && test -f /usr/src/anchor-template/Anchor.toml
+
 RUN solana --version && cargo build-sbf --version && anchor --version
 
 ################################################################################
