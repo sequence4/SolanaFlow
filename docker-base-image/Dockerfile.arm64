@@ -59,10 +59,12 @@ FROM --platform=linux/arm64 solana-toolchain AS builder
 ARG NODE_VERSION="v20.18.0"
 ENV HOME=/root
 ENV PATH=/usr/local/bin:$HOME/.cargo/bin:$PATH
+ENV NVM_DIR=$HOME/.nvm
+# 👇 make node & yarn visible in every later layer
+ENV PATH="$NVM_DIR/versions/node/${NODE_VERSION}/bin:$PATH"
 
 # --- Node + Yarn ---------------------------------------------------------------
 RUN curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-ENV NVM_DIR=$HOME/.nvm
 RUN . "$NVM_DIR/nvm.sh" && nvm install ${NODE_VERSION} && nvm alias default ${NODE_VERSION} && npm i -g yarn
 
 # minimal Next.js scaffold (cached Yarn)
