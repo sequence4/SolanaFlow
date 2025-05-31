@@ -49,11 +49,18 @@ RUN --mount=type=cache,id=cargo-registry,target=/root/.cargo/registry \
     --mount=type=cache,id=cargo-git,target=/root/.cargo/git \
     --mount=type=cache,id=sccache,target=/opt/sccache \
     --mount=type=cache,id=solana-target,target=/opt/target,sharing=locked \
-    ./scripts/cargo-install-all.sh . || true
+    ./scripts/cargo-install-all.sh .
 
 # --- copy CLI executables & SDK -------------------------------------------------
 RUN find /solana-src/bin -maxdepth 1 -type f -exec install -m 0755 -t /usr/local/bin {} + \
     && cp -r /solana-src/platform-tools-sdk /usr/local/bin/platform-tools-sdk
+
+# Copy cargo sub-command plugins (cargo-build-sbf, etc.)
+RUN install -m 0755 /root/.cargo/bin/cargo-* /usr/local/bin/ \
+    && ls -1 /usr/local/bin | grep cargo-build-sbf
+
+# Verify cargo-build-sbf is available
+RUN command -v cargo-build-sbf
 
 # --- install Anchor & Node (minimal) -------------------------------------------
 RUN rustup component add rust-src \
