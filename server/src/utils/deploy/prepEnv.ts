@@ -1,13 +1,13 @@
 import pool from 'src/config/database';
 import { v4 as uuidv4 } from 'uuid';
 import {
-  startProjectContainer,
   runCommand,
 } from '../projectUtils';
 import {
   rentContainerFromPool,
   releaseContainerToPool,
-} from '../container/rentContainerFromPool';
+  startProjectContainer
+} from '../container';
 import {
   resolveContainerUrl,
   isUrlAlive,

@@ -1,6 +1,7 @@
 import { prepEnv } from '../prepEnv'
 import poolMock from '../../../../tests/__mocks__/@db'
 import * as projectUtils from '../../projectUtils'
+import * as containerUtils from '../../container'
 import * as containerPool from '../../container/rentContainerFromPool'
 import * as helpers from '../../container/containerHelpers'
 import { mockNextQueryOnce } from '../../../../tests/test-helpers/mockDbQueries'
@@ -15,16 +16,13 @@ jest.mock('src/utils/container/containerHelpers', () => {
   };
 });
 
-jest.mock('../../projectUtils', () => ({
-  startProjectContainer: jest.fn()
-}));
-
-jest.mock('../../container/rentContainerFromPool', () => ({
+jest.mock('../../container', () => ({
+  startProjectContainer: jest.fn(),
   rentContainerFromPool: jest.fn()
 }));
 
-const startProjectContainer = projectUtils.startProjectContainer as jest.Mock
-const rentContainerFromPool = containerPool.rentContainerFromPool as jest.Mock
+const startProjectContainer = containerUtils.startProjectContainer as jest.Mock
+const rentContainerFromPool = containerUtils.rentContainerFromPool as jest.Mock
 const isUrlAlive = helpers.isUrlAlive as jest.Mock
 const folderExists = helpers.folderExists as jest.Mock
 const resolveContainerUrl = helpers.resolveContainerUrl as jest.Mock
