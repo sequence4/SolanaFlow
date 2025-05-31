@@ -83,11 +83,12 @@ RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing
 ################################################################################
 FROM ubuntu:22.04 AS runtime
 ENV PATH=/usr/local/bin:/root/.cargo/bin:$PATH \
-    HOSTNAME=0.0.0.0 NEXT_DISABLE_SWC=1
+    HOST=0.0.0.0 NEXT_DISABLE_SWC=1
 WORKDIR /usr/share/solanaflow/web
 
 # bring in compiled CLI + app
 COPY --from=solana-toolchain /usr/local/bin /usr/local/bin
+COPY --from=solana-toolchain /root/.cargo/bin /root/.cargo/bin
 COPY --from=builder /usr/share/solanaflow /usr/share/solanaflow
 
 RUN solana --version && anchor --version   # final smoke-test
