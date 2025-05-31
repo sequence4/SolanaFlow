@@ -6,6 +6,8 @@ ARG BUILDKIT_INLINE_CACHE=1
 ################################################################################
 FROM --platform=linux/arm64 ubuntu:22.04 AS solana-toolchain
 LABEL stage=toolchain
+ARG SOLANA_VERSION=v2.2.14
+ARG SOLANA_REPO=https://github.com/anza-xyz/agave.git
 
 # --- base packages (APT caches) ------------------------------------------------
 RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
@@ -31,8 +33,6 @@ ENV RUSTC_WRAPPER=/usr/local/bin/sccache \
     SCCACHE_DIR=/opt/sccache
 
 # --- clone Agave once (separate layer so Git is cached) ------------------------
-ARG SOLANA_VERSION=v2.2.14
-ARG SOLANA_REPO=https://github.com/anza-xyz/agave.git
 RUN git clone --depth 1 --branch ${SOLANA_VERSION} ${SOLANA_REPO} /solana-src
 WORKDIR /solana-src
 
@@ -42,25 +42,36 @@ RUN --mount=type=cache,id=cargo-registry,target=/root/.cargo/registry \
     --mount=type=cache,id=sccache,target=/opt/sccache \
     ./scripts/cargo-install-all.sh . || true
 
-# copy CLI executables **and** the SBF SDK expected by cargo-build-sbf
+# --- copy CLI executables & SDK -------------------------------------------------
 RUN find /solana-src/bin -maxdepth 1 -type f -exec install -m 0755 -t /usr/local/bin {} + \
     && cp -r /solana-src/platform-tools-sdk /usr/local/bin/platform-tools-sdk
 
-# rust-src lets Cargo build BPF std-libs on ARM64
-RUN rustup component add rust-src
+# --- add cargo source & global target dir --------------------------------------
+ENV RUSTUP_HOME=/root/.rustup \
+    CARGO_HOME=/root/.cargo \
+    CARGO_TARGET_DIR=/opt/target
+RUN mkdir -p $CARGO_TARGET_DIR \
+    && chown -R 1000:1000 $CARGO_TARGET_DIR   # node user later
 
-RUN cargo install anchor-cli --version 0.31.1 --locked
+# --- install Anchor & Node (minimal) -------------------------------------------
+RUN rustup component add rust-src \
+    && cargo install anchor-cli --version 0.31.1 --locked \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get update -qq \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs
 
-# Install a minimal Node just for anchor init (no Yarn download needed)
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
- && apt-get update -qq \
- && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs \
- && anchor init anchor-template --no-git --no-install \
- && rm -rf anchor-template/node_modules \
- && mv /solana-src/anchor-template /usr/src/anchor-template \
- && rm -rf /solana-src \
- && test -f /usr/src/anchor-template/Anchor.toml
+# --- PRIME THE CACHE! ----------------------------------------------------------
+# 1. create template     2. build it once     3. move into /usr/src
+WORKDIR /tmp
+RUN anchor init anchor-template --no-git --no-install \
+    && (cd anchor-template && anchor build -- --locked) \
+    && rm -rf anchor-template/node_modules \
+    && mv anchor-template /usr/src/anchor-template
 
+# --- clean up source tree ------------------------------------------------------
+RUN rm -rf /solana-src /tmp/*
+
+# --- sanity smoke tests --------------------------------------------------------
 RUN solana --version && cargo build-sbf --version && anchor --version
 
 ################################################################################
