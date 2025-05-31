@@ -24,6 +24,14 @@ RUN curl -sSf https://sh.rustup.rs | bash -s -- -y --profile minimal
 # 1️⃣ add Cargo to PATH for every later layer
 ENV PATH="/root/.cargo/bin:/usr/local/bin:${PATH}"
 
+# 🆕 Global Cargo config **before** we start compiling.
+# Everything under /opt/target will be cached by BuildKit.
+ENV RUSTUP_HOME=/root/.rustup \
+    CARGO_HOME=/root/.cargo \
+    CARGO_TARGET_DIR=/opt/target
+
+RUN mkdir -p /opt/target
+
 # 2️⃣ install sccache (wrapper not active yet)
 RUN cargo install sccache --locked
 
@@ -40,18 +48,12 @@ WORKDIR /solana-src
 RUN --mount=type=cache,id=cargo-registry,target=/root/.cargo/registry \
     --mount=type=cache,id=cargo-git,target=/root/.cargo/git \
     --mount=type=cache,id=sccache,target=/opt/sccache \
+    --mount=type=cache,id=solana-target,target=/opt/target,sharing=locked \
     ./scripts/cargo-install-all.sh . || true
 
 # --- copy CLI executables & SDK -------------------------------------------------
 RUN find /solana-src/bin -maxdepth 1 -type f -exec install -m 0755 -t /usr/local/bin {} + \
     && cp -r /solana-src/platform-tools-sdk /usr/local/bin/platform-tools-sdk
-
-# --- add cargo source & global target dir --------------------------------------
-ENV RUSTUP_HOME=/root/.rustup \
-    CARGO_HOME=/root/.cargo \
-    CARGO_TARGET_DIR=/opt/target
-RUN mkdir -p $CARGO_TARGET_DIR \
-    && chown -R 1000:1000 $CARGO_TARGET_DIR   # node user later
 
 # --- install Anchor & Node (minimal) -------------------------------------------
 RUN rustup component add rust-src \
