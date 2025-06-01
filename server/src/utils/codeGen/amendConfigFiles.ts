@@ -155,6 +155,24 @@ async function patchProgramCargoToml(
   const idlBuildFeatureLine = 'idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]';
   const defaultFeaturesLine = 'default   = []';
   
+  /* ───────── 1. ensure anchor-spl in [dependencies] ───────── */
+  const splDepLine = 'anchor-spl = "0.31.1"';           // pin to same version as CLI
+
+  /* find (or create) the [dependencies] block */
+  let depStart = cargoLines.findIndex(l => l.trim() === '[dependencies]');
+  if (depStart === -1) {
+    cargoLines.push('', '[dependencies]', splDepLine, '');
+  } else {
+    let depEnd = cargoLines.length;
+    for (let i = depStart + 1; i < cargoLines.length; i++) {
+      if (/^\[.*\]/.test(cargoLines[i].trim())) { depEnd = i; break; }
+    }
+    const hasSpl = cargoLines
+      .slice(depStart + 1, depEnd)
+      .some(l => l.trim().startsWith('anchor-spl'));
+    if (!hasSpl) cargoLines.splice(depEnd, 0, splDepLine);
+  }
+  
   // Check if [features] section exists
   let featuresStart = cargoLines.findIndex(l => l.trim() === '[features]');
   
