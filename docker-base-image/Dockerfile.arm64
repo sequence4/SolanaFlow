@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 ARG BUILDKIT_INLINE_CACHE=1
-ARG BASE_TOOLCHAIN=ghcr.io/sequence4/solana-toolchain:v2.2.14
+ARG BASE_TOOLCHAIN=ghcr.io/sequence4/solana-toolchain:latest
 
 ###############################################################################
 # 1.  Solana / Agave tool-chain – pulled pre-built, then lightly patched
