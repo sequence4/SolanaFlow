@@ -124,14 +124,21 @@ async function listGeneratedPrograms(
 
   const programDirs: string[] = [];
   for (const entry of entries) {
-    if (entry.type === 'directory') {
+    if (entry.type !== 'directory') continue;
+
+    /* retry up to 5 × 200 ms in case code-gen writes Cargo.toml a bit late */
+    const cargoPath = `programs/${entry.name}/Cargo.toml`;
+    for (let attempt = 1; attempt <= 5; attempt++) {
       try {
-        // Check if directory contains a Cargo.toml
-        await getFileContentBlocking(projectId, `programs/${entry.name}/Cargo.toml`, userId);
-        programDirs.push(`programs/${entry.name}`);
-      } catch (error) {
-        // Skip directories without Cargo.toml
-        console.log(`[AMEND] Skipping non-program directory: programs/${entry.name}`);
+        await getFileContentBlocking(projectId, cargoPath, userId);
+        programDirs.push(`programs/${entry.name}`);        // success!
+        break;
+      } catch (err) {
+        if (attempt === 5) {
+          console.log(`[AMEND] Skipping ${cargoPath} – still missing after retries`);
+        } else {
+          await new Promise(r => setTimeout(r, 200));
+        }
       }
     }
   }
