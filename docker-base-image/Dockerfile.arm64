@@ -44,9 +44,10 @@ ENV RUSTC_WRAPPER=/usr/local/bin/sccache \
 RUN git clone --depth 1 --branch ${SOLANA_VERSION} ${SOLANA_REPO} /solana-src
 WORKDIR /solana-src
 
-# ─── hot-fix cargo-install-all so the cp line never fails ───
-RUN sed -i '/cp .*target\\/release\\/solana/s/^/#/' \
-    /solana-src/scripts/cargo-install-all.sh
+# ---- hot-fix: disable wrong cp target/release/solana ----
+RUN sed -Ei \
+    's@cp +.?target/release/solana@# & (disabled – CARGO_TARGET_DIR is /opt/target)@' \
+    scripts/cargo-install-all.sh
 
 # --- build all CLI + SBF helpers (cached Cargo & sccache) ----------------------
 RUN --mount=type=cache,id=cargo-registry,target=/root/.cargo/registry \
