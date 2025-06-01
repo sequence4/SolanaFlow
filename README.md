@@ -110,8 +110,9 @@ This project uses a [PNPM workspace](https://pnpm.io/workspaces) for managing de
     ```
   - Remember that any variables without `NEXT_PUBLIC_` stay server-side in Next.js, and variables with `NEXT_PUBLIC_` are exposed to the browser.
 
-- **Server**:
-  - **Required variables**:
+ - **Server**:
+  - Create a `.env.development` file inside the `server` folder with at least the following variables.
+    `dotenv-flow` loads this automatically when running `pnpm dev`:
     ```ini
     PORT=9999
     JWT_SECRET=YOUR_JWT_SECRET
@@ -123,8 +124,10 @@ This project uses a [PNPM workspace](https://pnpm.io/workspaces) for managing de
     DB_NAME=YOUR_DB_NAME
     DB_PASSWORD=YOUR_DB_PASSWORD
     OPENAI_API_KEY=sk-xxxxxxx
+    BETA_CODE=YOUR_INVITE_CODE
+    API_KEY_ENCRYPTION_SECRET=32_BYTE_HEX_SECRET
     ```
-  - Ensure `.env` is added to `.gitignore` to keep sensitive info private.
+  - Ensure `.env*` files are listed in `.gitignore` to keep sensitive info private.
 
 ---
 
