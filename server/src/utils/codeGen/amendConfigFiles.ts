@@ -104,14 +104,26 @@ async function listGeneratedPrograms(
   projectId: string,
   userId: string,
 ): Promise<string[]> {
-  const taskId = await startListDirTask(projectId, 'programs', userId);
+  const taskId   = await startListDirTask(projectId, 'programs', userId);
   const { task } = await pollTaskStatus(taskId);
-  if (task.status !== 'succeed' || !Array.isArray(task.result)) {
-    throw new Error(`listGeneratedPrograms: failed to list /programs directory (${task.status})`);
+
+  /* task.result is serialised JSON (string) → parse & type-check */
+  let entries: unknown;
+  try {
+    entries = JSON.parse(task.result as string);
+  } catch (err) {
+    throw new Error(
+      `listGeneratedPrograms: JSON.parse failed – ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
-  
+  if (!Array.isArray(entries)) {
+    throw new Error(
+      `listGeneratedPrograms: expected array, got ${typeof entries}`,
+    );
+  }
+
   const programDirs: string[] = [];
-  for (const entry of task.result) {
+  for (const entry of entries) {
     if (entry.type === 'directory') {
       try {
         // Check if directory contains a Cargo.toml
