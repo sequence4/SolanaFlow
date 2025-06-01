@@ -40,7 +40,7 @@ WORKDIR /tmp
 RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
     --mount=type=cache,id=sccache,target=/opt/sccache,sharing=locked \
     anchor init anchor-template --no-git --no-install \
- && (cd anchor-template && anchor build --locked) \
+ && (cd anchor-template && anchor build) \
  && rm -rf anchor-template/node_modules \
  && mv anchor-template /usr/src/anchor-template \
  && rm -rf /tmp/*
