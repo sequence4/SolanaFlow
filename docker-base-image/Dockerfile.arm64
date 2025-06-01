@@ -1,11 +1,18 @@
 # syntax=docker/dockerfile:1.7
 ARG BUILDKIT_INLINE_CACHE=1
 ARG BASE_TOOLCHAIN=ghcr.io/sequence4/solana-toolchain:latest
+# Build-time AWS region (passed from `docker buildx ... --build-arg AWS_REGION=eu-north-1`)
+ARG AWS_REGION
 
 ###############################################################################
 # 1.  Solana / Agave tool-chain – pulled pre-built, then lightly patched
 ###############################################################################
 FROM ${BASE_TOOLCHAIN} AS solana-toolchain
+# Re-declare build arg inside this stage, then expose as env so the AWS SDK in
+# `sccache` knows what endpoint to talk to.
+ARG AWS_REGION
+ENV AWS_REGION=${AWS_REGION} \
+    SCCACHE_REGION=${AWS_REGION}
 LABEL stage=toolchain
 
 # hot-fix so cargo-install-all.sh can find the CLI artefact
@@ -16,7 +23,9 @@ ENV SCCACHE_BUCKET=solanaflow-cache \
     RUSTC_WRAPPER=/usr/local/bin/sccache
 
 # add Anchor CLI + minimal Node once (not in the base image yet)
-RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
+RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
+    --mount=type=cache,id=sccache,target=/opt/sccache,sharing=locked \
+    --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked \
     rustup component add rust-src \
  && cargo install anchor-cli --version 0.31.1 --locked \
@@ -28,7 +37,9 @@ RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
 
 # warm the BPF / SBF cache once so first user build is instant
 WORKDIR /tmp
-RUN anchor init anchor-template --no-git --no-install \
+RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
+    --mount=type=cache,id=sccache,target=/opt/sccache,sharing=locked \
+    anchor init anchor-template --no-git --no-install \
  && (cd anchor-template && anchor build -- --locked) \
  && rm -rf anchor-template/node_modules \
  && mv anchor-template /usr/src/anchor-template \
@@ -48,7 +59,8 @@ RUN cargo chef prepare --recipe-path recipe.json
 FROM solana-toolchain AS cooker
 WORKDIR /app
 COPY --from=chef /app/recipe.json .
-RUN --mount=type=cache,id=cargo-registry,target=/root/.cargo/registry,sharing=locked \
+RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
+    --mount=type=cache,id=cargo-registry,target=/root/.cargo/registry,sharing=locked \
     --mount=type=cache,id=cargo-git,target=/root/.cargo/git,sharing=locked \
     --mount=type=cache,id=sccache,target=/opt/sccache,sharing=locked \
     cargo chef cook --release --recipe-path recipe.json
