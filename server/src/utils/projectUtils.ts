@@ -183,7 +183,6 @@ function transformRootPath(rootPath: string): string {
 export const getBuildArtifactTask = async (projectId: string): Promise<{ status: string, base64So: string }> => {
   try {
     const rootPath = await getProjectRootPath(projectId);
-    const transformedRootPath = transformRootPath(rootPath);
     
     // Get the container name for this project
     const containerName = await getContainerName(projectId);
@@ -196,16 +195,13 @@ export const getBuildArtifactTask = async (projectId: string): Promise<{ status:
     // Create a temporary task ID for the command execution
     const tempTaskId = uuidv4();
     
-    // Read the .so file directly from inside the container
-    const containerSoPath = `/usr/src/${rootPath}/target/deploy/${transformedRootPath}.so`;
-    
-    // Check if the file exists in the container
-    const fileExistsCmd = `docker exec ${containerName} bash -c "if [ -f '${containerSoPath}' ]; then echo 'exists'; else echo 'not_found'; fi"`;
-    const fileExists = await runCommand(fileExistsCmd, '.', tempTaskId, { skipSuccessUpdate: true });
-    
-    if (fileExists.trim() !== 'exists') {
-      console.error(`[ARTIFACT] ❌ Built artifact not found in container at path: ${containerSoPath}`);
-      throw new Error(`Built artifact not found in container at path: ${containerSoPath}`);
+    // find the first .so inside target/deploy
+    const locateCmd = `docker exec ${containerName} bash -c "find /usr/src/${rootPath}/target/deploy -maxdepth 1 -name '*.so' | head -n 1"`;
+    const containerSoPath = (await runCommand(locateCmd, '.', tempTaskId, { skipSuccessUpdate: true })).trim();
+
+    if (!containerSoPath) {
+      console.error('[ARTIFACT] ❌  No .so produced by build');
+      throw new Error('Built artifact not found in container');
     }
     
     console.log(`[ARTIFACT] ✓ Found .so file at ${containerSoPath}, extracting...`);
@@ -247,7 +243,17 @@ set -euo pipefail
 cd /usr/src/${rootPath}
 
 echo "===== Running anchor build ====="
-anchor build
+anchor build -- --locked   # keep any flags you already pass
+
+# ── find the first .so file Anchor just produced ──
+SO_PATH=$(find target/deploy -maxdepth 1 -name '*.so' | head -n 1)
+
+if [[ -z "$SO_PATH" ]]; then
+  echo "BUILD_FAILURE: no .so in target/deploy"
+  exit 1
+fi
+
+echo "BUILD_SUCCESS: $SO_PATH"
 `;
       
       const tempDir = path.join(__dirname, '../../tmp');
@@ -289,9 +295,9 @@ anchor build
           { skipSuccessUpdate: true }
         );
         
-        const transformedRootPath = rootPath.replace(/-/g, '_');
+        // look for the *first* .so produced under target/deploy
         const soFileCheck = await runCommand(
-          `docker exec ${containerName} /bin/bash -c "if [ -f /usr/src/${rootPath}/target/deploy/${transformedRootPath}.so ]; then echo 'BUILD_SUCCESS: .so file was created'; else echo 'BUILD_FAILURE: .so file was NOT created'; fi"`,
+          `docker exec ${containerName} /bin/bash -c "if ls /usr/src/${rootPath}/target/deploy/*.so 1>/dev/null 2>&1; then echo 'BUILD_SUCCESS'; else echo 'BUILD_FAILURE'; fi"`,
           '.',
           sanitizedTaskId,
           { skipSuccessUpdate: true }
