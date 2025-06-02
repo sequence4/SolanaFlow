@@ -9,6 +9,7 @@ import { insertSrcFiles } from './insertSrcFiles';
 import { debugDumpContainerTree, debugPrintFiles } from '../containerUtils';
 import { ensureAnchorTomlProgram, ensureRootWorkspaceMembers } from './ensureConfigHelpers';
 import { parseNodeDetails } from './parseNodeDetails';
+import { lintWorkspaceManifests } from './cargoManifestLint';
 
 /** Block until every task-id is in a final state. */
 async function waitForAll(taskIds: string[]): Promise<{
@@ -185,11 +186,18 @@ export const handleGenerateCode = async ({
 
         sendProgress({ stage: 'src-gen-done', message: 'Rust sources ready' });
 
-        /* ────────────────────────── PATCH MANIFESTS ───────────────────────── */
-        console.log('[GEN] calling amendConfigFiles (post-generation)…');
-        const { anchorTaskId } = await amendConfigFiles(projectId, userId);
-        console.log('[GEN] amendConfigFiles result:', { anchorTaskId });
-        sendProgress({ stage: 'debug', message: '[handleGenerateCode] Amend done' });
+        // ─────────── Run static lint on Cargo manifests before amending ───────────
+        console.log('[GEN] Running static Cargo.toml linter...');
+        try {
+          await lintWorkspaceManifests({ projectId, userId, workspace });
+          console.log('[GEN] Cargo.toml lint passed');
+          sendProgress({ stage: 'lint-done', message: 'Cargo manifests validated' });
+        } catch (error: unknown) {
+          const lintError = error instanceof Error ? error : new Error(String(error));
+          console.error('[GEN] Cargo.toml lint failed:', lintError);
+          sendProgress({ stage: 'lint-failed', message: `Manifest validation failed: ${lintError.message}` });
+          // Continue with amendConfigFiles even if lint fails, as it will fix the issues
+        }
 
         // ─────────── Debug: dump container tree ───────────
         const dumpTaskId = await createTask(
@@ -227,6 +235,12 @@ export const handleGenerateCode = async ({
           }
           await updateTaskStatus(dumpTaskId, 'succeed', 'Tree dumped and files printed');
         }
+
+        // ────────────────────────── PATCH MANIFESTS ───────────────────────── */
+        console.log('[GEN] calling amendConfigFiles (post-generation)…');
+        const { anchorTaskId } = await amendConfigFiles(projectId, userId);
+        console.log('[GEN] amendConfigFiles result:', { anchorTaskId });
+        sendProgress({ stage: 'debug', message: '[handleGenerateCode] Amend done' });
     } catch (err) {
         console.error('Error in handleGenerateCode:', err);
         throw err;
