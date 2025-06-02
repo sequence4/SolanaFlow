@@ -11,9 +11,9 @@ export async function startProjectContainer(projId: string): Promise<string> {
   const name  = `userproj-${projId}-${Date.now()}`.slice(0, 63);        // 64-char limit
   const image = process.env.SOLANAFLOW_BUILD_IMAGE ?? 'ghcr.io/sequence4/solana-toolchain:latest';
   // 📦 three isolated caches
-  const vCargo   = 'solanaflow-cargo-registry';
-  const vTarget  = 'solanaflow-cargo-target';
-  const vSccache = 'solanaflow-sccache';
+  const vCargo       = 'solanaflow-cargo-registry';
+  const vTargetBuild = 'solanaflow-cargo-target';
+  const vSccache     = 'solanaflow-sccache';
 
   try {
     /* 1 ─ ensure image is present & host-arch-compatible */
@@ -26,7 +26,7 @@ export async function startProjectContainer(projId: string): Promise<string> {
        --label solanaflow.project=${projId} \
        -v ${vCargo}:/root/.cargo \
        -v ${vSccache}:/opt/sccache \
-       -v ${vTarget}:/usr/src/target \
+       -v ${vTargetBuild}:/usr/src/target \
        -p 0.0.0.0::3000 \
        ${image} \
        bash -c "cd /usr/src && tail -f /dev/null"`,
