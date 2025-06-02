@@ -87,3 +87,39 @@ export async function deploySignedTx(
     return next(new AppError((err as Error).message, 500));
   }
 }
+
+/**
+ * POST /api/build/:id/prepare-deploy-tx
+ * Prepares a deploy transaction for client-side signing
+ */
+export async function prepareDeployTx(
+  req: Request<{ id: string }, unknown, { graph: Graph }>,
+  res: Response,
+  next: NextFunction
+) {
+  const { id } = req.params;
+  const { graph } = req.body;
+  const userId = (req.user as { id?: string } | undefined)?.id;
+
+  console.log(`[API] Prepare deploy tx called for project: ${id}, userId: ${userId}`);
+
+  if (!userId) return next(new AppError('User not found', 400));
+
+  try {
+    // This is a placeholder for the actual transaction building logic
+    // In a real implementation, you would:
+    // 1. Get the compiled program binary
+    // 2. Create a deploy transaction with the correct instructions
+    // 3. Return the serialized transaction
+
+    // For now, we'll just return a mock response
+    res.status(200).json({
+      success: true,
+      encodedTx: 'BASE64_ENCODED_TRANSACTION_PLACEHOLDER',
+      message: 'Transaction prepared for signing'
+    });
+  } catch (err) {
+    console.error('[API] Error preparing deploy transaction:', err);
+    return next(new AppError(`Failed to prepare deploy transaction: ${(err as Error).message}`, 500));
+  }
+}

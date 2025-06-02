@@ -34,6 +34,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator"
 import { Label } from "@/components/ui/label";
 import { runDeployPipelineWithLogs } from '@/utils/deploy/deployPipeline';
+import { useWalletSigner, triggerSignedDeploy } from '@/utils/walletSignAndDeploy';
 import { useEnsureProjectId } from '@/hooks/useEnsureProjectId';
 
 export const Toolbox = () => {
@@ -61,6 +62,7 @@ export const Toolbox = () => {
     
     const taskLogs = useTaskLogs();
     const { ensureId, modalOpen, setModalOpen, handleModalSubmit } = useEnsureProjectId(projectContext, setProjectContext);
+    const walletSigner = useWalletSigner();
 
     useEffect(() => {
         setProjectName(projectContext.name || "My Token Project");
@@ -141,16 +143,64 @@ export const Toolbox = () => {
             };
             console.log('[deploy] Graph data (with nodes):', graph);
 
-            console.log('[deploy] Calling runDeployPipelineWithLogs');
-            esRef.current = runDeployPipelineWithLogs(
-              { ...projectContext, id },
-              graph,
-              taskLogs,
-              setProjectContext,
-              setArtifactUrl
-            );
-            
-            console.log('[deploy] Deploy pipeline started with EventSource');
+            // Use wallet signing for user-wallet option
+            if (selectedOption === 'user-wallet' && walletSigner.isConnected) {
+                taskLogs.resetLogs();
+                taskLogs.setIsVisible(true);
+                taskLogs.addSystemLog("🚀 Starting wallet-signed deployment pipeline...");
+                taskLogs.addSystemLog("⏳ Waiting for wallet signature...");
+                
+                try {
+                    // First, start the build process without the deploy step
+                    taskLogs.addSystemLog("🔨 Building program...");
+                    
+                    // We would need an API to get the built transaction
+                    // This is a placeholder - you'll need an actual endpoint to get the transaction to sign
+                    const response = await fetch(`/api/build/${id}/prepare-deploy-tx`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${localStorage.getItem('token')}`
+                        },
+                        body: JSON.stringify({ graph })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`Failed to prepare deploy transaction: ${response.statusText}`);
+                    }
+                    
+                    const { encodedTx } = await response.json();
+                    
+                    // Sign and relay the transaction
+                    taskLogs.addSystemLog("✍️ Signing transaction with connected wallet...");
+                    const signature = await walletSigner.signAndRelay(id, encodedTx);
+                    
+                    taskLogs.addSystemLog(`✅ Transaction signed and relayed successfully!`);
+                    taskLogs.addSystemLog(`📝 Transaction signature: ${signature}`);
+                    
+                    // Now trigger the pipeline with the SIGNED flag
+                    taskLogs.addSystemLog("🔄 Starting deploy pipeline with SIGNED flag...");
+                    await triggerSignedDeploy(id, graph);
+                    
+                    taskLogs.addSystemLog("✅ Deployment complete!");
+                    setTimeout(() => taskLogs.setIsVisible(false), 3000);
+                } catch (error: any) {
+                    console.error('[deploy] Wallet signing error:', error);
+                    taskLogs.addSystemLog(`❌ Error: ${error.message || 'Unknown error during wallet signing'}`);
+                }
+            } else {
+                // Legacy flow with delegated key
+                console.log('[deploy] Calling runDeployPipelineWithLogs');
+                esRef.current = runDeployPipelineWithLogs(
+                  { ...projectContext, id },
+                  graph,
+                  taskLogs,
+                  setProjectContext,
+                  setArtifactUrl
+                );
+                
+                console.log('[deploy] Deploy pipeline started with EventSource');
+            }
         } catch (err) {
             console.error('[deploy] Deployment error:', err);
             toast("Deployment error", {
