@@ -133,7 +133,7 @@ export async function waitForTaskCompletion(
         
         console.log(`[DEBUG_TASK_BACKEND] Task ${taskId} status: ${status}, has result: ${hasResult} (attempt ${retries + 1}/${maxRetries})`);
         
-        if (finalStates.includes(status) && hasResult) {
+        if (finalStates.includes(status)) {
           console.log(`[DEBUG_TASK_BACKEND] Task ${taskId} reached final state: ${status} with result`);
           return status;
         }

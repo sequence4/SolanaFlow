@@ -54,8 +54,9 @@ export async function runDeployPipeline({
     sendProgress({ stage: "build", message: "Building program…" });
     const buildTask = await startAnchorBuildTask(projectId, userId);
     
-    // Convert timeout ms to retry count (2-second interval)
-    const buildRetries = Math.ceil(120_000 / 2_000); // 60 tries = 2 min
+    // Convert env-driven minutes → retry count (2-second interval)
+    const buildMinutes = Number(process.env.MAX_BUILD_MINUTES) || 15;
+    const buildRetries = Math.ceil(buildMinutes * 60_000 / 2_000);
     
     // Check build status and bail early if not successful
     const buildStatus = await waitForTaskCompletion(buildTask, buildRetries, 2_000);
