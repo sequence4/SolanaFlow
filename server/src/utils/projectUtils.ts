@@ -9,6 +9,7 @@ import { normalizeProjectName } from './stringUtils';
 import pool from 'src/config/database';
 import { pruneContainerResources } from './container/pruneContainer';
 import { startProjectContainer } from './container/startProjectContainer';
+import { Connection, sendAndConfirmRawTransaction } from '@solana/web3.js';
 
 //const USER_WORKSPACE_IMAGE = "ghcr.io/sequence4/solanaflow:latest";
 
@@ -349,6 +350,12 @@ export const startAnchorDeployTask = async (
   const taskId = await createTask('Anchor Deploy', creatorId, projectId);
   let programId: string | null = null;
   const sanitizedTaskId = taskId.trim().replace(/,$/, '');
+  
+  if (ephemeralPubkey === 'SIGNED') {
+    console.log('[BUILD] signed-tx path – skipping container key copy');
+    await updateTaskStatus(sanitizedTaskId, 'succeed', 'Signed tx already broadcast by frontend');
+    return sanitizedTaskId;
+  }
 
   console.log(`[DEPLOY_DEBUG] Starting anchor deploy task ${sanitizedTaskId} for project ${projectId}${ephemeralPubkey ? ' with ephemeral key: ' + ephemeralPubkey : ''}`);
 
@@ -1084,4 +1091,18 @@ EOF`;
   await runCommand(`docker exec ${containerName} rm -rf ${tempRunnerDir}`, '.', taskId);
 
   return commandResult;
+}
+
+/**
+ * Relays a fully-signed deploy transaction (base64) to Devnet and
+ * returns the confirmed signature string.
+ */
+export async function broadcastSignedTx(projectId: string, encodedTx: string): Promise<string> {
+  // TODO: verify that the deployed program address matches the current project
+  // before relaying, to prevent malicious reuse of this endpoint.
+  console.log(`[broadcastSignedTx] project ${projectId} relaying…`);
+  const conn = new Connection('https://api.devnet.solana.com', 'confirmed');
+  const raw  = Buffer.from(encodedTx, 'base64');
+  const sig  = await sendAndConfirmRawTransaction(conn, raw);
+  return sig;
 }

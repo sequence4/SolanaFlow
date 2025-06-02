@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from 'express';
 import { AppError } from '../middleware/errorHandler';
 import { runDeployPipeline } from '../utils/deploy/runDeployPipeline';
 import { Graph } from '../types/graph'; 
+import { broadcastSignedTx } from '../utils/projectUtils';
 
 /**
  * POST /api/deploy/:id/deploy-pipeline
@@ -58,5 +59,31 @@ export async function deployPipeline(
     send({ stage: 'error', message: (err as Error).message });
     res.end();
     if (!res.headersSent) next(err);
+  }
+}
+
+/**
+ * POST /api/deploy/:id/deploy-signed
+ * Body: { encodedTx: string }  (base-64 of signed deploy transaction)
+ */
+export async function deploySignedTx(
+  req: Request<{ id: string }, unknown, { encodedTx: string }>,
+  res: Response,
+  next: NextFunction,
+) {
+  const { id }        = req.params;          // project UUID
+  const { encodedTx } = req.body;
+  const userId        = (req.user as { id?: string } | undefined)?.id;
+
+  if (!userId)        return next(new AppError('User not found', 400));
+  if (!encodedTx)     return next(new AppError('encodedTx missing', 400));
+
+  try {
+    const sig = await broadcastSignedTx(id, encodedTx);
+    res.status(200).json({ ok: true, sig });
+    return;
+  } catch (err) {
+    console.error('[deploySignedTx] relay failed:', err);
+    return next(new AppError((err as Error).message, 500));
   }
 }
