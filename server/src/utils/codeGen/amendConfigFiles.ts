@@ -243,8 +243,31 @@ async function patchProgramCargoToml(
       '',
       '[lib]',
       'crate-type = ["cdylib"]',
+      'test = false',      // Disable unit tests to prevent 4 KB stack-overflow
+      'doctest = false',   // Disable doc tests as well
       ''
     );
+  } else {
+    // Find the end of the [lib] section
+    let libEnd = cargoLines.length;
+    for (let i = libStart + 1; i < cargoLines.length; i++) {
+      if (/^\[.*\]/.test(cargoLines[i].trim())) {
+        libEnd = i;
+        break;
+      }
+    }
+    
+    // Check if test and doctest settings already exist
+    const hasTest = cargoLines.slice(libStart + 1, libEnd).some(l => /test\s*=/.test(l));
+    const hasDoctest = cargoLines.slice(libStart + 1, libEnd).some(l => /doctest\s*=/.test(l));
+    
+    // Add missing settings
+    if (!hasTest) {
+      cargoLines.splice(libEnd, 0, 'test = false');
+    }
+    if (!hasDoctest) {
+      cargoLines.splice(libEnd, 0, 'doctest = false');
+    }
   }
   
   // Remove [profile.test] and [profile.release] sections from individual crates
