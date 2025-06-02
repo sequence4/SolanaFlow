@@ -10,6 +10,8 @@ import pool from 'src/config/database';
 export async function startProjectContainer(projId: string): Promise<string> {
   const name  = `userproj-${projId}-${Date.now()}`.slice(0, 63);        // 64-char limit
   const image = process.env.SOLANAFLOW_BUILD_IMAGE ?? 'ghcr.io/sequence4/solana-toolchain:latest';
+  // 📦 shared compilation cache lives here
+  const volume = 'solanaflow-cargo-cache';
 
   try {
     /* 1 ─ ensure image is present & host-arch-compatible */
@@ -20,6 +22,9 @@ export async function startProjectContainer(projId: string): Promise<string> {
       `docker run -d --platform linux/arm64 \
        --name  ${name} \
        --label solanaflow.project=${projId} \
+       -v ${volume}:/root/.cargo \
+       -v ${volume}:/opt/sccache \
+       -v ${volume}:/usr/src/.cargo-target \
        -p 0.0.0.0::3000 \
        ${image} \
        bash -c "cd /usr/src && tail -f /dev/null"`,
