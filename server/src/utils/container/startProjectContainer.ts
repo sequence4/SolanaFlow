@@ -27,6 +27,7 @@ export async function startProjectContainer(projId: string): Promise<string> {
        -v ${vCargo}:/root/.cargo \
        -v ${vSccache}:/opt/sccache \
        -v ${vTargetBuild}:/usr/src/target \
+       -e CARGO_TARGET_DIR=/usr/src/target \
        -p 0.0.0.0::3000 \
        ${image} \
        bash -c "cd /usr/src && tail -f /dev/null"`,

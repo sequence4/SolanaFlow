@@ -39,6 +39,7 @@ RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
 WORKDIR /tmp
 RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
     --mount=type=cache,id=sccache,target=/opt/sccache,sharing=locked \
+    export CARGO_TARGET_DIR=/usr/src/target && \
     anchor init anchor-template --no-git --no-install \
  && (cd anchor-template && anchor build) \
  && rm -rf anchor-template/node_modules \
