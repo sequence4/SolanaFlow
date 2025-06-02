@@ -10,7 +10,7 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/src/$1'
   },
   roots: ['<rootDir>/src'],
-  testMatch: ['**/__tests__/**/*.test.ts'],
+  testMatch: ['**/__tests__/**/*.test.ts', '**/__tests__/**/*.spec.ts'],
   transform: {
     '^.+\\.[tj]sx?$': ['ts-jest', { tsconfig: 'tsconfig.json' }]
   },

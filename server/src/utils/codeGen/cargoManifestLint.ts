@@ -176,7 +176,7 @@ function removeComments(line: string): string {
 /**
  * Validate a single Cargo.toml file
  */
-function validateManifest(content: string, path: string, isRoot: boolean): string[] {
+export function validateManifest(content: string, path: string, isRoot: boolean): string[] {
   const issues: string[] = [];
   
   // Remove comments and empty lines for more reliable parsing
