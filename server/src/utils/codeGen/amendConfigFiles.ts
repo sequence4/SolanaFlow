@@ -236,10 +236,65 @@ async function patchProgramCargoToml(
     }
   }
   
+  // For test builds in template, add profile options to prevent stack overflow
+  if (cargoPath.includes('anchor-template')) {
+    // Check if [lib] section exists
+    const libStart = cargoLines.findIndex(l => l.trim() === '[lib]');
+    if (libStart === -1) {
+      cargoLines.push(
+        '',
+        '[lib]',
+        'crate-type = ["cdylib"]',
+        ''
+      );
+    }
+    
+    // Check if [profile.test] section exists
+    const testProfileStart = cargoLines.findIndex(l => l.trim() === '[profile.test]');
+    if (testProfileStart === -1) {
+      cargoLines.push(
+        '',
+        '[profile.test]',
+        'opt-level = "s"',
+        'debug = false',
+        'overflow-checks = false',
+        ''
+      );
+    }
+  }
+  
   const newCargo = cargoLines.join('\n');
+  
+  // Log preview of the outgoing Cargo.toml
+  console.log('\n──── outgoing Cargo.toml preview ────\n' +
+    newCargo.split('\n').slice(0, 30).join('\n') +
+    '\n─────────────────────────────────────\n');
+  
+  console.log(`[AMEND] Writing to workspace-relative path: ${cargoPath}`);
   const taskId = await startUpdateFileTask(projectId, cargoPath, newCargo, userId);
   const { task } = await pollTaskStatus(taskId);
   console.log(`[AMEND] ${cargoPath} write → ${task.status}`);
+  
+  if (task.status === 'succeed') {
+    // Verify our changes weren't overwritten (wait a moment to ensure any racing writes complete)
+    await new Promise(r => setTimeout(r, 500));
+    try {
+      const verifyContent = await getFileContentBlocking(projectId, cargoPath, userId);
+      const hasIdlBuild = verifyContent.includes('idl-build =');
+      console.log(`[AMEND] Verification check: ${cargoPath} contains idl-build feature: ${hasIdlBuild}`);
+      if (!hasIdlBuild) {
+        console.error(`[AMEND] WARNING: ${cargoPath} was overwritten after our patch! Features lost.`);
+        // Re-apply our changes
+        console.log(`[AMEND] Re-applying patch to ${cargoPath}...`);
+        const retryTaskId = await startUpdateFileTask(projectId, cargoPath, newCargo, userId);
+        const retryResult = await pollTaskStatus(retryTaskId);
+        console.log(`[AMEND] ${cargoPath} re-write → ${retryResult.task.status}`);
+        return { status: retryResult.task.status, taskId: retryTaskId };
+      }
+    } catch (error) {
+      console.error(`[AMEND] Error during verification of ${cargoPath}:`, error);
+    }
+  }
   
   return { status: task.status, taskId };
 }
