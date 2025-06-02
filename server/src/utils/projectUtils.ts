@@ -196,7 +196,7 @@ export const getBuildArtifactTask = async (projectId: string): Promise<{ status:
     const tempTaskId = uuidv4();
     
     // find the first .so inside target/deploy
-    const locateCmd = `docker exec ${containerName} bash -c "find /usr/src/${rootPath}/target/deploy -maxdepth 1 -name '*.so' | head -n 1"`;
+    const locateCmd = `docker exec ${containerName} bash -c "SO_DIR=\\\${CARGO_TARGET_DIR:-target}/deploy; find /usr/src/${rootPath}/\$SO_DIR -maxdepth 1 -name '*.so' | head -n 1"`;
     const containerSoPath = (await runCommand(locateCmd, '.', tempTaskId, { skipSuccessUpdate: true })).trim();
 
     if (!containerSoPath) {
@@ -245,11 +245,12 @@ cd /usr/src/${rootPath}
 echo "===== Running anchor build ====="
 anchor build
 
-# ── find the first .so file Anchor just produced ──
-SO_PATH=$(find target/deploy -maxdepth 1 -name '*.so' | head -n 1)
+# ── determine the correct target directory and find the first .so file ──
+SO_DIR="\${CARGO_TARGET_DIR:-target}/deploy"
+SO_PATH=$(find "$SO_DIR" -maxdepth 1 -name '*.so' | head -n 1)
 
 if [[ -z "$SO_PATH" ]]; then
-  echo "BUILD_FAILURE: no .so in target/deploy"
+  echo "BUILD_FAILURE: no .so in $SO_DIR"
   exit 1
 fi
 
@@ -297,7 +298,7 @@ echo "BUILD_SUCCESS: $SO_PATH"
         
         // look for the *first* .so produced under target/deploy
         const soFileCheck = await runCommand(
-          `docker exec ${containerName} /bin/bash -c "if ls /usr/src/${rootPath}/target/deploy/*.so 1>/dev/null 2>&1; then echo 'BUILD_SUCCESS'; else echo 'BUILD_FAILURE'; fi"`,
+          `docker exec ${containerName} /bin/bash -c "SO_DIR=\\\${CARGO_TARGET_DIR:-target}/deploy; if ls /usr/src/${rootPath}/\$SO_DIR/*.so 1>/dev/null 2>&1; then echo 'BUILD_SUCCESS'; else echo 'BUILD_FAILURE'; fi"`,
           '.',
           sanitizedTaskId,
           { skipSuccessUpdate: true }
