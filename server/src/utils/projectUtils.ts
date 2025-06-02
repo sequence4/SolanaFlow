@@ -195,8 +195,8 @@ export const getBuildArtifactTask = async (projectId: string): Promise<{ status:
     // Create a temporary task ID for the command execution
     const tempTaskId = uuidv4();
     
-    // find the first .so inside target/deploy
-    const locateCmd = `docker exec ${containerName} bash -c "SO_DIR=\\\${CARGO_TARGET_DIR:-target}/deploy; find /usr/src/${rootPath}/\$SO_DIR -maxdepth 1 -name '*.so' | head -n 1"`;
+    // find the first .so inside the correct target directory
+    const locateCmd = `docker exec ${containerName} bash -c 'cd /usr/src/${rootPath} && SO_DIR="\${CARGO_TARGET_DIR:-target}/deploy" && find "$SO_DIR" -maxdepth 1 -name "*.so" | head -n 1'`;
     const containerSoPath = (await runCommand(locateCmd, '.', tempTaskId, { skipSuccessUpdate: true })).trim();
 
     if (!containerSoPath) {
@@ -296,9 +296,9 @@ echo "BUILD_SUCCESS: $SO_PATH"
           { skipSuccessUpdate: true }
         );
         
-        // look for the *first* .so produced under target/deploy
+        // look for the *first* .so produced under the correct target directory
         const soFileCheck = await runCommand(
-          `docker exec ${containerName} /bin/bash -c "SO_DIR=\\\${CARGO_TARGET_DIR:-target}/deploy; if ls /usr/src/${rootPath}/\$SO_DIR/*.so 1>/dev/null 2>&1; then echo 'BUILD_SUCCESS'; else echo 'BUILD_FAILURE'; fi"`,
+          `docker exec ${containerName} bash -c 'cd /usr/src/${rootPath} && SO_DIR="\${CARGO_TARGET_DIR:-target}/deploy" && if ls "$SO_DIR"/*.so 1>/dev/null 2>&1; then echo "BUILD_SUCCESS"; else echo "BUILD_FAILURE"; fi'`,
           '.',
           sanitizedTaskId,
           { skipSuccessUpdate: true }
