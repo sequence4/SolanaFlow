@@ -236,49 +236,43 @@ async function patchProgramCargoToml(
     }
   }
   
-  // Ensure a size-optimised test profile to avoid 4 KB stack overflow errors
-  {
-    // --- [lib] section (if missing) ------------------------------------
-    const libStart = cargoLines.findIndex(l => l.trim() === '[lib]');
-    if (libStart === -1) {
-      cargoLines.push(
-        '',
-        '[lib]',
-        'crate-type = ["cdylib"]',
-        ''
-      );
-    }
-
-    // --- [profile.test] -------------------------------------------------
-    const testStart = cargoLines.findIndex(l => l.trim() === '[profile.test]');
-    const testBlock = [
-      '[profile.test]',
-      'opt-level = "s"',
-      'debug = false',
-      'overflow-checks = false',
-    ];
-
-    if (testStart === -1) {
-      cargoLines.push('', ...testBlock, '');
-    } else {
-      // overwrite / merge so we never duplicate keys
-      let testEnd = cargoLines.length;
-      for (let i = testStart + 1; i < cargoLines.length; i++) {
-        if (/^\[.*\]/.test(cargoLines[i].trim())) { testEnd = i; break; }
+  // Ensure [lib] section exists with cdylib crate-type
+  const libStart = cargoLines.findIndex(l => l.trim() === '[lib]');
+  if (libStart === -1) {
+    cargoLines.push(
+      '',
+      '[lib]',
+      'crate-type = ["cdylib"]',
+      ''
+    );
+  }
+  
+  // Remove [profile.test] and [profile.release] sections from individual crates
+  // as they are redundant and will be ignored (profiles are only honored in the workspace root)
+  const removeProfileSection = (lines: string[], profileName: string) => {
+    let profileStart = lines.findIndex(l => l.trim() === profileName);
+    if (profileStart !== -1) {
+      // Find the end of the profile section
+      let profileEnd = lines.length;
+      for (let i = profileStart + 1; i < lines.length; i++) {
+        if (/^\[.*\]/.test(lines[i].trim())) {
+          profileEnd = i;
+          break;
+        }
       }
-      // remove old lines inside the existing block that match the keys we force-set
-      cargoLines = [
-        ...cargoLines.slice(0, testStart + 1),
-        ...cargoLines.slice(testStart + 1, testEnd).filter(l =>
-          !/^opt-level\s*=/.test(l.trim()) &&
-          !/^debug\s*=/.test(l.trim()) &&
-          !/^overflow-checks\s*=/.test(l.trim())
-        ),
-        ...testBlock.slice(1),                // skip duplicate header
-        ...cargoLines.slice(testEnd),
+      // Remove the section
+      console.log(`[AMEND] Removing redundant ${profileName} section from ${cargoPath}`);
+      return [
+        ...lines.slice(0, profileStart),
+        ...lines.slice(profileEnd)
       ];
     }
-  }
+    return lines;
+  };
+  
+  // Remove redundant profile sections
+  cargoLines = removeProfileSection(cargoLines, '[profile.test]');
+  cargoLines = removeProfileSection(cargoLines, '[profile.release]');
   
   const newCargo = cargoLines.join('\n');
   
@@ -349,45 +343,80 @@ export const amendConfigFiles = async (
     
     let rootLines = rootCargoSrc.split('\n');
     
-    // Define the size-optimized test profile block
-    const testBlock = [
+    // Define the size-optimized profile blocks for both release and test
+    const sizeProfile = [
+      '[profile.release]',
+      'opt-level = "s"',      // shrink code size
+      'debug = false',        // strip DWARF
+      'overflow-checks = false', // remove extra stack probes
+      '',
       '[profile.test]',
       'opt-level = "s"',
       'debug = false',
       'overflow-checks = false',
     ];
     
-    // Find or create the [profile.test] section
-    let testStart = rootLines.findIndex(l => l.trim() === '[profile.test]');
-    if (testStart === -1) {
-      // No existing profile.test section, add it at the end
-      rootLines.push('', ...testBlock, '');
-    } else {
-      // Merge with existing section
-      let testEnd = rootLines.length;
-      for (let i = testStart + 1; i < rootLines.length; i++) {
-        if (/^\[.*\]/.test(rootLines[i].trim())) { 
-          testEnd = i; 
-          break; 
-        }
-      }
+    // Helper function to add or merge a profile section
+    const addOrMergeProfile = (lines: string[], profileName: string, settings: string[]) => {
+      let profileStart = lines.findIndex(l => l.trim() === profileName);
       
-      // Filter out existing lines we want to replace
-      rootLines = [
-        ...rootLines.slice(0, testStart + 1),
-        ...rootLines.slice(testStart + 1, testEnd).filter(l =>
-          !/^opt-level\s*=/.test(l.trim()) &&
-          !/^debug\s*=/.test(l.trim()) &&
-          !/^overflow-checks\s*=/.test(l.trim())
-        ),
-        ...testBlock.slice(1),  // Skip the header
-        ...rootLines.slice(testEnd),
-      ];
-    }
+      if (profileStart === -1) {
+        // No existing profile section, add it at the end
+        lines.push('', profileName, ...settings, '');
+        return lines;
+      } else {
+        // Merge with existing section
+        let profileEnd = lines.length;
+        for (let i = profileStart + 1; i < lines.length; i++) {
+          if (/^\[.*\]/.test(lines[i].trim())) { 
+            profileEnd = i; 
+            break; 
+          }
+        }
+        
+        // Extract setting keys we want to set
+        const keysToReplace = settings.map(s => {
+          const match = s.match(/^(\S+)\s*=/);
+          return match ? match[1] : null;
+        }).filter(Boolean);
+        
+        // Filter out existing lines we want to replace
+        const filtered = lines.slice(profileStart + 1, profileEnd).filter(l => {
+          for (const key of keysToReplace) {
+            if (l.trim().startsWith(`${key} =`) || l.trim().startsWith(`${key}=`)) {
+              return false;
+            }
+          }
+          return true;
+        });
+        
+        // Build the updated lines array
+        return [
+          ...lines.slice(0, profileStart + 1),
+          ...filtered,
+          ...settings,
+          ...lines.slice(profileEnd),
+        ];
+      }
+    };
+    
+    // Add or merge release profile
+    rootLines = addOrMergeProfile(
+      rootLines, 
+      '[profile.release]',
+      ['opt-level = "s"', 'debug = false', 'overflow-checks = false']
+    );
+    
+    // Add or merge test profile
+    rootLines = addOrMergeProfile(
+      rootLines, 
+      '[profile.test]',
+      ['opt-level = "s"', 'debug = false', 'overflow-checks = false']
+    );
     
     // Write back the updated root Cargo.toml
     const newRootCargo = rootLines.join('\n');
-    console.log(`[AMEND] Writing to workspace-root Cargo.toml to add size-optimized test profile`);
+    console.log(`[AMEND] Writing to workspace-root Cargo.toml to add size-optimized profiles`);
     rootCargoTaskId = await startUpdateFileTask(projectId, rootCargoPath, newRootCargo, userId);
     const rootCargoResult = await pollTaskStatus(rootCargoTaskId);
     rootCargoStatus = rootCargoResult.task.status;
@@ -398,11 +427,15 @@ export const amendConfigFiles = async (
       await new Promise(r => setTimeout(r, 500));
       try {
         const verifyContent = await getFileContentBlocking(projectId, rootCargoPath, userId);
+        const hasReleaseProfile = verifyContent.includes('[profile.release]') && 
+                                  verifyContent.includes('opt-level = "s"');
         const hasTestProfile = verifyContent.includes('[profile.test]') && 
-                               verifyContent.includes('opt-level = "s"');
-        console.log(`[AMEND] Verification: root ${rootCargoPath} has test profile: ${hasTestProfile}`);
-        if (!hasTestProfile) {
-          console.error(`[AMEND] WARNING: root ${rootCargoPath} test profile was overwritten!`);
+                              verifyContent.includes('opt-level = "s"');
+        
+        console.log(`[AMEND] Verification: root ${rootCargoPath} has profiles - release: ${hasReleaseProfile}, test: ${hasTestProfile}`);
+        
+        if (!hasReleaseProfile || !hasTestProfile) {
+          console.error(`[AMEND] WARNING: root ${rootCargoPath} profiles were not properly set!`);
           const retryTaskId = await startUpdateFileTask(projectId, rootCargoPath, newRootCargo, userId);
           const retryResult = await pollTaskStatus(retryTaskId);
           rootCargoStatus = retryResult.task.status;
