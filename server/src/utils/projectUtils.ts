@@ -243,7 +243,7 @@ set -euo pipefail
 cd /usr/src/${rootPath}
 
 echo "===== Running anchor build ====="
-anchor build -- --locked   # keep any flags you already pass
+anchor build
 
 # ── find the first .so file Anchor just produced ──
 SO_PATH=$(find target/deploy -maxdepth 1 -name '*.so' | head -n 1)
