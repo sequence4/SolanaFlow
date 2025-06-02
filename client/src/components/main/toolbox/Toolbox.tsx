@@ -28,11 +28,8 @@ import {
   Save,
   Plus,
   Rocket,
-  ChevronRight,
 } from "lucide-react";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Separator } from "@/components/ui/separator"
-import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { runDeployPipelineWithLogs } from '@/utils/deploy/deployPipeline';
 import { useWalletSigner, triggerSignedDeploy } from '@/utils/walletSignAndDeploy';
 import { useEnsureProjectId } from '@/hooks/useEnsureProjectId';
@@ -57,8 +54,6 @@ export const Toolbox = () => {
     const [projectsRefreshCounter, setProjectsRefreshCounter] = useState(0);
     
     const [isDeploying, setIsDeploying] = useState(false);
-    const [showDeployModal, setShowDeployModal] = useState(false);
-    const [selectedOption, setSelectedOption] = useState('user-wallet');
     
     const taskLogs = useTaskLogs();
     const { ensureId, modalOpen, setModalOpen, handleModalSubmit } = useEnsureProjectId(projectContext, setProjectContext);
@@ -111,19 +106,10 @@ export const Toolbox = () => {
         );
     };
     
-    const handleOpenDeployModal = () => {
-        setShowDeployModal(true);
-    };
-
-    const handleDeployCancel = () => {
-        setShowDeployModal(false);
-    };
-    
     const handleDeployClick = async () => {
         if (isDeploying) return;
         setIsDeploying(true);
         
-        setShowDeployModal(false);
         console.log('[deploy] Starting deploy process...');
         
         try {
@@ -143,80 +129,62 @@ export const Toolbox = () => {
             };
             console.log('[deploy] Graph data (with nodes):', graph);
 
-            // Use wallet signing for user-wallet option
-            if (selectedOption === 'user-wallet' && walletSigner.isConnected) {
-                taskLogs.resetLogs();
-                taskLogs.setIsVisible(true);
-                taskLogs.addSystemLog("🚀 Starting wallet-signed deployment pipeline...");
-                taskLogs.addSystemLog("⏳ Waiting for wallet signature...");
+            // Start wallet-signed deployment process
+            taskLogs.resetLogs();
+            taskLogs.setIsVisible(true);
+            taskLogs.addSystemLog("🚀 Starting wallet-signed deployment pipeline...");
+            taskLogs.addSystemLog("⏳ Waiting for wallet signature...");
+            
+            try {
+                // First, start the build process without the deploy step
+                taskLogs.addSystemLog("🔨 Building program...");
                 
-                try {
-                    // First, start the build process without the deploy step
-                    taskLogs.addSystemLog("🔨 Building program...");
-                    
-                    // We would need an API to get the built transaction
-                    // This is a placeholder - you'll need an actual endpoint to get the transaction to sign
-                    const response = await fetch(`/api/deploy/${id}/prepare-deploy-tx`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${localStorage.getItem('token')}`
-                        },
-                        body: JSON.stringify({ graph })
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`Failed to prepare deploy transaction: ${response.statusText}`);
-                    }
-                    
-                    const { encodedTx } = await response.json();
-                    
-                    // Sign and relay the transaction
-                    taskLogs.addSystemLog("✍️ Signing transaction with connected wallet...");
-                    const signature = await walletSigner.signAndRelay(id, encodedTx);
-                    
-                    taskLogs.addSystemLog(`✅ Transaction signed and relayed successfully!`);
-                    taskLogs.addSystemLog(`📝 Transaction signature: ${signature}`);
-                    
-                    // Now trigger the pipeline with the SIGNED flag
-                    taskLogs.addSystemLog("🔄 Starting deploy pipeline with SIGNED flag...");
-                    
-                    // Prepare graph with SIGNED flag
-                    const graphCopy = JSON.parse(JSON.stringify(graph));
-                    graphCopy.deployConfig = { 
-                      ...graphCopy.deployConfig || {}, 
-                      ephemeralPubkey: 'SIGNED' 
-                    };
-                    
-                    // Use the existing EventSource mechanism for logs streaming
-                    esRef.current = runDeployPipelineWithLogs(
-                      { ...projectContext, id },
-                      graphCopy,
-                      taskLogs,
-                      setProjectContext,
-                      setArtifactUrl
-                    );
-                    
-                    console.log('[deploy] Deploy pipeline started with EventSource and SIGNED flag');
-                    
-                    // No need to manually close logs - the EventSource will handle it
-                    // setTimeout(() => taskLogs.setIsVisible(false), 3000);
-                } catch (error: any) {
-                    console.error('[deploy] Wallet signing error:', error);
-                    taskLogs.addSystemLog(`❌ Error: ${error.message || 'Unknown error during wallet signing'}`);
+                // We need an API to get the built transaction
+                const response = await fetch(`/api/deploy/${id}/prepare-deploy-tx`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({ graph })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to prepare deploy transaction: ${response.statusText}`);
                 }
-            } else {
-                // Legacy flow with delegated key
-                console.log('[deploy] Calling runDeployPipelineWithLogs');
+                
+                const { encodedTx } = await response.json();
+                
+                // Sign and relay the transaction
+                taskLogs.addSystemLog("✍️ Signing transaction with connected wallet...");
+                const signature = await walletSigner.signAndRelay(id, encodedTx);
+                
+                taskLogs.addSystemLog(`✅ Transaction signed and relayed successfully!`);
+                taskLogs.addSystemLog(`📝 Transaction signature: ${signature}`);
+                
+                // Now trigger the pipeline with the SIGNED flag
+                taskLogs.addSystemLog("🔄 Starting deploy pipeline with SIGNED flag...");
+                
+                // Prepare graph with SIGNED flag
+                const graphCopy = JSON.parse(JSON.stringify(graph));
+                graphCopy.deployConfig = { 
+                    ...graphCopy.deployConfig || {}, 
+                    ephemeralPubkey: 'SIGNED' 
+                };
+                
+                // Use the existing EventSource mechanism for logs streaming
                 esRef.current = runDeployPipelineWithLogs(
-                  { ...projectContext, id },
-                  graph,
-                  taskLogs,
-                  setProjectContext,
-                  setArtifactUrl
+                    { ...projectContext, id },
+                    graphCopy,
+                    taskLogs,
+                    setProjectContext,
+                    setArtifactUrl
                 );
                 
-                console.log('[deploy] Deploy pipeline started with EventSource');
+                console.log('[deploy] Deploy pipeline started with EventSource and SIGNED flag');
+            } catch (error: unknown) {
+                console.error('[deploy] Wallet signing error:', error);
+                taskLogs.addSystemLog(`❌ Error: ${error instanceof Error ? error.message : String(error)}`);
             }
         } catch (err) {
             console.error('[deploy] Deployment error:', err);
@@ -342,8 +310,8 @@ export const Toolbox = () => {
                     <div className="grid grid-cols-1 gap-2 mb-4">
                         <button 
                             className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center"
-                            onClick={projectDeployed ? undefined : handleOpenDeployModal}
-                            disabled={!canDeploy}
+                            onClick={projectDeployed ? undefined : handleDeployClick}
+                            disabled={!canDeploy || !walletSigner.isConnected || isDeploying}
                         >
                             {isDeploying ? (
                                 <PulseLoader
@@ -515,94 +483,6 @@ export const Toolbox = () => {
                     />
                 </DialogContent>
             </Dialog>
-            
-            {showDeployModal && (
-                <Dialog open={showDeployModal} onOpenChange={handleDeployCancel}>
-                    <DialogContent className="p-0 sm:max-w-md border border-[#2a2a2a] bg-[#121212] text-gray-200 rounded-md shadow-xl overflow-hidden [&>button]:hidden">
-                        <div className="flex items-center justify-between border-b border-[#2a2a2a] bg-[#151515] px-4 py-2">
-                            <div className="text-sm font-medium text-white">Select a deployment option</div>
-                            <button 
-                                onClick={handleDeployCancel}
-                                className="cursor-pointer h-6 w-6 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-[#252525] transition-colors"
-                            >
-                                <X className="h-4 w-4" />
-                            </button>
-                        </div>
-
-                        <div className="p-4 space-y-3">
-                            <RadioGroup value={selectedOption} onValueChange={setSelectedOption} className="space-y-2">
-                                <div
-                                    className={`flex items-center space-x-3 rounded-md border ${
-                                        selectedOption === "user-wallet" ? "border-[#333333] bg-[#1a1a1a]" : "border-[#222222] bg-[#151515]"
-                                    } p-3`}
-                                >
-                                    <RadioGroupItem value="user-wallet" id="user-wallet" className="border-[#444444]" />
-                                    <Label htmlFor="user-wallet" className="flex flex-col cursor-pointer w-full">
-                                        <div className="flex justify-between w-full">
-                                            <span className="font-medium text-white text-sm">User Wallet Control</span>
-                                            {selectedOption === "user-wallet" && (
-                                                <span className="text-xs px-2 py-0.5 rounded bg-[#3b82f6] text-white">Selected</span>
-                                            )}
-                                        </div>
-                                        <span className="text-xs text-gray-500 mt-1">Deploy with your connected wallet</span>
-                                    </Label>
-                                </div>
-
-                                <div
-                                    className={`flex items-center space-x-3 rounded-md border ${
-                                        selectedOption === "delegated" ? "border-[#333333] bg-[#1a1a1a]" : "border-[#222222] bg-[#151515]"
-                                    } p-3`}
-                                >
-                                    <RadioGroupItem value="delegated" id="delegated" className="border-[#444444]" />
-                                    <Label htmlFor="delegated" className="flex flex-col cursor-pointer w-full">
-                                        <div className="flex justify-between w-full">
-                                            <span className="font-medium text-white text-sm">Delegated Control</span>
-                                            {selectedOption === "delegated" && (
-                                                <span className="text-xs px-2 py-0.5 rounded bg-[#3b82f6] text-white">Selected</span>
-                                            )}
-                                        </div>
-                                        <span className="text-xs text-gray-500 mt-1">Deploy with delegated permissions</span>
-                                    </Label>
-                                </div>
-                            </RadioGroup>
-
-                            <div className="text-xs text-[#6b7280] mt-2 border-t border-[#2a2a2a] pt-3">
-                                <div className="flex items-center">
-                                    <span className="inline-block w-2 h-2 rounded-full bg-[#10b981] mr-2"></span>
-                                    System ready for deployment
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex justify-between border-t border-[#2a2a2a] bg-[#151515] px-4 py-2">
-                            <Button
-                                variant="outline"
-                                onClick={handleDeployCancel}
-                                className="h-8 text-xs border-[#333333] bg-transparent text-gray-300 hover:bg-[#252525] hover:text-white"
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                onClick={handleDeployClick}
-                                className="h-8 text-xs bg-[#3b82f6] hover:bg-[#2563eb] text-white flex items-center cursor-pointer"
-                                disabled={isDeploying || (selectedOption === 'user-wallet' && !walletSigner.isConnected)}
-                            >
-                                {isDeploying ? (
-                                    <PulseLoader
-                                        color="#fff"
-                                        size={6}
-                                        cssOverride={{ display: 'inline-block', margin: '0' }}
-                                    />
-                                ) : (
-                                    <div className="flex items-center">
-                                        Deploy <ChevronRight className="ml-1 h-3 w-3" />
-                                    </div>
-                                )}
-                            </Button>
-                        </div>
-                    </DialogContent>
-                </Dialog>
-            )}
         </div>
     );
 };
