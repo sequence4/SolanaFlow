@@ -180,10 +180,27 @@ export const Toolbox = () => {
                     
                     // Now trigger the pipeline with the SIGNED flag
                     taskLogs.addSystemLog("🔄 Starting deploy pipeline with SIGNED flag...");
-                    await triggerSignedDeploy(id, graph);
                     
-                    taskLogs.addSystemLog("✅ Deployment complete!");
-                    setTimeout(() => taskLogs.setIsVisible(false), 3000);
+                    // Prepare graph with SIGNED flag
+                    const graphCopy = JSON.parse(JSON.stringify(graph));
+                    graphCopy.deployConfig = { 
+                      ...graphCopy.deployConfig || {}, 
+                      ephemeralPubkey: 'SIGNED' 
+                    };
+                    
+                    // Use the existing EventSource mechanism for logs streaming
+                    esRef.current = runDeployPipelineWithLogs(
+                      { ...projectContext, id },
+                      graphCopy,
+                      taskLogs,
+                      setProjectContext,
+                      setArtifactUrl
+                    );
+                    
+                    console.log('[deploy] Deploy pipeline started with EventSource and SIGNED flag');
+                    
+                    // No need to manually close logs - the EventSource will handle it
+                    // setTimeout(() => taskLogs.setIsVisible(false), 3000);
                 } catch (error: any) {
                     console.error('[deploy] Wallet signing error:', error);
                     taskLogs.addSystemLog(`❌ Error: ${error.message || 'Unknown error during wallet signing'}`);
@@ -568,6 +585,7 @@ export const Toolbox = () => {
                             <Button
                                 onClick={handleDeployClick}
                                 className="h-8 text-xs bg-[#3b82f6] hover:bg-[#2563eb] text-white flex items-center cursor-pointer"
+                                disabled={isDeploying || (selectedOption === 'user-wallet' && !walletSigner.isConnected)}
                             >
                                 {isDeploying ? (
                                     <PulseLoader

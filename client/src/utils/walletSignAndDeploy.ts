@@ -1,3 +1,4 @@
+import { Buffer } from "buffer";
 import { Connection, Transaction } from "@solana/web3.js";
 import { useWallet } from "@solana/wallet-adapter-react";
 
@@ -22,19 +23,32 @@ export function useWalletSigner() {
     const buffer = Buffer.from(encodedTx, 'base64');
     const tx = Transaction.from(buffer);
     
+    // Validate that the transaction expects exactly one signer (the wallet)
+    if (tx.signatures.length !== 1) {
+      throw new Error(`Transaction requires ${tx.signatures.length} signers, expected exactly 1`);
+    }
+    
+    // Validate that the fee payer is set to the user's wallet
+    if (!tx.feePayer || !wallet.publicKey.equals(tx.feePayer)) {
+      console.warn(`[signAndRelay] Transaction fee payer (${tx.feePayer?.toBase58()}) doesn't match wallet (${wallet.publicKey.toBase58()})`);
+      throw new Error("Transaction fee payer doesn't match connected wallet");
+    }
+    
     // Sign with Phantom
     const signed = await wallet.signTransaction(tx);
     
     // Serialize back to base64 for transmission
     const signedEncodedTx = signed.serialize({ verifySignatures: false }).toString("base64");
     
+    // Build headers with proper authorization
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    const token = localStorage.getItem('token');
+    if (token) headers.Authorization = `Bearer ${token}`;
+    
     // POST to the backend for relay
     const res = await fetch(`/api/deploy/${projectId}/deploy-signed`, {
       method: "POST",
-      headers: { 
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${localStorage.getItem('token')}`
-      },
+      headers,
       body: JSON.stringify({ encodedTx: signedEncodedTx }),
     });
     
@@ -62,7 +76,15 @@ export async function triggerSignedDeploy(projectId: string, graph: any): Promis
   // Make a deep copy of the graph
   const graphCopy = JSON.parse(JSON.stringify(graph));
   
-  // Modify deploy nodes to include the SIGNED flag
+  // Set the SIGNED flag in multiple possible locations to ensure it reaches the backend
+  
+  // 1. In the deployConfig object (main location)
+  graphCopy.deployConfig = { 
+    ...graphCopy.deployConfig || {}, 
+    ephemeralPubkey: 'SIGNED' 
+  };
+  
+  // 2. In each deploy node as before
   if (graphCopy.nodes) {
     graphCopy.nodes = graphCopy.nodes.map((node: any) => {
       if (node.type === 'deploy') {
@@ -75,13 +97,22 @@ export async function triggerSignedDeploy(projectId: string, graph: any): Promis
     });
   }
   
-  // Call the regular deploy pipeline API but with the SIGNED flag
+  console.log('[DEPLOY] Sending graph with SIGNED flag:', 
+    JSON.stringify({
+      deployConfig: graphCopy.deployConfig,
+      nodeFlags: graphCopy.nodes?.filter((n: any) => n.type === 'deploy').map((n: any) => n.ephemeralPubkey)
+    })
+  );
+  
+  // Build headers with proper authorization
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const token = localStorage.getItem('token');
+  if (token) headers.Authorization = `Bearer ${token}`;
+  
+  // Call the regular deploy pipeline API with the SIGNED flag
   const res = await fetch(`/api/deploy/${projectId}/deploy-pipeline`, {
     method: "POST",
-    headers: { 
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${localStorage.getItem('token')}`
-    },
+    headers,
     body: JSON.stringify({ graph: graphCopy }),
   });
   

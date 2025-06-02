@@ -3,6 +3,14 @@ import { AppError } from '../middleware/errorHandler';
 import { runDeployPipeline } from '../utils/deploy/runDeployPipeline';
 import { Graph } from '../types/graph'; 
 import { broadcastSignedTx } from '../utils/projectUtils';
+import {
+  Connection, Transaction, SystemProgram, Keypair, PublicKey,
+  BPF_LOADER_PROGRAM_ID, TransactionInstruction
+} from "@solana/web3.js";
+import fs from 'fs';
+import path from 'path';
+import { getProjectRootPath } from '../utils/fileUtils';
+import { getContainerName } from '../utils/projectUtils';
 
 /**
  * POST /api/deploy/:id/deploy-pipeline
@@ -89,7 +97,55 @@ export async function deploySignedTx(
 }
 
 /**
- * POST /api/build/:id/prepare-deploy-tx
+ * Creates instructions to load a program into a buffer account
+ */
+function createBPFLoaderWriteInstructions(
+  data: Buffer,
+  offset: number,
+  bufferKey: PublicKey,
+  payerKey: PublicKey
+): TransactionInstruction[] {
+  const chunkSize = 800;
+  const instructions: TransactionInstruction[] = [];
+
+  for (let i = 0; i < data.length; i += chunkSize) {
+    const chunk = data.slice(i, i + chunkSize);
+    const instruction = new TransactionInstruction({
+      keys: [
+        { pubkey: bufferKey, isSigner: false, isWritable: true },
+      ],
+      programId: BPF_LOADER_PROGRAM_ID,
+      data: Buffer.concat([
+        Buffer.from([0]), // Write instruction
+        Buffer.alloc(4).fill(new Uint8Array(new Uint32Array([offset + i]).buffer)),
+        chunk,
+      ]),
+    });
+    instructions.push(instruction);
+  }
+
+  return instructions;
+}
+
+/**
+ * Creates instruction to finalize the program
+ */
+function createBPFLoaderFinalizeInstruction(
+  bufferKey: PublicKey,
+  payerKey: PublicKey
+): TransactionInstruction {
+  return new TransactionInstruction({
+    keys: [
+      { pubkey: bufferKey, isSigner: false, isWritable: true },
+      { pubkey: payerKey, isSigner: true, isWritable: false },
+    ],
+    programId: BPF_LOADER_PROGRAM_ID,
+    data: Buffer.from([1]), // Finalize instruction
+  });
+}
+
+/**
+ * POST /api/deploy/:id/prepare-deploy-tx
  * Prepares a deploy transaction for client-side signing
  */
 export async function prepareDeployTx(
@@ -106,16 +162,100 @@ export async function prepareDeployTx(
   if (!userId) return next(new AppError('User not found', 400));
 
   try {
-    // This is a placeholder for the actual transaction building logic
-    // In a real implementation, you would:
-    // 1. Get the compiled program binary
-    // 2. Create a deploy transaction with the correct instructions
-    // 3. Return the serialized transaction
+    // Get the container information
+    const containerName = await getContainerName(id);
+    if (!containerName) {
+      return next(new AppError('No container found for this project', 404));
+    }
 
-    // For now, we'll just return a mock response
+    // Get project path
+    const rootPath = await getProjectRootPath(id);
+    const BUILD_DIR = path.join('/tmp', `build-${id}`);
+    
+    // Create temp directory if it doesn't exist
+    await fs.promises.mkdir(BUILD_DIR, { recursive: true });
+    
+    // Extract the program.so file from the container
+    const copyCmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && SO_DIR=\\"\${CARGO_TARGET_DIR:-target}/deploy\\" && find \\"$SO_DIR\\" -maxdepth 1 -name '*.so' | head -n 1 | xargs -I{} cat {}" > ${BUILD_DIR}/program.so`;
+    
+    try {
+      await new Promise<void>((resolve, reject) => {
+        require('child_process').exec(copyCmd, (error: Error | null) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    } catch (err) {
+      return next(new AppError(`Failed to extract program binary: ${(err as Error).message}`, 500));
+    }
+    
+    // Check if file exists and has content
+    try {
+      const stats = await fs.promises.stat(path.join(BUILD_DIR, 'program.so'));
+      if (stats.size === 0) {
+        return next(new AppError('Program binary is empty. Build may have failed.', 500));
+      }
+    } catch (err) {
+      return next(new AppError(`Program binary not found: ${(err as Error).message}`, 500));
+    }
+    
+    // Read the program binary
+    const programData = await fs.promises.readFile(path.join(BUILD_DIR, 'program.so'));
+    console.log(`[API] Read program binary: ${programData.length} bytes`);
+    
+    // Create a Solana connection
+    const conn = new Connection("https://api.devnet.solana.com", "recent");
+    
+    // Create keypairs for transaction
+    const payer = Keypair.generate(); // This will be replaced by the user's wallet
+    const buffer = Keypair.generate(); // Buffer account to hold the program
+    
+    // Calculate required lamports for rent exemption
+    const lamports = await conn.getMinimumBalanceForRentExemption(programData.length);
+    
+    // Create transaction
+    const tx = new Transaction().add(
+      SystemProgram.createAccount({
+        fromPubkey: payer.publicKey,
+        newAccountPubkey: buffer.publicKey,
+        lamports,
+        space: programData.length,
+        programId: BPF_LOADER_PROGRAM_ID,
+      })
+    );
+    
+    // Add write instructions for the program data
+    const writeInstructions = createBPFLoaderWriteInstructions(
+      programData, 
+      0, 
+      buffer.publicKey, 
+      payer.publicKey
+    );
+    
+    // Add all write instructions to the transaction
+    for (const instruction of writeInstructions) {
+      tx.add(instruction);
+    }
+    
+    // Add finalize instruction
+    tx.add(createBPFLoaderFinalizeInstruction(
+      buffer.publicKey,
+      payer.publicKey
+    ));
+    
+    // Get recent blockhash
+    const { blockhash } = await conn.getLatestBlockhash("finalized");
+    tx.recentBlockhash = blockhash;
+    tx.feePayer = payer.publicKey;
+    
+    // Serialize transaction to base64
+    const encodedTx = tx.serialize({ verifySignatures: false }).toString("base64");
+    
+    // Return the transaction for client-side signing
     res.status(200).json({
       success: true,
-      encodedTx: 'BASE64_ENCODED_TRANSACTION_PLACEHOLDER',
+      encodedTx,
+      programId: buffer.publicKey.toBase58(),
       message: 'Transaction prepared for signing'
     });
   } catch (err) {
