@@ -54,16 +54,21 @@ export async function runDeployPipeline({
     sendProgress({ stage: "build", message: "Building program…" });
     const buildTask = await startAnchorBuildTask(projectId, userId);
     
-    // Convert timeout ms to retry count (2-second default interval)
+    // Convert timeout ms to retry count (2-second interval)
     const buildRetries = Math.ceil(120_000 / 2_000); // 60 tries = 2 min
     
-    await waitForTaskCompletion(buildTask, buildRetries);
+    // Check build status and bail early if not successful
+    const buildStatus = await waitForTaskCompletion(buildTask, buildRetries, 2_000);
+    if (buildStatus !== 'succeed' && buildStatus !== 'finished') {
+      throw new Error(`Build task ended with status: ${buildStatus}`);
+    }
+    
     console.log("[PIPELINE] ✅ build task", buildTask, "completed");
 
     /* 3b ─ fetch artefact ------------------------------------------------ */
     console.log("[PIPELINE] 📦 fetching artefact (.so) from container");
     const { base64So } = await getBuildArtifactTask(projectId);
-    console.log("[PIPELINE] 📦 artefact length:", base64So?.length ?? 0);
+    console.log("[PIPELINE] 📦 artefact length:", base64So.length);
     sendProgress({
       stage   : "build-done",
       message : "Build finished",
@@ -73,11 +78,14 @@ export async function runDeployPipeline({
     /* 4 ─ deploy --------------------------------------------------------- */
     sendProgress({ stage: "deploy", message: "Deploying / upgrading…" });
 
-    // Get deployment timeout from env, ensure it's at least 1 minute
-    const deployMinutes = Number(process.env.MAX_DEPLOY_MINUTES || 6);
-    const deployTimeoutMs = (deployMinutes >= 1 ? deployMinutes : 6) * 60_000;
+    // Parse deployment timeout from env with better handling
+    const deployMinutesRaw = Number(process.env.MAX_DEPLOY_MINUTES);
+    const deployMinutes = Number.isFinite(deployMinutesRaw) && deployMinutesRaw >= 1
+      ? Math.ceil(deployMinutesRaw)
+      : 6;
+    const deployTimeoutMs = deployMinutes * 60_000;
     
-    // Convert timeout ms to retry count (2-second default interval)
+    // Convert timeout ms to retry count (2-second interval)
     const deployRetries = Math.ceil(deployTimeoutMs / 2_000);
 
     // Launch the async deploy task inside the container
@@ -88,7 +96,10 @@ export async function runDeployPipeline({
     );
 
     // Allow up to specified minutes for Devnet transaction retries
-    await waitForTaskCompletion(deployTask, deployRetries);
+    const deployStatus = await waitForTaskCompletion(deployTask, deployRetries, 2_000);
+    if (deployStatus !== 'succeed' && deployStatus !== 'finished') {
+      throw new Error(`Deployment task failed with status: ${deployStatus}`);
+    }
 
     // Retrieve the task's JSON result
     const { status, result } = await getTaskById(deployTask);

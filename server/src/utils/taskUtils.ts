@@ -45,7 +45,9 @@ export async function updateTaskStatus(
   }
 }
 
-export async function getTaskById(id: string) {
+export async function getTaskById(
+  id: string
+): Promise<{ status: string; result: string | null }> {
   const client = await pool.connect();
   try {
     const sanitizedTaskId = id.trim().replace(/,$/, '');
@@ -117,7 +119,7 @@ export async function waitForTaskCompletion(
       const client = await pool.connect();
       try {
         const result = await client.query(
-          'SELECT status FROM task WHERE id = $1',
+          'SELECT status, result FROM task WHERE id = $1',
           [taskId]
         );
         
@@ -127,10 +129,12 @@ export async function waitForTaskCompletion(
         }
         
         const status = result.rows[0].status;
-        console.log(`[DEBUG_TASK_BACKEND] Task ${taskId} status: ${status} (attempt ${retries + 1}/${maxRetries})`);
+        const hasResult = result.rows[0].result !== null;
         
-        if (finalStates.includes(status)) {
-          console.log(`[DEBUG_TASK_BACKEND] Task ${taskId} reached final state: ${status}`);
+        console.log(`[DEBUG_TASK_BACKEND] Task ${taskId} status: ${status}, has result: ${hasResult} (attempt ${retries + 1}/${maxRetries})`);
+        
+        if (finalStates.includes(status) && hasResult) {
+          console.log(`[DEBUG_TASK_BACKEND] Task ${taskId} reached final state: ${status} with result`);
           return status;
         }
       } finally {
