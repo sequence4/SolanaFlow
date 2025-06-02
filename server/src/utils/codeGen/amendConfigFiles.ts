@@ -183,6 +183,17 @@ async function patchProgramCargoToml(
   // Check if [features] section exists
   let featuresStart = cargoLines.findIndex(l => l.trim() === '[features]');
   
+  // Define Anchor helper features to silence cfg warnings
+  const anchorHelperFeatures = [
+    'cpi              = ["no-entrypoint"]',
+    'no-entrypoint    = []',
+    'no-idl           = []',
+    'no-log-ix-name   = []',
+    'anchor-debug     = []',
+    'custom-heap      = []',
+    'custom-panic     = []',
+  ];
+  
   if (featuresStart === -1) {
     // No [features] section, append it with required features
     cargoLines.push(
@@ -190,6 +201,7 @@ async function patchProgramCargoToml(
       '[features]',
       idlBuildFeatureLine,
       defaultFeaturesLine,
+      ...anchorHelperFeatures,
       ''
     );
   } else {
@@ -233,6 +245,18 @@ async function patchProgramCargoToml(
         // This shouldn't happen as we just added or updated idl-build
         cargoLines.splice(featuresStart + 1, 0, defaultFeaturesLine);
       }
+    }
+    
+    // Add any missing Anchor helper features
+    const featureSection = cargoLines.slice(featuresStart + 1, featuresEnd);
+    const missingFeatures = anchorHelperFeatures.filter(feature => {
+      const featureName = feature.split('=')[0].trim();
+      return !featureSection.some(line => line.trim().startsWith(`${featureName} =`) || 
+                                        line.trim().startsWith(`${featureName}=`));
+    });
+    
+    if (missingFeatures.length > 0) {
+      cargoLines.splice(featuresEnd, 0, ...missingFeatures);
     }
   }
   
