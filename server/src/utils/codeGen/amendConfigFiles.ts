@@ -257,16 +257,17 @@ async function patchProgramCargoToml(
       }
     }
     
-    // Check if test and doctest settings already exist
-    const hasTest = cargoLines.slice(libStart + 1, libEnd).some(l => /test\s*=/.test(l));
-    const hasDoctest = cargoLines.slice(libStart + 1, libEnd).some(l => /doctest\s*=/.test(l));
+    // Check if test and doctest settings already exist with anchored regex
+    const hasTest = cargoLines.slice(libStart + 1, libEnd).some(l => /^\s*test\s*=/.test(l));
+    const hasDoctest = cargoLines.slice(libStart + 1, libEnd).some(l => /^\s*doctest\s*=/.test(l));
     
-    // Add missing settings
-    if (!hasTest) {
-      cargoLines.splice(libEnd, 0, 'test = false');
-    }
-    if (!hasDoctest) {
-      cargoLines.splice(libEnd, 0, 'doctest = false');
+    // Add missing settings in a single splice operation to maintain order
+    if (!hasTest || !hasDoctest) {
+      const insertPos = libEnd;
+      const toAdd: string[] = [];
+      if (!hasTest) toAdd.push('test = false');
+      if (!hasDoctest) toAdd.push('doctest = false');
+      cargoLines.splice(insertPos, 0, ...toAdd);
     }
   }
   
