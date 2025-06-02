@@ -337,6 +337,87 @@ export const amendConfigFiles = async (
   console.log('[AMEND] Loaded Anchor.toml bytes:', anchorSrc.length);
 
   /* ------------------------------------------------------------------ *
+   * 1b. Read workspace-root Cargo.toml for profile settings
+   * ------------------------------------------------------------------ */
+  const rootCargoPath = 'Cargo.toml';
+  let rootCargoStatus = 'skipped';
+  let rootCargoTaskId = '';
+  
+  try {
+    const rootCargoSrc = await getFileContentBlocking(projectId, rootCargoPath, userId);
+    console.log('[AMEND] Loaded root Cargo.toml bytes:', rootCargoSrc.length);
+    
+    let rootLines = rootCargoSrc.split('\n');
+    
+    // Define the size-optimized test profile block
+    const testBlock = [
+      '[profile.test]',
+      'opt-level = "s"',
+      'debug = false',
+      'overflow-checks = false',
+    ];
+    
+    // Find or create the [profile.test] section
+    let testStart = rootLines.findIndex(l => l.trim() === '[profile.test]');
+    if (testStart === -1) {
+      // No existing profile.test section, add it at the end
+      rootLines.push('', ...testBlock, '');
+    } else {
+      // Merge with existing section
+      let testEnd = rootLines.length;
+      for (let i = testStart + 1; i < rootLines.length; i++) {
+        if (/^\[.*\]/.test(rootLines[i].trim())) { 
+          testEnd = i; 
+          break; 
+        }
+      }
+      
+      // Filter out existing lines we want to replace
+      rootLines = [
+        ...rootLines.slice(0, testStart + 1),
+        ...rootLines.slice(testStart + 1, testEnd).filter(l =>
+          !/^opt-level\s*=/.test(l.trim()) &&
+          !/^debug\s*=/.test(l.trim()) &&
+          !/^overflow-checks\s*=/.test(l.trim())
+        ),
+        ...testBlock.slice(1),  // Skip the header
+        ...rootLines.slice(testEnd),
+      ];
+    }
+    
+    // Write back the updated root Cargo.toml
+    const newRootCargo = rootLines.join('\n');
+    console.log(`[AMEND] Writing to workspace-root Cargo.toml to add size-optimized test profile`);
+    rootCargoTaskId = await startUpdateFileTask(projectId, rootCargoPath, newRootCargo, userId);
+    const rootCargoResult = await pollTaskStatus(rootCargoTaskId);
+    rootCargoStatus = rootCargoResult.task.status;
+    console.log(`[AMEND] Root ${rootCargoPath} write → ${rootCargoStatus}`);
+    
+    // Verify changes
+    if (rootCargoStatus === 'succeed') {
+      await new Promise(r => setTimeout(r, 500));
+      try {
+        const verifyContent = await getFileContentBlocking(projectId, rootCargoPath, userId);
+        const hasTestProfile = verifyContent.includes('[profile.test]') && 
+                               verifyContent.includes('opt-level = "s"');
+        console.log(`[AMEND] Verification: root ${rootCargoPath} has test profile: ${hasTestProfile}`);
+        if (!hasTestProfile) {
+          console.error(`[AMEND] WARNING: root ${rootCargoPath} test profile was overwritten!`);
+          const retryTaskId = await startUpdateFileTask(projectId, rootCargoPath, newRootCargo, userId);
+          const retryResult = await pollTaskStatus(retryTaskId);
+          rootCargoStatus = retryResult.task.status;
+          rootCargoTaskId = retryTaskId;
+        }
+      } catch (error) {
+        console.error(`[AMEND] Error verifying root ${rootCargoPath}:`, error);
+      }
+    }
+  } catch (error) {
+    console.error(`[AMEND] Error processing root Cargo.toml:`, error);
+    rootCargoStatus = 'failed';
+  }
+
+  /* ------------------------------------------------------------------ *
    * 2. Patch Anchor.toml
    * ------------------------------------------------------------------ */
   let anchorLines = anchorSrc.split('\n').map(l =>
@@ -382,6 +463,15 @@ export const amendConfigFiles = async (
    * 3. Patch program Cargo.toml files to add idl-build feature
    * ------------------------------------------------------------------ */
   const cargoPatches: Array<{ path: string; status: string; taskId: string }> = [];
+  
+  // Add the root Cargo.toml patch to the results
+  if (rootCargoTaskId) {
+    cargoPatches.push({ 
+      path: rootCargoPath, 
+      status: rootCargoStatus, 
+      taskId: rootCargoTaskId 
+    });
+  }
   
   // Find and patch all program Cargo.toml files
   const programPaths = await listGeneratedPrograms(projectId, userId);
