@@ -156,7 +156,7 @@ export const Toolbox = () => {
                     
                     // We would need an API to get the built transaction
                     // This is a placeholder - you'll need an actual endpoint to get the transaction to sign
-                    const response = await fetch(`/api/build/${id}/prepare-deploy-tx`, {
+                    const response = await fetch(`/api/deploy/${id}/prepare-deploy-tx`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',

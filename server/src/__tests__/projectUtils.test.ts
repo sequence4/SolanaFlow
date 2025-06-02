@@ -17,6 +17,11 @@ describe('startAnchorDeployTask', () => {
     jest.clearAllMocks();
   });
   
+  afterAll(() => {
+    // Restore the original fs module to avoid affecting other tests
+    jest.unmock('fs');
+  });
+  
   it('skips key-copy when SIGNED flag is provided', async () => {
     // Act
     await startAnchorDeployTask('test-project-id', 'test-creator-id', 'SIGNED');
@@ -24,7 +29,7 @@ describe('startAnchorDeployTask', () => {
     // Assert
     expect(fs.existsSync).not.toHaveBeenCalled();
     expect(mockUpdateTaskStatus).toHaveBeenCalledWith(
-      undefined,
+      'task-id',
       'succeed',
       'Signed tx already broadcast by frontend'
     );

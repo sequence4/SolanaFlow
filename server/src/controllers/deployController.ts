@@ -4,13 +4,16 @@ import { runDeployPipeline } from '../utils/deploy/runDeployPipeline';
 import { Graph } from '../types/graph'; 
 import { broadcastSignedTx } from '../utils/projectUtils';
 import {
-  Connection, Transaction, SystemProgram, Keypair, PublicKey,
-  BPF_LOADER_PROGRAM_ID, TransactionInstruction
+  Connection, Transaction, Keypair, PublicKey,
+  SystemProgram, TransactionInstruction
 } from "@solana/web3.js";
 import fs from 'fs';
 import path from 'path';
 import { getProjectRootPath } from '../utils/fileUtils';
 import { getContainerName } from '../utils/projectUtils';
+
+// BPF Loader Upgradeable Program ID
+const BPF_LOADER_UPGRADEABLE_PROGRAM_ID = new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111');
 
 /**
  * POST /api/deploy/:id/deploy-pipeline
@@ -97,51 +100,79 @@ export async function deploySignedTx(
 }
 
 /**
- * Creates instructions to load a program into a buffer account
+ * Creates a program deploy transaction that only requires the wallet to sign
+ * Uses the BPF Upgradeable Loader which allows for program upgrades
  */
-function createBPFLoaderWriteInstructions(
-  data: Buffer,
-  offset: number,
-  bufferKey: PublicKey,
-  payerKey: PublicKey
+function createUpgradeableProgramDeployInstructions(
+  programData: Buffer,
+  payer: PublicKey,
+  programId: PublicKey
 ): TransactionInstruction[] {
-  const chunkSize = 800;
+  // Constants for buffer account
+  const dataLen = programData.length;
+  const chunkSize = 900; // Standard chunk size for Solana
+  
+  // Calculate program derived buffer address
+  const [bufferAddress] = PublicKey.findProgramAddressSync(
+    [Buffer.from("buffer_seed")],
+    BPF_LOADER_UPGRADEABLE_PROGRAM_ID
+  );
+  
   const instructions: TransactionInstruction[] = [];
-
-  for (let i = 0; i < data.length; i += chunkSize) {
-    const chunk = data.slice(i, i + chunkSize);
-    const instruction = new TransactionInstruction({
+  
+  // 1. Create the buffer account - only requires payer to sign
+  instructions.push(
+    new TransactionInstruction({
+      programId: BPF_LOADER_UPGRADEABLE_PROGRAM_ID,
       keys: [
-        { pubkey: bufferKey, isSigner: false, isWritable: true },
+        { pubkey: payer, isSigner: true, isWritable: true }, // fee payer
+        { pubkey: bufferAddress, isSigner: false, isWritable: true }, // buffer
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system program
       ],
-      programId: BPF_LOADER_PROGRAM_ID,
       data: Buffer.concat([
-        Buffer.from([0]), // Write instruction
-        Buffer.alloc(4).fill(new Uint8Array(new Uint32Array([offset + i]).buffer)),
-        chunk,
+        Buffer.from([0]), // CreateBuffer instruction
+        // len as u32 LE
+        Buffer.from(new Uint32Array([dataLen]).buffer),
       ]),
-    });
-    instructions.push(instruction);
+    })
+  );
+  
+  // 2. Write program data to the buffer in chunks
+  for (let offset = 0; offset < programData.length; offset += chunkSize) {
+    const chunk = programData.slice(offset, offset + chunkSize);
+    instructions.push(
+      new TransactionInstruction({
+        programId: BPF_LOADER_UPGRADEABLE_PROGRAM_ID,
+        keys: [
+          { pubkey: bufferAddress, isSigner: false, isWritable: true },
+          { pubkey: payer, isSigner: true, isWritable: false },
+        ],
+        data: Buffer.concat([
+          Buffer.from([1]), // Write instruction
+          // offset as u32 LE
+          Buffer.from(new Uint32Array([offset]).buffer),
+          chunk,
+        ]),
+      })
+    );
   }
-
+  
+  // 3. Deploy the program from buffer
+  instructions.push(
+    new TransactionInstruction({
+      programId: BPF_LOADER_UPGRADEABLE_PROGRAM_ID,
+      keys: [
+        { pubkey: payer, isSigner: true, isWritable: true }, // payer 
+        { pubkey: bufferAddress, isSigner: false, isWritable: true }, // buffer
+        { pubkey: programId, isSigner: false, isWritable: true }, // program
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system program
+        { pubkey: BPF_LOADER_UPGRADEABLE_PROGRAM_ID, isSigner: false, isWritable: false }, // BPF Loader Upgradeable Program
+      ],
+      data: Buffer.from([2]), // DeployWithMaxDataLen instruction
+    })
+  );
+  
   return instructions;
-}
-
-/**
- * Creates instruction to finalize the program
- */
-function createBPFLoaderFinalizeInstruction(
-  bufferKey: PublicKey,
-  payerKey: PublicKey
-): TransactionInstruction {
-  return new TransactionInstruction({
-    keys: [
-      { pubkey: bufferKey, isSigner: false, isWritable: true },
-      { pubkey: payerKey, isSigner: true, isWritable: false },
-    ],
-    programId: BPF_LOADER_PROGRAM_ID,
-    data: Buffer.from([1]), // Finalize instruction
-  });
 }
 
 /**
@@ -206,56 +237,48 @@ export async function prepareDeployTx(
     // Create a Solana connection
     const conn = new Connection("https://api.devnet.solana.com", "recent");
     
-    // Create keypairs for transaction
-    const payer = Keypair.generate(); // This will be replaced by the user's wallet
-    const buffer = Keypair.generate(); // Buffer account to hold the program
-    
-    // Calculate required lamports for rent exemption
-    const lamports = await conn.getMinimumBalanceForRentExemption(programData.length);
-    
-    // Create transaction
-    const tx = new Transaction().add(
-      SystemProgram.createAccount({
-        fromPubkey: payer.publicKey,
-        newAccountPubkey: buffer.publicKey,
-        lamports,
-        space: programData.length,
-        programId: BPF_LOADER_PROGRAM_ID,
-      })
+    // Generate a deterministic program ID derived from the project ID
+    // This allows frontend to know the program ID in advance
+    const programSeed = Buffer.from(`program-${id}`, 'utf8');
+    const [programId] = PublicKey.findProgramAddressSync(
+      [programSeed],
+      BPF_LOADER_UPGRADEABLE_PROGRAM_ID
     );
     
-    // Add write instructions for the program data
-    const writeInstructions = createBPFLoaderWriteInstructions(
-      programData, 
-      0, 
-      buffer.publicKey, 
-      payer.publicKey
+    // This will be replaced by the frontend with the actual user's wallet
+    // We use a placeholder here just to build the transaction
+    const placeholderWallet = Keypair.generate();
+    
+    // Create a transaction with instructions that only require the wallet to sign
+    const tx = new Transaction();
+    
+    // Add the program deployment instructions
+    const deployInstructions = createUpgradeableProgramDeployInstructions(
+      programData,
+      placeholderWallet.publicKey,
+      programId
     );
     
-    // Add all write instructions to the transaction
-    for (const instruction of writeInstructions) {
+    // Add all instructions to the transaction
+    for (const instruction of deployInstructions) {
       tx.add(instruction);
     }
-    
-    // Add finalize instruction
-    tx.add(createBPFLoaderFinalizeInstruction(
-      buffer.publicKey,
-      payer.publicKey
-    ));
     
     // Get recent blockhash
     const { blockhash } = await conn.getLatestBlockhash("finalized");
     tx.recentBlockhash = blockhash;
-    tx.feePayer = payer.publicKey;
+    
+    // Set the fee payer - this will be replaced by the frontend with the wallet's public key
+    tx.feePayer = placeholderWallet.publicKey;
     
     // Serialize transaction to base64
-    const encodedTx = tx.serialize({ verifySignatures: false }).toString("base64");
+    const serializedTx = tx.serialize({ requireAllSignatures: false }).toString("base64");
     
     // Return the transaction for client-side signing
     res.status(200).json({
       success: true,
-      encodedTx,
-      programId: buffer.publicKey.toBase58(),
+      encodedTx: serializedTx,
+      programId: programId.toBase58(),
       message: 'Transaction prepared for signing'
     });
   } catch (err) {

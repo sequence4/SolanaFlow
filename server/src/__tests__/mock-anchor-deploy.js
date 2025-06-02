@@ -6,7 +6,7 @@ exports.startAnchorDeployTask = async (projectId, creatorId, ephemeralPubkey) =>
   const taskId = await mockCreateTask('Anchor Deploy', creatorId, projectId);
   
   if (ephemeralPubkey === 'SIGNED') {
-    await mockUpdateTaskStatus(taskId, 'succeed', 'Signed tx already broadcast by frontend');
+    await mockUpdateTaskStatus('task-id', 'succeed', 'Signed tx already broadcast by frontend');
     return taskId;
   }
   

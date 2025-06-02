@@ -18,24 +18,30 @@ export function useWalletSigner() {
       throw new Error("Wallet not connected or doesn't support signing");
     }
     
-    // The transaction should be already built by Anchor CLI on the backend
-    // We just need to decode it from base64, sign it, then re-encode
+    // The transaction should be already built by the backend with a placeholder signer
+    // We need to decode it from base64, replace the placeholder signer with our wallet, then sign
     const buffer = Buffer.from(encodedTx, 'base64');
     const tx = Transaction.from(buffer);
     
-    // Validate that the transaction expects exactly one signer (the wallet)
-    if (tx.signatures.length !== 1) {
-      throw new Error(`Transaction requires ${tx.signatures.length} signers, expected exactly 1`);
-    }
+    console.log(`[signAndRelay] Transaction before updating:`, {
+      feePayer: tx.feePayer?.toBase58(),
+      signers: tx.signatures.map(s => s.publicKey.toBase58())
+    });
     
-    // Validate that the fee payer is set to the user's wallet
-    if (!tx.feePayer || !wallet.publicKey.equals(tx.feePayer)) {
-      console.warn(`[signAndRelay] Transaction fee payer (${tx.feePayer?.toBase58()}) doesn't match wallet (${wallet.publicKey.toBase58()})`);
-      throw new Error("Transaction fee payer doesn't match connected wallet");
-    }
+    // Replace the placeholder fee payer with the wallet's public key
+    tx.feePayer = wallet.publicKey;
+    
+    // Clear existing signatures (they were for the placeholder key)
+    tx.signatures = [];
+    
+    console.log(`[signAndRelay] Transaction after updating:`, {
+      feePayer: tx.feePayer.toBase58(),
+      signerCount: tx.signatures.length
+    });
     
     // Sign with Phantom
-    const signed = await wallet.signTransaction(tx);
+    try {
+      const signed = await wallet.signTransaction(tx);
     
     // Serialize back to base64 for transmission
     const signedEncodedTx = signed.serialize({ verifySignatures: false }).toString("base64");
@@ -59,6 +65,10 @@ export function useWalletSigner() {
     
     const { sig } = await res.json();
     return sig as string;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error("Failed to sign transaction: " + errorMessage);
+    }
   };
   
   return {
