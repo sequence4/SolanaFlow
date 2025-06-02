@@ -1,5 +1,6 @@
 import { startGetFileContentTask } from '../fileUtils';
 import { pollTaskStatus } from '../taskUtils';
+import { runCommand } from '../projectUtils';
 import type { WorkspaceHandle } from '../deploy/prepEnv';
 
 interface LintContext {
@@ -9,6 +10,7 @@ interface LintContext {
 }
 
 // Define the required features that must exist
+// Note: idl-build is intentionally excluded as it's optional
 const REQUIRED_HELPER_FEATURES = [
   'cpi',
   'no-entrypoint',
@@ -16,8 +18,7 @@ const REQUIRED_HELPER_FEATURES = [
   'no-log-ix-name',
   'anchor-debug',
   'custom-heap',
-  'custom-panic',
-  'idl-build'
+  'custom-panic'
 ];
 
 // Define the required [lib] settings
@@ -25,6 +26,13 @@ const REQUIRED_LIB_SETTINGS = [
   'crate-type = ["cdylib"]',
   'test = false',
   'doctest = false'
+];
+
+// Required optimization settings for profiles
+const REQUIRED_PROFILE_SETTINGS = [
+  'opt-level = "s"',
+  'debug = false',
+  'overflow-checks = false'
 ];
 
 /**
@@ -46,7 +54,11 @@ async function getFileContentBlocking(
 /**
  * Finds all program Cargo.toml files in the workspace
  */
-async function findProgramManifests(projectId: string, userId: string): Promise<string[]> {
+async function findProgramManifests(
+  projectId: string, 
+  userId: string, 
+  context: LintContext
+): Promise<string[]> {
   try {
     // Get the workspace root Cargo.toml
     const rootManifest = 'Cargo.toml';
@@ -54,14 +66,46 @@ async function findProgramManifests(projectId: string, userId: string): Promise<
     // Read the content to find workspace members
     const rootContent = await getFileContentBlocking(projectId, rootManifest, userId);
     
-    // Parse for workspace members
+    // Parse for workspace members - both [workspace.members] format and [workspace] members = [...] format
     const members: string[] = [];
     const lines = rootContent.split('\n');
     
-    // Look for [workspace.members] section
+    // Case 1: Look for [workspace] with members = [...] (canonical form)
+    let inWorkspaceSection = false;
+    for (const line of lines) {
+      const trimmed = line.trim();
+      
+      if (trimmed === '[workspace]') {
+        inWorkspaceSection = true;
+      } else if (inWorkspaceSection && trimmed.startsWith('[')) {
+        inWorkspaceSection = false;
+      }
+      
+      // Extract member paths from members = [...] format
+      if (inWorkspaceSection && trimmed.startsWith('members')) {
+        const membersPart = trimmed.substring(trimmed.indexOf('=') + 1).trim();
+        if (membersPart.includes('[') && membersPart.includes(']')) {
+          // Extract everything between [ and ]
+          const arrayPart = membersPart.substring(
+            membersPart.indexOf('[') + 1, 
+            membersPart.lastIndexOf(']')
+          );
+          
+          // Split by commas and handle quoted paths
+          const memberPaths = arrayPart.split(',').map(p => p.trim());
+          for (const path of memberPaths) {
+            // Remove quotes if present
+            const cleanPath = path.replace(/^["']|["']$/g, '');
+            if (cleanPath) members.push(cleanPath);
+          }
+        }
+      }
+    }
+    
+    // Case 2: Look for [workspace.members] section (non-canonical but sometimes used)
     let inMembersSection = false;
     for (const line of lines) {
-      if (line.trim() === '[workspace.members]' || line.includes('members = [')) {
+      if (line.trim() === '[workspace.members]') {
         inMembersSection = true;
       } else if (inMembersSection && line.trim().startsWith('[')) {
         inMembersSection = false;
@@ -79,18 +123,54 @@ async function findProgramManifests(projectId: string, userId: string): Promise<
       }
     }
     
-    // Fallback if no members found: look in programs/ directory
-    if (members.length === 0) {
-      console.log('[LINT] No workspace members found, trying programs/ directory');
-      return ['programs/*/Cargo.toml'];
+    // If members were found, return their Cargo.toml paths
+    if (members.length > 0) {
+      console.log(`[LINT] Found ${members.length} workspace members: ${members.join(', ')}`);
+      return members.map(member => `${member}/Cargo.toml`);
     }
     
-    // Return paths to all member Cargo.toml files
-    return members.map(member => `${member}/Cargo.toml`);
+    // Fallback: Find Cargo.toml files in programs/ directory using docker exec
+    console.log('[LINT] No workspace members found, trying to find Cargo.toml files directly');
+    try {
+      const { containerName, rootPath } = context.workspace;
+      
+      const findCmd = `docker exec ${containerName} find /usr/src/${rootPath}/programs -name Cargo.toml -maxdepth 2`;
+      const result = await runCommand(findCmd, '.', 'find-cargo-files');
+      
+      // Parse results and convert to relative paths
+      const manifestPaths = result
+        .split('\n')
+        .filter(Boolean)
+        .map((path: string) => path.replace(`/usr/src/${rootPath}/`, ''));
+      
+      if (manifestPaths.length > 0) {
+        console.log(`[LINT] Found ${manifestPaths.length} Cargo.toml files via find command`);
+        return manifestPaths;
+      }
+    } catch (error) {
+      console.warn(`[LINT] Error finding Cargo.toml files via docker exec:`, error);
+      // Continue to next fallback
+    }
+    
+    // Final fallback: Just return programs/*/Cargo.toml for amendConfigFiles to find
+    console.log('[LINT] Falling back to programs/*/Cargo.toml pattern');
+    return ['programs/*/Cargo.toml'];
   } catch (error) {
     console.error('[LINT] Error finding program manifests:', error);
-    return ['programs/*/Cargo.toml']; // Fallback
+    throw new Error(`Failed to find program manifests: ${error}`);
   }
+}
+
+/**
+ * Helper to remove comments from a line of TOML
+ */
+function removeComments(line: string): string {
+  // Handle # comments and // comments, but skip URLs like http://example.com
+  const commentIndex = line.search(/(?<!(https?:|ftp:))\/\/|#/);
+  if (commentIndex >= 0) {
+    return line.substring(0, commentIndex).trim();
+  }
+  return line.trim();
 }
 
 /**
@@ -98,7 +178,12 @@ async function findProgramManifests(projectId: string, userId: string): Promise<
  */
 function validateManifest(content: string, path: string, isRoot: boolean): string[] {
   const issues: string[] = [];
-  const lines = content.split('\n');
+  
+  // Remove comments and empty lines for more reliable parsing
+  const cleanLines = content
+    .split('\n')
+    .map(removeComments)
+    .filter(Boolean);
   
   // Validate different things based on whether it's the root or a crate
   if (isRoot) {
@@ -114,53 +199,97 @@ function validateManifest(content: string, path: string, isRoot: boolean): strin
       issues.push(`${path}: Missing [profile.test] section`);
     }
     
-    // Check for correct profile settings if they exist
-    if (hasReleaseProfile && (!content.includes('opt-level = "s"') || 
-                             !content.includes('debug = false') ||
-                             !content.includes('overflow-checks = false'))) {
-      issues.push(`${path}: [profile.release] is missing one or more optimization settings`);
-    }
-    
-    if (hasTestProfile && (!content.includes('opt-level = "s"') || 
-                          !content.includes('debug = false') ||
-                          !content.includes('overflow-checks = false'))) {
-      issues.push(`${path}: [profile.test] is missing one or more optimization settings`);
-    }
-  } else {
-    // Program crates should NOT have profile sections
-    if (content.includes('[profile.')) {
-      issues.push(`${path}: Contains [profile.*] section which should only be in root Cargo.toml`);
-    }
-    
-    // Program crates should have [lib] with required settings
-    let libSectionStart = -1;
-    let libSectionEnd = -1;
-    
-    // Find the [lib] section
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].trim() === '[lib]') {
-        libSectionStart = i;
-        break;
-      }
-    }
-    
-    if (libSectionStart === -1) {
-      issues.push(`${path}: Missing [lib] section`);
-    } else {
-      // Find the end of the [lib] section
-      for (let i = libSectionStart + 1; i < lines.length; i++) {
-        if (/^\[.*\]/.test(lines[i].trim())) {
-          libSectionEnd = i;
-          break;
+    // Check for required profile settings if sections exist
+    // Note: We only check for presence of each setting, not exact matches
+    if (hasReleaseProfile) {
+      // Find the [profile.release] section content
+      let inReleaseSection = false;
+      let releaseSection = '';
+      for (const line of cleanLines) {
+        if (line === '[profile.release]') {
+          inReleaseSection = true;
+          continue;
+        }
+        if (inReleaseSection && line.startsWith('[')) {
+          inReleaseSection = false;
+          continue;
+        }
+        if (inReleaseSection) {
+          releaseSection += line + '\n';
         }
       }
       
-      if (libSectionEnd === -1) {
-        libSectionEnd = lines.length;
+      // Check each required setting is present
+      for (const setting of REQUIRED_PROFILE_SETTINGS) {
+        const key = setting.split('=')[0].trim();
+        const hasKey = new RegExp(`^\\s*${key}\\s*=`, 'm').test(releaseSection);
+        if (!hasKey) {
+          issues.push(`${path}: [profile.release] missing required setting: ${setting}`);
+        }
+      }
+    }
+    
+    if (hasTestProfile) {
+      // Find the [profile.test] section content
+      let inTestSection = false;
+      let testSection = '';
+      for (const line of cleanLines) {
+        if (line === '[profile.test]') {
+          inTestSection = true;
+          continue;
+        }
+        if (inTestSection && line.startsWith('[')) {
+          inTestSection = false;
+          continue;
+        }
+        if (inTestSection) {
+          testSection += line + '\n';
+        }
       }
       
+      // Check each required setting is present
+      for (const setting of REQUIRED_PROFILE_SETTINGS) {
+        const key = setting.split('=')[0].trim();
+        const hasKey = new RegExp(`^\\s*${key}\\s*=`, 'm').test(testSection);
+        if (!hasKey) {
+          issues.push(`${path}: [profile.test] missing required setting: ${setting}`);
+        }
+      }
+    }
+  } else {
+    // Program crates should NOT have profile sections or includes
+    // Check entire content to catch profile.* in any context
+    const hasProfileSection = cleanLines.some(line => 
+      line.startsWith('[profile.') || 
+      (line.includes('profile.') && line.includes('include'))
+    );
+    
+    if (hasProfileSection) {
+      issues.push(`${path}: Contains [profile.*] section or include which should only be in root Cargo.toml`);
+    }
+    
+    // Program crates should have [lib] with required settings
+    let libSection = '';
+    let inLibSection = false;
+    
+    for (const line of cleanLines) {
+      if (line === '[lib]') {
+        inLibSection = true;
+        continue;
+      }
+      if (inLibSection && line.startsWith('[')) {
+        inLibSection = false;
+        continue;
+      }
+      if (inLibSection) {
+        libSection += line + '\n';
+      }
+    }
+    
+    if (!inLibSection && libSection === '') {
+      issues.push(`${path}: Missing [lib] section`);
+    } else {
       // Check for required [lib] settings
-      const libSection = lines.slice(libSectionStart, libSectionEnd).join('\n');
       for (const setting of REQUIRED_LIB_SETTINGS) {
         const key = setting.split('=')[0].trim();
         if (!new RegExp(`^\\s*${key}\\s*=`, 'm').test(libSection)) {
@@ -170,34 +299,27 @@ function validateManifest(content: string, path: string, isRoot: boolean): strin
     }
     
     // Check for [features] section with required helper features
-    let featuresSectionStart = -1;
-    let featuresSectionEnd = -1;
+    let featuresSection = '';
+    let inFeaturesSection = false;
     
-    // Find the [features] section
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].trim() === '[features]') {
-        featuresSectionStart = i;
-        break;
+    for (const line of cleanLines) {
+      if (line === '[features]') {
+        inFeaturesSection = true;
+        continue;
+      }
+      if (inFeaturesSection && line.startsWith('[')) {
+        inFeaturesSection = false;
+        continue;
+      }
+      if (inFeaturesSection) {
+        featuresSection += line + '\n';
       }
     }
     
-    if (featuresSectionStart === -1) {
+    if (!inFeaturesSection && featuresSection === '') {
       issues.push(`${path}: Missing [features] section`);
     } else {
-      // Find the end of the [features] section
-      for (let i = featuresSectionStart + 1; i < lines.length; i++) {
-        if (/^\[.*\]/.test(lines[i].trim())) {
-          featuresSectionEnd = i;
-          break;
-        }
-      }
-      
-      if (featuresSectionEnd === -1) {
-        featuresSectionEnd = lines.length;
-      }
-      
-      // Check for required helper features
-      const featuresSection = lines.slice(featuresSectionStart, featuresSectionEnd).join('\n');
+      // Check for required helper features with whitespace-tolerant regex
       for (const feature of REQUIRED_HELPER_FEATURES) {
         if (!new RegExp(`^\\s*${feature}\\s*=`, 'm').test(featuresSection)) {
           issues.push(`${path}: [features] section missing required feature: ${feature}`);
@@ -231,7 +353,7 @@ export async function lintWorkspaceManifests(context: LintContext): Promise<void
     }
     
     // Find all program Cargo.toml files
-    const programManifests = await findProgramManifests(projectId, userId);
+    const programManifests = await findProgramManifests(projectId, userId, context);
     console.log(`[LINT] Found ${programManifests.length} program manifests to check`);
     
     // Validate each program Cargo.toml
