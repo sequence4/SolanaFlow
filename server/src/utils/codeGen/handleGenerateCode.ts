@@ -91,11 +91,6 @@ export const handleGenerateCode = async ({
 
         //const frontendTaskId = await genUi(nodes);   // possible skip this step if not working correctly (save til end) 
         
-        console.log('[GEN] calling amendConfigFiles…');
-        const { anchorTaskId } = await amendConfigFiles(projectId, userId);
-        console.log('[GEN] amendConfigFiles result:', { anchorTaskId });
-        sendProgress({ stage: 'debug', message: '[handleGenerateCode] Amend done' });
-        
         sendProgress({ stage: 'file-tree', message: 'Refreshing file tree…' });
         const fileTreeTaskIds = await refreshWorkspaceTree(projectId, userId);
         console.log('[GEN] refreshWorkspaceTree triggered, taskIds =', fileTreeTaskIds);
@@ -189,6 +184,12 @@ export const handleGenerateCode = async ({
         }
 
         sendProgress({ stage: 'src-gen-done', message: 'Rust sources ready' });
+
+        /* ────────────────────────── PATCH MANIFESTS ───────────────────────── */
+        console.log('[GEN] calling amendConfigFiles (post-generation)…');
+        const { anchorTaskId } = await amendConfigFiles(projectId, userId);
+        console.log('[GEN] amendConfigFiles result:', { anchorTaskId });
+        sendProgress({ stage: 'debug', message: '[handleGenerateCode] Amend done' });
 
         // ─────────── Debug: dump container tree ───────────
         const dumpTaskId = await createTask(
