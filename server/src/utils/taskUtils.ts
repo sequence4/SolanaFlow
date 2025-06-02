@@ -45,6 +45,28 @@ export async function updateTaskStatus(
   }
 }
 
+export async function getTaskById(id: string) {
+  const client = await pool.connect();
+  try {
+    const sanitizedTaskId = id.trim().replace(/,$/, '');
+    const result = await client.query(
+      'SELECT status, result FROM task WHERE id = $1',
+      [sanitizedTaskId]
+    );
+    
+    if (result.rows.length === 0) {
+      throw new Error(`Task with ID ${sanitizedTaskId} not found`);
+    }
+    
+    return { 
+      status: result.rows[0].status,
+      result: result.rows[0].result 
+    };
+  } finally {
+    client.release();
+  }
+}
+
 export async function ensureDirectoryExists(
   dirPath: string,
   containerName?: string
@@ -134,7 +156,7 @@ export async function waitForTaskCompletion(
  * one of the final states or we run out of retries.
  *
  * Returns the full row as `{ task: { status: string; result: string } }`
- * so it’s a drop-in replacement for the client’s pollTaskStatus3.
+ * so it's a drop-in replacement for the client's pollTaskStatus3.
  */
 export async function pollTaskStatus(
   taskId: string,
