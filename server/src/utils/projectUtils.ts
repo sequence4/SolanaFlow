@@ -1100,6 +1100,8 @@ EOF`;
 export async function broadcastSignedTx(projectId: string, encodedTx: string): Promise<string> {
   // TODO: verify that the deployed program address matches the current project
   // before relaying, to prevent malicious reuse of this endpoint.
+  // NOTE: encodedTx must be base64-encoded. If using Phantom, call 
+  // tx.serialize({ verifySignatures: false }).toString('base64') before sending.
   console.log(`[broadcastSignedTx] project ${projectId} relaying…`);
   const conn = new Connection('https://api.devnet.solana.com', 'confirmed');
   const raw  = Buffer.from(encodedTx, 'base64');
