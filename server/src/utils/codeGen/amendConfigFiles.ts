@@ -236,9 +236,9 @@ async function patchProgramCargoToml(
     }
   }
   
-  // For test builds in template, add profile options to prevent stack overflow
-  if (cargoPath.includes('anchor-template')) {
-    // Check if [lib] section exists
+  // Ensure a size-optimised test profile to avoid 4 KB stack overflow errors
+  {
+    // --- [lib] section (if missing) ------------------------------------
     const libStart = cargoLines.findIndex(l => l.trim() === '[lib]');
     if (libStart === -1) {
       cargoLines.push(
@@ -248,18 +248,35 @@ async function patchProgramCargoToml(
         ''
       );
     }
-    
-    // Check if [profile.test] section exists
-    const testProfileStart = cargoLines.findIndex(l => l.trim() === '[profile.test]');
-    if (testProfileStart === -1) {
-      cargoLines.push(
-        '',
-        '[profile.test]',
-        'opt-level = "s"',
-        'debug = false',
-        'overflow-checks = false',
-        ''
-      );
+
+    // --- [profile.test] -------------------------------------------------
+    const testStart = cargoLines.findIndex(l => l.trim() === '[profile.test]');
+    const testBlock = [
+      '[profile.test]',
+      'opt-level = "s"',
+      'debug = false',
+      'overflow-checks = false',
+    ];
+
+    if (testStart === -1) {
+      cargoLines.push('', ...testBlock, '');
+    } else {
+      // overwrite / merge so we never duplicate keys
+      let testEnd = cargoLines.length;
+      for (let i = testStart + 1; i < cargoLines.length; i++) {
+        if (/^\[.*\]/.test(cargoLines[i].trim())) { testEnd = i; break; }
+      }
+      // remove old lines inside the existing block that match the keys we force-set
+      cargoLines = [
+        ...cargoLines.slice(0, testStart + 1),
+        ...cargoLines.slice(testStart + 1, testEnd).filter(l =>
+          !/^opt-level\s*=/.test(l.trim()) &&
+          !/^debug\s*=/.test(l.trim()) &&
+          !/^overflow-checks\s*=/.test(l.trim())
+        ),
+        ...testBlock.slice(1),                // skip duplicate header
+        ...cargoLines.slice(testEnd),
+      ];
     }
   }
   
