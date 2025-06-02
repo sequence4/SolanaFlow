@@ -22,7 +22,15 @@ const app = express();
 const PORT = process.env.PORT || 9999;
 
 app.use((req, _res, next) => {
-  console.log('[TRACE] %s %s', req.method, req.url);
+  console.log('[TRACE] %s %s [Headers: %s]', 
+    req.method, 
+    req.url, 
+    JSON.stringify({
+      'content-type': req.headers['content-type'],
+      'origin': req.headers.origin,
+      'authorization': req.headers.authorization ? 'present' : 'absent'
+    })
+  );
   next();
 });
 
@@ -30,6 +38,9 @@ app.use(cookieParser());
 app.use(cors({
   origin: 'http://localhost:3000',
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));

@@ -49,7 +49,9 @@ export function useWalletSigner() {
     // Build headers with proper authorization
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     const token = localStorage.getItem('token');
-    if (token) headers.Authorization = `Bearer ${token}`;
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
     
     // POST to the backend for relay
     const res = await fetch(`/api/deploy/${projectId}/deploy-signed`, {
@@ -117,7 +119,9 @@ export async function triggerSignedDeploy(projectId: string, graph: any): Promis
   // Build headers with proper authorization
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   const token = localStorage.getItem('token');
-  if (token) headers.Authorization = `Bearer ${token}`;
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
   
   // Call the regular deploy pipeline API with the SIGNED flag
   const res = await fetch(`/api/deploy/${projectId}/deploy-pipeline`, {

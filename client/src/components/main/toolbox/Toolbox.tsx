@@ -142,10 +142,16 @@ export const Toolbox = () => {
                 // We need an API to get the built transaction
                 const response = await fetch(`/api/deploy/${id}/prepare-deploy-tx`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    },
+                    headers: (() => {
+                        const headers: Record<string, string> = {
+                            'Content-Type': 'application/json'
+                        };
+                        const token = localStorage.getItem('token');
+                        if (token) {
+                            headers.Authorization = `Bearer ${token}`;
+                        }
+                        return headers;
+                    })(),
                     body: JSON.stringify({ graph })
                 });
                 

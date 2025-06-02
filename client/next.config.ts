@@ -12,6 +12,16 @@ const nextConfig: NextConfig = {
     };
     return config;
   },
+  
+  async rewrites() {
+    return [
+      {
+        // forward any call starting with /api/… to Express
+        source: '/api/:path*',
+        destination: 'http://localhost:9999/:path*',
+      },
+    ];
+  },
 };
 
 export default nextConfig;
