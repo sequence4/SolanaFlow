@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { normalizeProjectName } from './stringUtils';
 import pool from 'src/config/database';
 import { pruneContainerResources } from './container/pruneContainer';
+import { startProjectContainer } from './container/startProjectContainer';
 
 //const USER_WORKSPACE_IMAGE = "ghcr.io/sequence4/solanaflow:latest";
 
@@ -182,7 +183,6 @@ function transformRootPath(rootPath: string): string {
 export const getBuildArtifactTask = async (projectId: string): Promise<{ status: string, base64So: string }> => {
   try {
     const rootPath = await getProjectRootPath(projectId);
-    const transformedRootPath = transformRootPath(rootPath);
     
     // Get the container name for this project
     const containerName = await getContainerName(projectId);
@@ -190,27 +190,31 @@ export const getBuildArtifactTask = async (projectId: string): Promise<{ status:
       throw new Error(`No container found for project ${projectId}`);
     }
     
+    console.log(`[ARTIFACT] Looking for compiled .so file in container ${containerName} for project ${projectId}`);
+    
     // Create a temporary task ID for the command execution
     const tempTaskId = uuidv4();
     
-    // Read the .so file directly from inside the container
-    const containerSoPath = `/usr/src/${rootPath}/target/deploy/${transformedRootPath}.so`;
-    
-    // Check if the file exists in the container
-    const fileExistsCmd = `docker exec ${containerName} bash -c "if [ -f '${containerSoPath}' ]; then echo 'exists'; else echo 'not_found'; fi"`;
-    const fileExists = await runCommand(fileExistsCmd, '.', tempTaskId, { skipSuccessUpdate: true });
-    
-    if (fileExists.trim() !== 'exists') {
-      throw new Error(`Built artifact not found in container at path: ${containerSoPath}`);
+    // find the first .so inside target/deploy
+    const locateCmd = `docker exec ${containerName} bash -c "find /usr/src/${rootPath}/target/deploy -maxdepth 1 -name '*.so' | head -n 1"`;
+    const containerSoPath = (await runCommand(locateCmd, '.', tempTaskId, { skipSuccessUpdate: true })).trim();
+
+    if (!containerSoPath) {
+      console.error('[ARTIFACT] ❌  No .so produced by build');
+      throw new Error('Built artifact not found in container');
     }
+    
+    console.log(`[ARTIFACT] ✓ Found .so file at ${containerSoPath}, extracting...`);
     
     // Read and encode the file directly from the container
     const base64Cmd = `docker exec ${containerName} bash -c "cat '${containerSoPath}' | base64 -w 0"`;
     const base64So = await runCommand(base64Cmd, '.', tempTaskId, { skipSuccessUpdate: true });
     
+    console.log(`[ARTIFACT] ✓ Successfully encoded .so file to base64 (${base64So.length} bytes)`);
+    
     return { status: 'success', base64So };
   } catch (error) {
-    console.error('Error retrieving built artifact:', error);
+    console.error('[ARTIFACT] Error retrieving built artifact:', error);
     return { status: 'failed', base64So: '' };
   }
 };
@@ -231,7 +235,7 @@ export const startAnchorBuildTask = async (
       
       const rootPath = await getProjectRootPath(projectId);
       
-      console.log(`Starting anchor build for project ${projectId} in container ${containerName}...`);
+      console.log(`[BUILD] Running anchor build in ${containerName} (root=${rootPath}) for project ${projectId}`);
       
       const buildScriptContent = `#!/bin/bash
 set -euo pipefail
@@ -240,6 +244,16 @@ cd /usr/src/${rootPath}
 
 echo "===== Running anchor build ====="
 anchor build
+
+# ── find the first .so file Anchor just produced ──
+SO_PATH=$(find target/deploy -maxdepth 1 -name '*.so' | head -n 1)
+
+if [[ -z "$SO_PATH" ]]; then
+  echo "BUILD_FAILURE: no .so in target/deploy"
+  exit 1
+fi
+
+echo "BUILD_SUCCESS: $SO_PATH"
 `;
       
       const tempDir = path.join(__dirname, '../../tmp');
@@ -250,14 +264,14 @@ anchor build
       const buildScriptPath = path.join(tempDir, `build-${projectId}.sh`);
       fs.writeFileSync(buildScriptPath, buildScriptContent, 'utf8');
       
-      console.log(`Created build script locally at ${tempDir}`);
+      console.log(`[BUILD] Created build script locally at ${tempDir}`);
 
-      console.log(`Starting anchor build for project ${projectId}...`);
+      console.log(`[BUILD] Starting anchor build for project ${projectId}...`);
       
       try {
         await updateTaskStatus(sanitizedTaskId, 'doing', 'Anchor build in progress...');
         
-        console.log(`Copying build script to container ${containerName}...`);
+        console.log(`[BUILD] Copying build script to container ${containerName}...`);
         await runCommand(
           `docker cp ${buildScriptPath} ${containerName}:/tmp/build.sh`,
           '.',
@@ -265,7 +279,7 @@ anchor build
           { skipSuccessUpdate: true }
         );
         
-        console.log(`Making build script executable...`);
+        console.log(`[BUILD] Making build script executable...`);
         await runCommand(
           `docker exec ${containerName} chmod +x /tmp/build.sh`,
           '.',
@@ -273,7 +287,7 @@ anchor build
           { skipSuccessUpdate: true }
         );
         
-        console.log(`Executing build script in container ${containerName}...`);
+        console.log(`[BUILD] Executing build script in container ${containerName}...`);
         const buildOutput = await runCommand(
           `docker exec ${containerName} /bin/bash /tmp/build.sh`,
           '.',
@@ -281,9 +295,9 @@ anchor build
           { skipSuccessUpdate: true }
         );
         
-        const transformedRootPath = rootPath.replace(/-/g, '_');
+        // look for the *first* .so produced under target/deploy
         const soFileCheck = await runCommand(
-          `docker exec ${containerName} /bin/bash -c "if [ -f /usr/src/${rootPath}/target/deploy/${transformedRootPath}.so ]; then echo 'BUILD_SUCCESS: .so file was created'; else echo 'BUILD_FAILURE: .so file was NOT created'; fi"`,
+          `docker exec ${containerName} /bin/bash -c "if ls /usr/src/${rootPath}/target/deploy/*.so 1>/dev/null 2>&1; then echo 'BUILD_SUCCESS'; else echo 'BUILD_FAILURE'; fi"`,
           '.',
           sanitizedTaskId,
           { skipSuccessUpdate: true }
@@ -292,18 +306,19 @@ anchor build
         try {
           fs.unlinkSync(buildScriptPath);
         } catch (cleanupError: any) {
-          console.log(`Non-critical error cleaning up temp files: ${cleanupError.message}`);
+          console.log(`[BUILD] Non-critical error cleaning up temp files: ${cleanupError.message}`);
         }
         
         if (soFileCheck.includes('BUILD_SUCCESS')) {
+          console.log("[BUILD] ✔️  anchor build finished & .so produced");
           await updateTaskStatus(sanitizedTaskId, 'succeed', `Build completed successfully. .so file was created.`);
         } else {
-          const fullBuildError = `Build process completed but no .so file was created.\n\nBuild output: ${buildOutput}`;
+          const fullBuildError = `[BUILD] ❌  Build finished but no .so was created.\n\nBuild output:\n${buildOutput}`;
           console.error(fullBuildError);
           await updateTaskStatus(sanitizedTaskId, 'failed', fullBuildError);
         }
       } catch (buildError: any) {
-        console.error(`Anchor build failed with error: ${buildError.message}`);
+        console.error(`[BUILD] Anchor build failed with error: ${buildError.message}`);
         await updateTaskStatus(
           sanitizedTaskId,
           'failed',
@@ -313,11 +328,11 @@ anchor build
         try {
           fs.unlinkSync(buildScriptPath);
         } catch (cleanupError: any) {
-          console.log(`Non-critical error cleaning up temp files: ${cleanupError.message}`);
+          console.log(`[BUILD] Non-critical error cleaning up temp files: ${cleanupError.message}`);
         }
       }
     } catch (error: any) {
-      console.error(`Error in anchor build task: ${error.message}`);
+      console.error(`[BUILD] Error in anchor build task: ${error.message}`);
       await updateTaskStatus(sanitizedTaskId, 'failed', `Error: ${error.message}`);
     }
   });
@@ -909,51 +924,6 @@ export const closeProjectContainer = async (
   
   return sanitizedTaskId;
 };
-
-export async function startProjectContainer(projId: string): Promise<string> {
-  const name  = `userproj-${projId}-${Date.now()}`.slice(0, 63);        // 64-char limit
-  const image = 'ghcr.io/sequence4/solanaflow:latest';
-
-  try {
-    /* 1 ─ ensure image is present & host-arch-compatible */
-    execSync(`docker pull --platform linux/arm64 ${image}`, { stdio: 'inherit' });
-
-    /* 2 ─ run container with explicit platform, project label & random host-port */
-    execSync(
-      `docker run -d --platform linux/arm64 \
-       --name  ${name} \
-       --label solanaflow.project=${projId} \
-       -p 0.0.0.0::3000 \
-       ${image} \
-       bash -c "cd /usr/src && tail -f /dev/null"`,
-      { stdio: 'inherit' }
-    );
-
-    return name;
-  } catch (err: any) {
-    /* ---------- quarantine on failure ---------- */
-    const reason = err.stderr?.toString() || err.message || 'unknown';
-    console.error('[startProjectContainer] docker run failed:', reason);
-
-    /* Attempt best-effort cleanup of half-created container */
-    try { execSync(`docker rm -f ${name}`); } catch { /* ignore */ }
-
-    /* Tag a sentinel row: port = 0  ➜ excluded from partial-unique index */
-    const failed = `failed-container-${name}`;
-    await pool.query(
-      `INSERT INTO warm_container_pool (name, image, busy, port, last_used)
-             VALUES ($1,      $2,    false, 0,    now())
-         ON CONFLICT (name) DO UPDATE
-                   SET image = EXCLUDED.image,
-                       busy  = false,
-                       port  = 0,
-                       last_used = now()`,
-      [failed, image]
-    );
-
-    throw new Error(`Container creation failed: ${reason}`);
-  }
-}
 
 export async function getContainerName(projectId: string): Promise<string | null> {
   const result = await pool.query(

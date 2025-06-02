@@ -1,13 +1,13 @@
 import pool from 'src/config/database';
 import { v4 as uuidv4 } from 'uuid';
 import {
-  startProjectContainer,
   runCommand,
 } from '../projectUtils';
 import {
   rentContainerFromPool,
   releaseContainerToPool,
-} from '../container/rentContainerFromPool';
+  startProjectContainer
+} from '../container';
 import {
   resolveContainerUrl,
   isUrlAlive,
@@ -106,21 +106,34 @@ export async function prepEnv(
         });
     }
 
-    // ---- bootstrap template if Cargo.toml is still missing ----------------
-    try {
-      const hasCargo = await folderExists(containerName, `${projectDir}/Cargo.toml`);
-      if (!hasCargo) {
-        console.log(`[prepEnv] Bootstrapping template into ${projectDir}`);
-        // copy baked Anchor template (added at /usr/src/anchor-template by Dockerfile)
+    // ─── bootstrap workspace if Cargo.toml is missing ──────────────────────
+    const hasCargo = await folderExists(containerName, `${projectDir}/Cargo.toml`);
+    if (!hasCargo) {
+      console.log(`[prepEnv] Bootstrapping workspace in ${projectDir}`);
+
+      let copied = false;
+      try {
+        /* Fast path: copy a prebaked template if present */
         execSync(
           `docker exec ${containerName} bash -c ` +
           `"cp -r /usr/src/anchor-template/* '${projectDir}' && ` +
-          `chown -R 1000:1000 '${projectDir}'"`,  // 1000:1000 == node user in image
+          `chown -R 1000:1000 '${projectDir}'"`,
+          { stdio: 'inherit' }
+        );
+        copied = true;
+      } catch {
+        console.warn('[prepEnv] No prebaked template found – falling back to anchor init');
+      }
+
+      if (!copied) {
+        /* Universal path: generate a fresh Anchor workspace */
+        execSync(
+          `docker exec ${containerName} bash -c ` +
+          `"anchor init '${projectDir}' --no-git --skip-tests --typescript && ` +
+          `chown -R 1000:1000 '${projectDir}'"`,
+          { stdio: 'inherit' }
         );
       }
-    } catch (copyErr) {
-      console.error('[prepEnv] template copy failed:', copyErr);
-      throw copyErr;
     }
 
     // ─── quick probes so handleGenerateCode can trust the env ───

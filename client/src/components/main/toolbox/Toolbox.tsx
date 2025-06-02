@@ -49,6 +49,7 @@ export const Toolbox = () => {
     const inputRef = useRef<HTMLInputElement>(null);
     const nodeItemsRef = useRef<any>(null);
     const esRef = useRef<ReturnType<typeof runDeployPipelineWithLogs> | null>(null);
+    const [artifactUrl, setArtifactUrl] = useState<string | null>(null);
     
     const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
     const [isProjectListModalOpen, setIsProjectListModalOpen] = useState(false);
@@ -145,7 +146,8 @@ export const Toolbox = () => {
               { ...projectContext, id },
               graph,
               taskLogs,
-              setProjectContext
+              setProjectContext,
+              setArtifactUrl
             );
             
             console.log('[deploy] Deploy pipeline started with EventSource');
@@ -289,6 +291,16 @@ export const Toolbox = () => {
                                 </>
                             )}
                         </button>
+                        
+                        {artifactUrl && (
+                            <a 
+                                href={artifactUrl} 
+                                download="program.so" 
+                                className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center text-[#4d7cfe] mt-2"
+                            >
+                                <span>Download compiled program</span>
+                            </a>
+                        )}
                     </div>
                     
                     {projectDeployed && projectContext.details?.projectState?.programId && (

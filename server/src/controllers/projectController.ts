@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 import { getProjectRootPath } from '../utils/fileUtils';
-import { startProjectContainer } from '../utils/projectUtils';
+import { startProjectContainer } from '../utils/container';
 import { normalizeProjectName } from '../utils/stringUtils';
 import {
   startAnchorBuildTask,

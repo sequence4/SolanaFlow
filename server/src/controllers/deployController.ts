@@ -49,6 +49,9 @@ export async function deployPipeline(
    * ------------------------------------------------------------------ */
   try {
     await runDeployPipeline({ projectId: id, userId, graph, sendProgress: send });
+
+    // let the client know we're done, then close the SSE stream
+    send({ stage: 'completed', message: 'Pipeline finished' });
     res.end();
   } catch (err) {
     console.error('[API] Deploy pipeline error:', err);

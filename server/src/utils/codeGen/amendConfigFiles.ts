@@ -1,6 +1,9 @@
 import { startGetFileContentTask } from '../fileUtils';          // helper that blocks until content is ready
 import { startUpdateFileTask } from '../fileUtils';
 import { pollTaskStatus } from '../taskUtils';
+import { createTask, updateTaskStatus } from '../taskUtils';
+import { runCommand } from '../projectUtils';
+import pool from '../../config/database';
 
 /**
  * Helper function to block until file content is ready and return it
@@ -18,9 +21,288 @@ async function getFileContentBlocking(
   return task.result;
 }
 
+/**
+ * Helper function to list directory contents
+ */
+async function startListDirTask(
+  projectId: string,
+  dirPath: string,
+  creatorId: string | null,
+): Promise<string> {
+  const taskId = await createTask('List Directory', creatorId, projectId);
+  
+  setImmediate(async () => {
+    try {
+      const containerQuery = await pool.query(
+        'SELECT container_name FROM solanaproject WHERE id = $1',
+        [projectId]
+      );
+      
+      const containerName = containerQuery.rows.length > 0 ? containerQuery.rows[0].container_name : null;
+      const projectRootPath = await getProjectRootPath(projectId);
+      
+      let entries: Array<{name: string, type: 'file' | 'directory'}> = [];
+      
+      if (containerName) {
+        try {
+          console.log(`Listing directory ${dirPath} from container ${containerName}`);
+          const lsCmd = `docker exec ${containerName} find /usr/src/${projectRootPath}/${dirPath} -maxdepth 1 -mindepth 1 -printf '%y %f\\n'`;
+          const output = await runCommand(lsCmd, '.', taskId, { skipSuccessUpdate: true });
+          
+          entries = output.split('\n')
+            .filter(Boolean)
+            .map(line => {
+              const [typeChar, ...nameParts] = line.split(' ');
+              const name = nameParts.join(' ');
+              return {
+                name,
+                type: typeChar === 'd' ? 'directory' : 'file'
+              };
+            });
+          
+          await updateTaskStatus(taskId, 'succeed', JSON.stringify(entries));
+        } catch (containerError) {
+          console.error(`Error listing directory ${dirPath} from container:`, containerError);
+          await updateTaskStatus(taskId, 'failed', `Failed to list directory: ${containerError}`);
+        }
+      } else {
+        await updateTaskStatus(taskId, 'failed', 'No container found for this project');
+      }
+    } catch (error) {
+      console.error('Error listing directory:', error);
+      await updateTaskStatus(
+        taskId,
+        'failed',
+        `Failed to list directory: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  });
+  
+  return taskId;
+}
+
+/**
+ * Helper function to get project root path
+ */
+async function getProjectRootPath(projectId: string): Promise<string> {
+  const projectQuery = await pool.query(
+    'SELECT root_path FROM solanaproject WHERE id = $1',
+    [projectId]
+  );
+  
+  if (projectQuery.rows.length === 0) {
+    throw new Error(`Project not found: ${projectId}`);
+  }
+  
+  return projectQuery.rows[0].root_path;
+}
+
+/**
+ * Finds all program crates that were generated
+ */
+async function listGeneratedPrograms(
+  projectId: string,
+  userId: string,
+): Promise<string[]> {
+  const taskId   = await startListDirTask(projectId, 'programs', userId);
+  const { task } = await pollTaskStatus(taskId);
+
+  /* task.result is serialised JSON (string) → parse & type-check */
+  let entries: unknown;
+  try {
+    entries = JSON.parse(task.result as string);
+  } catch (err) {
+    throw new Error(
+      `listGeneratedPrograms: JSON.parse failed – ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+  if (!Array.isArray(entries)) {
+    throw new Error(
+      `listGeneratedPrograms: expected array, got ${typeof entries}`,
+    );
+  }
+
+  const programDirs: string[] = [];
+  for (const entry of entries) {
+    if (entry.type !== 'directory') continue;
+
+    /* retry up to 5 × 200 ms in case code-gen writes Cargo.toml a bit late */
+    const cargoPath = `programs/${entry.name}/Cargo.toml`;
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      try {
+        await getFileContentBlocking(projectId, cargoPath, userId);
+        programDirs.push(`programs/${entry.name}`);        // success!
+        break;
+      } catch (err) {
+        if (attempt === 5) {
+          console.log(`[AMEND] Skipping ${cargoPath} – still missing after retries`);
+        } else {
+          await new Promise(r => setTimeout(r, 200));
+        }
+      }
+    }
+  }
+  
+  return programDirs;
+}
+
+/**
+ * Patches a program's Cargo.toml to include idl-build feature
+ */
+async function patchProgramCargoToml(
+  projectId: string,
+  cargoPath: string,
+  userId: string,
+): Promise<{ status: string; taskId: string }> {
+  // Read Cargo.toml content
+  const cargoSrc = await getFileContentBlocking(projectId, cargoPath, userId);
+  console.log(`[AMEND] Loaded ${cargoPath} bytes:`, cargoSrc.length);
+  
+  let cargoLines = cargoSrc.split('\n');
+  const idlBuildFeatureLine = 'idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]';
+  const defaultFeaturesLine = 'default   = []';
+  
+  /* ───────── 1. ensure anchor-spl in [dependencies] ───────── */
+  const splDepLine = 'anchor-spl = "0.31.1"';           // pin to same version as CLI
+
+  /* find (or create) the [dependencies] block */
+  let depStart = cargoLines.findIndex(l => l.trim() === '[dependencies]');
+  if (depStart === -1) {
+    cargoLines.push('', '[dependencies]', splDepLine, '');
+  } else {
+    let depEnd = cargoLines.length;
+    for (let i = depStart + 1; i < cargoLines.length; i++) {
+      if (/^\[.*\]/.test(cargoLines[i].trim())) { depEnd = i; break; }
+    }
+    const hasSpl = cargoLines
+      .slice(depStart + 1, depEnd)
+      .some(l => l.trim().startsWith('anchor-spl'));
+    if (!hasSpl) cargoLines.splice(depEnd, 0, splDepLine);
+  }
+  
+  // Check if [features] section exists
+  let featuresStart = cargoLines.findIndex(l => l.trim() === '[features]');
+  
+  if (featuresStart === -1) {
+    // No [features] section, append it with required features
+    cargoLines.push(
+      '',
+      '[features]',
+      idlBuildFeatureLine,
+      defaultFeaturesLine,
+      ''
+    );
+  } else {
+    // [features] section exists, find its end
+    let featuresEnd = cargoLines.length;
+    for (let i = featuresStart + 1; i < cargoLines.length; i++) {
+      if (/^\[.*\]/.test(cargoLines[i].trim())) {
+        featuresEnd = i;
+        break;
+      }
+    }
+    
+    // Check if idl-build feature already exists
+    const hasIdlBuild = cargoLines
+      .slice(featuresStart + 1, featuresEnd)
+      .some(l => l.trim().startsWith('idl-build ='));
+    
+    if (!hasIdlBuild) {
+      // Add idl-build feature at the beginning of the section
+      cargoLines.splice(featuresStart + 1, 0, idlBuildFeatureLine);
+    } else {
+      // Replace existing idl-build line with the correct one
+      for (let i = featuresStart + 1; i < featuresEnd; i++) {
+        if (cargoLines[i].trim().startsWith('idl-build =')) {
+          cargoLines[i] = idlBuildFeatureLine;
+        }
+      }
+    }
+    
+    // Check if default feature already exists - if not, we don't add it as per requirements
+    const hasDefault = cargoLines
+      .slice(featuresStart + 1, featuresEnd)
+      .some(l => l.trim().startsWith('default ='));
+      
+    if (!hasDefault) {
+      // Find where to insert default feature (after idl-build)
+      const idlBuildIndex = cargoLines.findIndex(l => l.trim().startsWith('idl-build ='));
+      if (idlBuildIndex !== -1) {
+        cargoLines.splice(idlBuildIndex + 1, 0, defaultFeaturesLine);
+      } else {
+        // This shouldn't happen as we just added or updated idl-build
+        cargoLines.splice(featuresStart + 1, 0, defaultFeaturesLine);
+      }
+    }
+  }
+  
+  // For test builds in template, add profile options to prevent stack overflow
+  if (cargoPath.includes('anchor-template')) {
+    // Check if [lib] section exists
+    const libStart = cargoLines.findIndex(l => l.trim() === '[lib]');
+    if (libStart === -1) {
+      cargoLines.push(
+        '',
+        '[lib]',
+        'crate-type = ["cdylib"]',
+        ''
+      );
+    }
+    
+    // Check if [profile.test] section exists
+    const testProfileStart = cargoLines.findIndex(l => l.trim() === '[profile.test]');
+    if (testProfileStart === -1) {
+      cargoLines.push(
+        '',
+        '[profile.test]',
+        'opt-level = "s"',
+        'debug = false',
+        'overflow-checks = false',
+        ''
+      );
+    }
+  }
+  
+  const newCargo = cargoLines.join('\n');
+  
+  // Log preview of the outgoing Cargo.toml
+  console.log('\n──── outgoing Cargo.toml preview ────\n' +
+    newCargo.split('\n').slice(0, 30).join('\n') +
+    '\n─────────────────────────────────────\n');
+  
+  console.log(`[AMEND] Writing to workspace-relative path: ${cargoPath}`);
+  const taskId = await startUpdateFileTask(projectId, cargoPath, newCargo, userId);
+  const { task } = await pollTaskStatus(taskId);
+  console.log(`[AMEND] ${cargoPath} write → ${task.status}`);
+  
+  if (task.status === 'succeed') {
+    // Verify our changes weren't overwritten (wait a moment to ensure any racing writes complete)
+    await new Promise(r => setTimeout(r, 500));
+    try {
+      const verifyContent = await getFileContentBlocking(projectId, cargoPath, userId);
+      const hasIdlBuild = verifyContent.includes('idl-build =');
+      console.log(`[AMEND] Verification check: ${cargoPath} contains idl-build feature: ${hasIdlBuild}`);
+      if (!hasIdlBuild) {
+        console.error(`[AMEND] WARNING: ${cargoPath} was overwritten after our patch! Features lost.`);
+        // Re-apply our changes
+        console.log(`[AMEND] Re-applying patch to ${cargoPath}...`);
+        const retryTaskId = await startUpdateFileTask(projectId, cargoPath, newCargo, userId);
+        const retryResult = await pollTaskStatus(retryTaskId);
+        console.log(`[AMEND] ${cargoPath} re-write → ${retryResult.task.status}`);
+        return { status: retryResult.task.status, taskId: retryTaskId };
+      }
+    } catch (error) {
+      console.error(`[AMEND] Error during verification of ${cargoPath}:`, error);
+    }
+  }
+  
+  return { status: task.status, taskId };
+}
+
 interface AmendResult {
   anchorStatus: string;
   anchorTaskId: string;
+  cargoPatches?: Array<{ path: string; status: string; taskId: string }>;
 }
 
 /**
@@ -79,6 +361,19 @@ export const amendConfigFiles = async (
   const anchorStatus = (await pollTaskStatus(anchorTaskId)).task.status;
   console.log(`[AMEND] Anchor.toml write → ${anchorStatus}`);
 
+  /* ------------------------------------------------------------------ *
+   * 3. Patch program Cargo.toml files to add idl-build feature
+   * ------------------------------------------------------------------ */
+  const cargoPatches: Array<{ path: string; status: string; taskId: string }> = [];
+  
+  // Find and patch all program Cargo.toml files
+  const programPaths = await listGeneratedPrograms(projectId, userId);
+  for (const p of programPaths) {
+    const cargoPath = `${p}/Cargo.toml`;
+    const result = await patchProgramCargoToml(projectId, cargoPath, userId);
+    cargoPatches.push({ path: cargoPath, status: result.status, taskId: result.taskId });
+  }
+
   /* ------------------------------------------------------------------ */
-  return { anchorStatus, anchorTaskId };
+  return { anchorStatus, anchorTaskId, cargoPatches };
 };
