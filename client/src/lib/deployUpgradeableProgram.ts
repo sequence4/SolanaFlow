@@ -57,12 +57,14 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
   
   // 1. Create a *real* buffer account (Keypair, not PDA)
   const bufferKey = Keypair.generate();
-
+  const programKey = Keypair.generate();
+  
   // Rent-exempt lamports for the buffer's exact length
   const lamports = await connection.getMinimumBalanceForRentExemption(dataLength);
+  const progLamports = await connection.getMinimumBalanceForRentExemption(0);
   
   // If programId not provided, derive a new one
-  const programId = userProvidedProgramId || new PublicKey(wallet.publicKey.toBytes().slice(0, 32));
+  const programId = userProvidedProgramId || programKey.publicKey;
   
   console.log(`[DEPLOY] Buffer: ${bufferKey.publicKey.toBase58()}`);
   console.log(`[DEPLOY] Program ID: ${programId.toBase58()}`);
@@ -85,6 +87,14 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
         { pubkey: wallet.publicKey!,  isSigner: true,  isWritable: false },
       ],
       data: Buffer.from([0]),
+    });
+    
+    const createProgAcct = SystemProgram.createAccount({
+      fromPubkey: wallet.publicKey!,
+      newAccountPubkey: programKey.publicKey,
+      lamports: progLamports,
+      space: 0,                       // program acct stores only a pointer
+      programId: BPF_UPGRADE_LOADER_ID,
     });
 
     onProgress?.({ stage: 'create', uploaded: 0, total: dataLength });
@@ -174,7 +184,7 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
         // payer / authority first, then buffer, program & rent
         { pubkey: wallet.publicKey!,    isSigner: true,  isWritable: true },
         { pubkey: bufferKey.publicKey,  isSigner: false, isWritable: true },
-        { pubkey: programId,            isSigner: false, isWritable: true },
+        { pubkey: programKey.publicKey, isSigner: true,  isWritable: true },
         { pubkey: SYSVAR_RENT_PUBKEY,   isSigner: false, isWritable: false },
       ],
       data: Buffer.concat([
@@ -183,13 +193,16 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
       ]),
     });
     
-    const deployTx = new Transaction().add(deployIx);
+    const deployTx = new Transaction()
+      .add(createProgAcct)   // must precede loader call
+      .add(deployIx);
+    
     deployTx.feePayer = wallet.publicKey;
     const { blockhash: deployBlockhash } = await connection.getLatestBlockhash();
     deployTx.recentBlockhash = deployBlockhash;
     
     // Sign and send deploy transaction
-    deployTx.partialSign(bufferKey);
+    deployTx.partialSign(bufferKey, programKey);
     const signedDeployTx = await wallet.signTransaction(deployTx);
     const deploySignature = await connection.sendRawTransaction(signedDeployTx.serialize());
     signatures.push(deploySignature);
