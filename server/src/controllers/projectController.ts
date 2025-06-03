@@ -25,8 +25,6 @@ import fs from 'fs';
 import { Keypair } from '@solana/web3.js';
 import { waitForTaskCompletion } from '../utils/taskUtils';
 import { createProject as createProjectDb } from '../utils/project/createProject';
-import { execSync } from 'child_process';
-import { markContainerForCleanup } from "../utils/container/cleanupQueue";
 
 export const runCommandController = async (
   req: Request,

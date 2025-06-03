@@ -1,5 +1,4 @@
 import pool from "../../config/database";
-import { APP_CONFIG } from "../../config/appConfig";
 import { exec as _exec } from "child_process";
 import util from "util";
 const exec = util.promisify(_exec);
@@ -30,6 +29,9 @@ export async function flushOldContainers(staleMs: number): Promise<void> {
     [staleMs]
   );
 
+  // NOTE: we delete the DB row **after** docker rm succeeds.
+  // If a new container with the same name appears in the tiny race-window
+  // it will be queued again on next markContainerForCleanup().
   for (const { container_name } of rows) {
     try {
       await exec(`docker rm -f ${container_name}`);
