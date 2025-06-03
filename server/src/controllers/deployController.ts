@@ -27,8 +27,8 @@ export async function deployPipeline(
   const { id }    = req.params;
   const { graph } = req.body;
   const userId    = (req.user as { id?: string } | undefined)?.id; // keep optional-chaining safe
-  const graphWithConfig = graph as unknown as { deployConfig?: { ephemeralPubkey?: string } };
-  const walletSigned = graphWithConfig.deployConfig?.ephemeralPubkey === "SIGNED";
+  const { deployConfig } = graph as Partial<Graph> & { deployConfig?: { ephemeralPubkey?: string } };
+  const walletSigned = deployConfig?.ephemeralPubkey === "SIGNED";
 
   console.log(`[API] Deploy pipeline called for project: ${id}, userId: ${userId}`);
   console.log(`[API] Graph data received:`, JSON.stringify(graph).substring(0, 200) + '…');

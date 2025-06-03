@@ -12,6 +12,7 @@ import {
   getBuildArtifactTask,
 } from "../projectUtils";
 import { waitForTaskCompletion, getTaskById } from "../taskUtils";
+import { PublicKey } from '@solana/web3.js';
 
 interface PipelineArgs {
   projectId: string;
@@ -99,8 +100,7 @@ export async function runDeployPipeline({
       // Launch the async deploy task inside the container
       const deployTask = await startAnchorDeployTask(
         projectId,
-        userId,
-        ephemeralPubkey
+        userId
       );
 
       // Allow up to specified minutes for Devnet transaction retries
@@ -143,6 +143,18 @@ export async function runDeployPipeline({
       const graphWithConfig = graph as unknown as { deployConfig?: { programId?: string } };
       if (graphWithConfig.deployConfig?.programId) {
         programId = graphWithConfig.deployConfig.programId;
+      }
+      
+      // If no programId is available, derive it deterministically
+      if (!programId) {
+        // Use the same derivation as in prepareDeployTx
+        const BPF_LOADER_UPGRADEABLE_PROGRAM_ID = new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111');
+        const programSeed = Buffer.from(`program-${projectId}`, 'utf8');
+        const [derived] = PublicKey.findProgramAddressSync(
+          [programSeed],
+          BPF_LOADER_UPGRADEABLE_PROGRAM_ID
+        );
+        programId = derived.toBase58();
       }
     }
 
