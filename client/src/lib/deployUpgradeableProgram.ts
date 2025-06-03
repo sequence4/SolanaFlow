@@ -76,6 +76,9 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
   const bufferKey = Keypair.generate();
   const programKey = Keypair.generate();
   
+  // Ephemeral authority valid only for this tab
+  const sessionKey = Keypair.generate();
+  
   const [programDataPubkey] = PublicKey.findProgramAddressSync(
     [programKey.publicKey.toBuffer()],
     BPF_UPGRADE_LOADER_ID,
@@ -114,6 +117,20 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
       ]),
     });
     
+    // Loader variant 2 = SetAuthority(Buffer/ProgramData)
+    const setAuthIx = new TransactionInstruction({
+      programId: BPF_UPGRADE_LOADER_ID,
+      keys: [
+        { pubkey: bufferKey.publicKey, isSigner: false, isWritable: true }, // account whose authority changes
+        { pubkey: wallet.publicKey!,   isSigner: true,  isWritable: false }, // current authority
+      ],
+      data: Buffer.concat([
+        leU32(2),                       // tag = SetAuthority
+        leU32(1),                       // COption::Some
+        sessionKey.publicKey.toBuffer() // new authority
+      ]),
+    });
+    
     const createProgAcct = SystemProgram.createAccount({
       fromPubkey: wallet.publicKey!,
       newAccountPubkey: programKey.publicKey,
@@ -125,8 +142,10 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
     onProgress?.({ stage: 'create', uploaded: 0, total: dataLength });
 
     const createBufferTx = new Transaction()
-      .add(createBufAcct)
-      .add(initBufIx);
+      .add(createBufAcct)   // create account
+      .add(initBufIx)       // initialise buffer, authority = wallet
+      .add(setAuthIx);      // hand authority to sessionKey
+    
     createBufferTx.feePayer = wallet.publicKey;
     const { blockhash } = await connection.getLatestBlockhash();
     createBufferTx.recentBlockhash = blockhash;
@@ -145,9 +164,9 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
     const numChunks = Math.ceil(dataLength / CHUNK_SIZE);
     console.log(`[DEPLOY] Writing program data in ${numChunks} chunks of max ${CHUNK_SIZE} bytes each`);
     
-    // Cache blockhash for 2½ minutes to reduce RPC calls
+    // Prepare an array to collect chunk uploads
+    const writeTxs: Transaction[] = [];
     let { blockhash: cachedHash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-    const currentBlockHeight = await connection.getBlockHeight();
     
     for (let chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
       const offset = chunkIndex * CHUNK_SIZE;
@@ -169,7 +188,7 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
         programId: BPF_UPGRADE_LOADER_ID,
         keys: [
           { pubkey: bufferKey.publicKey, isSigner: false, isWritable: true },
-          { pubkey: wallet.publicKey,  isSigner: true,  isWritable: false },
+          { pubkey: sessionKey.publicKey,  isSigner: true,  isWritable: false },
         ],
         data: Buffer.concat([
           leU32(1),                         // tag = Write
@@ -180,28 +199,27 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
       });
       
       const writeTx = new Transaction().add(writeIx);
-      writeTx.feePayer = wallet.publicKey;
-      
-      // Reuse cached blockhash when possible
-      if (currentBlockHeight > lastValidBlockHeight - 150) {
-        ({ blockhash: cachedHash, lastValidBlockHeight } = await connection.getLatestBlockhash());
-      }
+      writeTx.feePayer = wallet.publicKey!;
       writeTx.recentBlockhash = cachedHash;
       
-      try {
-        // Sign and send write transaction
-        const signedWriteTx = await wallet.signTransaction(writeTx);
-        const writeSignature = await connection.sendRawTransaction(signedWriteTx.serialize());
-        signatures.push(writeSignature);
-        
-        // Wait for confirmation
-        await connection.confirmTransaction(writeSignature);
-        console.log(`[DEPLOY] Chunk ${chunkIndex + 1} written successfully. Signature: ${writeSignature}`);
-      } catch (error) {
-        console.error(`[DEPLOY] Failed to write chunk ${chunkIndex + 1}:`, error);
-        throw new Error(`Failed to write chunk ${chunkIndex + 1}: ${error instanceof Error ? error.message : String(error)}`);
-      }
+      // payer is wallet; authority is sessionKey
+      writeTx.partialSign(sessionKey);
+      writeTxs.push(writeTx);
     }
+    
+    // One Phantom popup: "Sign N transactions"
+    if (!wallet.signAllTransactions) {
+      throw new Error("Wallet doesn't support signing multiple transactions");
+    }
+    const signedWriteTxs = await wallet.signAllTransactions(writeTxs);
+    console.info('Tip: Turn on "Auto-Confirm" in Phantom → Connected Apps for zero pop-ups next time.');
+    
+    for (const tx of signedWriteTxs) {
+      const sig = await connection.sendRawTransaction(tx.serialize());
+      signatures.push(sig);
+      await connection.confirmTransaction(sig);
+    }
+    console.log('[DEPLOY] All write chunks signed & confirmed');
     
     // 4. Deploy from buffer
     onProgress?.({
@@ -211,6 +229,20 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
     });
     
     console.log(`[DEPLOY] All chunks written. Deploying program with ID: ${programId.toBase58()}`);
+    
+    // Return authority to the wallet before deploy
+    const reclaimAuthIx = new TransactionInstruction({
+      programId: BPF_UPGRADE_LOADER_ID,
+      keys: [
+        { pubkey: bufferKey.publicKey, isSigner: false, isWritable: true },
+        { pubkey: sessionKey.publicKey, isSigner: true, isWritable: false },
+      ],
+      data: Buffer.concat([
+        leU32(2),              // SetAuthority
+        leU32(1),              // Some
+        wallet.publicKey!.toBuffer(),
+      ]),
+    });
     
     const deployIx = new TransactionInstruction({
       programId: BPF_UPGRADE_LOADER_ID,
@@ -240,6 +272,7 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
     
     const deployTx = new Transaction()
       .add(createProgAcct)   // must precede loader call
+      .add(reclaimAuthIx)    // reclaim buffer authority to wallet
       .add(deployIx);
     
     deployTx.feePayer = wallet.publicKey;
@@ -247,7 +280,7 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
     deployTx.recentBlockhash = deployBlockhash;
     
     // Sign and send deploy transaction
-    deployTx.partialSign(bufferKey, programKey);
+    deployTx.partialSign(programKey, sessionKey);
     const signedDeployTx = await wallet.signTransaction(deployTx);
     const deploySignature = await connection.sendRawTransaction(signedDeployTx.serialize());
     signatures.push(deploySignature);
@@ -255,6 +288,9 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
     // Wait for confirmation
     await connection.confirmTransaction(deploySignature);
     console.log(`[DEPLOY] Program deployed successfully. Signature: ${deploySignature}`);
+    
+    // Destroy the session key
+    sessionKey.secretKey.fill(0);  // GC will wipe it soon
     
     onProgress?.({
       stage: 'complete',
