@@ -298,7 +298,7 @@ export const deleteProject = async (
   req: Request,
   res: Response,
   next: NextFunction
-) => {
+): Promise<void> => {
   const { id } = req.params;
 
   try {
@@ -325,7 +325,7 @@ export const deleteProject = async (
       );
     }
 
-    return res.status(204).end();
+    res.status(204).end();
   } catch (err) {
     next(err);
   }
