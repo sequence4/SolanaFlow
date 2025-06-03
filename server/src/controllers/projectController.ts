@@ -25,6 +25,7 @@ import fs from 'fs';
 import { Keypair } from '@solana/web3.js';
 import { waitForTaskCompletion } from '../utils/taskUtils';
 import { createProject as createProjectDb } from '../utils/project/createProject';
+import { execSync } from 'child_process';
 
 export const runCommandController = async (
   req: Request,
@@ -299,76 +300,31 @@ export const deleteProject = async (
   req: Request,
   res: Response,
   next: NextFunction
-): Promise<void> => {
+) => {
   const { id } = req.params;
-  const userId = req.user?.id;
-  const orgId = req.user?.org_id;
-
-  if (!userId || !orgId) {
-    next(new AppError('User information not found', 400));
-    return;
-  }
-
-  const client = await pool.connect();
-
   try {
-    await client.query('BEGIN');
-
-    const userCheck = await client.query(
-      'SELECT role FROM Creator WHERE id = $1 AND org_id = $2',
-      [userId, orgId]
+    // 1) delete the project row
+    const { rowCount } = await pool.query(
+      `DELETE FROM solanaproject WHERE id = $1`, [id]
     );
+    if (rowCount === 0) return next(new AppError("Not found", 404));
 
-    if (userCheck.rows.length === 0 || userCheck.rows[0].role !== 'admin') {
-      throw new AppError('Only admin users can delete projects', 403);
-    }
-
-    const projectCheck = await client.query(
-      'SELECT * FROM solanaproject WHERE id = $1 AND org_id = $2',
-      [id, orgId]
+    // 2) fetch & delete any queued containers
+    const { rows } = await pool.query(
+      `DELETE FROM cleanup_queue WHERE project_id = $1 RETURNING container_name`,
+      [id]
     );
-
-    if (projectCheck.rows.length === 0) {
-      throw new AppError(
-        'Project not found or you do not have permission to delete it',
-        404
-      );
-    }
-
-    const containerTaskId = await closeProjectContainer(
-      id,
-      userId,
-      false,
-      true
-    );
-
-    await client.query('DELETE FROM solanaproject WHERE id = $1', [id]);
-    
-    await client.query('COMMIT');
-
-    // Release any occupied warm-pool slot
-    await pool.query(
-      'UPDATE warm_container_pool SET busy = false WHERE name = $1',
-      [ projectCheck.rows[0].container_name ]
-    );
-    
-    res.status(200).json({
-      message: 'Project deleted successfully',
-      containerTaskId: containerTaskId,
+    rows.forEach(({ container_name }) => {
+      try {
+        execSync(`docker rm -f ${container_name}`);
+      } catch (err) {
+        console.warn("container removal failed:", err);
+      }
     });
-    
-    return;
-    
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Error in deleteProject:', error);
-    if (error instanceof AppError) {
-      next(error);
-    } else {
-      next(new AppError('Failed to delete project', 500));
-    }
-  } finally {
-    client.release();
+
+    return res.status(204).end();
+  } catch (err) { 
+    next(err); 
   }
 };
 

@@ -5,7 +5,7 @@ import { prepEnv } from './prepEnv';
 import type { WorkspaceHandle } from './prepEnv';
 import { Graph } from '../../types/graph';
 import { handleGenerateCode } from "../codeGen/handleGenerateCode";
-import { pruneContainerResources } from '../container/pruneContainer';
+import { markContainerForCleanup } from "../container/cleanupQueue";
 import {
   startAnchorBuildTask,
   startAnchorDeployTask,
@@ -162,15 +162,11 @@ export async function runDeployPipeline({
 
   } finally {
     /* ----------------------------------------------------------------
-     * DEV-only cleanup: stop & delete the container + dangling volumes
+     * Queue container for later cleanup instead of immediate deletion
      * ---------------------------------------------------------------- */
     if (workspace) {
-      try {
-        pruneContainerResources(workspace.containerName, projectId);
-        console.log(`[cleanup] pruned container ${workspace.containerName}`);
-      } catch (err) {
-        console.warn('[cleanup] failed to prune container:', err);
-      }
+      await markContainerForCleanup(projectId, workspace.containerName);
+      console.log(`[pipeline] queued ${workspace.containerName} for later cleanup`);
     }
   }
 }

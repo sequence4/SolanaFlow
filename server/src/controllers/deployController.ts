@@ -12,6 +12,7 @@ import path from 'path';
 import { getProjectRootPath } from '../utils/fileUtils';
 import { getContainerName } from '../utils/projectUtils';
 import { deriveProgramId } from "../utils/deriveProgramId";
+import { markContainerForCleanup } from "../utils/container/cleanupQueue";
 
 // BPF Loader Upgradeable Program ID
 const BPF_LOADER_UPGRADEABLE_PROGRAM_ID = new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111');
@@ -294,6 +295,9 @@ export async function prepareDeployTx(
       programId: programId.toBase58(),
       message: 'Transaction prepared for signing'
     });
+
+    // Mark the container for cleanup
+    await markContainerForCleanup(id, containerName);
   } catch (err) {
     console.error('[API] Error preparing deploy transaction:', err);
     return next(new AppError(`Failed to prepare deploy transaction: ${(err as Error).message}`, 500));
