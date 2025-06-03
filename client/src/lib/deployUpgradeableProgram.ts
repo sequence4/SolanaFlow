@@ -112,8 +112,9 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
         { pubkey: wallet.publicKey!,  isSigner: true,  isWritable: false },
       ],
       data: Buffer.concat([
-        leU32(0),   // variant = InitializeBuffer
-        leU32(0),   // COption<Pubkey>::None discriminant
+        leU32(0),                       // tag = InitializeBuffer
+        leU32(1),                       // COption::Some
+        wallet.publicKey!.toBuffer(),   // initial authority = wallet
       ]),
     });
     
