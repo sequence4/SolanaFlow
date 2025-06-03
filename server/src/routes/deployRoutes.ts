@@ -1,5 +1,5 @@
 import express from 'express';
-import { deployPipeline, deploySignedTx, prepareDeployTx } from '../controllers/deployController';
+import { deployPipeline } from '../controllers/deployController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -15,8 +15,6 @@ const DEV_AUTH = (req: any, _res: any, next: () => void) => {
 const guard = DEV_AUTH;              // <-- flip back to authMiddleware later
 // ----------------------------------------------------------------------------
 
-router.post('/:id/prepare-deploy-tx', guard, prepareDeployTx);
-router.post('/:id/deploy-signed', guard, deploySignedTx);
 router.post('/:id/deploy-pipeline', guard, deployPipeline);
 
 export default router;
