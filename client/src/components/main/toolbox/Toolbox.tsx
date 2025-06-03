@@ -133,13 +133,31 @@ export const Toolbox = () => {
             taskLogs.resetLogs();
             taskLogs.setIsVisible(true);
             taskLogs.addSystemLog("🚀 Starting wallet-signed deployment pipeline...");
-            taskLogs.addSystemLog("⏳ Waiting for wallet signature...");
             
             try {
                 // First, start the build process without the deploy step
                 taskLogs.addSystemLog("🔨 Building program...");
                 
-                // We need an API to get the built transaction
+                // Step 1: Run the build pipeline first to create the container and compile the program
+                await new Promise<void>((resolve, reject) => {
+                    try {
+                        esRef.current = runDeployPipelineWithLogs(
+                            { ...projectContext, id },
+                            graph,
+                            taskLogs,
+                            setProjectContext,
+                            setArtifactUrl,
+                            () => resolve()  // onComplete callback
+                        );
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
+                
+                taskLogs.addSystemLog("✅ Build completed successfully!");
+                taskLogs.addSystemLog("⏳ Waiting for wallet signature...");
+                
+                // Step 2: Now that the build is complete, prepare the deploy transaction
                 const response = await fetch(`/api/deploy/${id}/prepare-deploy-tx`, {
                     method: 'POST',
                     headers: (() => {
@@ -161,14 +179,14 @@ export const Toolbox = () => {
                 
                 const { encodedTx } = await response.json();
                 
-                // Sign and relay the transaction
+                // Step 3: Sign and relay the transaction
                 taskLogs.addSystemLog("✍️ Signing transaction with connected wallet...");
                 const signature = await walletSigner.signAndRelay(id, encodedTx);
                 
                 taskLogs.addSystemLog(`✅ Transaction signed and relayed successfully!`);
                 taskLogs.addSystemLog(`📝 Transaction signature: ${signature}`);
                 
-                // Now trigger the pipeline with the SIGNED flag
+                // Step 4: Trigger the deploy pipeline with the SIGNED flag
                 taskLogs.addSystemLog("🔄 Starting deploy pipeline with SIGNED flag...");
                 
                 // Prepare graph with SIGNED flag

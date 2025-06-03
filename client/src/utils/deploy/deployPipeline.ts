@@ -12,6 +12,7 @@ export function runDeployPipelineWithLogs(
   },
   setProjectContext: React.Dispatch<React.SetStateAction<ProjectContextType>>,
   setArtifactUrl?: (url: string) => void,
+  onComplete?: () => void,
 ) {
   
   taskLogs.resetLogs();
@@ -47,10 +48,13 @@ export function runDeployPipelineWithLogs(
       }
     }
 
-    if (msg.stage === 'deploy-done' || msg.stage === 'done') {
+    if (msg.stage === 'deploy-done' || msg.stage === 'done' || msg.stage === 'completed') {
       taskLogs.addSystemLog("✅ Deployment complete!");
       if (es) {
         es.close();
+      }
+      if (onComplete) {
+        onComplete();
       }
       setTimeout(() => taskLogs.setIsVisible(false), 3000);
     } else if (msg.stage === 'error') {
