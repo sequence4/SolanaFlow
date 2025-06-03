@@ -4,10 +4,14 @@ import { authMiddleware } from '../middleware/authMiddleware';
 
 const router = express.Router();
 
-// -- TEMP: skip auth while debugging -----------------------------------
-const NOAUTH = (_req: unknown, _res: unknown, next: () => void) => next(); // pass-through
-const guard = NOAUTH;          // <-- flip to authMiddleware when done
-// ----------------------------------------------------------------------
+// -- TEMP: skip real auth while debugging ------------------------------------
+const DEV_AUTH = (req: any, _res: any, next: () => void) => {
+  /* provide a fake user so controllers don't bail out */
+  req.user = { id: 'dev-user' };
+  next();
+};
+const guard = DEV_AUTH;              // <-- flip back to authMiddleware later
+// ----------------------------------------------------------------------------
 
 router.post('/:id/prepare-deploy-tx', guard, prepareDeployTx);
 router.post('/:id/deploy-signed', guard, deploySignedTx);
