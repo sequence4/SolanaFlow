@@ -13,6 +13,7 @@ import { WalletContextState } from "@solana/wallet-adapter-react";
 
 const BPF_UPGRADE_LOADER_ID = new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111");
 const CHUNK_SIZE = 900; // Standard chunk size for Solana BPF loader
+const HEADER_LEN = 8;   // version (4) + authority Pubkey option (4)
 
 type DeployProgress = {
   stage: 'create' | 'write' | 'deploy' | 'complete';
@@ -52,6 +53,7 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
   // Convert ArrayBuffer to Uint8Array for processing
   const programData = new Uint8Array(soBytes);
   const dataLength = programData.length;
+  const bufferSpace = HEADER_LEN + dataLength;
   const signatures: string[] = [];
   
   console.log(`[DEPLOY] Starting program deployment, program size: ${dataLength} bytes`);
@@ -66,7 +68,7 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
   );
   
   // Rent-exempt lamports for the buffer's exact length
-  const lamports = await connection.getMinimumBalanceForRentExemption(dataLength);
+  const lamports = await connection.getMinimumBalanceForRentExemption(bufferSpace);
   const progLamports = await connection.getMinimumBalanceForRentExemption(0);
   
   // If programId not provided, derive a new one
@@ -81,7 +83,7 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
       fromPubkey: wallet.publicKey!,
       newAccountPubkey: bufferKey.publicKey,
       lamports,
-      space: dataLength,
+      space: bufferSpace,
       programId: BPF_UPGRADE_LOADER_ID,
     });
 
@@ -206,7 +208,7 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
       ],
       data: Buffer.concat([
         Buffer.from([3]),                               // DeployWithMaxDataLen
-        Buffer.from(new Uint32Array([dataLength]).buffer),
+        Buffer.from(new Uint32Array([bufferSpace]).buffer),
       ]),
     });
     
