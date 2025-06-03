@@ -145,6 +145,10 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
     const numChunks = Math.ceil(dataLength / CHUNK_SIZE);
     console.log(`[DEPLOY] Writing program data in ${numChunks} chunks of max ${CHUNK_SIZE} bytes each`);
     
+    // Cache blockhash for 2½ minutes to reduce RPC calls
+    let { blockhash: cachedHash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+    const currentBlockHeight = await connection.getBlockHeight();
+    
     for (let chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
       const offset = chunkIndex * CHUNK_SIZE;
       const chunkEnd = Math.min((chunkIndex + 1) * CHUNK_SIZE, dataLength);
@@ -177,8 +181,12 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
       
       const writeTx = new Transaction().add(writeIx);
       writeTx.feePayer = wallet.publicKey;
-      const { blockhash: writeBlockhash } = await connection.getLatestBlockhash();
-      writeTx.recentBlockhash = writeBlockhash;
+      
+      // Reuse cached blockhash when possible
+      if (currentBlockHeight > lastValidBlockHeight - 150) {
+        ({ blockhash: cachedHash, lastValidBlockHeight } = await connection.getLatestBlockhash());
+      }
+      writeTx.recentBlockhash = cachedHash;
       
       try {
         // Sign and send write transaction
