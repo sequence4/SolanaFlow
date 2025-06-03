@@ -1,8 +1,7 @@
 "use client";
 
 import axios, { AxiosInstance } from 'axios';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:9999';
+import { API_URL } from '@/config/api';
 
 const createApiInstance = (): AxiosInstance => {
   const api = axios.create({
