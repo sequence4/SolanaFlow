@@ -207,15 +207,24 @@ export async function prepareDeployTx(
     await fs.promises.mkdir(BUILD_DIR, { recursive: true });
     
     // Extract the program.so file from the container
-    const copyCmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && SO_DIR=\\"\${CARGO_TARGET_DIR:-target}/deploy\\" && find \\"$SO_DIR\\" -maxdepth 1 -name '*.so' | head -n 1 | xargs -I{} cat {}" > ${BUILD_DIR}/program.so`;
-    
     try {
-      await new Promise<void>((resolve, reject) => {
-        require('child_process').exec(copyCmd, (error: Error | null) => {
-          if (error) reject(error);
-          else resolve();
-        });
-      });
+      // 1. Locate the .so in the container
+      const findCmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && SO_DIR=\\"\${CARGO_TARGET_DIR:-target}/deploy\\" && find \\"$SO_DIR\\" -maxdepth 1 -name \\"*.so\\" | head -n 1"`;
+      
+      console.log(`[API] Finding program binary with command: ${findCmd}`);
+      const soPath = require('child_process').execSync(findCmd, { encoding: 'utf8' }).trim();
+      
+      if (!soPath) {
+        return next(new AppError('Program binary not found in container', 500));
+      }
+      
+      // 2. Copy it out safely with docker cp
+      const hostSo = path.join(BUILD_DIR, 'program.so');
+      const cpCmd = `docker cp ${containerName}:${soPath} ${hostSo}`;
+      
+      console.log(`[API] Copying program binary with command: ${cpCmd}`);
+      require('child_process').execSync(cpCmd);
+      
     } catch (err) {
       return next(new AppError(`Failed to extract program binary: ${(err as Error).message}`, 500));
     }
