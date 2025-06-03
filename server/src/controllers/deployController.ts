@@ -9,6 +9,7 @@ import {
 } from "@solana/web3.js";
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
 import { getProjectRootPath } from '../utils/fileUtils';
 import { getContainerName } from '../utils/projectUtils';
 import { deriveProgramId } from "../utils/deriveProgramId";
@@ -221,7 +222,7 @@ export async function prepareDeployTx(
       // 1. Locate the .so in the container
       const findCmd = `docker exec ${containerName} bash -c 'cd "/usr/src/${rootPath}" && SO_DIR="\${CARGO_TARGET_DIR:-target}/deploy" && find "$SO_DIR" -maxdepth 1 -name "*.so" | head -n 1'`;      
       console.log(`[API] Finding program binary with command: ${findCmd}`);
-      const soPath = require('child_process').execSync(findCmd, { encoding: 'utf8' }).trim();
+      const soPath = execSync(findCmd, { encoding: 'utf8' }).toString().trim();
       
       if (!soPath) {
         return next(new AppError('Program binary not found in container', 500));
@@ -232,7 +233,7 @@ export async function prepareDeployTx(
       const cpCmd = `docker cp ${containerName}:${soPath} ${hostSo}`;
       
       console.log(`[API] Copying program binary with command: ${cpCmd}`);
-      require('child_process').execSync(cpCmd);
+      execSync(cpCmd);
       
     } catch (err) {
       return next(new AppError(`Failed to extract program binary: ${(err as Error).message}`, 500));

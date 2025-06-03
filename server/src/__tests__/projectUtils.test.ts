@@ -1,8 +1,9 @@
 import fs from 'fs';
+import { startAnchorDeployTask, mockUpdateTaskStatus } from './mock-anchor-deploy.test';
 
 // Mock the real function
 jest.mock('../utils/projectUtils', () => ({
-  startAnchorDeployTask: jest.requireActual('./mock-anchor-deploy').startAnchorDeployTask
+  startAnchorDeployTask: jest.requireActual('./mock-anchor-deploy.test').startAnchorDeployTask
 }));
 
 // Mock fs.existsSync
@@ -11,8 +12,6 @@ jest.mock('fs', () => ({
 }));
 
 describe('startAnchorDeployTask', () => {
-  const { startAnchorDeployTask, mockUpdateTaskStatus } = require('./mock-anchor-deploy');
-  
   beforeEach(() => {
     jest.clearAllMocks();
   });
