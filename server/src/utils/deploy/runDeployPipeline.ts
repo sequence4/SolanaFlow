@@ -20,6 +20,9 @@ interface PipelineArgs {
   sendProgress: (data: unknown) => void;
   /** Optional base58 pubkey of a temp keypair the UI created for this run */
   ephemeralPubkey?: string;
+
+  /** When true, the program was already deployed by a wallet-signed tx */
+  walletSigned?: boolean;
 }
 
 export async function runDeployPipeline({
@@ -28,6 +31,7 @@ export async function runDeployPipeline({
   graph,
   sendProgress,
   ephemeralPubkey,
+  walletSigned = false,
 }: PipelineArgs): Promise<void> {
   sendProgress({ stage: "environment", message: "Preparing your build environment…" });
 
@@ -77,62 +81,82 @@ export async function runDeployPipeline({
     });
 
     /* 4 ─ deploy --------------------------------------------------------- */
-    sendProgress({ stage: "deploy", message: "Deploying / upgrading…" });
-
-    // Parse deployment timeout from env with better handling
-    const deployMinutesRaw = Number(process.env.MAX_DEPLOY_MINUTES);
-    const deployMinutes = Number.isFinite(deployMinutesRaw) && deployMinutesRaw >= 1
-      ? Math.ceil(deployMinutesRaw)
-      : 6;
-    const deployTimeoutMs = deployMinutes * 60_000;
-    
-    // Convert timeout ms to retry count (2-second interval)
-    const deployRetries = Math.ceil(deployTimeoutMs / 2_000);
-
-    // Launch the async deploy task inside the container
-    const deployTask = await startAnchorDeployTask(
-      projectId,
-      userId,
-      ephemeralPubkey
-    );
-
-    // Allow up to specified minutes for Devnet transaction retries
-    const deployStatus = await waitForTaskCompletion(deployTask, deployRetries, 2_000);
-    if (deployStatus !== 'succeed' && deployStatus !== 'finished') {
-      throw new Error(`Deployment task failed with status: ${deployStatus}`);
-    }
-
-    // Retrieve the task's JSON result
-    const { status, result } = await getTaskById(deployTask);
-    
-    if (status !== 'succeed' && status !== 'finished') {
-      throw new Error(`Deployment task failed with status: ${status}`);
-    }
-    
-    if (!result) {
-      throw new Error("Deployment task finished without a result");
-    }
-    
     let programId: string | undefined;
-    try {
-      const parsed = JSON.parse(result) as 
-        | { status: "success"; programId: string }
-        | Record<string, unknown>;
-        
-      if (parsed.status === "success" && typeof parsed.programId === "string") {
-        programId = parsed.programId;
-      }
-    } catch { /* ignore malformed JSON; handled below */ }
+    
+    if (!walletSigned) {
+      sendProgress({ stage: "deploy", message: "Deploying / upgrading…" });
 
-    if (!programId) {
-      throw new Error("Deployment task finished without a valid Program ID");
+      // Parse deployment timeout from env with better handling
+      const deployMinutesRaw = Number(process.env.MAX_DEPLOY_MINUTES);
+      const deployMinutes = Number.isFinite(deployMinutesRaw) && deployMinutesRaw >= 1
+        ? Math.ceil(deployMinutesRaw)
+        : 6;
+      const deployTimeoutMs = deployMinutes * 60_000;
+      
+      // Convert timeout ms to retry count (2-second interval)
+      const deployRetries = Math.ceil(deployTimeoutMs / 2_000);
+
+      // Launch the async deploy task inside the container
+      const deployTask = await startAnchorDeployTask(
+        projectId,
+        userId,
+        ephemeralPubkey
+      );
+
+      // Allow up to specified minutes for Devnet transaction retries
+      const deployStatus = await waitForTaskCompletion(deployTask, deployRetries, 2_000);
+      if (deployStatus !== 'succeed' && deployStatus !== 'finished') {
+        throw new Error(`Deployment task failed with status: ${deployStatus}`);
+      }
+
+      // Retrieve the task's JSON result
+      const { status, result } = await getTaskById(deployTask);
+      
+      if (status !== 'succeed' && status !== 'finished') {
+        throw new Error(`Deployment task failed with status: ${status}`);
+      }
+      
+      if (!result) {
+        throw new Error("Deployment task finished without a result");
+      }
+      
+      try {
+        const parsed = JSON.parse(result) as 
+          | { status: "success"; programId: string }
+          | Record<string, unknown>;
+          
+        if (parsed.status === "success" && typeof parsed.programId === "string") {
+          programId = parsed.programId;
+        }
+      } catch { /* ignore malformed JSON; handled below */ }
+
+      if (!programId) {
+        throw new Error("Deployment task finished without a valid Program ID");
+      }
+    } else {
+      sendProgress({
+        stage   : "deploy-skipped",
+        message : "Wallet-signed deploy detected – skipping Anchor deploy step"
+      });
+      
+      // For wallet-signed deployments, extract programId from graph if available
+      const graphWithConfig = graph as unknown as { deployConfig?: { programId?: string } };
+      if (graphWithConfig.deployConfig?.programId) {
+        programId = graphWithConfig.deployConfig.programId;
+      }
     }
 
-    sendProgress({
-      stage    : "done", // Keep original stage name for backward compatibility
-      message  : "Deployment complete",
-      programId: programId,           // UI can deep-link to the explorer
-    });
+    // Only include programId in the completion event if we have one
+    const completionEvent: Record<string, unknown> = {
+      stage: "done",
+      message: "Deployment complete"
+    };
+    
+    if (programId) {
+      completionEvent.programId = programId;
+    }
+
+    sendProgress(completionEvent);
 
   } finally {
     /* ----------------------------------------------------------------

@@ -57,6 +57,8 @@ export function runDeployPipelineWithLogs(
         onComplete();
       }
       setTimeout(() => taskLogs.setIsVisible(false), 3000);
+    } else if (msg.stage === 'deploy-skipped') {
+      taskLogs.addSystemLog("✅ Wallet-signed deploy detected – backend deploy step skipped");
     } else if (msg.stage === 'error') {
       taskLogs.addSystemLog(`❌ Error: ${msg.message || 'Unknown error'}`);
       if (es) {
