@@ -16,9 +16,9 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
-        // forward any call starting with /api/… to Express
+        // 👇 preserve /api so Express still matches /api/deploy, /api/projects, …
         source: '/api/:path*',
-        destination: 'http://localhost:9999/:path*',
+        destination: 'http://localhost:9999/api/:path*',   // <— was http://localhost:9999/:path*
       },
     ];
   },
