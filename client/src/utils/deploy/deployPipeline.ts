@@ -12,7 +12,7 @@ export function runDeployPipelineWithLogs(
   },
   setProjectContext: React.Dispatch<React.SetStateAction<ProjectContextType>>,
   setArtifactUrl?: (url: string) => void,
-  onComplete?: () => void,
+  onComplete?: (status?: 'error') => void,
 ) {
   
   taskLogs.resetLogs();
@@ -61,6 +61,9 @@ export function runDeployPipelineWithLogs(
       taskLogs.addSystemLog(`❌ Error: ${msg.message || 'Unknown error'}`);
       if (es) {
         es.close();
+      }
+      if (onComplete) {
+        onComplete('error');
       }
     }
   };

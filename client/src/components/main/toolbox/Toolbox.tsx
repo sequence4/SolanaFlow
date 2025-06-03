@@ -147,7 +147,7 @@ export const Toolbox = () => {
                             taskLogs,
                             setProjectContext,
                             setArtifactUrl,
-                            () => resolve()  // onComplete callback
+                            (status?: 'error') => status === 'error' ? reject(new Error('Build failed')) : resolve()
                         );
                     } catch (error) {
                         reject(error);
@@ -202,7 +202,8 @@ export const Toolbox = () => {
                     graphCopy,
                     taskLogs,
                     setProjectContext,
-                    setArtifactUrl
+                    setArtifactUrl,
+                    undefined  // No need for onComplete callback here
                 );
                 
                 console.log('[deploy] Deploy pipeline started with EventSource and SIGNED flag');
