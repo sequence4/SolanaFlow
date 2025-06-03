@@ -20,15 +20,14 @@ const BPF_LOADER_UPGRADEABLE_PROGRAM_ID = new PublicKey('BPFLoaderUpgradeab1e111
  * Streams Server-Sent Events while the build/deploy pipeline runs.
  */
 export async function deployPipeline(
-  req: Request<{ id: string }, unknown, { graph: Graph }>, // ← TYPED generics :contentReference[oaicite:0]{index=0}
+  req: Request<{ id: string }, unknown, { graph: Graph; walletSigned?: boolean }>,
   res: Response,
   next: NextFunction,
 ) {
   const { id }    = req.params;
-  const { graph } = req.body;
+  const { graph, walletSigned: requestWalletSigned } = req.body;
   const userId    = (req.user as { id?: string } | undefined)?.id; // keep optional-chaining safe
-  const { deployConfig } = graph as Partial<Graph> & { deployConfig?: { ephemeralPubkey?: string } };
-  const walletSigned = deployConfig?.ephemeralPubkey === "SIGNED";
+  const walletSigned = requestWalletSigned === true;
 
   console.log(`[API] Deploy pipeline called for project: ${id}, userId: ${userId}`);
   console.log(`[API] Graph data received:`, JSON.stringify(graph).substring(0, 200) + '…');

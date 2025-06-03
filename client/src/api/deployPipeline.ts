@@ -6,6 +6,7 @@ export function deployPipeline(
   projectId: string,
   graph: unknown,
   onProgress: (msg: unknown) => void,
+  walletSigned = true,
 ) {
   console.log(`[SSE] Starting deploy pipeline for project: ${projectId}`);
   console.log(`[SSE] API_URL: ${API_URL}`);
@@ -27,7 +28,7 @@ export function deployPipeline(
   fetchEventSource(url, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ graph }),
+    body: JSON.stringify({ graph, walletSigned }),
     signal: controller.signal,
     
     async onopen(response) {

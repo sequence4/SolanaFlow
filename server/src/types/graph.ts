@@ -37,3 +37,11 @@ export interface GraphNode {
     edges?: GraphEdge[];
   }
   
+  /**
+   * Request body for the deploy pipeline endpoint
+   */
+  export interface DeployPipelineRequestBody {
+    graph: Graph;
+    walletSigned?: boolean;
+  }
+  

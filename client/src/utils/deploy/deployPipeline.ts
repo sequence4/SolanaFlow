@@ -73,7 +73,7 @@ export function runDeployPipelineWithLogs(
   let es: ReturnType<typeof sseDeploy> | null = null;
   
   try {
-    es = sseDeploy(projectContext.id!, graph, update);
+    es = sseDeploy(projectContext.id!, graph, update, /* walletSigned = */ true);
     
     es.addEventListener('close', () => {
       console.log(`[deployPipeline] SSE connection closed`);

@@ -19,8 +19,6 @@ interface PipelineArgs {
   userId: string;
   graph: Graph; 
   sendProgress: (data: unknown) => void;
-  /** Optional base58 pubkey of a temp keypair the UI created for this run */
-  ephemeralPubkey?: string;
 
   /** When true, the program was already deployed by a wallet-signed tx */
   walletSigned?: boolean;
@@ -31,7 +29,6 @@ export async function runDeployPipeline({
   userId,
   graph,
   sendProgress,
-  ephemeralPubkey,
   walletSigned = false,
 }: PipelineArgs): Promise<void> {
   sendProgress({ stage: "environment", message: "Preparing your build environment…" });
