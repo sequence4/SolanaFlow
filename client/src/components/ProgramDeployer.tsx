@@ -189,7 +189,7 @@ export function ProgramDeployer({
                 <Info className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm font-medium text-white">🪄 Tip: Turn on Auto-Approve</p>
-                  <p className="text-xs text-[#6e6e76]">
+                  <p className="text-xs text-[#6e6e76] sm:whitespace-normal">
                     Enable Auto-Approve in Phantom to let SolanaFlow sign ~{Math.ceil(byteLength / 900) + 2} transactions in one go.
                   </p>
                 </div>
@@ -206,7 +206,7 @@ export function ProgramDeployer({
                     </span>
                     <span className="text-sm text-[#6e6e76]">{progress}%</span>
                   </div>
-                  <Progress value={progress} aria-label="upload progress" />
+                  <Progress value={progress} aria-label="deployment progress" />
                 </div>
               )}
             </div>
