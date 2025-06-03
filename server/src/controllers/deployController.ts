@@ -209,8 +209,7 @@ export async function prepareDeployTx(
     // Extract the program.so file from the container
     try {
       // 1. Locate the .so in the container
-      const findCmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && SO_DIR=\\"\${CARGO_TARGET_DIR:-target}/deploy\\" && find \\"$SO_DIR\\" -maxdepth 1 -name \\"*.so\\" | head -n 1"`;
-      
+      const findCmd = `docker exec ${containerName} bash -c 'cd "/usr/src/${rootPath}" && SO_DIR="\${CARGO_TARGET_DIR:-target}/deploy" && find "$SO_DIR" -maxdepth 1 -name "*.so" | head -n 1'`;      
       console.log(`[API] Finding program binary with command: ${findCmd}`);
       const soPath = require('child_process').execSync(findCmd, { encoding: 'utf8' }).trim();
       
