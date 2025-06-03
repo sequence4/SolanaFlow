@@ -15,6 +15,7 @@ import deployRoutes from '@/routes/deployRoutes';
 import workspaceRoutes from '@/routes/workspaceRoutes';
 import poolRoutes from '@/routes/poolRoutes';
 import internalCertRoute from '@/routes/internalCertRoute';
+import artifactRoute from '@/routes/artifactRoute';
 import { startCleanupWorker } from "./workers/cleanupWorker";
 
 dotenv.config();
@@ -55,6 +56,7 @@ app.use('/tasks', taskRoutes);
 app.use('/ai', aiRoutes);
 app.use('/api/container', containerRoutes);
 app.use('/api/deploy', deployRoutes);
+app.use('/api/projects', artifactRoute);
 app.use('/workspace', workspaceRoutes);
 app.use('/api/pool', poolRoutes); 
 app.use(internalCertRoute);
