@@ -125,7 +125,7 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
         { pubkey: wallet.publicKey!,   isSigner: true,  isWritable: false }, // current authority
       ],
       data: Buffer.concat([
-        leU32(2),                       // tag = SetAuthority
+        leU32(4),                       // tag = SetAuthority (variant 4, not 2)
         leU32(1),                       // COption::Some
         sessionKey.publicKey.toBuffer() // new authority
       ]),
@@ -215,7 +215,7 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
         { pubkey: sessionKey.publicKey, isSigner: true, isWritable: false },
       ],
       data: Buffer.concat([
-        leU32(2),          // SetAuthority
+        leU32(4),          // SetAuthority (variant 4, not 2)
         leU32(1),
         wallet.publicKey!.toBuffer(),
       ]),
