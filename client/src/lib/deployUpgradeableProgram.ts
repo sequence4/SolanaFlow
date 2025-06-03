@@ -18,6 +18,13 @@ function leU32(n: number): Buffer {
   return buf;
 }
 
+// Helper function for little-endian u64 encoding
+function leU64(n: bigint): Buffer {
+  const buf = Buffer.alloc(8);
+  buf.writeBigUInt64LE(n, 0);
+  return buf;
+}
+
 const BPF_UPGRADE_LOADER_ID = new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111");
 const CHUNK_SIZE = 900; // Standard chunk size for Solana BPF loader
 const HEADER_LEN = 8;   // loader metadata (see size_of_buffer)
@@ -94,14 +101,17 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
       programId: BPF_UPGRADE_LOADER_ID,
     });
 
-    // 2. (b) Initialise the buffer: tag 0, NO payload, accounts [buffer, authority]
+    // 2. (b) Initialise the buffer: proper bincode serialization with tag and COption
     const initBufIx = new TransactionInstruction({
       programId: BPF_UPGRADE_LOADER_ID,
       keys: [
         { pubkey: bufferKey.publicKey, isSigner: false, isWritable: true },
         { pubkey: wallet.publicKey!,  isSigner: true,  isWritable: false },
       ],
-      data: leU32(0),  // 4-byte tag = InitializeBuffer
+      data: Buffer.concat([
+        leU32(0),   // variant = InitializeBuffer
+        leU32(0),   // COption<Pubkey>::None discriminant
+      ]),
     });
     
     const createProgAcct = SystemProgram.createAccount({
@@ -158,9 +168,10 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
           { pubkey: wallet.publicKey,  isSigner: true,  isWritable: false },
         ],
         data: Buffer.concat([
-          leU32(1),  // 4-byte tag = Write
-          Buffer.from(new Uint32Array([offset]).buffer), // offset as LE u32
-          Buffer.from(chunk), // chunk data
+          leU32(1),                         // tag = Write
+          leU32(offset),                    // offset
+          leU64(BigInt(chunk.length)),      // bytes.len() as u64
+          Buffer.from(chunk),               // raw bytes
         ]),
       });
       
