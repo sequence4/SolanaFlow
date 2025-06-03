@@ -15,6 +15,7 @@ import deployRoutes from '@/routes/deployRoutes';
 import workspaceRoutes from '@/routes/workspaceRoutes';
 import poolRoutes from '@/routes/poolRoutes';
 import internalCertRoute from '@/routes/internalCertRoute';
+import { startCleanupWorker } from "./workers/cleanupWorker";
 
 dotenv.config();
 
@@ -66,6 +67,9 @@ app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+  if (process.env.NODE_ENV !== "test") {
+    startCleanupWorker();
+  }
 });
 
 export default app;

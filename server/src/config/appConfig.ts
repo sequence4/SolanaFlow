@@ -35,6 +35,7 @@ export const APP_CONFIG = {
   TOKEN_EXPIRATION: '7d',
   MAX_FILE_SIZE: 1024 * 1024 * 5,
   BETA_CODE: process.env.BETA_CODE as string,
+  CLEANUP_POLL_MS: Number(process.env.CLEANUP_POLL_MS ?? 3600000),
 };
 
 const requiredEnvVars = [

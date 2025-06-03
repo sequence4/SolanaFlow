@@ -26,6 +26,7 @@ import { Keypair } from '@solana/web3.js';
 import { waitForTaskCompletion } from '../utils/taskUtils';
 import { createProject as createProjectDb } from '../utils/project/createProject';
 import { execSync } from 'child_process';
+import { markContainerForCleanup } from "../utils/container/cleanupQueue";
 
 export const runCommandController = async (
   req: Request,
@@ -311,17 +312,14 @@ export const deleteProject = async (
 
     // 2) fetch & delete any queued containers
     // Note: This is redundant with ON DELETE CASCADE but keeps explicit Docker removal
-    const { rows } = await pool.query(
-      `DELETE FROM cleanup_queue WHERE project_id = $1 RETURNING container_name`,
+    await pool.query(
+      `INSERT INTO cleanup_queue (container_name, project_id)
+           SELECT container_name, id
+             FROM solanaproject
+            WHERE id = $1
+      ON CONFLICT DO NOTHING`,
       [id]
     );
-    rows.forEach(({ container_name }) => {
-      try {
-        execSync(`docker rm -f ${container_name}`);
-      } catch (err) {
-        console.warn("container removal failed:", err);
-      }
-    });
 
     return res.status(204).end();
   } catch (err) { 
