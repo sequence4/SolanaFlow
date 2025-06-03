@@ -2,20 +2,14 @@ import { Pool } from 'pg'
 import { config as loadEnv } from 'dotenv'
 import { resolve } from 'path'
 
-loadEnv()  
+loadEnv()                                     // loads .env
+loadEnv({ path: resolve(process.cwd(), `.env.${process.env.NODE_ENV || 'development'}`) })
 
-const envFile = `.env.${process.env.NODE_ENV || 'development'}`
-loadEnv({ path: resolve(process.cwd(), envFile) })
+const isProd = process.env.NODE_ENV === 'production'   // 👈 single switch
 
-const pool =
-  process.env.DATABASE_URL
-    ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } })
-    : new Pool({
-        user:     process.env.DB_USER,
-        host:     process.env.DB_HOST,
-        database: process.env.DB_NAME,
-        password: process.env.DB_PASSWORD,
-        port:     Number(process.env.DB_PORT ?? 5432)
-      })
-
-export default pool
+export default new Pool({
+  connectionString: process.env.DATABASE_URL,          // one URL everywhere
+  ssl: isProd
+       ? { rejectUnauthorized: false }  // prod/staging ➜ encrypted
+       : false                          // local/CI ➜ no SSL hand-shake
+})

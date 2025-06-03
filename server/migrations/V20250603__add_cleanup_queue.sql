@@ -6,4 +6,5 @@ CREATE TABLE cleanup_queue (
   queued_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_cleanup_by_project ON cleanup_queue (project_id); 
+CREATE INDEX idx_cleanup_by_project ON cleanup_queue (project_id);
+CREATE INDEX idx_cleanup_queued_at  ON cleanup_queue (queued_at);
