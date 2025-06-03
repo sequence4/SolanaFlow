@@ -11,6 +11,7 @@ import fs from 'fs';
 import path from 'path';
 import { getProjectRootPath } from '../utils/fileUtils';
 import { getContainerName } from '../utils/projectUtils';
+import { deriveProgramId } from "../utils/deriveProgramId";
 
 // BPF Loader Upgradeable Program ID
 const BPF_LOADER_UPGRADEABLE_PROGRAM_ID = new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111');
@@ -255,11 +256,7 @@ export async function prepareDeployTx(
     
     // Generate a deterministic program ID derived from the project ID
     // This allows frontend to know the program ID in advance
-    const programSeed = Buffer.from(`program-${id}`, 'utf8');
-    const [programId] = PublicKey.findProgramAddressSync(
-      [programSeed],
-      BPF_LOADER_UPGRADEABLE_PROGRAM_ID
-    );
+    const programId = deriveProgramId(id);
     
     // This will be replaced by the frontend with the actual user's wallet
     // We use a placeholder here just to build the transaction

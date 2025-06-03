@@ -12,7 +12,7 @@ import {
   getBuildArtifactTask,
 } from "../projectUtils";
 import { waitForTaskCompletion, getTaskById } from "../taskUtils";
-import { PublicKey } from '@solana/web3.js';
+import { deriveProgramId } from "../../utils/deriveProgramId";
 
 interface PipelineArgs {
   projectId: string;
@@ -144,14 +144,7 @@ export async function runDeployPipeline({
       
       // If no programId is available, derive it deterministically
       if (!programId) {
-        // Use the same derivation as in prepareDeployTx
-        const BPF_LOADER_UPGRADEABLE_PROGRAM_ID = new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111');
-        const programSeed = Buffer.from(`program-${projectId}`, 'utf8');
-        const [derived] = PublicKey.findProgramAddressSync(
-          [programSeed],
-          BPF_LOADER_UPGRADEABLE_PROGRAM_ID
-        );
-        programId = derived.toBase58();
+        programId = deriveProgramId(projectId).toBase58();
       }
     }
 
