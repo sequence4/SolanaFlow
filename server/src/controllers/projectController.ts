@@ -17,7 +17,6 @@ import {
   runCommand,
   startInstallNodeDependenciesTask,
   compileTs,
-  closeProjectContainer,
 } from '../utils/projectUtils';
 import path from 'path';
 import { APP_CONFIG } from '../config/appConfig';
