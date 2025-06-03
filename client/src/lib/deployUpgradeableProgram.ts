@@ -13,7 +13,7 @@ import { WalletContextState } from "@solana/wallet-adapter-react";
 
 const BPF_UPGRADE_LOADER_ID = new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111");
 const CHUNK_SIZE = 900; // Standard chunk size for Solana BPF loader
-const HEADER_LEN = 8;   // version (4) + authority Pubkey option (4)
+const HEADER_LEN = 40;  // 4(tag)+4(option)+32(pubkey)
 
 type DeployProgress = {
   stage: 'create' | 'write' | 'deploy' | 'complete';
@@ -129,14 +129,14 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
     console.log(`[DEPLOY] Writing program data in ${numChunks} chunks of max ${CHUNK_SIZE} bytes each`);
     
     for (let chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
-      const offset = chunkIndex * CHUNK_SIZE;
-      const chunkEnd = Math.min(offset + CHUNK_SIZE, dataLength);
-      const chunkSize = chunkEnd - offset;
-      const chunk = programData.slice(offset, chunkEnd);
+      const offset = HEADER_LEN + chunkIndex * CHUNK_SIZE;
+      const chunkEnd = Math.min((chunkIndex + 1) * CHUNK_SIZE, dataLength);
+      const chunkSize = chunkEnd - chunkIndex * CHUNK_SIZE;
+      const chunk = programData.slice(chunkIndex * CHUNK_SIZE, chunkEnd);
       
       onProgress?.({
         stage: 'write',
-        uploaded: offset,
+        uploaded: chunkIndex * CHUNK_SIZE,
         total: dataLength,
         chunkIndex,
         totalChunks: numChunks
