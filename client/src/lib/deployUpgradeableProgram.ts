@@ -206,6 +206,11 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
       // payer is wallet; authority is sessionKey
       writeTx.partialSign(sessionKey);
       writeTxs.push(writeTx);
+      
+      if (chunkIndex % 10 === 0) {
+        // give the event-loop 1 ms
+        await new Promise(requestAnimationFrame);
+      }
     }
     
     // ---- reclaim authority + deploy (will ride in the batch) ----
