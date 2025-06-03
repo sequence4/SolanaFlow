@@ -40,11 +40,7 @@ export const APP_CONFIG = {
 const requiredEnvVars = [
   'JWT_SECRET',
   'ROOT_FOLDER',
-  'DB_USER',
-  'DB_HOST',
-  'DB_NAME',
-  'DB_PASSWORD',
-  'DB_PORT',
+  'DATABASE_URL',
 ];
 
 requiredEnvVars.forEach((envVar) => {

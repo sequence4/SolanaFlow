@@ -310,6 +310,7 @@ export const deleteProject = async (
     if (rowCount === 0) return next(new AppError("Not found", 404));
 
     // 2) fetch & delete any queued containers
+    // Note: This is redundant with ON DELETE CASCADE but keeps explicit Docker removal
     const { rows } = await pool.query(
       `DELETE FROM cleanup_queue WHERE project_id = $1 RETURNING container_name`,
       [id]
