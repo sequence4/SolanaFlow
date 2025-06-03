@@ -7,6 +7,7 @@ import {
   SystemProgram,
   Keypair,
   SYSVAR_RENT_PUBKEY,
+  SYSVAR_CLOCK_PUBKEY,
 } from "@solana/web3.js";
 import { WalletContextState } from "@solana/wallet-adapter-react";
 
@@ -58,6 +59,11 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
   // 1. Create a *real* buffer account (Keypair, not PDA)
   const bufferKey = Keypair.generate();
   const programKey = Keypair.generate();
+  
+  const [programDataPubkey] = PublicKey.findProgramAddressSync(
+    [programKey.publicKey.toBuffer()],
+    BPF_UPGRADE_LOADER_ID,
+  );
   
   // Rent-exempt lamports for the buffer's exact length
   const lamports = await connection.getMinimumBalanceForRentExemption(dataLength);
@@ -181,11 +187,22 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
     const deployIx = new TransactionInstruction({
       programId: BPF_UPGRADE_LOADER_ID,
       keys: [
-        // payer / authority first, then buffer, program & rent
+        // 0. [signer] payer
         { pubkey: wallet.publicKey!,    isSigner: true,  isWritable: true },
-        { pubkey: bufferKey.publicKey,  isSigner: false, isWritable: true },
+        // 1. [writable] uninitialised ProgramData PDA
+        { pubkey: programDataPubkey,    isSigner: false, isWritable: true },
+        // 2. [writable, signer] Program account
         { pubkey: programKey.publicKey, isSigner: true,  isWritable: true },
+        // 3. [writable] Buffer
+        { pubkey: bufferKey.publicKey,  isSigner: false, isWritable: true },
+        // 4. [] Rent sysvar
         { pubkey: SYSVAR_RENT_PUBKEY,   isSigner: false, isWritable: false },
+        // 5. [] Clock sysvar
+        { pubkey: SYSVAR_CLOCK_PUBKEY,  isSigner: false, isWritable: false },
+        // 6. [] System program
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        // 7. [signer] program authority (can reuse wallet key)
+        { pubkey: wallet.publicKey!,    isSigner: true,  isWritable: false },
       ],
       data: Buffer.concat([
         Buffer.from([3]),                               // DeployWithMaxDataLen
