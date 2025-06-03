@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { runDeployPipelineWithLogs } from '@/utils/deploy/deployPipeline';
-import { useWalletSigner } from '@/utils/walletSignAndDeploy';
+import { useWalletSigner } from '@/utils/wallet';
 import { useEnsureProjectId } from '@/hooks/useEnsureProjectId';
 import { ProgramDeployer } from '@/components/ProgramDeployer';
 

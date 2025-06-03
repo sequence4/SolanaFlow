@@ -14,6 +14,7 @@ import {
   DialogDescription,
   DialogFooter
 } from '@/components/ui/dialog';
+import { Progress } from '@/components/ui/progress';
 
 interface ProgramDeployerProps {
   projectId: string;
@@ -144,19 +145,6 @@ export function ProgramDeployer({
     }
   }, [wallet, programBytes, projectId, onSuccess, onClose, taskLogs]);
 
-  const getProgressText = () => {
-    if (deployStage === 'create') {
-      return 'Creating buffer...';
-    } else if (deployStage === 'write') {
-      return `Writing chunk ${currentChunk}/${totalChunks}...`;
-    } else if (deployStage === 'deploy') {
-      return 'Finalizing deployment...';
-    } else if (deployStage === 'complete') {
-      return 'Deployment complete!';
-    }
-    return 'Preparing...';
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !isLoading && !open && onClose()}>
       <DialogContent className="bg-[#121214] border-[#2a2a2d] text-white sm:max-w-md">
@@ -210,15 +198,15 @@ export function ProgramDeployer({
               {isLoading && (
                 <div className="space-y-2 mt-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-[#6e6e76]">{getProgressText()}</span>
+                    <span className="text-sm text-[#6e6e76]">
+                      {deployStage === 'create' ? 'Creating buffer...' :
+                       deployStage === 'write' ? `Writing chunk ${currentChunk}/${totalChunks}...` :
+                       deployStage === 'deploy' ? 'Finalizing deployment...' :
+                       deployStage === 'complete' ? 'Deployment complete!' : 'Preparing...'}
+                    </span>
                     <span className="text-sm text-[#6e6e76]">{progress}%</span>
                   </div>
-                  <div className="h-2 w-full bg-[#2a2a2d] rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-[#4d7cfe] transition-all" 
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
+                  <Progress value={progress} aria-label="upload progress" />
                 </div>
               )}
             </div>
