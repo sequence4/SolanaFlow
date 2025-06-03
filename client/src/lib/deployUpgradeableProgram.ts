@@ -11,9 +11,16 @@ import {
 } from "@solana/web3.js";
 import { WalletContextState } from "@solana/wallet-adapter-react";
 
+// Helper function for little-endian u32 encoding
+function leU32(n: number): Buffer {
+  const buf = Buffer.alloc(4);
+  buf.writeUInt32LE(n, 0);
+  return buf;
+}
+
 const BPF_UPGRADE_LOADER_ID = new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111");
 const CHUNK_SIZE = 900; // Standard chunk size for Solana BPF loader
-const HEADER_LEN = 40;  // 4(tag)+4(option)+32(pubkey)
+const HEADER_LEN = 8;   // loader metadata (see size_of_buffer)
 
 type DeployProgress = {
   stage: 'create' | 'write' | 'deploy' | 'complete';
@@ -94,7 +101,7 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
         { pubkey: bufferKey.publicKey, isSigner: false, isWritable: true },
         { pubkey: wallet.publicKey!,  isSigner: true,  isWritable: false },
       ],
-      data: Buffer.from([0]),
+      data: leU32(0),  // 4-byte tag = InitializeBuffer
     });
     
     const createProgAcct = SystemProgram.createAccount({
@@ -129,7 +136,7 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
     console.log(`[DEPLOY] Writing program data in ${numChunks} chunks of max ${CHUNK_SIZE} bytes each`);
     
     for (let chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
-      const offset = HEADER_LEN + chunkIndex * CHUNK_SIZE;
+      const offset = chunkIndex * CHUNK_SIZE;
       const chunkEnd = Math.min((chunkIndex + 1) * CHUNK_SIZE, dataLength);
       const chunkSize = chunkEnd - chunkIndex * CHUNK_SIZE;
       const chunk = programData.slice(chunkIndex * CHUNK_SIZE, chunkEnd);
@@ -151,7 +158,7 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
           { pubkey: wallet.publicKey,  isSigner: true,  isWritable: false },
         ],
         data: Buffer.concat([
-          Buffer.from([1]), // Write instruction
+          leU32(1),  // 4-byte tag = Write
           Buffer.from(new Uint32Array([offset]).buffer), // offset as LE u32
           Buffer.from(chunk), // chunk data
         ]),
@@ -207,7 +214,7 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
         { pubkey: wallet.publicKey!,    isSigner: true,  isWritable: false },
       ],
       data: Buffer.concat([
-        Buffer.from([3]),                               // DeployWithMaxDataLen
+        leU32(3),  // 4-byte tag = DeployWithMaxDataLen
         Buffer.from(new Uint32Array([bufferSpace]).buffer),
       ]),
     });
