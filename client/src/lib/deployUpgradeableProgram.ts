@@ -27,7 +27,7 @@ function leU64(n: bigint): Buffer {
 
 const BPF_UPGRADE_LOADER_ID = new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111");
 const CHUNK_SIZE = 900; // Standard chunk size for Solana BPF loader
-const HEADER_LEN = 8;   // loader metadata (see size_of_buffer)
+const HEADER_LEN = 36;  // 4 (tag) + 32 (authority pubkey)
 
 type DeployProgress = {
   stage: 'create' | 'write' | 'deploy' | 'complete';
@@ -112,9 +112,8 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
         { pubkey: wallet.publicKey!,  isSigner: true,  isWritable: false },
       ],
       data: Buffer.concat([
-        leU32(0),                       // tag = InitializeBuffer
-        leU32(1),                       // COption::Some
-        wallet.publicKey!.toBuffer(),   // initial authority = wallet
+        leU32(0),                       // InitializeBuffer tag
+        wallet.publicKey!.toBuffer(),   // authority pubkey (32 B)
       ]),
     });
     
