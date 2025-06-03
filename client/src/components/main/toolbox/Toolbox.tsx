@@ -31,8 +31,9 @@ import {
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { runDeployPipelineWithLogs } from '@/utils/deploy/deployPipeline';
-import { useWalletSigner, triggerSignedDeploy } from '@/utils/walletSignAndDeploy';
+import { useWalletSigner } from '@/utils/walletSignAndDeploy';
 import { useEnsureProjectId } from '@/hooks/useEnsureProjectId';
+import { ProgramDeployer } from '@/components/ProgramDeployer';
 
 export const Toolbox = () => {
     const [isExpanded] = useState(true);
@@ -54,6 +55,7 @@ export const Toolbox = () => {
     const [projectsRefreshCounter, setProjectsRefreshCounter] = useState(0);
     
     const [isDeploying, setIsDeploying] = useState(false);
+    const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
     
     const taskLogs = useTaskLogs();
     const { ensureId, modalOpen, setModalOpen, handleModalSubmit } = useEnsureProjectId(projectContext, setProjectContext);
@@ -108,118 +110,88 @@ export const Toolbox = () => {
     
     const handleDeployClick = async () => {
         if (isDeploying) return;
-        setIsDeploying(true);
-        
-        console.log('[deploy] Starting deploy process...');
         
         try {
-            if (esRef.current) {
-                console.log('[deploy] Closing previous EventSource');
-                esRef.current.close();
-                esRef.current = null;
-            }
-            
-            console.log('[deploy] Calling ensureId()');
+            console.log('[deploy] Starting deploy process...');
             const id = await ensureId();
             console.log(`[deploy] Project ID ensured: ${id}`);
             
-            const graph = {
-                ...(projectContext.details?.projectState ?? {}),
-                nodes: projectContext.details?.projectState?.nodes ?? [],
-            };
-            console.log('[deploy] Graph data (with nodes):', graph);
-
-            // Start wallet-signed deployment process
-            taskLogs.resetLogs();
-            taskLogs.setIsVisible(true);
-            taskLogs.addSystemLog("🚀 Starting wallet-signed deployment pipeline...");
-            
-            try {
-                // First, start the build process without the deploy step
+            // Check if the program has been built already
+            if (!projectContext.details?.projectState?.deployed) {
+                setIsDeploying(true);
+                
+                // First, run the build pipeline to compile the program
+                taskLogs.resetLogs();
+                taskLogs.setIsVisible(true);
                 taskLogs.addSystemLog("🔨 Building program...");
                 
-                // Step 1: Run the build pipeline first to create the container and compile the program
-                await new Promise<void>((resolve, reject) => {
-                    try {
-                        esRef.current = runDeployPipelineWithLogs(
-                            { ...projectContext, id },
-                            graph,
-                            taskLogs,
-                            setProjectContext,
-                            setArtifactUrl,
-                            (status?: 'error') => status === 'error' ? reject(new Error('Build failed')) : resolve()
-                        );
-                    } catch (error) {
-                        reject(error);
-                    }
-                });
-                
-                taskLogs.addSystemLog("✅ Build completed successfully!");
-                taskLogs.addSystemLog("⏳ Waiting for wallet signature...");
-                
-                // Step 2: Now that the build is complete, prepare the deploy transaction
-                const response = await fetch(`/api/deploy/${id}/prepare-deploy-tx`, {
-                    method: 'POST',
-                    headers: (() => {
-                        const headers: Record<string, string> = {
-                            'Content-Type': 'application/json'
-                        };
-                        const token = localStorage.getItem('token');
-                        if (token) {
-                            headers.Authorization = `Bearer ${token}`;
-                        }
-                        return headers;
-                    })(),
-                    body: JSON.stringify({ graph })
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`Failed to prepare deploy transaction: ${response.statusText}`);
-                }
-                
-                const { encodedTx } = await response.json();
-                
-                // Step 3: Sign and relay the transaction
-                taskLogs.addSystemLog("✍️ Signing transaction with connected wallet...");
-                const signature = await walletSigner.signAndRelay(id, encodedTx);
-                
-                taskLogs.addSystemLog(`✅ Transaction signed and relayed successfully!`);
-                taskLogs.addSystemLog(`📝 Transaction signature: ${signature}`);
-                
-                // Step 4: Trigger the deploy pipeline with the SIGNED flag
-                taskLogs.addSystemLog("🔄 Starting deploy pipeline with SIGNED flag...");
-                
-                // Prepare graph with SIGNED flag
-                const graphCopy = JSON.parse(JSON.stringify(graph));
-                graphCopy.deployConfig = { 
-                    ...graphCopy.deployConfig || {}, 
-                    ephemeralPubkey: 'SIGNED' 
+                const graph = {
+                    ...(projectContext.details?.projectState ?? {}),
+                    nodes: projectContext.details?.projectState?.nodes ?? [],
                 };
                 
-                // Use the existing EventSource mechanism for logs streaming
-                esRef.current = runDeployPipelineWithLogs(
-                    { ...projectContext, id },
-                    graphCopy,
-                    taskLogs,
-                    setProjectContext,
-                    setArtifactUrl,
-                    undefined  // No need for onComplete callback here
-                );
-                
-                console.log('[deploy] Deploy pipeline started with EventSource and SIGNED flag');
-            } catch (error: unknown) {
-                console.error('[deploy] Wallet signing error:', error);
-                taskLogs.addSystemLog(`❌ Error: ${error instanceof Error ? error.message : String(error)}`);
+                try {
+                    // Run the build pipeline
+                    await new Promise<void>((resolve, reject) => {
+                        try {
+                            esRef.current = runDeployPipelineWithLogs(
+                                { ...projectContext, id },
+                                graph,
+                                taskLogs,
+                                setProjectContext,
+                                setArtifactUrl,
+                                (status?: 'error') => status === 'error' ? reject(new Error('Build failed')) : resolve()
+                            );
+                        } catch (error) {
+                            reject(error);
+                        }
+                    });
+                    
+                    taskLogs.addSystemLog("✅ Build completed successfully!");
+                    
+                    // Now open the deploy modal for wallet-based deployment
+                    setIsDeployModalOpen(true);
+                } catch (error) {
+                    console.error('[deploy] Build error:', error);
+                    taskLogs.addSystemLog(`❌ Error: ${error instanceof Error ? error.message : String(error)}`);
+                    toast.error("Build failed", {
+                        description: String(error)
+                    });
+                } finally {
+                    setIsDeploying(false);
+                }
+            } else {
+                // Program is already built, just open the deploy modal
+                setIsDeployModalOpen(true);
             }
         } catch (err) {
-            console.error('[deploy] Deployment error:', err);
-            toast("Deployment error", {
-                description: String(err),
-                style: { backgroundColor: "#f87171", color: "white" }
+            console.error('[deploy] Error:', err);
+            toast.error("Deployment error", {
+                description: String(err)
             });
-        } finally {
             setIsDeploying(false);
         }
+    };
+    
+    const handleDeploySuccess = (programId: string) => {
+        // Update project context with deployed status and program ID
+        if (projectContext.details?.projectState) {
+            const updatedContext = {
+                ...projectContext,
+                details: {
+                    ...projectContext.details,
+                    projectState: {
+                        ...projectContext.details.projectState,
+                        deployed: true,
+                        programId
+                    }
+                }
+            };
+            setProjectContext(updatedContext);
+        }
+        
+        // Close the deploy modal
+        setIsDeployModalOpen(false);
     };
     
     const projectDeployed = !!projectContext?.details?.projectState?.deployed;
@@ -333,24 +305,32 @@ export const Toolbox = () => {
                     </div>
 
                     <div className="grid grid-cols-1 gap-2 mb-4">
-                        <button 
-                            className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center"
-                            onClick={projectDeployed ? undefined : handleDeployClick}
-                            disabled={!canDeploy || !walletSigner.isConnected || isDeploying}
-                        >
-                            {isDeploying ? (
-                                <PulseLoader
-                                    color="#80a3ff"
-                                    size={3}
-                                    cssOverride={{ display: 'inline-block', margin: '0' }}
-                                />
-                            ) : (
-                                <>
-                                    <Rocket className={`h-4 w-4 mr-2 ${projectDeployed ? "text-[#9de19f]" : ""}`} />
-                                    <span>{projectDeployed ? "Program Deployed" : "Deploy Program"}</span>
-                                </>
+                        <div className="relative">
+                            <button 
+                                className="w-full cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center"
+                                onClick={handleDeployClick}
+                                disabled={!canDeploy || !walletSigner.isConnected || isDeploying}
+                            >
+                                {isDeploying ? (
+                                    <PulseLoader
+                                        color="#80a3ff"
+                                        size={3}
+                                        cssOverride={{ display: 'inline-block', margin: '0' }}
+                                    />
+                                ) : (
+                                    <>
+                                        <Rocket className={`h-4 w-4 mr-2 ${projectDeployed ? "text-[#9de19f]" : ""}`} />
+                                        <span>{projectDeployed ? "Program Deployed" : "Deploy Program"}</span>
+                                    </>
+                                )}
+                            </button>
+                            
+                            {!projectDeployed && (
+                                <div className="mt-1 text-xs text-[#6e6e76] px-1">
+                                    🪄 Tip: Turn <strong>Auto-Approve</strong> on in Phantom to let SolanaFlow sign ~50 small uploads in one go.
+                                </div>
                             )}
-                        </button>
+                        </div>
                         
                         {artifactUrl && (
                             <a 
@@ -493,6 +473,17 @@ export const Toolbox = () => {
                 onOpenChange={setModalOpen}
                 onSubmit={handleModalSubmit}
             />
+            
+            {/* Program deployer modal */}
+            {isDeployModalOpen && projectContext.id && (
+                <ProgramDeployer
+                    projectId={projectContext.id}
+                    isOpen={isDeployModalOpen}
+                    onClose={() => setIsDeployModalOpen(false)}
+                    onSuccess={handleDeploySuccess}
+                    taskLogs={taskLogs}
+                />
+            )}
 
             <Dialog open={isProjectListModalOpen} onOpenChange={(open) => setIsProjectListModalOpen(open)}>
                 <DialogContent className="bg-[#111827] text-slate-100" 

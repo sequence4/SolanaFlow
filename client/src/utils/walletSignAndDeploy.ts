@@ -1,80 +1,47 @@
-import { Buffer } from "buffer";
 import { Connection, Transaction } from "@solana/web3.js";
 import { useWallet } from "@solana/wallet-adapter-react";
 
 /**
- * React hook for wallet signing and deployment to Solana
- * This is integrated with the backend's new signed transaction relay
+ * React hook for wallet transaction signing 
+ * This is a simplified version that just provides basic wallet utilities
  */
 export function useWalletSigner() {
   const wallet = useWallet();
   
   /**
-   * Signs a transaction with Phantom wallet and sends it to the backend's relay endpoint
-   * @returns Confirmed transaction signature
+   * A simple helper to send a transaction using the connected wallet
    */
-  const signAndRelay = async (projectId: string, encodedTx: string): Promise<string> => {
+  const sendTransaction = async (transaction: Transaction, connection: Connection): Promise<string> => {
     if (!wallet.signTransaction || !wallet.publicKey) {
       throw new Error("Wallet not connected or doesn't support signing");
     }
     
-    // The transaction should be already built by the backend with a placeholder signer
-    // We need to decode it from base64, replace the placeholder signer with our wallet, then sign
-    const buffer = Buffer.from(encodedTx, 'base64');
-    const tx = Transaction.from(buffer);
+    // Set the fee payer to the wallet's public key
+    transaction.feePayer = wallet.publicKey;
     
-    console.log(`[signAndRelay] Transaction before updating:`, {
-      feePayer: tx.feePayer?.toBase58(),
-      signers: tx.signatures.map(s => s.publicKey.toBase58())
-    });
+    // Get recent blockhash if not already set
+    if (!transaction.recentBlockhash) {
+      const { blockhash } = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+    }
     
-    // Replace the placeholder fee payer with the wallet's public key
-    tx.feePayer = wallet.publicKey;
-    
-    // Clear existing signatures (they were for the placeholder key)
-    tx.signatures = [];
-    
-    console.log(`[signAndRelay] Transaction after updating:`, {
-      feePayer: tx.feePayer.toBase58(),
-      signerCount: tx.signatures.length
-    });
-    
-    // Sign with Phantom
     try {
-      const signed = await wallet.signTransaction(tx);
-    
-    // Serialize back to base64 for transmission
-    const signedEncodedTx = signed.serialize({ verifySignatures: false }).toString("base64");
-    
-    // Build headers with proper authorization
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    const token = localStorage.getItem('token');
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-    
-    // POST to the backend for relay
-    const res = await fetch(`/api/deploy/${projectId}/deploy-signed`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ encodedTx: signedEncodedTx }),
-    });
-    
-    if (!res.ok) {
-      const errorData = await res.json();
-      throw new Error(`Deploy relay failed: ${errorData.error || res.statusText}`);
-    }
-    
-    const { sig } = await res.json();
-    return sig as string;
+      // Sign the transaction
+      const signedTransaction = await wallet.signTransaction(transaction);
+      
+      // Send the signed transaction
+      const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+      
+      // Return the transaction signature
+      return signature;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error("Failed to sign transaction: " + errorMessage);
+      throw new Error("Failed to sign or send transaction: " + errorMessage);
     }
   };
   
   return {
-    signAndRelay,
+    sendTransaction,
     isConnected: !!wallet.connected,
     publicKey: wallet.publicKey
   };
