@@ -166,7 +166,7 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
     
     // Prepare an array to collect chunk uploads
     const writeTxs: Transaction[] = [];
-    let { blockhash: cachedHash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+    let { blockhash: cachedHash } = await connection.getLatestBlockhash();   // valid ~150 slots
     
     for (let chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
       const offset = chunkIndex * CHUNK_SIZE;
@@ -200,26 +200,69 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
       
       const writeTx = new Transaction().add(writeIx);
       writeTx.feePayer = wallet.publicKey!;
-      writeTx.recentBlockhash = cachedHash;
+      writeTx.recentBlockhash = cachedHash;   // ← shared hash for the whole batch
       
       // payer is wallet; authority is sessionKey
       writeTx.partialSign(sessionKey);
       writeTxs.push(writeTx);
     }
     
+    // ---- reclaim authority + deploy (will ride in the batch) ----
+    const reclaimAuthIx = new TransactionInstruction({
+      programId: BPF_UPGRADE_LOADER_ID,
+      keys: [
+        { pubkey: bufferKey.publicKey, isSigner: false, isWritable: true },
+        { pubkey: sessionKey.publicKey, isSigner: true, isWritable: false },
+      ],
+      data: Buffer.concat([
+        leU32(2),          // SetAuthority
+        leU32(1),
+        wallet.publicKey!.toBuffer(),
+      ]),
+    });
+    
+    const deployIx = new TransactionInstruction({
+      programId: BPF_UPGRADE_LOADER_ID,
+      keys: [
+        { pubkey: wallet.publicKey!,        isSigner: true,  isWritable: true },
+        { pubkey: programDataPubkey,        isSigner: false, isWritable: true },
+        { pubkey: programKey.publicKey,     isSigner: true,  isWritable: true },
+        { pubkey: bufferKey.publicKey,      isSigner: false, isWritable: true },
+        { pubkey: SYSVAR_RENT_PUBKEY,       isSigner: false, isWritable: false },
+        { pubkey: SYSVAR_CLOCK_PUBKEY,      isSigner: false, isWritable: false },
+        { pubkey: SystemProgram.programId,  isSigner: false, isWritable: false },
+        { pubkey: wallet.publicKey!,        isSigner: true,  isWritable: false },
+      ],
+      data: Buffer.concat([
+        leU32(3),                                    // DeployWithMaxDataLen
+        Buffer.from(new Uint32Array([bufferSpace]).buffer),
+      ]),
+    });
+    
+    const deployTx = new Transaction()
+      .add(createProgAcct)   // program account
+      .add(reclaimAuthIx)    // give authority back to wallet
+      .add(deployIx);
+    
+    deployTx.feePayer = wallet.publicKey!;
+    deployTx.recentBlockhash = cachedHash;          // SAME hash
+    deployTx.partialSign(programKey, sessionKey);   // local keys only
+    
+    writeTxs.push(deployTx);   // after the loop, before signAllTransactions
+    
     // One Phantom popup: "Sign N transactions"
     if (!wallet.signAllTransactions) {
       throw new Error("Wallet doesn't support signing multiple transactions");
     }
-    const signedWriteTxs = await wallet.signAllTransactions(writeTxs);
+    const signedBatch = await wallet.signAllTransactions(writeTxs);   // wallet-approval #2
     console.info('Tip: Turn on "Auto-Confirm" in Phantom → Connected Apps for zero pop-ups next time.');
     
-    for (const tx of signedWriteTxs) {
-      const sig = await connection.sendRawTransaction(tx.serialize());
+    for (let i = 0; i < signedBatch.length; i++) {
+      const sig = await connection.sendRawTransaction(signedBatch[i].serialize());
       signatures.push(sig);
       await connection.confirmTransaction(sig);
     }
-    console.log('[DEPLOY] All write chunks signed & confirmed');
+    console.log('[DEPLOY] All write chunks and deploy signed & confirmed');
     
     // 4. Deploy from buffer
     onProgress?.({
@@ -228,66 +271,7 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
       total: dataLength
     });
     
-    console.log(`[DEPLOY] All chunks written. Deploying program with ID: ${programId.toBase58()}`);
-    
-    // Return authority to the wallet before deploy
-    const reclaimAuthIx = new TransactionInstruction({
-      programId: BPF_UPGRADE_LOADER_ID,
-      keys: [
-        { pubkey: bufferKey.publicKey, isSigner: false, isWritable: true },
-        { pubkey: sessionKey.publicKey, isSigner: true, isWritable: false },
-      ],
-      data: Buffer.concat([
-        leU32(2),              // SetAuthority
-        leU32(1),              // Some
-        wallet.publicKey!.toBuffer(),
-      ]),
-    });
-    
-    const deployIx = new TransactionInstruction({
-      programId: BPF_UPGRADE_LOADER_ID,
-      keys: [
-        // 0. [signer] payer
-        { pubkey: wallet.publicKey!,    isSigner: true,  isWritable: true },
-        // 1. [writable] uninitialised ProgramData PDA
-        { pubkey: programDataPubkey,    isSigner: false, isWritable: true },
-        // 2. [writable, signer] Program account
-        { pubkey: programKey.publicKey, isSigner: true,  isWritable: true },
-        // 3. [writable] Buffer
-        { pubkey: bufferKey.publicKey,  isSigner: false, isWritable: true },
-        // 4. [] Rent sysvar
-        { pubkey: SYSVAR_RENT_PUBKEY,   isSigner: false, isWritable: false },
-        // 5. [] Clock sysvar
-        { pubkey: SYSVAR_CLOCK_PUBKEY,  isSigner: false, isWritable: false },
-        // 6. [] System program
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-        // 7. [signer] program authority (can reuse wallet key)
-        { pubkey: wallet.publicKey!,    isSigner: true,  isWritable: false },
-      ],
-      data: Buffer.concat([
-        leU32(3),  // 4-byte tag = DeployWithMaxDataLen
-        Buffer.from(new Uint32Array([bufferSpace]).buffer),
-      ]),
-    });
-    
-    const deployTx = new Transaction()
-      .add(createProgAcct)   // must precede loader call
-      .add(reclaimAuthIx)    // reclaim buffer authority to wallet
-      .add(deployIx);
-    
-    deployTx.feePayer = wallet.publicKey;
-    const { blockhash: deployBlockhash } = await connection.getLatestBlockhash();
-    deployTx.recentBlockhash = deployBlockhash;
-    
-    // Sign and send deploy transaction
-    deployTx.partialSign(programKey, sessionKey);
-    const signedDeployTx = await wallet.signTransaction(deployTx);
-    const deploySignature = await connection.sendRawTransaction(signedDeployTx.serialize());
-    signatures.push(deploySignature);
-    
-    // Wait for confirmation
-    await connection.confirmTransaction(deploySignature);
-    console.log(`[DEPLOY] Program deployed successfully. Signature: ${deploySignature}`);
+    console.log(`[DEPLOY] Program deployed successfully with ID: ${programId.toBase58()}`);
     
     // Destroy the session key
     sessionKey.secretKey.fill(0);  // GC will wipe it soon
