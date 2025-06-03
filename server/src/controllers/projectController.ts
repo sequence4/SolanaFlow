@@ -303,27 +303,34 @@ export const deleteProject = async (
   next: NextFunction
 ) => {
   const { id } = req.params;
-  try {
-    // 1) delete the project row
-    const { rowCount } = await pool.query(
-      `DELETE FROM solanaproject WHERE id = $1`, [id]
-    );
-    if (rowCount === 0) return next(new AppError("Not found", 404));
 
-    // 2) fetch & delete any queued containers
-    // Note: This is redundant with ON DELETE CASCADE but keeps explicit Docker removal
-    await pool.query(
-      `INSERT INTO cleanup_queue (container_name, project_id)
-           SELECT container_name, id
-             FROM solanaproject
-            WHERE id = $1
-      ON CONFLICT DO NOTHING`,
+  try {
+    // 1) fetch container name *before* we delete the project
+    const { rows } = await pool.query(
+      `SELECT container_name FROM solanaproject WHERE id = $1`,
       [id]
     );
+    const container = rows[0]?.container_name;
+
+    // 2) delete the project row
+    const { rowCount } = await pool.query(
+      `DELETE FROM solanaproject WHERE id = $1`,
+      [id]
+    );
+    if (rowCount === 0) return next(new AppError('Not found', 404));
+
+    // 3) queue container for cleanup (if we had one)
+    if (container) {
+      await pool.query(
+        `INSERT INTO cleanup_queue (container_name, project_id)
+         VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        [container, id]
+      );
+    }
 
     return res.status(204).end();
-  } catch (err) { 
-    next(err); 
+  } catch (err) {
+    next(err);
   }
 };
 

@@ -21,20 +21,21 @@ export async function markContainerForCleanup(
 }
 
 /** Delete containers queued earlier than `olderThan` and remove their DB row. */
-export async function flushOldContainers(olderThanMs: number): Promise<void> {
+export async function flushOldContainers(staleMs: number): Promise<void> {
+  // 1) fetch, but DON'T delete yet
   const { rows } = await pool.query(
-    `DELETE FROM cleanup_queue
-           WHERE queued_at < NOW() - ($1 * INTERVAL '1 millisecond')
-        RETURNING container_name`,
-    [olderThanMs]
+    `SELECT container_name
+       FROM cleanup_queue
+      WHERE queued_at < NOW() - ($1 * INTERVAL '1 millisecond')`,
+    [staleMs]
   );
 
-  // remove from Docker
-  await Promise.all(rows.map(async ({ container_name }) => {
+  for (const { container_name } of rows) {
     try {
       await exec(`docker rm -f ${container_name}`);
+      await pool.query(`DELETE FROM cleanup_queue WHERE container_name = $1`, [container_name]);
     } catch (e) {
-      console.warn("[cleanup] docker rm failed:", container_name, e);
+      console.warn('[cleanup] docker rm failed, will retry:', container_name, e);
     }
-  }));
+  }
 } 

@@ -36,6 +36,7 @@ export const APP_CONFIG = {
   MAX_FILE_SIZE: 1024 * 1024 * 5,
   BETA_CODE: process.env.BETA_CODE as string,
   CLEANUP_POLL_MS: Number(process.env.CLEANUP_POLL_MS ?? 3600000),
+  CLEANUP_STALE_MS: Number(process.env.CLEANUP_STALE_MS ?? 86400000),
 };
 
 const requiredEnvVars = [
