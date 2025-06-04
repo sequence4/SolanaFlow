@@ -9,7 +9,7 @@
 !.yarn/versions
 
 # local environment
-.env.local
+.env.*
 
 # testing
 /coverage
