@@ -1,11 +1,14 @@
-import { Connection, PublicKey, Transaction, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
+import { Connection, PublicKey, Transaction, TransactionMessage, VersionedTransaction, Commitment } from '@solana/web3.js';
 import { Keypair } from '@solana/web3.js';
 import { rpcWithRetry } from "@/utils/rpcRetry";
 
 export async function debugAndSendTransaction(
     tx: Transaction,
     connection: Connection,
-    sendTransaction: (tx: Transaction, connection: Connection, options: { signers?: Keypair[] }) => Promise<string>,
+    sendTransaction: (tx: Transaction, connection: Connection, options: { 
+      signers?: Keypair[];
+      preflightCommitment?: Commitment;
+    }) => Promise<string>,
     signers?: Keypair[],
     walletPublicKey?: PublicKey,
 ) {
@@ -54,7 +57,14 @@ export async function debugAndSendTransaction(
         console.error('Simulation error:', simResult.value.err);
     }
 
-    const signature = await sendTransaction(tx, connection, { signers });
+    const signature = await sendTransaction(
+      tx, 
+      connection, 
+      { 
+        signers, 
+        preflightCommitment: 'processed' 
+      }
+    );
     console.log('Signature:', signature);
 
     // Get latest blockhash with retry
@@ -73,7 +83,7 @@ export async function debugAndSendTransaction(
         lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
         signature,
         },
-        'confirmed'
+        'processed'
     );
 
   return signature;

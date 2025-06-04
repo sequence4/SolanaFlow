@@ -26,7 +26,7 @@ export function useSignAndSendTx() {
         lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
         signature,
       },
-      'confirmed'
+      'processed'
     );
 
     return signature;
