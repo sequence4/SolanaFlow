@@ -76,9 +76,6 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
   const bufferKey = Keypair.generate();
   const programKey = Keypair.generate();
   
-  // Ephemeral authority valid only for this tab
-  const sessionKey = Keypair.generate();
-  
   const [programDataPubkey] = PublicKey.findProgramAddressSync(
     [programKey.publicKey.toBuffer()],
     BPF_UPGRADE_LOADER_ID,
@@ -118,20 +115,6 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
       ]),
     });
     
-    // Loader variant 2 = SetAuthority(Buffer/ProgramData)
-    const setAuthIx = new TransactionInstruction({
-      programId: BPF_UPGRADE_LOADER_ID,
-      keys: [
-        { pubkey: bufferKey.publicKey, isSigner: false, isWritable: true }, // account whose authority changes
-        { pubkey: wallet.publicKey!,   isSigner: true,  isWritable: false }, // current authority
-      ],
-      data: Buffer.concat([
-        leU32(4),                       // tag = SetAuthority (variant 4, not 2)
-        leU32(1),                       // COption::Some
-        sessionKey.publicKey.toBuffer() // new authority
-      ]),
-    });
-    
     const createProgAcct = SystemProgram.createAccount({
       fromPubkey: wallet.publicKey!,
       newAccountPubkey: programKey.publicKey,
@@ -144,8 +127,7 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
 
     const createBufferTx = new Transaction()
       .add(createBufAcct)   // create account
-      .add(initBufIx)       // initialise buffer, authority = wallet
-      .add(setAuthIx);      // hand authority to sessionKey
+      .add(initBufIx);      // initialise buffer, authority = wallet
     
     createBufferTx.feePayer = wallet.publicKey;
     const { blockhash } = await connection.getLatestBlockhash();
@@ -189,7 +171,7 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
         programId: BPF_UPGRADE_LOADER_ID,
         keys: [
           { pubkey: bufferKey.publicKey, isSigner: false, isWritable: true },
-          { pubkey: sessionKey.publicKey,  isSigner: true,  isWritable: false },
+          { pubkey: wallet.publicKey!,   isSigner: true,  isWritable: false },
         ],
         data: Buffer.concat([
           leU32(1),                         // tag = Write
@@ -203,8 +185,6 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
       writeTx.feePayer = wallet.publicKey!;
       writeTx.recentBlockhash = cachedHash;   // ← shared hash for the whole batch
       
-      // payer is wallet; authority is sessionKey
-      writeTx.partialSign(sessionKey);
       writeTxs.push(writeTx);
       
       if (chunkIndex % 10 === 0) {
@@ -212,20 +192,6 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
         await new Promise(requestAnimationFrame);
       }
     }
-    
-    // ---- reclaim authority + deploy (will ride in the batch) ----
-    const reclaimAuthIx = new TransactionInstruction({
-      programId: BPF_UPGRADE_LOADER_ID,
-      keys: [
-        { pubkey: bufferKey.publicKey, isSigner: false, isWritable: true },
-        { pubkey: sessionKey.publicKey, isSigner: true, isWritable: false },
-      ],
-      data: Buffer.concat([
-        leU32(4),          // SetAuthority (variant 4, not 2)
-        leU32(1),
-        wallet.publicKey!.toBuffer(),
-      ]),
-    });
     
     const deployIx = new TransactionInstruction({
       programId: BPF_UPGRADE_LOADER_ID,
@@ -247,12 +213,11 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
     
     const deployTx = new Transaction()
       .add(createProgAcct)   // program account
-      .add(reclaimAuthIx)    // give authority back to wallet
       .add(deployIx);
     
     deployTx.feePayer = wallet.publicKey!;
     deployTx.recentBlockhash = cachedHash;          // SAME hash
-    deployTx.partialSign(programKey, sessionKey);   // local keys only
+    deployTx.partialSign(programKey);               // local keys only
     
     writeTxs.push(deployTx);   // after the loop, before signAllTransactions
     
@@ -278,9 +243,6 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
     });
     
     console.log(`[DEPLOY] Program deployed successfully with ID: ${programId.toBase58()}`);
-    
-    // Destroy the session key
-    sessionKey.secretKey.fill(0);  // GC will wipe it soon
     
     onProgress?.({
       stage: 'complete',
