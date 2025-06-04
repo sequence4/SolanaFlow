@@ -28,6 +28,8 @@ function leU64(n: bigint): Buffer {
 const BPF_UPGRADE_LOADER_ID = new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111");
 const CHUNK_SIZE = 900; // Standard chunk size for Solana BPF loader
 const HEADER_LEN = 40;  // 4 (tag) + 4 (discr) + 32 (pubkey)
+// Phantom (and most wallets) will not sign more than ~64 txs in one call
+const MAX_BATCH = 60;          // stay comfortably under the cap
 
 type DeployProgress = {
   stage: 'create' | 'write' | 'deploy' | 'complete';
@@ -217,31 +219,38 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
     
     writeTxs.push(deployTx);   // after the loop, before signAllTransactions
     
-    // ---- get a fresh hash for the whole batch ----
-    const { blockhash: freshHash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-
-    for (const tx of writeTxs) {
-      tx.recentBlockhash = freshHash;
-      // fee-payer is already wallet.publicKey
-    }
-    
     // now that deployTx has its final hash, sign with the programKey
     deployTx.partialSign(programKey);
     
-    // One Phantom popup: "Sign N transactions"
+    // ── sign & send in safe-sized batches ──────────────────────────────────────────
     if (!wallet.signAllTransactions) {
       throw new Error("Wallet doesn't support signing multiple transactions");
     }
-    const signedBatch = await wallet.signAllTransactions(writeTxs);   // wallet-approval #2
-    console.info('Tip: Turn on "Auto-Confirm" in Phantom → Connected Apps for zero pop-ups next time.');
-    
-    for (let i = 0; i < signedBatch.length; i++) {
-      const sig = await connection.sendRawTransaction(signedBatch[i].serialize());
-      await connection.confirmTransaction(
-        { signature: sig, blockhash: freshHash, lastValidBlockHeight },
-        'confirmed'
-      );
-      signatures.push(sig);
+
+    let batchIndex = 0;
+    for (let start = 0; start < writeTxs.length; start += MAX_BATCH) {
+      const slice = writeTxs.slice(start, start + MAX_BATCH);
+
+      // fresh hash for this batch, to avoid expiry if user lingers
+      const { blockhash: batchHash, lastValidBlockHeight: lvh } =
+            await connection.getLatestBlockhash();
+      for (const tx of slice) {
+        tx.recentBlockhash = batchHash;
+      }
+
+      // NB: deployTx already has programKey's partial signature; still valid
+      const signed = await wallet.signAllTransactions(slice);
+
+      console.log(`[DEPLOY] Sending batch ${++batchIndex} (${signed.length} txs)…`);
+
+      for (const tx of signed) {
+        const sig = await connection.sendRawTransaction(tx.serialize());
+        await connection.confirmTransaction(
+          { signature: sig, blockhash: batchHash, lastValidBlockHeight: lvh },
+          'confirmed'
+        );
+        signatures.push(sig);
+      }
     }
     console.log('[DEPLOY] All write chunks and deploy signed & confirmed');
     
