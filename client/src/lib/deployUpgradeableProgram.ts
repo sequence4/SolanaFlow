@@ -219,9 +219,6 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
     
     writeTxs.push(deployTx);   // after the loop, before signAllTransactions
     
-    // now that deployTx has its final hash, sign with the programKey
-    deployTx.partialSign(programKey);
-    
     // ── sign & send in safe-sized batches ──────────────────────────────────────────
     if (!wallet.signAllTransactions) {
       throw new Error("Wallet doesn't support signing multiple transactions");
@@ -236,9 +233,13 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
             await connection.getLatestBlockhash();
       for (const tx of slice) {
         tx.recentBlockhash = batchHash;
+        // re-sign deployTx now that it has its final hash
+        if (tx === deployTx) {
+          tx.partialSign(programKey);
+        }
       }
 
-      // NB: deployTx already has programKey's partial signature; still valid
+      // deployTx is signed with programKey inside the loop above
       const signed = await wallet.signAllTransactions(slice);
 
       console.log(`[DEPLOY] Sending batch ${++batchIndex} (${signed.length} txs)…`);
