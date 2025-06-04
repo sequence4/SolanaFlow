@@ -214,8 +214,8 @@ export async function deployUpgradeableProgram(
       writeTx.feePayer = wallet.publicKey!;
       writeTxs.push(writeTx);
       
-      if (chunkIndex % 10 === 0) {
-        // give the event-loop 1 ms
+      if (chunkIndex % 20 === 0) {
+        // give the event-loop 1 ms - less frequent for better performance on large binaries
         await yieldToBrowser(1);
       }
     }

@@ -1,5 +1,6 @@
 import { Connection, PublicKey, Transaction, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
 import { Keypair } from '@solana/web3.js';
+import { rpcWithRetry } from "@/lib/rpcRetry";
 
 export async function debugAndSendTransaction(
     tx: Transaction,
@@ -8,7 +9,15 @@ export async function debugAndSendTransaction(
     signers?: Keypair[],
     walletPublicKey?: PublicKey,
 ) {
-    const blockhashInfo = await connection.getLatestBlockhash();
+    // Get blockhash with retry in case of rate limit
+    const { value: blockhashInfo } = await rpcWithRetry<{
+      value: { blockhash: string; lastValidBlockHeight: number }
+    }>(
+      connection, 
+      "getLatestBlockhash", 
+      [{ commitment: "processed" }], 
+      "processed"
+    );
 
     const messageV0 = new TransactionMessage({
         payerKey: walletPublicKey || new PublicKey(''),
@@ -29,7 +38,14 @@ export async function debugAndSendTransaction(
       },
     };
 
-    const simResult = await connection.simulateTransaction(versionedTx, simulateConfig);
+    // Simulate with retry for rate limits
+    const simResult = await rpcWithRetry<{
+      value: { err?: any; logs?: string[] }
+    }>(
+      connection, 
+      "simulateTransaction", 
+      [versionedTx, simulateConfig]
+    );
     console.log('Simulation logs:', simResult.value?.logs);
 
     if (simResult.value.err) {
@@ -39,7 +55,16 @@ export async function debugAndSendTransaction(
     const signature = await sendTransaction(tx, connection, { signers });
     console.log('Signature:', signature);
 
-    const latestBlockhash = await connection.getLatestBlockhash();
+    // Get latest blockhash with retry
+    const { value: latestBlockhash } = await rpcWithRetry<{
+      value: { blockhash: string; lastValidBlockHeight: number }
+    }>(
+      connection, 
+      "getLatestBlockhash", 
+      [{ commitment: "processed" }], 
+      "processed"
+    );
+    
     await connection.confirmTransaction(
         {
         blockhash: latestBlockhash.blockhash,

@@ -25,7 +25,7 @@ import {
   createSetAuthorityInstructionData,
 } from './instructionData';
 import { checkBufferAuthority } from './checkBufferAuth';
-import { connection } from "../connection";
+import { connection } from "@/utils/connection";
 
 export async function deployUpgradeableProgramServer(
   connection: Connection,
