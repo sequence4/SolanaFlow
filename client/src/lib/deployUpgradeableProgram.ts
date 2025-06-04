@@ -236,6 +236,11 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
       //   (default "finalized" can already be tens of seconds old ⇒ expires)
       const { blockhash: batchHash, lastValidBlockHeight: lvh } =
             await connection.getLatestBlockhash('processed');
+            
+      // Wait half a second so the new hash is visible to the pre-flight bank.
+      // This avoids "Blockhash not found" on the first tx of the batch.
+      await new Promise(res => setTimeout(res, 600));
+      
       for (const tx of slice) {
         tx.recentBlockhash = batchHash;
         // re-sign deployTx now that it has its final hash
