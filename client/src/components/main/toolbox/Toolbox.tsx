@@ -324,12 +324,6 @@ export const Toolbox = () => {
                                     </>
                                 )}
                             </button>
-                            
-                            {!projectDeployed && (
-                                <div className="mt-1 text-xs text-[#6e6e76] px-1">
-                                    🪄 Tip: Turn <strong>Auto-Approve</strong> on in Phantom to let SolanaFlow sign ~50 small uploads in one go.
-                                </div>
-                            )}
                         </div>
                         
                         {artifactUrl && (
