@@ -213,7 +213,7 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
       .add(deployIx);
     
     deployTx.feePayer = wallet.publicKey!;
-    deployTx.partialSign(programKey);               // local keys only
+    // (no recentBlockhash yet)
     
     writeTxs.push(deployTx);   // after the loop, before signAllTransactions
     
@@ -224,6 +224,9 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
       tx.recentBlockhash = freshHash;
       // fee-payer is already wallet.publicKey
     }
+    
+    // now that deployTx has its final hash, sign with the programKey
+    deployTx.partialSign(programKey);
     
     // One Phantom popup: "Sign N transactions"
     if (!wallet.signAllTransactions) {
