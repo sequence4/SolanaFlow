@@ -9,7 +9,7 @@ import {
   SYSVAR_RENT_PUBKEY,
   SYSVAR_CLOCK_PUBKEY,
 } from "@solana/web3.js";
-import { connection as devnetConnection } from "../utils/connection";
+import { connection as devnetConnection } from "@/utils/connection";
 import { WalletContextState } from "@solana/wallet-adapter-react";
 import { rpcWithRetry } from "./rpcRetry";
 
@@ -54,6 +54,17 @@ type DeployResult = {
   programId: PublicKey;
   signatures: string[];
 };
+
+/**
+ * Yields to the browser's event loop, allowing UI updates
+ * @param ms Optional timeout in milliseconds (defaults to requestAnimationFrame timing ~16ms)
+ */
+async function yieldToBrowser(ms?: number): Promise<void> {
+  if (ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+  return new Promise(resolve => requestAnimationFrame(() => resolve()));
+}
 
 /**
  * Deploys a Solana program using the BPF Upgradeable Loader
@@ -205,7 +216,7 @@ export async function deployUpgradeableProgram(
       
       if (chunkIndex % 10 === 0) {
         // give the event-loop 1 ms
-        await new Promise(requestAnimationFrame);
+        await yieldToBrowser(1);
       }
     }
     
@@ -258,7 +269,7 @@ export async function deployUpgradeableProgram(
       if (batchIndex === 0) {
         // Wait half a second so the new hash is visible to the pre-flight bank.
         // This avoids "Blockhash not found" on the first tx of the batch.
-        await new Promise(res => setTimeout(res, 600));
+        await yieldToBrowser(600);
       }
       
       for (const tx of slice) {
@@ -293,7 +304,7 @@ export async function deployUpgradeableProgram(
         signatures.push(sig);
         
         // Throttle to stay under Helius rate limits (5 TPS)
-        await new Promise(r => setTimeout(r, 350)); // 1000 ms / 3 tx ≈ 333 ms
+        await yieldToBrowser(350); // 1000 ms / 3 tx ≈ 333 ms
       }
       
       // advance only after successful send

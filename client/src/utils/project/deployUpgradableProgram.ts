@@ -27,14 +27,14 @@ import {
 import { checkBufferAuthority } from './checkBufferAuth';
 import { connection } from "../connection";
 
-export async function deployUpgradeableProgram(
+export async function deployUpgradeableProgramServer(
   connection: Connection,
   phantomPublicKey: PublicKey,
   signAndSendTransaction: (tx: Transaction, signers?: Keypair[]) => Promise<string>,
   programData: Buffer,
   deployControlOption: 'fullWallet' | 'delegated' = 'delegated'
 ): Promise<PublicKey> {
-  console.log('calling deployUpgradeableProgram');
+  console.log('calling deployUpgradeableProgramServer');
 
   const bufferAccount = Keypair.generate();
   const bufferSpace = 37 + programData.length;
@@ -903,7 +903,7 @@ export const handleDeployProgram = async (
             return;
           }
         } else {
-          const programKey = await deployUpgradeableProgram(
+          const programKey = await deployUpgradeableProgramServer(
             connection,
             walletPublicKey,
             signAndSendTransaction,

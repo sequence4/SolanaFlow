@@ -5,7 +5,8 @@ import { Connection } from "@solana/web3.js";
  * Note: For production/mainnet, use a private (non-NEXT_PUBLIC_) env var
  * and proxy requests through a server endpoint to protect your API key
  */
-export const connection = new Connection(
-  process.env.NEXT_PUBLIC_SOLANA_RPC || "https://devnet.helius-rpc.com/?api-key=623fd101-c0bd-4575-905b-cfeac8e9138c",
-  "confirmed"
-); 
+const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC;
+if (!rpcUrl) {
+  throw new Error("❌  NEXT_PUBLIC_SOLANA_RPC env var not defined");
+}
+export const connection = new Connection(rpcUrl, "confirmed"); 
