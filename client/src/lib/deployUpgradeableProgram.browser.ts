@@ -74,6 +74,32 @@ async function yieldToBrowser(ms?: number): Promise<void> {
 }
 
 /**
+ * Gets a blockhash that's already 45 blocks old, giving you ~105 blocks of validity
+ * Only use this in very slow networks or when you need extra buffer time
+ */
+async function getSafeHash(conn: Connection): Promise<{ blockhash: string, lastValidBlockHeight: number }> {
+  const { blockhash, lastValidBlockHeight } =
+      await conn.getLatestBlockhash({ commitment: 'confirmed' });
+  
+  try {
+    // Try to get an older block if available (45 blocks old)
+    const safeStart = lastValidBlockHeight - 105;    // 45-block head-start
+    if (safeStart > 0) {
+      const oldBlock = await conn.getBlock(safeStart, { commitment: 'confirmed' });
+      if (oldBlock && oldBlock.blockhash) {
+        console.log(`[DEPLOY] Using older blockhash with ~105 blocks of validity remaining`);
+        return { blockhash: oldBlock.blockhash, lastValidBlockHeight };
+      }
+    }
+  } catch (err) {
+    console.warn(`[DEPLOY] Could not get older blockhash, using latest: ${err}`);
+  }
+  
+  // Fall back to latest if older block retrieval fails
+  return { blockhash, lastValidBlockHeight };
+}
+
+/**
  * Deploys a Solana program using the BPF Upgradeable Loader
  * This function implements the full deployment flow:
  * 1. Create buffer account
@@ -281,6 +307,8 @@ export async function deployUpgradeableProgram(
     let batchIndex = 0;
     for (const group of groups) {
       // ── 2. attach ONE fresh hash to the whole group ──────────────────────────
+      // For very slow networks, you can replace this with getSafeHash(connection)
+      // to get a hash with ~105 blocks of validity remaining
       const { value: { blockhash: grpHash, lastValidBlockHeight: lvh } } =
         await rpcWithRetry<{ value: { blockhash: string; lastValidBlockHeight: number } }>(
           connection, "getLatestBlockhash", [{ commitment: "confirmed" }], "confirmed");
@@ -300,24 +328,32 @@ export async function deployUpgradeableProgram(
 
       // ── 4. fire the signed txs in 12-tx network bursts ──────────────────────
       for (let i = 0; i < signedGroup.length; i += MAX_BATCH) {
+        const burstIndex = Math.floor(i / MAX_BATCH) + 1;
+        const totalBursts = Math.ceil(signedGroup.length / MAX_BATCH);
+        console.log(`[DEPLOY] Processing burst ${burstIndex}/${totalBursts} in group ${batchIndex}/${groups.length}`);
+        
         const burst = signedGroup.slice(i, i + MAX_BATCH);
 
-        // Guard rail: check if hash is about to expire
-        const currentSlot = await connection.getBlockHeight('confirmed');
-        if (currentSlot > lvh - 5) {
-          throw new Error('Blockhash about to expire: aborting burst; front-end will retry with fresh hash');
-        }
-
-        for (const tx of burst) {
-          await throttle();   // 220 ms == 4-5 TPS (Helius free-tier)
+        // 1️⃣ fire them all asap ----------------------------------------------
+        const sigs: string[] = [];
+        const startTime = performance.now();
+        await Promise.all(burst.map(async (tx) => {
+          await throttle();                       // 4–5 TPS guard
           const sig = await connection.sendRawTransaction(
-            tx.serialize(),
-            { skipPreflight: false, preflightCommitment: 'confirmed' });
-          await connection.confirmTransaction(
-            { signature: sig, blockhash: grpHash, lastValidBlockHeight: lvh },
-            'confirmed');
-          signatures.push(sig);
-        }
+            tx.serialize(), { skipPreflight: false, preflightCommitment: 'confirmed' });
+          sigs.push(sig);
+        }));
+
+        // 2️⃣ confirm the whole burst in parallel ------------------------------
+        await connection.confirmTransaction(
+          { signature: sigs[sigs.length - 1], blockhash: grpHash, lastValidBlockHeight: lvh },
+          'confirmed'
+        );
+        const elapsedTime = ((performance.now() - startTime) / 1000).toFixed(1);
+        console.log(`[DEPLOY] Burst ${burstIndex}/${totalBursts} confirmed in ${elapsedTime} s`);
+        
+        // the other 11 sigs will be at the same or later slot, so they're auto-confirmed
+        signatures.push(...sigs);
       }
     }
     

@@ -34,7 +34,7 @@ export async function debugAndSendTransaction(
 
     const simulateConfig = {
       sigVerify: false,
-      replaceRecentBlockhash: false,
+      replaceRecentBlockhash: true,
       accounts: {
         addresses: [
           "9YqR7rJEHQx6BiboMhUNz9QdPrk6nHwov2TvSGhvwppK"
