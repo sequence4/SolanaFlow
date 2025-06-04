@@ -149,7 +149,6 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
     
     // Prepare an array to collect chunk uploads
     const writeTxs: Transaction[] = [];
-    let { blockhash: cachedHash } = await connection.getLatestBlockhash();   // valid ~150 slots
     
     for (let chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
       const offset = chunkIndex * CHUNK_SIZE;
@@ -183,8 +182,6 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
       
       const writeTx = new Transaction().add(writeIx);
       writeTx.feePayer = wallet.publicKey!;
-      writeTx.recentBlockhash = cachedHash;   // ← shared hash for the whole batch
-      
       writeTxs.push(writeTx);
       
       if (chunkIndex % 10 === 0) {
@@ -216,10 +213,17 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
       .add(deployIx);
     
     deployTx.feePayer = wallet.publicKey!;
-    deployTx.recentBlockhash = cachedHash;          // SAME hash
     deployTx.partialSign(programKey);               // local keys only
     
     writeTxs.push(deployTx);   // after the loop, before signAllTransactions
+    
+    // ---- get a fresh hash for the whole batch ----
+    const { blockhash: freshHash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+
+    for (const tx of writeTxs) {
+      tx.recentBlockhash = freshHash;
+      // fee-payer is already wallet.publicKey
+    }
     
     // One Phantom popup: "Sign N transactions"
     if (!wallet.signAllTransactions) {
@@ -230,8 +234,11 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
     
     for (let i = 0; i < signedBatch.length; i++) {
       const sig = await connection.sendRawTransaction(signedBatch[i].serialize());
+      await connection.confirmTransaction(
+        { signature: sig, blockhash: freshHash, lastValidBlockHeight },
+        'confirmed'
+      );
       signatures.push(sig);
-      await connection.confirmTransaction(sig);
     }
     console.log('[DEPLOY] All write chunks and deploy signed & confirmed');
     
