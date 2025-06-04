@@ -9,7 +9,7 @@ import {
   SYSVAR_RENT_PUBKEY,
   SYSVAR_CLOCK_PUBKEY,
 } from "@solana/web3.js";
-import { connection as devnetConnection } from "@/utils/connection";
+import { connection as devnetConnection, RATE_LIMIT_MS } from "@/utils/connection";
 import { WalletContextState } from "@solana/wallet-adapter-react";
 import { rpcWithRetry } from "./rpcRetry";
 
@@ -304,7 +304,7 @@ export async function deployUpgradeableProgram(
         signatures.push(sig);
         
         // Throttle to stay under Helius rate limits (5 TPS)
-        await yieldToBrowser(350); // 1000 ms / 3 tx ≈ 333 ms
+        await yieldToBrowser(RATE_LIMIT_MS);
       }
       
       // advance only after successful send
