@@ -168,7 +168,7 @@ export async function deployUpgradeableProgramServer(
             blockhash,
             lastValidBlockHeight,
           },
-          'confirmed'
+          'processed'
         );
 
         console.log(`Chunk at offset ${offset} written. Tx sig: ${txSig}`);
@@ -514,7 +514,7 @@ export const handleDeployProgram = async (
                     signature,
                     blockhash: latestBlockhash.blockhash,
                     lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
-                  }, 'confirmed');
+                  }, 'processed');
                   console.log(`Transaction confirmed. Ephemeral successfully funded with additional ${additionalFundsNeeded / LAMPORTS_PER_SOL} SOL`);
                 } catch (confirmError: any) {
                   console.error('Transaction confirmation error:', confirmError);

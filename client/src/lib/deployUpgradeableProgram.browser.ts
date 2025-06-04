@@ -160,8 +160,8 @@ export async function deployUpgradeableProgram(
       .add(initBufIx);      // initialise buffer, authority = wallet
     
     createBufferTx.feePayer = wallet.publicKey;
-    const { value: { blockhash } } =
-      await rpcWithRetry<{ value: { blockhash: string } }>(connection, "getLatestBlockhash",
+    const { value: { blockhash, lastValidBlockHeight: lvh } } =
+      await rpcWithRetry<{ value: { blockhash: string; lastValidBlockHeight: number } }>(connection, "getLatestBlockhash",
         [{ commitment: "processed" }], "processed");
     createBufferTx.recentBlockhash = blockhash;
     
@@ -178,8 +178,15 @@ export async function deployUpgradeableProgram(
     );
     signatures.push(createBufferSig);
     
-    // Wait for confirmation
-    await connection.confirmTransaction(createBufferSig);
+    // Wait for confirmation with full form
+    await connection.confirmTransaction(
+      { 
+        signature: createBufferSig, 
+        blockhash, 
+        lastValidBlockHeight: lvh 
+      },
+      'processed'  // match the commitment used for the hash
+    );
     console.log(`[DEPLOY] Buffer created successfully. Signature: ${createBufferSig}`);
     
     // 3. Write program data in chunks
@@ -320,7 +327,7 @@ export async function deployUpgradeableProgram(
         await connection.confirmTransaction(
           { signature: sig, blockhash: batchHash, lastValidBlockHeight: lvh },
           /** You may keep 'confirmed' here – it's fine to wait for a stricter level. */
-          'confirmed',
+          'processed',
         );
         signatures.push(sig);
         
