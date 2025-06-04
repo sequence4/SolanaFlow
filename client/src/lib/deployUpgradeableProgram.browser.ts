@@ -37,6 +37,8 @@ const CHUNK_SIZE = 900; // Standard chunk size for Solana BPF loader
 const HEADER_LEN = 40;  // 4 (tag) + 4 (discr) + 32 (pubkey)
 // Phantom (current versions) cap signAllTransactions at ~100 TXs; stay well below.
 const MAX_BATCH = 12;  // 12×900 B ≃ 10 KB – sim & preflight finish < 20 s
+// Phantom UI stays reliable below 100 tx; use a safe margin.
+const PROMPT_GROUP_SIZE = 90;          // one Phantom pop-up handles ≤ 90 tx
 
 type DeployProgress = {
   stage: 'create' | 'write' | 'deploy' | 'complete';
@@ -270,76 +272,55 @@ export async function deployUpgradeableProgram(
       throw new Error("Wallet doesn't support signing multiple transactions");
     }
 
-    let batchIndex = 0;
-    for (let start = 0; start < writeTxs.length; ) {
-      const slice = writeTxs.slice(start, start + MAX_BATCH);
+    // ── 1. slice all prepared txs into "signature groups" of ≤ 90 ──────────────
+    const groups: Transaction[][] = [];
+    for (let i = 0; i < writeTxs.length; i += PROMPT_GROUP_SIZE) {
+      groups.push(writeTxs.slice(i, i + PROMPT_GROUP_SIZE));
+    }
 
-      // IMPORTANT:
-      //   ask for the *freshest* hash – use "confirmed" commitment.
-      //   (default "finalized" can already be tens of seconds old ⇒ expires)
-      const { value: { blockhash: batchHash, lastValidBlockHeight: lvh } } =
+    let batchIndex = 0;
+    for (const group of groups) {
+      // ── 2. attach ONE fresh hash to the whole group ──────────────────────────
+      const { value: { blockhash: grpHash, lastValidBlockHeight: lvh } } =
         await rpcWithRetry<{ value: { blockhash: string; lastValidBlockHeight: number } }>(
-          connection, 
-          "getLatestBlockhash",
-          [{ commitment: "confirmed" }], 
-          "confirmed"
-        );
-            
-      if (batchIndex === 0) {
-        // Wait half a second so the new hash is visible to the pre-flight bank.
-        // This avoids "Blockhash not found" on the first tx of the batch.
-        await yieldToBrowser(600);
+          connection, "getLatestBlockhash", [{ commitment: "confirmed" }], "confirmed");
+
+      for (const tx of group) {
+        tx.recentBlockhash = grpHash;
+        if (tx === deployTx) tx.partialSign(programKey);          // keep partial-sign
       }
-      
-      for (const tx of slice) {
-        tx.recentBlockhash = batchHash;
-        // re-sign deployTx now that it has its final hash
-        if (tx === deployTx) {
-          tx.partialSign(programKey);
+
+      // ── 3. ONE wallet prompt here ────────────────────────────────────────────
+      const signedGroup = await wallet.signAllTransactions(group);
+      console.log(`[DEPLOY] Sending group ${batchIndex + 1}/${groups.length} (${signedGroup.length} txs signed, ${Math.ceil(signedGroup.length / MAX_BATCH)} bursts)`);
+      batchIndex++;
+
+      // small delay so the hash propagates to "confirmed"
+      await yieldToBrowser(300);
+
+      // ── 4. fire the signed txs in 12-tx network bursts ──────────────────────
+      for (let i = 0; i < signedGroup.length; i += MAX_BATCH) {
+        const burst = signedGroup.slice(i, i + MAX_BATCH);
+
+        // Guard rail: check if hash is about to expire
+        const currentSlot = await connection.getBlockHeight('confirmed');
+        if (currentSlot > lvh - 5) {
+          throw new Error('Blockhash about to expire: aborting burst; front-end will retry with fresh hash');
+        }
+
+        for (const tx of burst) {
+          await throttle();   // 220 ms == 4-5 TPS (Helius free-tier)
+          const sig = await connection.sendRawTransaction(
+            tx.serialize(),
+            { skipPreflight: false, preflightCommitment: 'confirmed' });
+          await connection.confirmTransaction(
+            { signature: sig, blockhash: grpHash, lastValidBlockHeight: lvh },
+            'confirmed');
+          signatures.push(sig);
         }
       }
-
-      // Phantom sometimes shows the second prompt for a while.
-      // ↓ If the user is slow **and** the hash expires, we refetch and retry.
-      let signed: Transaction[];
-      try {
-        signed = await wallet.signAllTransactions(slice);
-      } catch (e) {
-        // very unlikely to throw here, but keep the code symmetric
-        throw e;
-      }
-
-      await yieldToBrowser(300);   // 0.3 s – prevents "blockhash not found" on first tx
-
-      console.log(`[DEPLOY] Sending batch ${++batchIndex} (${signed.length} txs)…`);
-
-      for (const tx of signed) {
-        // skipPreflight=false by default; but if this line still ever throws
-        // "blockhash not found", try `skipPreflight:true` while debugging.
-        // const sig = await connection.sendRawTransaction(tx.serialize(), { skipPreflight:true });
-        await throttle();
-        const sig = await connection.sendRawTransaction(
-          tx.serialize(),
-          {
-            skipPreflight: false,
-            /** MUST match the commitment used for getLatestBlockhash */
-            preflightCommitment: 'confirmed',
-          },
-        );
-        await connection.confirmTransaction(
-          { signature: sig, blockhash: batchHash, lastValidBlockHeight: lvh },
-          /** You may keep 'confirmed' here – it's fine to wait for a stricter level. */
-          'confirmed',
-        );
-        signatures.push(sig);
-        
-        // Throttle to stay under Helius rate limits (5 TPS)
-        await yieldToBrowser(RATE_LIMIT_MS);
-      }
-      
-      // advance only after successful send
-      start += MAX_BATCH;
     }
+    
     console.log('[DEPLOY] All write chunks and deploy signed & confirmed');
     
     // 4. Deploy from buffer

@@ -20,7 +20,7 @@ export function useWalletSigner() {
     
     // Get recent blockhash if not already set
     if (!transaction.recentBlockhash) {
-      const { blockhash } = await connection.getLatestBlockhash();
+      const { blockhash } = await connection.getLatestBlockhash({ commitment: 'confirmed' });
       transaction.recentBlockhash = blockhash;
     }
     

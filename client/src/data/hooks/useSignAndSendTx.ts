@@ -15,7 +15,7 @@ export function useSignAndSendTx() {
 
     const signature = await debugAndSendTransaction(tx, connection, sendTransaction, undefined, publicKey);
 
-    const latestBlockhash = await connection.getLatestBlockhash();
+    const latestBlockhash = await connection.getLatestBlockhash({ commitment: 'confirmed' });
     await connection.confirmTransaction(
       {
         blockhash: latestBlockhash.blockhash,

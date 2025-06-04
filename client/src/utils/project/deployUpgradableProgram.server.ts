@@ -88,7 +88,7 @@ export async function deployUpgradeableProgramServer(
         ephemeralKeypair.publicKey,
         0.1 * LAMPORTS_PER_SOL
       );
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash({ commitment: 'confirmed' });
       await connection.confirmTransaction(
         {
           signature: airdropSig,
@@ -151,7 +151,7 @@ export async function deployUpgradeableProgramServer(
       if (deployControlOption === 'delegated' && ephemeralKeypair) {
         writeTx.feePayer = ephemeralKeypair.publicKey;
 
-        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash({ commitment: 'confirmed' });
         writeTx.recentBlockhash = blockhash;
 
         writeTx.sign(ephemeralKeypair);
@@ -288,7 +288,7 @@ export const handleDeployProgram = async (
     console.log('Verifying devnet connection with shared connection...');
     
     // Get recent blockhash to verify connection
-    const { blockhash } = await connection.getLatestBlockhash();
+    const { blockhash } = await connection.getLatestBlockhash({ commitment: 'confirmed' });
     console.log('Successfully connected to devnet. Recent blockhash:', blockhash.substring(0, 10) + '...');
     
     // Verify wallet account exists on this network
@@ -330,7 +330,7 @@ export const handleDeployProgram = async (
     // Verify wallet is on correct network by checking an account that only exists on devnet
     try {
       // Try looking up a devnet-only account or getting recent blockhash
-      const { blockhash } = await connection.getLatestBlockhash();
+      const { blockhash } = await connection.getLatestBlockhash({ commitment: 'confirmed' });
       console.log(`Connected to correct network. Latest blockhash: ${blockhash}`);
     } catch (networkError: any) {
       console.error('Network connection error - possibly not on devnet:', networkError);
@@ -424,7 +424,7 @@ export const handleDeployProgram = async (
                 const fundTx = new Transaction().add(fundIx);
 
                 // Add recent blockhash to transaction before signing
-                const { blockhash } = await connection.getLatestBlockhash();
+                const { blockhash } = await connection.getLatestBlockhash({ commitment: 'confirmed' });
                 fundTx.recentBlockhash = blockhash;
                 fundTx.feePayer = walletPublicKey;
                 
@@ -505,7 +505,7 @@ export const handleDeployProgram = async (
                 console.log(`Ephemeral funding transaction sent for ${additionalFundsNeeded / LAMPORTS_PER_SOL} SOL. Sig:`, signature);
 
                 // Get fresh blockhash for confirmation
-                const latestBlockhash = await connection.getLatestBlockhash();
+                const latestBlockhash = await connection.getLatestBlockhash({ commitment: 'confirmed' });
                 
                 // Confirm the transaction with timeout and retry
                 console.log('Confirming transaction...');
