@@ -15,6 +15,7 @@ import {
   DialogFooter
 } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
+import { connection } from "../utils/connection";
 
 interface ProgramDeployerProps {
   projectId: string;
@@ -85,7 +86,7 @@ export function ProgramDeployer({
     taskLogs.setIsVisible(true);
     
     try {
-      const connection = new Connection('https://api.devnet.solana.com', 'confirmed');
+      // const connection = new Connection('https://api.devnet.solana.com', 'confirmed');
       
       const { programId, signatures } = await deployUpgradeableProgram({
         soBytes: programBytes,

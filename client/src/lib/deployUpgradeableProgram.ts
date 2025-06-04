@@ -280,6 +280,9 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
           'confirmed'
         );
         signatures.push(sig);
+        
+        // Throttle to stay under Helius rate limits (5 TPS)
+        await new Promise(r => setTimeout(r, 350)); // 1000 ms / 3 tx ≈ 333 ms
       }
       
       // advance only after successful send

@@ -25,6 +25,7 @@ import {
   createSetAuthorityInstructionData,
 } from './instructionData';
 import { checkBufferAuthority } from './checkBufferAuth';
+import { connection } from "../connection";
 
 export async function deployUpgradeableProgram(
   connection: Connection,
@@ -281,8 +282,8 @@ export const handleDeployProgram = async (
   
   // Verify explicitly that we're connected to devnet with a fresh connection
   try {
-    const connection = new Connection('https://api.devnet.solana.com', 'confirmed');
-    console.log('Verifying devnet connection with fresh connection object...');
+    // const connection = new Connection('https://api.devnet.solana.com', 'confirmed');
+    console.log('Verifying devnet connection with shared connection...');
     
     // Get recent blockhash to verify connection
     const { blockhash } = await connection.getLatestBlockhash();
@@ -312,8 +313,7 @@ export const handleDeployProgram = async (
 
     
 
-    const connection = new Connection('https://tiniest-smart-putty.solana-devnet.quiknode.pro/31fdf5493679b4c1c854289d95c822094900efc2/', 'confirmed');
-    console.log('connection', connection);
+    console.log('Using shared connection');
 
     // Double-check wallet is still connected before proceeding with lengthy build
     if (!walletPublicKey) {
