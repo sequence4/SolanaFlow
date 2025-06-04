@@ -231,9 +231,11 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
     for (let start = 0; start < writeTxs.length; start += MAX_BATCH) {
       const slice = writeTxs.slice(start, start + MAX_BATCH);
 
-      // fresh hash for this batch, to avoid expiry if user lingers
+      // IMPORTANT:
+      //   ask for the *freshest* hash – use "processed" commitment.
+      //   (default "finalized" can already be tens of seconds old ⇒ expires)
       const { blockhash: batchHash, lastValidBlockHeight: lvh } =
-            await connection.getLatestBlockhash();
+            await connection.getLatestBlockhash('processed');
       for (const tx of slice) {
         tx.recentBlockhash = batchHash;
         // re-sign deployTx now that it has its final hash
@@ -242,12 +244,22 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
         }
       }
 
-      // deployTx is signed with programKey inside the loop above
-      const signed = await wallet.signAllTransactions(slice);
+      // Phantom sometimes shows the second prompt for a while.
+      // ↓ If the user is slow **and** the hash expires, we refetch and retry.
+      let signed: Transaction[];
+      try {
+        signed = await wallet.signAllTransactions(slice);
+      } catch (e) {
+        // very unlikely to throw here, but keep the code symmetric
+        throw e;
+      }
 
       console.log(`[DEPLOY] Sending batch ${++batchIndex} (${signed.length} txs)…`);
 
       for (const tx of signed) {
+        // skipPreflight=false by default; but if this line still ever throws
+        // "blockhash not found", try `skipPreflight:true` while debugging.
+        // const sig = await connection.sendRawTransaction(tx.serialize(), { skipPreflight:true });
         const sig = await connection.sendRawTransaction(tx.serialize());
         await connection.confirmTransaction(
           { signature: sig, blockhash: batchHash, lastValidBlockHeight: lvh },
