@@ -29,7 +29,14 @@ export function useWalletSigner() {
       const signedTransaction = await wallet.signTransaction(transaction);
       
       // Send the signed transaction
-      const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+      const signature = await connection.sendRawTransaction(
+        signedTransaction.serialize(),
+        {
+          skipPreflight: false,
+          /** MUST match the commitment used for getLatestBlockhash */
+          preflightCommitment: 'processed',
+        }
+      );
       
       // Return the transaction signature
       return signature;

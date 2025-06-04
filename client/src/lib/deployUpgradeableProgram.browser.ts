@@ -168,7 +168,14 @@ export async function deployUpgradeableProgram(
     // Sign with wallet + bufferKey
     createBufferTx.partialSign(bufferKey);
     const signedCreateBufferTx = await wallet.signTransaction(createBufferTx);
-    const createBufferSig = await connection.sendRawTransaction(signedCreateBufferTx.serialize());
+    const createBufferSig = await connection.sendRawTransaction(
+      signedCreateBufferTx.serialize(),
+      {
+        skipPreflight: false,
+        /** MUST match the commitment used for getLatestBlockhash */
+        preflightCommitment: 'processed',
+      }
+    );
     signatures.push(createBufferSig);
     
     // Wait for confirmation
@@ -302,10 +309,18 @@ export async function deployUpgradeableProgram(
         // "blockhash not found", try `skipPreflight:true` while debugging.
         // const sig = await connection.sendRawTransaction(tx.serialize(), { skipPreflight:true });
         await throttle();
-        const sig = await connection.sendRawTransaction(tx.serialize());
+        const sig = await connection.sendRawTransaction(
+          tx.serialize(),
+          {
+            skipPreflight: false,
+            /** MUST match the commitment used for getLatestBlockhash */
+            preflightCommitment: 'processed',
+          },
+        );
         await connection.confirmTransaction(
           { signature: sig, blockhash: batchHash, lastValidBlockHeight: lvh },
-          'confirmed'
+          /** You may keep 'confirmed' here – it's fine to wait for a stricter level. */
+          'confirmed',
         );
         signatures.push(sig);
         

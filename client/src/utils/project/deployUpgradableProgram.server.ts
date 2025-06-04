@@ -158,6 +158,8 @@ export async function deployUpgradeableProgram(
 
         const txSig = await connection.sendRawTransaction(writeTx.serialize(), {
           skipPreflight: false,
+          /** MUST match the commitment used for getLatestBlockhash */
+          preflightCommitment: 'processed',
         });
 
         await connection.confirmTransaction(
