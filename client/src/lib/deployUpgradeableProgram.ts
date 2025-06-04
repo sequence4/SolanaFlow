@@ -10,6 +10,7 @@ import {
   SYSVAR_CLOCK_PUBKEY,
 } from "@solana/web3.js";
 import { WalletContextState } from "@solana/wallet-adapter-react";
+import { rpcWithRetry } from "./rpcRetry";
 
 // Helper function for little-endian u32 encoding
 function leU32(n: number): Buffer {
@@ -132,7 +133,9 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
       .add(initBufIx);      // initialise buffer, authority = wallet
     
     createBufferTx.feePayer = wallet.publicKey;
-    const { blockhash } = await connection.getLatestBlockhash();
+    const { value: { blockhash } } =
+      await rpcWithRetry<{ value: { blockhash: string } }>(connection, "getLatestBlockhash",
+        [{ commitment: "processed" }], "processed");
     createBufferTx.recentBlockhash = blockhash;
     
     // Sign with wallet + bufferKey
@@ -218,7 +221,6 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
       .add(deployIx);
     
     deployTx.feePayer = wallet.publicKey!;
-    // (no recentBlockhash yet)
     
     writeTxs.push(deployTx);   // after the loop, before signAllTransactions
     
@@ -234,8 +236,13 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
       // IMPORTANT:
       //   ask for the *freshest* hash – use "processed" commitment.
       //   (default "finalized" can already be tens of seconds old ⇒ expires)
-      const { blockhash: batchHash, lastValidBlockHeight: lvh } =
-            await connection.getLatestBlockhash('processed');
+      const { value: { blockhash: batchHash, lastValidBlockHeight: lvh } } =
+        await rpcWithRetry<{ value: { blockhash: string; lastValidBlockHeight: number } }>(
+          connection, 
+          "getLatestBlockhash",
+          [{ commitment: "processed" }], 
+          "processed"
+        );
             
       if (batchIndex === 0) {
         // Wait half a second so the new hash is visible to the pre-flight bank.
@@ -262,14 +269,6 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
       }
 
       console.log(`[DEPLOY] Sending batch ${++batchIndex} (${signed.length} txs)…`);
-
-      // Check if blockhash is still valid before sending
-      const isValid = await connection.isBlockhashValid(batchHash, { commitment: 'processed' });
-      if (!isValid.value) {
-        console.log('[DEPLOY] Blockhash expired during signing, retrying batch with fresh hash...');
-        // hash expired, retry same slice with fresh hash
-        continue;
-      }
 
       for (const tx of signed) {
         // skipPreflight=false by default; but if this line still ever throws
