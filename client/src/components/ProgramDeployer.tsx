@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Connection, PublicKey } from '@solana/web3.js';
+import { PublicKey } from '@solana/web3.js';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { toast } from 'sonner';
 import { downloadArtifact } from '@/api/projectArtifact';
@@ -15,7 +15,7 @@ import {
   DialogFooter
 } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
-import { connection } from "../utils/connection";
+import { connection } from "@/utils/connection";
 
 interface ProgramDeployerProps {
   projectId: string;

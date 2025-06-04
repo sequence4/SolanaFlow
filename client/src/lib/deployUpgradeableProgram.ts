@@ -9,6 +9,7 @@ import {
   SYSVAR_RENT_PUBKEY,
   SYSVAR_CLOCK_PUBKEY,
 } from "@solana/web3.js";
+import { connection as devnetConnection } from "../utils/connection";
 import { WalletContextState } from "@solana/wallet-adapter-react";
 import { rpcWithRetry } from "./rpcRetry";
 
@@ -30,7 +31,7 @@ const BPF_UPGRADE_LOADER_ID = new PublicKey("BPFLoaderUpgradeab1e111111111111111
 const CHUNK_SIZE = 900; // Standard chunk size for Solana BPF loader
 const HEADER_LEN = 40;  // 4 (tag) + 4 (discr) + 32 (pubkey)
 // Phantom (and most wallets) will not sign more than ~64 txs in one call
-const MAX_BATCH = 60;          // stay comfortably under the cap
+const MAX_BATCH = 30;   // Stay under Helius rate limit (5 TPS) while minimizing wallet prompts
 
 type DeployProgress = {
   stage: 'create' | 'write' | 'deploy' | 'complete';
@@ -42,7 +43,8 @@ type DeployProgress = {
 
 type DeployOptions = {
   soBytes: ArrayBuffer;
-  connection: Connection;
+  /** optional – defaults to shared dev-net connection */
+  connection?: Connection;
   wallet: WalletContextState;
   programId?: PublicKey;
   onProgress?: (progress: DeployProgress) => void;
@@ -60,8 +62,17 @@ type DeployResult = {
  * 2. Write program data in chunks
  * 3. Deploy program from buffer
  */
-export async function deployUpgradeableProgram(options: DeployOptions): Promise<DeployResult> {
-  const { soBytes, connection, wallet, onProgress, programId: userProvidedProgramId } = options;
+export async function deployUpgradeableProgram(
+  options: DeployOptions,
+): Promise<DeployResult> {
+  // fall back to the shared Helius connection if caller omitted one
+  const {
+    soBytes,
+    connection = devnetConnection,
+    wallet,
+    onProgress,
+    programId: userProvidedProgramId,
+  } = options;
   
   if (!wallet.publicKey || !wallet.signTransaction) {
     throw new Error("Wallet not connected or doesn't support signing");
