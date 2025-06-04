@@ -34,7 +34,7 @@ export function useWalletSigner() {
         {
           skipPreflight: false,
           /** MUST match the commitment used for getLatestBlockhash */
-          preflightCommitment: 'processed',
+          preflightCommitment: 'confirmed',
         }
       );
       

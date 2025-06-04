@@ -11,8 +11,8 @@ if (!RPC_URL) throw new Error("❌  NEXT_PUBLIC_SOLANA_RPC is missing");
 
 /**  
  * Milliseconds to wait between tx sends so we stay < 5 TPS  
- * 1000 / (1000 / RATE_LIMIT_MS) ≈ 2.8 TPS – plenty of head-room.
+ * 1000 / (1000 / RATE_LIMIT_MS) ≈ 4.5 TPS – keeps Helius happy
  */
-export const RATE_LIMIT_MS = 350;
+export const RATE_LIMIT_MS = 220;
 
 export const connection = new Connection(RPC_URL, "confirmed"); 

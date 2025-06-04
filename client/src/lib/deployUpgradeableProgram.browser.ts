@@ -36,7 +36,7 @@ const BPF_UPGRADE_LOADER_ID = new PublicKey("BPFLoaderUpgradeab1e111111111111111
 const CHUNK_SIZE = 900; // Standard chunk size for Solana BPF loader
 const HEADER_LEN = 40;  // 4 (tag) + 4 (discr) + 32 (pubkey)
 // Phantom (current versions) cap signAllTransactions at ~100 TXs; stay well below.
-const MAX_BATCH = 30;  // 30 keeps us <5 TPS with RATE_LIMIT_MS back-pressure
+const MAX_BATCH = 12;  // 12×900 B ≃ 10 KB – sim & preflight finish < 20 s
 
 type DeployProgress = {
   stage: 'create' | 'write' | 'deploy' | 'complete';
@@ -162,7 +162,7 @@ export async function deployUpgradeableProgram(
     createBufferTx.feePayer = wallet.publicKey;
     const { value: { blockhash, lastValidBlockHeight: lvh } } =
       await rpcWithRetry<{ value: { blockhash: string; lastValidBlockHeight: number } }>(connection, "getLatestBlockhash",
-        [{ commitment: "processed" }], "processed");
+        [{ commitment: "confirmed" }], "confirmed");
     createBufferTx.recentBlockhash = blockhash;
     
     // Sign with wallet + bufferKey
@@ -173,7 +173,7 @@ export async function deployUpgradeableProgram(
       {
         skipPreflight: false,
         /** MUST match the commitment used for getLatestBlockhash */
-        preflightCommitment: 'processed',
+        preflightCommitment: 'confirmed',
       }
     );
     signatures.push(createBufferSig);
@@ -185,7 +185,7 @@ export async function deployUpgradeableProgram(
         blockhash, 
         lastValidBlockHeight: lvh 
       },
-      'processed'  // match the commitment used for the hash
+      'confirmed'  // match the commitment used for the hash
     );
     console.log(`[DEPLOY] Buffer created successfully. Signature: ${createBufferSig}`);
     
@@ -275,14 +275,14 @@ export async function deployUpgradeableProgram(
       const slice = writeTxs.slice(start, start + MAX_BATCH);
 
       // IMPORTANT:
-      //   ask for the *freshest* hash – use "processed" commitment.
+      //   ask for the *freshest* hash – use "confirmed" commitment.
       //   (default "finalized" can already be tens of seconds old ⇒ expires)
       const { value: { blockhash: batchHash, lastValidBlockHeight: lvh } } =
         await rpcWithRetry<{ value: { blockhash: string; lastValidBlockHeight: number } }>(
           connection, 
           "getLatestBlockhash",
-          [{ commitment: "processed" }], 
-          "processed"
+          [{ commitment: "confirmed" }], 
+          "confirmed"
         );
             
       if (batchIndex === 0) {
@@ -309,6 +309,8 @@ export async function deployUpgradeableProgram(
         throw e;
       }
 
+      await yieldToBrowser(300);   // 0.3 s – prevents "blockhash not found" on first tx
+
       console.log(`[DEPLOY] Sending batch ${++batchIndex} (${signed.length} txs)…`);
 
       for (const tx of signed) {
@@ -321,13 +323,13 @@ export async function deployUpgradeableProgram(
           {
             skipPreflight: false,
             /** MUST match the commitment used for getLatestBlockhash */
-            preflightCommitment: 'processed',
+            preflightCommitment: 'confirmed',
           },
         );
         await connection.confirmTransaction(
           { signature: sig, blockhash: batchHash, lastValidBlockHeight: lvh },
           /** You may keep 'confirmed' here – it's fine to wait for a stricter level. */
-          'processed',
+          'confirmed',
         );
         signatures.push(sig);
         

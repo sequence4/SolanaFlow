@@ -159,7 +159,7 @@ export async function deployUpgradeableProgramServer(
         const txSig = await connection.sendRawTransaction(writeTx.serialize(), {
           skipPreflight: false,
           /** MUST match the commitment used for getLatestBlockhash */
-          preflightCommitment: 'processed',
+          preflightCommitment: 'confirmed',
         });
 
         await connection.confirmTransaction(
@@ -168,7 +168,7 @@ export async function deployUpgradeableProgramServer(
             blockhash,
             lastValidBlockHeight,
           },
-          'processed'
+          'confirmed'
         );
 
         console.log(`Chunk at offset ${offset} written. Tx sig: ${txSig}`);
@@ -514,7 +514,7 @@ export const handleDeployProgram = async (
                     signature,
                     blockhash: latestBlockhash.blockhash,
                     lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
-                  }, 'processed');
+                  }, 'confirmed');
                   console.log(`Transaction confirmed. Ephemeral successfully funded with additional ${additionalFundsNeeded / LAMPORTS_PER_SOL} SOL`);
                 } catch (confirmError: any) {
                   console.error('Transaction confirmation error:', confirmError);

@@ -18,8 +18,8 @@ export async function debugAndSendTransaction(
     }>(
       connection, 
       "getLatestBlockhash", 
-      [{ commitment: "processed" }], 
-      "processed"
+      [{ commitment: "confirmed" }], 
+      "confirmed"
     );
 
     const messageV0 = new TransactionMessage({
@@ -62,7 +62,7 @@ export async function debugAndSendTransaction(
       connection, 
       { 
         signers, 
-        preflightCommitment: 'processed' 
+        preflightCommitment: 'confirmed' 
       }
     );
     console.log('Signature:', signature);
@@ -73,8 +73,8 @@ export async function debugAndSendTransaction(
     }>(
       connection, 
       "getLatestBlockhash", 
-      [{ commitment: "processed" }], 
-      "processed"
+      [{ commitment: "confirmed" }], 
+      "confirmed"
     );
     
     await connection.confirmTransaction(
@@ -83,7 +83,7 @@ export async function debugAndSendTransaction(
         lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
         signature,
         },
-        'processed'
+        'confirmed'
     );
 
   return signature;

@@ -12,7 +12,7 @@ export async function rpcWithRetry<T = unknown>(
   conn: Connection,
   method: string,
   params: unknown[] = [],
-  commitment: Commitment = "processed",
+  commitment: Commitment = "confirmed",
 ): Promise<T> {
   for (let attempt = 0; attempt <= MAX_RETRY; attempt++) {
     try {

@@ -13,10 +13,6 @@ export function useSignAndSendTx() {
       throw new Error('Wallet not connected');
     }
 
-    //const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
-    //const connection = new Connection('http://127.0.0.1:8899', 'confirmed');
-    //const connection = new Connection('https://tiniest-smart-putty.solana-devnet.quiknode.pro/31fdf5493679b4c1c854289d95c822094900efc2/', 'confirmed');
-
     const signature = await debugAndSendTransaction(tx, connection, sendTransaction, undefined, publicKey);
 
     const latestBlockhash = await connection.getLatestBlockhash();
@@ -26,7 +22,7 @@ export function useSignAndSendTx() {
         lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
         signature,
       },
-      'processed'
+      'confirmed'
     );
 
     return signature;
