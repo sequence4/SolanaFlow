@@ -153,6 +153,8 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
     const writeTxs: Transaction[] = [];
     
     for (let chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
+      // offset is from start of the payload area (after the 40-byte header)
+      // this is correct for BPF loader which interprets offset from data start
       const offset = chunkIndex * CHUNK_SIZE;
       const chunkEnd = Math.min((chunkIndex + 1) * CHUNK_SIZE, dataLength);
       const chunkSize = chunkEnd - chunkIndex * CHUNK_SIZE;
@@ -168,6 +170,7 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
       
       console.log(`[DEPLOY] Writing chunk ${chunkIndex + 1}/${numChunks}, offset: ${offset}, size: ${chunkSize} bytes`);
       
+      // Loader instruction tag 1 = Write
       const writeIx = new TransactionInstruction({
         programId: BPF_UPGRADE_LOADER_ID,
         keys: [
@@ -205,7 +208,7 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
         { pubkey: wallet.publicKey!,        isSigner: true,  isWritable: false },
       ],
       data: Buffer.concat([
-        leU32(2),                       // DeployWithMaxDataLen
+        leU32(2),                       // Loader instruction tag 2 = DeployWithMaxDataLen
         Buffer.from(new Uint32Array([bufferSpace]).buffer),
       ]),
     });
