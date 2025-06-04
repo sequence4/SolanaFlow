@@ -237,9 +237,11 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
       const { blockhash: batchHash, lastValidBlockHeight: lvh } =
             await connection.getLatestBlockhash('processed');
             
-      // Wait half a second so the new hash is visible to the pre-flight bank.
-      // This avoids "Blockhash not found" on the first tx of the batch.
-      await new Promise(res => setTimeout(res, 600));
+      if (batchIndex === 0) {
+        // Wait half a second so the new hash is visible to the pre-flight bank.
+        // This avoids "Blockhash not found" on the first tx of the batch.
+        await new Promise(res => setTimeout(res, 600));
+      }
       
       for (const tx of slice) {
         tx.recentBlockhash = batchHash;
@@ -260,6 +262,16 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
       }
 
       console.log(`[DEPLOY] Sending batch ${++batchIndex} (${signed.length} txs)…`);
+
+      // Check if blockhash is still valid before sending
+      const isValid = await connection.isBlockhashValid(batchHash, { commitment: 'processed' });
+      if (!isValid.value) {
+        console.log('[DEPLOY] Blockhash expired during signing, retrying batch with fresh hash...');
+        // Decrement to retry this batch
+        batchIndex--;
+        start -= MAX_BATCH;
+        continue;
+      }
 
       for (const tx of signed) {
         // skipPreflight=false by default; but if this line still ever throws
