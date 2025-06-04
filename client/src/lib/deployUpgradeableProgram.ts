@@ -228,7 +228,7 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
     }
 
     let batchIndex = 0;
-    for (let start = 0; start < writeTxs.length; start += MAX_BATCH) {
+    for (let start = 0; start < writeTxs.length; ) {
       const slice = writeTxs.slice(start, start + MAX_BATCH);
 
       // IMPORTANT:
@@ -267,9 +267,7 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
       const isValid = await connection.isBlockhashValid(batchHash, { commitment: 'processed' });
       if (!isValid.value) {
         console.log('[DEPLOY] Blockhash expired during signing, retrying batch with fresh hash...');
-        // Decrement to retry this batch
-        batchIndex--;
-        start -= MAX_BATCH;
+        // hash expired, retry same slice with fresh hash
         continue;
       }
 
@@ -284,6 +282,9 @@ export async function deployUpgradeableProgram(options: DeployOptions): Promise<
         );
         signatures.push(sig);
       }
+      
+      // advance only after successful send
+      start += MAX_BATCH;
     }
     console.log('[DEPLOY] All write chunks and deploy signed & confirmed');
     
