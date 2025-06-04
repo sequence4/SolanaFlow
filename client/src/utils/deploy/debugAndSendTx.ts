@@ -1,6 +1,6 @@
 import { Connection, PublicKey, Transaction, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
 import { Keypair } from '@solana/web3.js';
-import { rpcWithRetry } from "@/lib/rpcRetry";
+import { rpcWithRetry } from "@/utils/rpcRetry";
 
 export async function debugAndSendTransaction(
     tx: Transaction,
@@ -20,7 +20,9 @@ export async function debugAndSendTransaction(
     );
 
     const messageV0 = new TransactionMessage({
-        payerKey: walletPublicKey || new PublicKey(''),
+        payerKey: walletPublicKey ?? (() => { 
+          throw new Error('walletPublicKey missing when building VersionedTx'); 
+        })(),
         recentBlockhash: blockhashInfo.blockhash,
         instructions: tx.instructions,
       }).compileToV0Message();

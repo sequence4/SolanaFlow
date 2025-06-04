@@ -27,7 +27,7 @@ import {
 import { checkBufferAuthority } from './checkBufferAuth';
 import { connection } from "@/utils/connection";
 
-export async function deployUpgradeableProgramServer(
+export async function deployUpgradeableProgram(
   connection: Connection,
   phantomPublicKey: PublicKey,
   signAndSendTransaction: (tx: Transaction, signers?: Keypair[]) => Promise<string>,
@@ -903,7 +903,7 @@ export const handleDeployProgram = async (
             return;
           }
         } else {
-          const programKey = await deployUpgradeableProgramServer(
+          const programKey = await deployUpgradeableProgram(
             connection,
             walletPublicKey,
             signAndSendTransaction,
@@ -949,3 +949,6 @@ export const handleDeployProgram = async (
     });
   }
 };
+
+// Export types for consumers
+export type { PublicKey };

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { PublicKey } from '@solana/web3.js';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { toast } from 'sonner';
 import { downloadArtifact } from '@/api/projectArtifact';
-import { deployUpgradeableProgram } from '@/lib/deployUpgradeableProgram';
+import { deployUpgradeableProgram } from '@/lib/deployUpgradeableProgram.browser';
 import { Button } from '@/components/ui/button';
 import { Rocket, AlertTriangle, Info } from 'lucide-react';
 import {

@@ -1,3 +1,7 @@
+/**
+ * BROWSER-side deployer (uses WalletAdapter + signAllTransactions).
+ * Server-side deployer lives in "@/utils/project/deployUpgradableProgram.server".
+ */
 import {
   Connection,
   PublicKey,
@@ -11,7 +15,8 @@ import {
 } from "@solana/web3.js";
 import { connection as devnetConnection, RATE_LIMIT_MS } from "@/utils/connection";
 import { WalletContextState } from "@solana/wallet-adapter-react";
-import { rpcWithRetry } from "./rpcRetry";
+import { rpcWithRetry } from "@/utils/rpcRetry";
+import { throttle } from "@/utils/rateLimiter";
 
 // Helper function for little-endian u32 encoding
 function leU32(n: number): Buffer {
@@ -30,8 +35,8 @@ function leU64(n: bigint): Buffer {
 const BPF_UPGRADE_LOADER_ID = new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111");
 const CHUNK_SIZE = 900; // Standard chunk size for Solana BPF loader
 const HEADER_LEN = 40;  // 4 (tag) + 4 (discr) + 32 (pubkey)
-// Phantom (and most wallets) will not sign more than ~64 txs in one call
-const MAX_BATCH = 30;   // Stay under Helius rate limit (5 TPS) while minimizing wallet prompts
+// Phantom (current versions) cap signAllTransactions at ~100 TXs; stay well below.
+const MAX_BATCH = 30;  // 30 keeps us <5 TPS with RATE_LIMIT_MS back-pressure
 
 type DeployProgress = {
   stage: 'create' | 'write' | 'deploy' | 'complete';
@@ -296,6 +301,7 @@ export async function deployUpgradeableProgram(
         // skipPreflight=false by default; but if this line still ever throws
         // "blockhash not found", try `skipPreflight:true` while debugging.
         // const sig = await connection.sendRawTransaction(tx.serialize(), { skipPreflight:true });
+        await throttle();
         const sig = await connection.sendRawTransaction(tx.serialize());
         await connection.confirmTransaction(
           { signature: sig, blockhash: batchHash, lastValidBlockHeight: lvh },
