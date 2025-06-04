@@ -22,6 +22,10 @@ export async function debugAndSendTransaction(
       "confirmed"
     );
 
+    // Set transaction blockhash to ensure we simulate exactly what we'll send
+    tx.recentBlockhash = blockhashInfo.blockhash;
+    tx.lastValidBlockHeight = blockhashInfo.lastValidBlockHeight;
+
     const messageV0 = new TransactionMessage({
         payerKey: walletPublicKey ?? (() => { 
           throw new Error('walletPublicKey missing when building VersionedTx'); 

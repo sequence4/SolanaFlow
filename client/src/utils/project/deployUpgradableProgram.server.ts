@@ -19,6 +19,9 @@ import {
 } from '@solana/web3.js';
 import { 
   BPF_UPGRADE_LOADER_ID,
+  BPF_LOADER_CHUNK_SIZE
+} from "@/utils/constants";
+import {
   createInitializeBufferData, 
   createDeployInstructionData, 
   createWriteBufferInstructionData,
@@ -129,7 +132,7 @@ export async function deployUpgradeableProgramServer(
     currentBufferAuthority = ephemeralKeypair.publicKey;
   }
 
-  const CHUNK_SIZE = 700;
+  const CHUNK_SIZE = BPF_LOADER_CHUNK_SIZE;
   let offset = 0;
 
   while (offset < programData.length) {
@@ -370,7 +373,7 @@ export const handleDeployProgram = async (
             console.log('Fetched ephemeral pubkey:', ephemeralPubkey.toBase58());
 
             // Reference the same chunk size used in deployUpgradeableProgram
-            const CHUNK_SIZE = 700; // Must match the chunk size used during deployment
+            const CHUNK_SIZE = BPF_LOADER_CHUNK_SIZE; // Must match the chunk size used during deployment
             
             // Calculate buffer rent (for the buffer account holding the program)
             const bufferSpace = 37 + programData.length;

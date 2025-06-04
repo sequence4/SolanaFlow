@@ -17,6 +17,11 @@ import { connection as devnetConnection, RATE_LIMIT_MS } from "@/utils/connectio
 import { WalletContextState } from "@solana/wallet-adapter-react";
 import { rpcWithRetry } from "@/utils/rpcRetry";
 import { throttle } from "@/utils/rateLimiter";
+import { 
+  BPF_LOADER_CHUNK_SIZE, 
+  BPF_UPGRADE_LOADER_ID,
+  BPF_BUFFER_HEADER_LEN 
+} from "@/utils/constants";
 
 // Helper function for little-endian u32 encoding
 function leU32(n: number): Buffer {
@@ -32,9 +37,8 @@ function leU64(n: bigint): Buffer {
   return buf;
 }
 
-const BPF_UPGRADE_LOADER_ID = new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111");
-const CHUNK_SIZE = 900; // Standard chunk size for Solana BPF loader
-const HEADER_LEN = 40;  // 4 (tag) + 4 (discr) + 32 (pubkey)
+const CHUNK_SIZE = BPF_LOADER_CHUNK_SIZE;
+const HEADER_LEN = BPF_BUFFER_HEADER_LEN;
 // Phantom (current versions) cap signAllTransactions at ~100 TXs; stay well below.
 const MAX_BATCH = 12;  // 12×900 B ≃ 10 KB – sim & preflight finish < 20 s
 // Phantom UI stays reliable below 100 tx; use a safe margin.
@@ -55,6 +59,8 @@ type DeployOptions = {
   wallet: WalletContextState;
   programId?: PublicKey;
   onProgress?: (progress: DeployProgress) => void;
+  /** Use an older blockhash for extremely slow networks (gives ~105 blocks validity) */
+  useSafeHash?: boolean;
 };
 
 type DeployResult = {
@@ -116,11 +122,15 @@ export async function deployUpgradeableProgram(
     wallet,
     onProgress,
     programId: userProvidedProgramId,
+    useSafeHash,
   } = options;
   
   if (!wallet.publicKey || !wallet.signTransaction) {
     throw new Error("Wallet not connected or doesn't support signing");
   }
+  
+  // Cache the payer's public key to avoid repeated null checks
+  const payer = wallet.publicKey;
   
   // Convert ArrayBuffer to Uint8Array for processing
   const programData = new Uint8Array(soBytes);
@@ -152,7 +162,7 @@ export async function deployUpgradeableProgram(
   try {
     // 2. (a) Allocate the buffer with SystemProgram
     const createBufAcct = SystemProgram.createAccount({
-      fromPubkey: wallet.publicKey!,
+      fromPubkey: payer,
       newAccountPubkey: bufferKey.publicKey,
       lamports,
       space: bufferSpace,
@@ -164,17 +174,17 @@ export async function deployUpgradeableProgram(
       programId: BPF_UPGRADE_LOADER_ID,
       keys: [
         { pubkey: bufferKey.publicKey, isSigner: false, isWritable: true },
-        { pubkey: wallet.publicKey!,  isSigner: true,  isWritable: false },
+        { pubkey: payer,  isSigner: true,  isWritable: false },
       ],
       data: Buffer.concat([
         leU32(0),                     // tag = InitializeBuffer
         leU32(1),                     // COption::Some discriminant
-        wallet.publicKey!.toBuffer(), // 32-byte authority pubkey
+        payer.toBuffer(), // 32-byte authority pubkey
       ]),
     });
     
     const createProgAcct = SystemProgram.createAccount({
-      fromPubkey: wallet.publicKey!,
+      fromPubkey: payer,
       newAccountPubkey: programKey.publicKey,
       lamports: progLamports,
       space: 0,                       // program acct stores only a pointer
@@ -187,7 +197,7 @@ export async function deployUpgradeableProgram(
       .add(createBufAcct)   // create account
       .add(initBufIx);      // initialise buffer, authority = wallet
     
-    createBufferTx.feePayer = wallet.publicKey;
+    createBufferTx.feePayer = payer;
     const { value: { blockhash, lastValidBlockHeight: lvh } } =
       await rpcWithRetry<{ value: { blockhash: string; lastValidBlockHeight: number } }>(connection, "getLatestBlockhash",
         [{ commitment: "confirmed" }], "confirmed");
@@ -247,7 +257,7 @@ export async function deployUpgradeableProgram(
         programId: BPF_UPGRADE_LOADER_ID,
         keys: [
           { pubkey: bufferKey.publicKey, isSigner: false, isWritable: true },
-          { pubkey: wallet.publicKey!,   isSigner: true,  isWritable: false },
+          { pubkey: payer,   isSigner: true,  isWritable: false },
         ],
         data: Buffer.concat([
           leU32(1),                         // tag = Write
@@ -258,7 +268,7 @@ export async function deployUpgradeableProgram(
       });
       
       const writeTx = new Transaction().add(writeIx);
-      writeTx.feePayer = wallet.publicKey!;
+      writeTx.feePayer = payer;
       writeTxs.push(writeTx);
       
       if (chunkIndex % 20 === 0) {
@@ -270,14 +280,14 @@ export async function deployUpgradeableProgram(
     const deployIx = new TransactionInstruction({
       programId: BPF_UPGRADE_LOADER_ID,
       keys: [
-        { pubkey: wallet.publicKey!,        isSigner: true,  isWritable: true },
+        { pubkey: payer,        isSigner: true,  isWritable: true },
         { pubkey: programDataPubkey,        isSigner: false, isWritable: true },
         { pubkey: programKey.publicKey,     isSigner: true,  isWritable: true },
         { pubkey: bufferKey.publicKey,      isSigner: false, isWritable: true },
         { pubkey: SYSVAR_RENT_PUBKEY,       isSigner: false, isWritable: false },
         { pubkey: SYSVAR_CLOCK_PUBKEY,      isSigner: false, isWritable: false },
         { pubkey: SystemProgram.programId,  isSigner: false, isWritable: false },
-        { pubkey: wallet.publicKey!,        isSigner: true,  isWritable: false },
+        { pubkey: payer,        isSigner: true,  isWritable: false },
       ],
       data: Buffer.concat([
         leU32(2),                       // Loader instruction tag 2 = DeployWithMaxDataLen
@@ -289,7 +299,7 @@ export async function deployUpgradeableProgram(
       .add(createProgAcct)   // program account
       .add(deployIx);
     
-    deployTx.feePayer = wallet.publicKey!;
+    deployTx.feePayer = payer;
     
     writeTxs.push(deployTx);   // after the loop, before signAllTransactions
     
@@ -307,11 +317,22 @@ export async function deployUpgradeableProgram(
     let batchIndex = 0;
     for (const group of groups) {
       // ── 2. attach ONE fresh hash to the whole group ──────────────────────────
-      // For very slow networks, you can replace this with getSafeHash(connection)
-      // to get a hash with ~105 blocks of validity remaining
-      const { value: { blockhash: grpHash, lastValidBlockHeight: lvh } } =
-        await rpcWithRetry<{ value: { blockhash: string; lastValidBlockHeight: number } }>(
-          connection, "getLatestBlockhash", [{ commitment: "confirmed" }], "confirmed");
+      let grpHash: string;
+      let lvh: number;
+
+      if (useSafeHash) {
+        // Use a hash that's already ~45 blocks old for extra validity time
+        const safeHashInfo = await getSafeHash(connection);
+        grpHash = safeHashInfo.blockhash;
+        lvh = safeHashInfo.lastValidBlockHeight;
+      } else {
+        // Use the latest hash with standard validity
+        const { value: { blockhash, lastValidBlockHeight } } =
+          await rpcWithRetry<{ value: { blockhash: string; lastValidBlockHeight: number } }>(
+            connection, "getLatestBlockhash", [{ commitment: "confirmed" }], "confirmed");
+        grpHash = blockhash;
+        lvh = lastValidBlockHeight;
+      }
 
       for (const tx of group) {
         tx.recentBlockhash = grpHash;
@@ -336,20 +357,30 @@ export async function deployUpgradeableProgram(
 
         // 1️⃣ fire them all asap ----------------------------------------------
         const sigs: string[] = [];
-        const startTime = performance.now();
-        await Promise.all(burst.map(async (tx) => {
-          await throttle();                       // 4–5 TPS guard
-          const sig = await connection.sendRawTransaction(
-            tx.serialize(), { skipPreflight: false, preflightCommitment: 'confirmed' });
+        const startTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        
+        // Sequential send with throttling to respect rate limits
+        const sendOpts = { skipPreflight: false, preflightCommitment: 'confirmed' as const };
+        for (const tx of burst) {
+          await throttle();  // 220 ms guard, called sequentially
+          const sig = await connection.sendRawTransaction(tx.serialize(), sendOpts);
           sigs.push(sig);
-        }));
+        }
 
         // 2️⃣ confirm the whole burst in parallel ------------------------------
         await connection.confirmTransaction(
           { signature: sigs[sigs.length - 1], blockhash: grpHash, lastValidBlockHeight: lvh },
           'confirmed'
         );
-        const elapsedTime = ((performance.now() - startTime) / 1000).toFixed(1);
+        
+        // Verify all signatures were successful, not just the last one
+        const statusResp = await connection.getSignatureStatuses(sigs);
+        statusResp.value.forEach((st, idx) => {
+          if (st && st.err) throw new Error(`TX ${i + idx} failed: ${JSON.stringify(st.err)}`);
+        });
+        
+        const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        const elapsedTime = ((now - startTime) / 1000).toFixed(1);
         console.log(`[DEPLOY] Burst ${burstIndex}/${totalBursts} confirmed in ${elapsedTime} s`);
         
         // the other 11 sigs will be at the same or later slot, so they're auto-confirmed
