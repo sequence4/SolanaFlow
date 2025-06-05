@@ -13,6 +13,7 @@ import {
   SYSVAR_RENT_PUBKEY,
   SYSVAR_CLOCK_PUBKEY,
   ComputeBudgetProgram,
+  NonceAccount,
 } from "@solana/web3.js";
 import { connection as devnetConnection, RATE_LIMIT_MS } from "@/utils/connection";
 import { WalletContextState } from "@solana/wallet-adapter-react";
@@ -24,6 +25,8 @@ import {
   BPF_BUFFER_HEADER_LEN 
 } from "@/utils/constants";
 import type { SendOptions } from '@solana/web3.js';
+// durable nonce account (injected from shared connection util)
+import { NONCE_PUBKEY } from "@/utils/connection";
 
 // ── batching tuned to Solana Playground ──────────────────────────
 // Break into smaller groups to avoid blockhash expiry
@@ -78,6 +81,36 @@ async function yieldToBrowser(ms?: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
   return new Promise(resolve => requestAnimationFrame(() => resolve()));
+}
+
+/**
+ * Stamps a durable nonce onto `tx` and prepends the obligatory
+ * `AdvanceNonceAccount` instruction.  Wallet (payer) MUST be the nonce
+ * authority.
+ */
+async function applyDurableNonce(
+  tx: Transaction,
+  connection: Connection,
+  payer: PublicKey
+): Promise<void> {
+  // ⬇️ get the current value stored in the nonce account
+  const nonceAcct = (await connection.getNonce(
+    NONCE_PUBKEY,
+    "confirmed"
+  )) as NonceAccount;
+  const durableHash = nonceAcct.nonce;
+
+  // stamp the durable hash
+  tx.recentBlockhash = durableHash;
+
+  // ensure advance instruction is first
+  tx.nonceInfo = {
+    nonce: durableHash,
+    nonceInstruction: SystemProgram.nonceAdvance({
+      noncePubkey: NONCE_PUBKEY,
+      authorizedPubkey: payer,
+    }),
+  };
 }
 
 /**
@@ -172,9 +205,8 @@ export async function deployUpgradeableProgram(
     
     createBufferTx.feePayer = payer;
     
-    // Get a fresh blockhash for this transaction
-    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
-    createBufferTx.recentBlockhash = blockhash;
+    // Apply durable nonce instead of ephemeral blockhash
+    await applyDurableNonce(createBufferTx, connection, payer);
     
     // Sign with wallet + bufferKey
     createBufferTx.partialSign(bufferKey);
@@ -186,11 +218,7 @@ export async function deployUpgradeableProgram(
     signatures.push(createBufferSig);
     
     // Wait for confirmation
-    await connection.confirmTransaction({
-      signature: createBufferSig,
-      blockhash,
-      lastValidBlockHeight
-    }, 'confirmed');
+    await connection.confirmTransaction(createBufferSig, 'confirmed');
     console.log(`[DEPLOY] Buffer created successfully. Signature: ${createBufferSig}`);
     
     // 3. Write program data in chunks
@@ -292,11 +320,10 @@ export async function deployUpgradeableProgram(
     }
 
     for (const [gIdx, group] of groups.entries()) {
-      // 1️⃣ fresh hash *before* signing this batch - get a new hash for each group
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
-      
-      // Apply blockhash to all transactions in this group
-      group.forEach(tx => { tx.recentBlockhash = blockhash; });
+      // 1️⃣ Apply durable nonce to each transaction in this group
+      await Promise.all(
+        group.map((tx) => applyDurableNonce(tx, connection, payer))
+      );
       
       // Partial sign with program keypair if needed
       if (programKeypair) group.find(tx => tx === deployTx)?.partialSign(programKeypair);
@@ -313,11 +340,7 @@ export async function deployUpgradeableProgram(
       }
 
       // 4️⃣ confirm last sig; others are in the same / later slot
-      await connection.confirmTransaction({ 
-        signature: sigs.at(-1)!, 
-        blockhash, 
-        lastValidBlockHeight 
-      }, 'confirmed');
+      await connection.confirmTransaction(sigs.at(-1)!, 'confirmed');
 
       // 5️⃣ verify every status
       const st = await connection.getSignatureStatuses(sigs);
