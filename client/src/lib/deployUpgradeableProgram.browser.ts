@@ -48,7 +48,7 @@ export const HEADER_LEN = BPF_BUFFER_HEADER_LEN;
 const SEND_OPTS: SendOptions = { skipPreflight: true, maxRetries: 5 };
 
 // Phantom (current versions) cap signAllTransactions at ~100 TXs; stay well below.
-const MAX_BATCH = 12;  // 12×900 B ≃ 10 KB – sim & preflight finish < 20 s
+const MAX_BATCH = 12;  // 12 tx burst; now ~1 s with 80 ms throttle
 // Phantom UI stays reliable below 100 tx; use a safe margin.
 const PROMPT_GROUP_SIZE = 30;          // one Phantom pop-up handles ≤ 30 tx
 
@@ -168,7 +168,7 @@ export async function deployUpgradeableProgram(
     onProgress?.({ stage: 'create', uploaded: 0, total: dataLength });
 
     const priorityIx = ComputeBudgetProgram.setComputeUnitPrice({
-      microLamports: 10_000,          // ≈0.00001 SOL
+      microLamports: 60_000,          // ≈0.00006 SOL
     });
     const createBufferTx = new Transaction()
       .add(priorityIx)                // must be first
@@ -240,7 +240,7 @@ export async function deployUpgradeableProgram(
         ]),
       });
       
-      const priorityIx = ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 });
+      const priorityIx = ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 60_000 });
       const writeTx = new Transaction()
         .add(priorityIx)
         .add(writeIx);
@@ -285,7 +285,7 @@ export async function deployUpgradeableProgram(
     }
     deployTx = deployTx.add(deployIx);
     
-    const deployPriorityIx = ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 });
+    const deployPriorityIx = ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 60_000 });
     deployTx.instructions.unshift(deployPriorityIx);   // prepend
     
     deployTx.feePayer = payer;
@@ -337,7 +337,7 @@ export async function deployUpgradeableProgram(
         
         // Sequential send with throttling to respect rate limits
         for (const tx of burst) {
-          await throttle();  // 220 ms guard, called sequentially
+          await throttle(80); // faster burst, still avoids 429
           const sig = await connection.sendRawTransaction(tx.serialize(), SEND_OPTS);
           sigs.push(sig);
         }
