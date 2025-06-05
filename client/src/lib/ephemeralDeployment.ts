@@ -33,7 +33,8 @@ async function getSafeHash(conn: Connection): Promise<{ blockhash: string, lastV
       const oldBlock = await conn.getBlock(safeSlot, { commitment: 'confirmed' });
       if (oldBlock && oldBlock.blockhash) {
         console.log(`[DEPLOY] Using older blockhash with ~105 blocks of validity remaining`);
-        return { blockhash: oldBlock.blockhash, lastValidBlockHeight };
+        const safeHeight = lastValidBlockHeight - 105;
+        return { blockhash: oldBlock.blockhash, lastValidBlockHeight: safeHeight };
       }
     }
   } catch (err) {
@@ -249,7 +250,6 @@ export async function deployWithEphemeralKey(
       data: Buffer.concat([
         Buffer.from(new Uint32Array([1]).buffer),        // tag = Write
         Buffer.from(new Uint32Array([offset]).buffer),   // offset
-        Buffer.from(BigUint64Array.of(BigInt(chunkSize)).buffer), // length
         Buffer.from(chunk),                              // payload
       ]),
     });
@@ -316,7 +316,7 @@ export async function deployWithEphemeralKey(
         { pubkey: SYSVAR_RENT_PUBKEY,      isSigner: false, isWritable: false },
         { pubkey: SYSVAR_CLOCK_PUBKEY,     isSigner: false, isWritable: false },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-        { pubkey: walletPublicKey,         isSigner: true,  isWritable: false }, // upgrade authority
+        { pubkey: ephemeralKey.publicKey,  isSigner: true,  isWritable: false }, // authority = buffer authority
       ],
       data: Buffer.concat([
         Buffer.from([2]), // DeployWithMaxDataLen
@@ -332,7 +332,7 @@ export async function deployWithEphemeralKey(
           await connection.getLatestBlockhash('confirmed');
     deployTx.recentBlockhash = deployHash;
     deployTx.feePayer = ephemeralKey.publicKey;
-    deployTx.sign(ephemeralKey, programKeypair);
+    deployTx.sign(ephemeralKey, programKeypair);      // wallet no longer signs
 
     deployOrUpgradeSig = await connection.sendRawTransaction(deployTx.serialize());
     signatures.push(deployOrUpgradeSig);
@@ -354,7 +354,7 @@ export async function deployWithEphemeralKey(
         { pubkey: spillPubkey,          isSigner: false, isWritable: true },
         { pubkey: SYSVAR_RENT_PUBKEY,   isSigner: false, isWritable: false },
         { pubkey: SYSVAR_CLOCK_PUBKEY,  isSigner: false, isWritable: false },
-        { pubkey: walletPublicKey,      isSigner: true,  isWritable: false }, // authority
+        { pubkey: ephemeralKey.publicKey, isSigner: true,  isWritable: false }, // authority = buffer authority
       ],
       data: Buffer.from([3]), // 3 = Upgrade
     });
@@ -375,6 +375,35 @@ export async function deployWithEphemeralKey(
       signature: deployOrUpgradeSig,
     });
   }
+
+  // 5. Hand upgrade authority from ephemeral key → wallet -------------------
+  const setAuthIx = new TransactionInstruction({
+    programId: BPF_UPGRADE_LOADER_ID,
+    keys: [
+      { pubkey: programDataPubkey,      isSigner: false, isWritable: true },
+      { pubkey: ephemeralKey.publicKey, isSigner: true,  isWritable: false }, // current authority
+      { pubkey: walletPublicKey,        isSigner: false, isWritable: false }, // new authority
+    ],
+    data: Buffer.from([4]), // SetAuthority
+  });
+
+  const setAuthTx = new Transaction().add(setAuthIx);
+  setAuthTx.feePayer = ephemeralKey.publicKey;
+
+  const { blockhash: authHash, lastValidBlockHeight: authHeight } =
+        await connection.getLatestBlockhash('confirmed');
+  setAuthTx.recentBlockhash = authHash;
+
+  setAuthTx.sign(ephemeralKey);
+
+  const authSig = await connection.sendRawTransaction(setAuthTx.serialize());
+  signatures.push(authSig);
+
+  await connection.confirmTransaction({
+    blockhash: authHash,
+    lastValidBlockHeight: authHeight,
+    signature: authSig,
+  });
 
   console.log(`[EPHEMERAL_DEPLOY] Program deployed successfully to ${programId.toBase58()}`);
   onProgress(100, "Deployment successful!");
