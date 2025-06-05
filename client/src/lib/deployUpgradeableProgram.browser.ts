@@ -25,8 +25,7 @@ import {
   BPF_BUFFER_HEADER_LEN 
 } from "@/utils/constants";
 import type { SendOptions } from '@solana/web3.js';
-// durable nonce account (injected from shared connection util)
-import { NONCE_PUBKEY } from "@/utils/connection";
+import { ensureDurableNonce } from "@/utils/nonce";
 
 // ── batching tuned to Solana Playground ──────────────────────────
 // Break into smaller groups to avoid blockhash expiry
@@ -91,11 +90,12 @@ async function yieldToBrowser(ms?: number): Promise<void> {
 async function applyDurableNonce(
   tx: Transaction,
   connection: Connection,
-  payer: PublicKey
+  payer: PublicKey,
+  noncePubkey: PublicKey
 ): Promise<void> {
   // ⬇️ get the current value stored in the nonce account
   const nonceAcct = (await connection.getNonce(
-    NONCE_PUBKEY,
+    noncePubkey,
     "confirmed"
   )) as NonceAccount;
   const durableHash = nonceAcct.nonce;
@@ -107,7 +107,7 @@ async function applyDurableNonce(
   tx.nonceInfo = {
     nonce: durableHash,
     nonceInstruction: SystemProgram.nonceAdvance({
-      noncePubkey: NONCE_PUBKEY,
+      noncePubkey: noncePubkey,
       authorizedPubkey: payer,
     }),
   };
@@ -138,6 +138,9 @@ export async function deployUpgradeableProgram(
   
   // Cache the payer's public key to avoid repeated null checks
   const payer = wallet.publicKey;
+  
+  // Get or create a durable nonce account
+  const noncePubkey = await ensureDurableNonce(connection, wallet);
   
   // Convert ArrayBuffer to Uint8Array for processing
   const programData = new Uint8Array(soBytes);
@@ -206,7 +209,7 @@ export async function deployUpgradeableProgram(
     createBufferTx.feePayer = payer;
     
     // Apply durable nonce instead of ephemeral blockhash
-    await applyDurableNonce(createBufferTx, connection, payer);
+    await applyDurableNonce(createBufferTx, connection, payer, noncePubkey);
     
     // Sign with wallet + bufferKey
     createBufferTx.partialSign(bufferKey);
@@ -322,7 +325,7 @@ export async function deployUpgradeableProgram(
     for (const [gIdx, group] of groups.entries()) {
       // 1️⃣ Apply durable nonce to each transaction in this group
       await Promise.all(
-        group.map((tx) => applyDurableNonce(tx, connection, payer))
+        group.map((tx) => applyDurableNonce(tx, connection, payer, noncePubkey))
       );
       
       // Partial sign with program keypair if needed
