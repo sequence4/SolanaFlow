@@ -155,14 +155,6 @@ export async function deployUpgradeableProgram(
       ]),
     });
     
-    const createProgAcct = SystemProgram.createAccount({
-      fromPubkey: payer,
-      newAccountPubkey: programKeypair!.publicKey,
-      lamports: progLamports,
-      space: 0,                       // program acct stores only a pointer
-      programId: BPF_UPGRADE_LOADER_ID,
-    });
-
     onProgress?.({ stage: 'create', uploaded: 0, total: dataLength });
 
     const createBufferTx = new Transaction()
