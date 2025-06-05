@@ -20,7 +20,6 @@ import { WalletContextState } from "@solana/wallet-adapter-react";
 import { rpcWithRetry } from "@/utils/rpcRetry";
 import { throttle } from "@/utils/rateLimiter";
 import { 
-  BPF_LOADER_CHUNK_SIZE, 
   BPF_UPGRADE_LOADER_ID,
   BPF_BUFFER_HEADER_LEN 
 } from "@/utils/constants";
@@ -42,7 +41,8 @@ function leU32(n: number): Buffer {
 }
 
 // Shared chunk size across upload logic
-export const MAX_CHUNK_SIZE = BPF_LOADER_CHUNK_SIZE;
+// 900 B payload + nonceAdvance instr + metadata ≤ 1 232-byte tx cap
+export const MAX_CHUNK_SIZE = 900;   // was 1 024
 export const HEADER_LEN = BPF_BUFFER_HEADER_LEN;
 
 // Bypass RPC simulation for all non-funding TXs;
