@@ -47,11 +47,6 @@ export const HEADER_LEN = BPF_BUFFER_HEADER_LEN;
 // retries help if the TPU drops a packet in browser env.
 const SEND_OPTS: SendOptions = { skipPreflight: true, maxRetries: 5 };
 
-// Phantom (current versions) cap signAllTransactions at ~100 TXs; stay well below.
-const MAX_BATCH = 12;  // 12 tx burst; now ~1 s with 80 ms throttle
-// Phantom UI stays reliable below 100 tx; use a safe margin.
-const PROMPT_GROUP_SIZE = MAX_BATCH;   // 12 tx per wallet popup
-
 type DeployProgress = {
   stage: 'create' | 'write' | 'deploy' | 'complete';
   uploaded: number;
@@ -297,62 +292,49 @@ export async function deployUpgradeableProgram(
       throw new Error("Wallet doesn't support signing multiple transactions");
     }
 
-    // ── 1. slice all prepared txs into "signature groups" of ≤ 90 ──────────────
-    const groups: Transaction[][] = [];
-    for (let i = 0; i < writeTxs.length; i += PROMPT_GROUP_SIZE) {
-      groups.push(writeTxs.slice(i, i + PROMPT_GROUP_SIZE));
-    }
+    // one group that contains everything (≤ 90 legacy TX)
+    const groups: Transaction[][] = [writeTxs];
 
-    let batchIndex = 0;
     for (const group of groups) {
-      // ── 2. attach ONE fresh hash to the whole group ──────────────────────────
+      // ── fetch blockhash BEFORE signing ─────────────────────────────────────
       const { value: { blockhash: grpHash, lastValidBlockHeight: lvh } } =
         await rpcWithRetry<{ value: { blockhash: string; lastValidBlockHeight: number } }>(
           connection, "getLatestBlockhash", [{ commitment: "confirmed" }], "confirmed");
+      
+      // Apply the same blockhash to all transactions and partial-sign if needed
+      group.forEach(tx => (tx.recentBlockhash = grpHash));
+      if (programKeypair) group.find(tx=>tx===deployTx)?.partialSign(programKeypair);
 
-      for (const tx of group) {
-        tx.recentBlockhash = grpHash;
-        if (programKeypair && tx === deployTx) tx.partialSign(programKeypair);          // keep partial-sign
-      }
-
-      // ── 3. ONE wallet prompt here ────────────────────────────────────────────
+      // ── ONE wallet prompt for ALL transactions ────────────────────────────────────
       const signedGroup = await wallet.signAllTransactions(group);
-      console.log(`[DEPLOY] Sending group ${batchIndex + 1}/${groups.length} (${signedGroup.length} txs signed, ${Math.ceil(signedGroup.length / MAX_BATCH)} bursts)`);
-      batchIndex++;
+      console.log(`[DEPLOY] Sending ${signedGroup.length} signed transactions with shared blockhash`);
 
       // small delay so the hash propagates to "confirmed"
       await yieldToBrowser(50);
 
-      // ── 4. fire the signed txs in 12-tx network bursts ──────────────────────
-      for (let i = 0; i < signedGroup.length; i += MAX_BATCH) {
-        const burstIndex = Math.floor(i / MAX_BATCH) + 1;
-        const totalBursts = Math.ceil(signedGroup.length / MAX_BATCH);
-        console.log(`[DEPLOY] Processing burst ${burstIndex}/${totalBursts} in group ${batchIndex}/${groups.length}`);
-        
-        const burst = signedGroup.slice(i, i + MAX_BATCH);
-
-        /* send every tx in the group, remember sigs */
-        const sigs: string[] = [];
-        for (const tx of burst) {
-          await throttle(40);                   // faster throttle
-          sigs.push(await connection.sendRawTransaction(tx.serialize(), SEND_OPTS));
-        }
-        /* once every tx is in the TPU, confirm the last one;
-           if it is rooted, the earlier sigs are rooted too */
-        await connection.confirmTransaction(
-          { signature: sigs[sigs.length - 1], blockhash: grpHash, lastValidBlockHeight: lvh },
-          'confirmed'
-        );
-        /* extra safety: poll all sigs for errors */
-        const status = await connection.getSignatureStatuses(sigs);
-        status.value.forEach((st, idx) => {
-          if (st && st.err) throw new Error(`TX ${idx} failed: ${JSON.stringify(st.err)}`);
-        });
-        signatures.push(...sigs);
+      // ── broadcast all transactions, then confirm once ────────────────────────
+      const sigs: string[] = [];
+      for (const tx of signedGroup) {
+        await throttle(40);               // keep 5 TPS
+        sigs.push(await connection.sendRawTransaction(tx.serialize(), SEND_OPTS));
       }
+      
+      // one confirm after everything is in the TPU
+      await connection.confirmTransaction(
+        { signature: sigs[sigs.length-1], blockhash: grpHash, lastValidBlockHeight: lvh },
+        'confirmed'
+      );
+      
+      // Verify all signatures were successful
+      const status = await connection.getSignatureStatuses(sigs);
+      status.value.forEach((st, idx) => {
+        if (st && st.err) throw new Error(`TX ${idx} failed: ${JSON.stringify(st.err)}`);
+      });
+      
+      signatures.push(...sigs);
+      
+      console.log('[DEPLOY] All transactions confirmed successfully');
     }
-    
-    console.log('[DEPLOY] All write chunks and deploy signed & confirmed');
     
     // 4. Deploy from buffer
     onProgress?.({
