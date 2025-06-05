@@ -1,3 +1,4 @@
+import type { SendOptions } from '@solana/web3.js';
 import { 
   Keypair, 
   PublicKey, 
@@ -16,6 +17,10 @@ const HEADER_LEN = 48;
 
 // Chunk size for buffer writes (a bit smaller than max to allow for instruction overhead)
 const CHUNK_SIZE = 900;
+
+// Re-use these options for every raw TX that the wallet does **not** sign.
+// Skipping pre-flight avoids "Blockhash not found" simulations.
+const SEND_OPTS: SendOptions = { skipPreflight: true };
 
 /**
  * Gets a blockhash that's already 45 blocks old, giving you ~105 blocks of validity
@@ -225,7 +230,10 @@ export async function deployWithEphemeralKey(
   createBufferTx.sign(ephemeralKey, bufferKey);
   
   // Send and confirm buffer creation
-  const bufferSig = await connection.sendRawTransaction(createBufferTx.serialize());
+  const bufferSig = await connection.sendRawTransaction(
+    createBufferTx.serialize(),
+    SEND_OPTS,
+  );
   signatures.push(bufferSig);
   
   await connection.confirmTransaction({
@@ -279,7 +287,10 @@ export async function deployWithEphemeralKey(
     
     // Send raw transaction without waiting for confirmation
     // We'll send them all quickly
-    const writeSig = await connection.sendRawTransaction(writeTx.serialize());
+    const writeSig = await connection.sendRawTransaction(
+      writeTx.serialize(),
+      SEND_OPTS,
+    );
     writeSigs.push(writeSig);
     
     // Small delay to avoid rate limiting
@@ -345,7 +356,10 @@ export async function deployWithEphemeralKey(
     deployTx.feePayer = ephemeralKey.publicKey;
     deployTx.sign(ephemeralKey, programKeypair);      // wallet no longer signs
 
-    deployOrUpgradeSig = await connection.sendRawTransaction(deployTx.serialize());
+    deployOrUpgradeSig = await connection.sendRawTransaction(
+      deployTx.serialize(),
+      SEND_OPTS,
+    );
     signatures.push(deployOrUpgradeSig);
 
     await connection.confirmTransaction({
@@ -377,7 +391,10 @@ export async function deployWithEphemeralKey(
     upgradeTx.feePayer = ephemeralKey.publicKey;
     upgradeTx.sign(ephemeralKey);          // wallet already signed buffer writes
 
-    deployOrUpgradeSig = await connection.sendRawTransaction(upgradeTx.serialize());
+    deployOrUpgradeSig = await connection.sendRawTransaction(
+      upgradeTx.serialize(),
+      SEND_OPTS,
+    );
     signatures.push(deployOrUpgradeSig);
 
     await connection.confirmTransaction({
@@ -407,7 +424,10 @@ export async function deployWithEphemeralKey(
 
   setAuthTx.sign(ephemeralKey);
 
-  const authSig = await connection.sendRawTransaction(setAuthTx.serialize());
+  const authSig = await connection.sendRawTransaction(
+    setAuthTx.serialize(),
+    SEND_OPTS,
+  );
   signatures.push(authSig);
 
   await connection.confirmTransaction({
