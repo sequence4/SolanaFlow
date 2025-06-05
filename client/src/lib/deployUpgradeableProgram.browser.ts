@@ -32,6 +32,13 @@ function leU32(n: number): Buffer {
   return buf;
 }
 
+// Helper for little-endian u64
+function leU64(n: bigint): Buffer {
+  const buf = Buffer.alloc(8);
+  buf.writeBigUInt64LE(n, 0);
+  return buf;
+}
+
 // Shared chunk size across upload logic
 export const MAX_CHUNK_SIZE = BPF_LOADER_CHUNK_SIZE;
 export const HEADER_LEN = BPF_BUFFER_HEADER_LEN;
@@ -202,8 +209,7 @@ export async function deployUpgradeableProgram(
     const writeTxs: Transaction[] = [];
     
     for (let chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
-      // offset is from start of the payload area (after the 48-byte header)
-      // this is correct for BPF loader which interprets offset from data start
+      // offset is from start of the payload area (after the 48-byte ProgramData header)
       const offset = chunkIndex * MAX_CHUNK_SIZE;
       const chunkEnd = Math.min((chunkIndex + 1) * MAX_CHUNK_SIZE, dataLength);
       const chunkSize = chunkEnd - chunkIndex * MAX_CHUNK_SIZE;
@@ -229,6 +235,7 @@ export async function deployUpgradeableProgram(
         data: Buffer.concat([
           leU32(1),                         // tag = Write
           leU32(offset),                    // offset
+          leU64(BigInt(chunkSize)),         // Vec<u8> length prefix
           Buffer.from(chunk),               // raw bytes
         ]),
       });
