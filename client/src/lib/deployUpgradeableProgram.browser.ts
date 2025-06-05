@@ -50,7 +50,7 @@ const SEND_OPTS: SendOptions = { skipPreflight: true, maxRetries: 5 };
 // Phantom (current versions) cap signAllTransactions at ~100 TXs; stay well below.
 const MAX_BATCH = 12;  // 12 tx burst; now ~1 s with 80 ms throttle
 // Phantom UI stays reliable below 100 tx; use a safe margin.
-const PROMPT_GROUP_SIZE = 30;          // one Phantom pop-up handles ≤ 30 tx
+const PROMPT_GROUP_SIZE = MAX_BATCH;   // 12 tx per wallet popup
 
 type DeployProgress = {
   stage: 'create' | 'write' | 'deploy' | 'complete';
@@ -321,7 +321,7 @@ export async function deployUpgradeableProgram(
       batchIndex++;
 
       // small delay so the hash propagates to "confirmed"
-      await yieldToBrowser(300);
+      await yieldToBrowser(50);
 
       // ── 4. fire the signed txs in 12-tx network bursts ──────────────────────
       for (let i = 0; i < signedGroup.length; i += MAX_BATCH) {
@@ -331,34 +331,23 @@ export async function deployUpgradeableProgram(
         
         const burst = signedGroup.slice(i, i + MAX_BATCH);
 
-        // 1️⃣ fire them all asap ----------------------------------------------
+        /* send every tx in the group, remember sigs */
         const sigs: string[] = [];
-        const startTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
-        
-        // Sequential send with throttling to respect rate limits
         for (const tx of burst) {
-          await throttle(80); // faster burst, still avoids 429
-          const sig = await connection.sendRawTransaction(tx.serialize(), SEND_OPTS);
-          sigs.push(sig);
+          await throttle(40);                   // faster throttle
+          sigs.push(await connection.sendRawTransaction(tx.serialize(), SEND_OPTS));
         }
-
-        // 2️⃣ confirm the whole burst in parallel ------------------------------
+        /* once every tx is in the TPU, confirm the last one;
+           if it is rooted, the earlier sigs are rooted too */
         await connection.confirmTransaction(
           { signature: sigs[sigs.length - 1], blockhash: grpHash, lastValidBlockHeight: lvh },
           'confirmed'
         );
-        
-        // Verify all signatures were successful, not just the last one
-        const statusResp = await connection.getSignatureStatuses(sigs);
-        statusResp.value.forEach((st, idx) => {
-          if (st && st.err) throw new Error(`TX ${i + idx} failed: ${JSON.stringify(st.err)}`);
+        /* extra safety: poll all sigs for errors */
+        const status = await connection.getSignatureStatuses(sigs);
+        status.value.forEach((st, idx) => {
+          if (st && st.err) throw new Error(`TX ${idx} failed: ${JSON.stringify(st.err)}`);
         });
-        
-        const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-        const elapsedTime = ((now - startTime) / 1000).toFixed(1);
-        console.log(`[DEPLOY] Burst ${burstIndex}/${totalBursts} confirmed in ${elapsedTime} s`);
-        
-        // the other 11 sigs will be at the same or later slot, so they're auto-confirmed
         signatures.push(...sigs);
       }
     }
