@@ -133,9 +133,20 @@ export async function deployWithEphemeralKey(
   // 2. Rent for program account
   // 3. Transaction fees for all write transactions (~175) and deploy transaction
   const writeTxCount = Math.ceil(dataLength / CHUNK_SIZE);
-  const feePerTx = 10000; // safer
-  const totalFees = (writeTxCount + 2) * feePerTx; // +2 for createBuffer and deploy txs
-  const totalNeeded = bufferRent + programRent + totalFees;
+  const feePerTx = 10000; // conservative upper bound
+
+  // Transactions the ephemeral key must pay for:
+  //   writeTxCount  – chunk writes
+  //   +1            – createBufferTx
+  //   +1            – deploy OR upgrade
+  //   +1            – post-deploy SetAuthority
+  const totalFees = (writeTxCount + 3) * feePerTx;
+
+  // When upgrading an existing program we do **not** have to fund rent
+  // for a new Program account.
+  const programRentForFunding = programKeypair ? programRent : 0;
+
+  const totalNeeded = bufferRent + programRentForFunding + totalFees;
   
   onProgress(5, "Funding ephemeral key...");
   
