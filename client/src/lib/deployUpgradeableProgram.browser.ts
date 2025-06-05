@@ -31,13 +31,6 @@ function leU32(n: number): Buffer {
   return buf;
 }
 
-// Helper function for little-endian u64 encoding
-function leU64(n: bigint): Buffer {
-  const buf = Buffer.alloc(8);
-  buf.writeBigUInt64LE(n, 0);
-  return buf;
-}
-
 // Shared chunk size across upload logic
 export const MAX_CHUNK_SIZE = BPF_LOADER_CHUNK_SIZE;
 export const HEADER_LEN = BPF_BUFFER_HEADER_LEN;
@@ -120,10 +113,14 @@ export async function deployUpgradeableProgram(
   
   // 1. Create a *real* buffer account (Keypair, not PDA)
   const bufferKey = Keypair.generate();
-  const programKey = Keypair.generate();
+  
+  // Generate a keypair only when we are _creating_ a new program
+  const programKeypair: Keypair | null = userProvidedProgramId ? null : Keypair.generate();
+  
+  const effectiveProgramId = userProvidedProgramId ?? programKeypair!.publicKey;
   
   const [programDataPubkey] = PublicKey.findProgramAddressSync(
-    [programKey.publicKey.toBuffer()],
+    [effectiveProgramId.toBuffer()],
     BPF_UPGRADE_LOADER_ID,
   );
   
@@ -131,11 +128,8 @@ export async function deployUpgradeableProgram(
   const lamports = await connection.getMinimumBalanceForRentExemption(bufferSpace);
   const progLamports = await connection.getMinimumBalanceForRentExemption(0);
   
-  // If programId not provided, derive a new one
-  const programId = userProvidedProgramId || programKey.publicKey;
-  
   console.log(`[DEPLOY] Buffer: ${bufferKey.publicKey.toBase58()}`);
-  console.log(`[DEPLOY] Program ID: ${programId.toBase58()}`);
+  console.log(`[DEPLOY] Program ID: ${effectiveProgramId.toBase58()}`);
   
   try {
     // 2. (a) Allocate the buffer with SystemProgram
@@ -163,7 +157,7 @@ export async function deployUpgradeableProgram(
     
     const createProgAcct = SystemProgram.createAccount({
       fromPubkey: payer,
-      newAccountPubkey: programKey.publicKey,
+      newAccountPubkey: programKeypair!.publicKey,
       lamports: progLamports,
       space: 0,                       // program acct stores only a pointer
       programId: BPF_UPGRADE_LOADER_ID,
@@ -209,7 +203,7 @@ export async function deployUpgradeableProgram(
     const writeTxs: Transaction[] = [];
     
     for (let chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
-      // offset is from start of the payload area (after the 40-byte header)
+      // offset is from start of the payload area (after the 48-byte header)
       // this is correct for BPF loader which interprets offset from data start
       const offset = chunkIndex * MAX_CHUNK_SIZE;
       const chunkEnd = Math.min((chunkIndex + 1) * MAX_CHUNK_SIZE, dataLength);
@@ -255,7 +249,7 @@ export async function deployUpgradeableProgram(
       keys: [
         { pubkey: payer,        isSigner: true,  isWritable: true },
         { pubkey: programDataPubkey,        isSigner: false, isWritable: true },
-        { pubkey: programKey.publicKey,     isSigner: true,  isWritable: true },
+        { pubkey: effectiveProgramId,       isSigner: !!programKeypair, isWritable: true },
         { pubkey: bufferKey.publicKey,      isSigner: false, isWritable: true },
         { pubkey: SYSVAR_RENT_PUBKEY,       isSigner: false, isWritable: false },
         { pubkey: SYSVAR_CLOCK_PUBKEY,      isSigner: false, isWritable: false },
@@ -268,9 +262,19 @@ export async function deployUpgradeableProgram(
       ]),
     });
     
-    const deployTx = new Transaction()
-      .add(createProgAcct)   // program account
-      .add(deployIx);
+    let deployTx = new Transaction();
+    
+    if (programKeypair) {
+      const createProgAcct = SystemProgram.createAccount({
+        fromPubkey: payer,
+        newAccountPubkey: programKeypair.publicKey,
+        lamports: progLamports,
+        space: 0,
+        programId: BPF_UPGRADE_LOADER_ID,
+      });
+      deployTx = deployTx.add(createProgAcct);
+    }
+    deployTx = deployTx.add(deployIx);
     
     deployTx.feePayer = payer;
     
@@ -296,7 +300,7 @@ export async function deployUpgradeableProgram(
 
       for (const tx of group) {
         tx.recentBlockhash = grpHash;
-        if (tx === deployTx) tx.partialSign(programKey);          // keep partial-sign
+        if (programKeypair && tx === deployTx) tx.partialSign(programKeypair);          // keep partial-sign
       }
 
       // ── 3. ONE wallet prompt here ────────────────────────────────────────────
@@ -356,7 +360,7 @@ export async function deployUpgradeableProgram(
       total: dataLength
     });
     
-    console.log(`[DEPLOY] Program deployed successfully with ID: ${programId.toBase58()}`);
+    console.log(`[DEPLOY] Program deployed successfully with ID: ${effectiveProgramId.toBase58()}`);
     
     onProgress?.({
       stage: 'complete',
@@ -365,7 +369,7 @@ export async function deployUpgradeableProgram(
     });
     
     return {
-      programId,
+      programId: effectiveProgramId,
       signatures
     };
   } catch (error) {
