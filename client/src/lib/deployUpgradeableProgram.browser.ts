@@ -323,10 +323,10 @@ export async function deployUpgradeableProgram(
     }
 
     for (const [gIdx, group] of groups.entries()) {
-      // 1️⃣ Apply durable nonce to each transaction in this group
-      await Promise.all(
-        group.map((tx) => applyDurableNonce(tx, connection, payer, noncePubkey))
-      );
+      // 1️⃣ Apply durable nonce *sequentially* to stay under 10 RPC calls/sec
+      for (let i = 0; i < group.length; i++) {
+        await applyDurableNonce(group[i], connection, payer, noncePubkey);
+      }
       
       // Partial sign with program keypair if needed
       if (programKeypair) group.find(tx => tx === deployTx)?.partialSign(programKeypair);
