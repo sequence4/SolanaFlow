@@ -22,6 +22,7 @@ import {
   BPF_UPGRADE_LOADER_ID,
   BPF_BUFFER_HEADER_LEN 
 } from "@/utils/constants";
+import type { SendOptions } from '@solana/web3.js';
 
 // Helper function for little-endian u32 encoding
 function leU32(n: number): Buffer {
@@ -37,8 +38,14 @@ function leU64(n: bigint): Buffer {
   return buf;
 }
 
-const CHUNK_SIZE = BPF_LOADER_CHUNK_SIZE;
-const HEADER_LEN = BPF_BUFFER_HEADER_LEN;
+// Shared chunk size across upload logic
+export const MAX_CHUNK_SIZE = BPF_LOADER_CHUNK_SIZE;
+export const HEADER_LEN = BPF_BUFFER_HEADER_LEN;
+
+// Bypass RPC simulation for all non-funding TXs;
+// retries help if the TPU drops a packet in browser env.
+const SEND_OPTS: SendOptions = { skipPreflight: true, maxRetries: 5 };
+
 // Phantom (current versions) cap signAllTransactions at ~100 TXs; stay well below.
 const MAX_BATCH = 12;  // 12×900 B ≃ 10 KB – sim & preflight finish < 20 s
 // Phantom UI stays reliable below 100 tx; use a safe margin.
@@ -208,11 +215,7 @@ export async function deployUpgradeableProgram(
     const signedCreateBufferTx = await wallet.signTransaction(createBufferTx);
     const createBufferSig = await connection.sendRawTransaction(
       signedCreateBufferTx.serialize(),
-      {
-        skipPreflight: false,
-        /** MUST match the commitment used for getLatestBlockhash */
-        preflightCommitment: 'confirmed',
-      }
+      SEND_OPTS
     );
     signatures.push(createBufferSig);
     
@@ -228,8 +231,8 @@ export async function deployUpgradeableProgram(
     console.log(`[DEPLOY] Buffer created successfully. Signature: ${createBufferSig}`);
     
     // 3. Write program data in chunks
-    const numChunks = Math.ceil(dataLength / CHUNK_SIZE);
-    console.log(`[DEPLOY] Writing program data in ${numChunks} chunks of max ${CHUNK_SIZE} bytes each`);
+    const numChunks = Math.ceil(dataLength / MAX_CHUNK_SIZE);
+    console.log(`[DEPLOY] Writing program data in ${numChunks} chunks of max ${MAX_CHUNK_SIZE} bytes each`);
     
     // Prepare an array to collect chunk uploads
     const writeTxs: Transaction[] = [];
@@ -237,14 +240,14 @@ export async function deployUpgradeableProgram(
     for (let chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
       // offset is from start of the payload area (after the 40-byte header)
       // this is correct for BPF loader which interprets offset from data start
-      const offset = chunkIndex * CHUNK_SIZE;
-      const chunkEnd = Math.min((chunkIndex + 1) * CHUNK_SIZE, dataLength);
-      const chunkSize = chunkEnd - chunkIndex * CHUNK_SIZE;
-      const chunk = programData.slice(chunkIndex * CHUNK_SIZE, chunkEnd);
+      const offset = chunkIndex * MAX_CHUNK_SIZE;
+      const chunkEnd = Math.min((chunkIndex + 1) * MAX_CHUNK_SIZE, dataLength);
+      const chunkSize = chunkEnd - chunkIndex * MAX_CHUNK_SIZE;
+      const chunk = programData.slice(chunkIndex * MAX_CHUNK_SIZE, chunkEnd);
       
       onProgress?.({
         stage: 'write',
-        uploaded: chunkIndex * CHUNK_SIZE,
+        uploaded: chunkIndex * MAX_CHUNK_SIZE,
         total: dataLength,
         chunkIndex,
         totalChunks: numChunks
@@ -262,7 +265,6 @@ export async function deployUpgradeableProgram(
         data: Buffer.concat([
           leU32(1),                         // tag = Write
           leU32(offset),                    // offset
-          leU64(BigInt(chunk.length)),      // bytes.len() as u64
           Buffer.from(chunk),               // raw bytes
         ]),
       });
@@ -360,10 +362,9 @@ export async function deployUpgradeableProgram(
         const startTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
         
         // Sequential send with throttling to respect rate limits
-        const sendOpts = { skipPreflight: false, preflightCommitment: 'confirmed' as const };
         for (const tx of burst) {
           await throttle();  // 220 ms guard, called sequentially
-          const sig = await connection.sendRawTransaction(tx.serialize(), sendOpts);
+          const sig = await connection.sendRawTransaction(tx.serialize(), SEND_OPTS);
           sigs.push(sig);
         }
 
