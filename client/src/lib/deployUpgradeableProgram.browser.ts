@@ -25,6 +25,11 @@ import {
 } from "@/utils/constants";
 import type { SendOptions } from '@solana/web3.js';
 
+// --- grouping & timing ---------------------------------------------------
+const GROUP_SIZE = 25;    // max legacy-TX per wallet popup
+const BURST_SIZE = 8;     // how many TX we fire before a tiny delay
+const BURST_WAIT = 40;    // ms – keeps us < 5 TPS (Helius soft limit)
+
 // Helper function for little-endian u32 encoding
 function leU32(n: number): Buffer {
   const buf = Buffer.alloc(4);
@@ -292,48 +297,57 @@ export async function deployUpgradeableProgram(
       throw new Error("Wallet doesn't support signing multiple transactions");
     }
 
-    // one group that contains everything (≤ 90 legacy TX)
-    const groups: Transaction[][] = [writeTxs];
+    // ⬇ BEFORE sending batches (FUTURE OPTION - DURABLE NONCE):
+    // import { NONCE_ACCOUNT_LENGTH } from '@solana/web3.js';
+    //
+    // ...create + fund nonce account once:
+    // const nonceKey = Keypair.generate();
+    // const createNonceIx = SystemProgram.createNonceAccount({
+    //   fromPubkey: payer,
+    //   noncePubkey: nonceKey.publicKey,
+    //   authorizedPubkey: payer,
+    //   lamports: await connection.getMinimumBalanceForRentExemption(NONCE_ACCOUNT_LENGTH),
+    // });
+    //   + SystemProgram.nonceAdvance({ noncePubkey: nonceKey.publicKey, authorizedPubkey: payer });
+    //
+    // For *every* TX: tx.nonceInfo = { nonce: nonceAccount.nonce, nonceInstruction };
+    // First instruction in each tx must be SystemProgram.nonceAdvance(...);
+    //
+    // ==> user signs one extra popup the first time, none for subsequent upgrades.
 
-    for (const group of groups) {
-      // ── fetch blockhash BEFORE signing ─────────────────────────────────────
-      const { value: { blockhash: grpHash, lastValidBlockHeight: lvh } } =
-        await rpcWithRetry<{ value: { blockhash: string; lastValidBlockHeight: number } }>(
-          connection, "getLatestBlockhash", [{ commitment: "confirmed" }], "confirmed");
-      
-      // Apply the same blockhash to all transactions and partial-sign if needed
-      group.forEach(tx => (tx.recentBlockhash = grpHash));
-      if (programKeypair) group.find(tx=>tx===deployTx)?.partialSign(programKeypair);
+    // ── slice all prepared TX into groups of ≤ GROUP_SIZE ────────────────
+    const groups: Transaction[][] = [];
+    for (let i = 0; i < writeTxs.length; i += GROUP_SIZE) {
+      groups.push(writeTxs.slice(i, i + GROUP_SIZE));
+    }
 
-      // ── ONE wallet prompt for ALL transactions ────────────────────────────────────
-      const signedGroup = await wallet.signAllTransactions(group);
-      console.log(`[DEPLOY] Sending ${signedGroup.length} signed transactions with shared blockhash`);
+    for (const [gIdx, group] of groups.entries()) {
+      // 1️⃣ fresh hash *before* signing this batch
+      const { blockhash: grpHash, lastValidBlockHeight: lvh } =
+        await connection.getLatestBlockhash('confirmed');
 
-      // small delay so the hash propagates to "confirmed"
-      await yieldToBrowser(50);
+      group.forEach(tx => { tx.recentBlockhash = grpHash; });
+      if (programKeypair) group.find(tx => tx === deployTx)?.partialSign(programKeypair);
 
-      // ── broadcast all transactions, then confirm once ────────────────────────
+      // 2️⃣ one wallet prompt for this batch
+      const signed = await wallet.signAllTransactions(group);
+      console.log(`[DEPLOY] Batch ${gIdx + 1}/${groups.length} signed (${signed.length} TX)`);
+
+      // 3️⃣ fire signed TX quickly, but throttle in small bursts
       const sigs: string[] = [];
-      for (const tx of signedGroup) {
-        await throttle(40);               // keep 5 TPS
-        sigs.push(await connection.sendRawTransaction(tx.serialize(), SEND_OPTS));
+      for (let i = 0; i < signed.length; i++) {
+        if (i % BURST_SIZE === 0) await throttle(BURST_WAIT);
+        sigs.push(await connection.sendRawTransaction(signed[i].serialize(), SEND_OPTS));
       }
-      
-      // one confirm after everything is in the TPU
-      await connection.confirmTransaction(
-        { signature: sigs[sigs.length-1], blockhash: grpHash, lastValidBlockHeight: lvh },
-        'confirmed'
-      );
-      
-      // Verify all signatures were successful
-      const status = await connection.getSignatureStatuses(sigs);
-      status.value.forEach((st, idx) => {
-        if (st && st.err) throw new Error(`TX ${idx} failed: ${JSON.stringify(st.err)}`);
-      });
-      
+
+      // 4️⃣ confirm last sig; others are in the same / later slot
+      await connection.confirmTransaction({ signature: sigs.at(-1)!, blockhash: grpHash, lastValidBlockHeight: lvh }, 'confirmed');
+
+      // 5️⃣ verify every status
+      const st = await connection.getSignatureStatuses(sigs);
+      st.value.forEach((v, ix) => { if (v?.err) throw new Error(`TX ${ix} failed: ${JSON.stringify(v.err)}`); });
+
       signatures.push(...sigs);
-      
-      console.log('[DEPLOY] All transactions confirmed successfully');
     }
     
     // 4. Deploy from buffer
