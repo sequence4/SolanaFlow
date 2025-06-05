@@ -37,13 +37,6 @@ function leU32(n: number): Buffer {
   return buf;
 }
 
-// Helper for little-endian u64
-function leU64(n: bigint): Buffer {
-  const buf = Buffer.alloc(8);
-  buf.writeBigUInt64LE(n, 0);
-  return buf;
-}
-
 // Shared chunk size across upload logic
 export const MAX_CHUNK_SIZE = BPF_LOADER_CHUNK_SIZE;
 export const HEADER_LEN = BPF_BUFFER_HEADER_LEN;
@@ -225,7 +218,7 @@ export async function deployUpgradeableProgram(
       
       console.log(`[DEPLOY] Writing chunk ${chunkIndex + 1}/${numChunks}, offset: ${offset}, size: ${chunkSize} bytes`);
       
-      // Loader instruction tag 1 = Write
+      // Loader instruction tag 1 = Write (offset + raw bytes)
       const writeIx = new TransactionInstruction({
         programId: BPF_UPGRADE_LOADER_ID,
         keys: [
@@ -235,7 +228,6 @@ export async function deployUpgradeableProgram(
         data: Buffer.concat([
           leU32(1),                         // tag = Write
           leU32(offset),                    // offset
-          leU64(BigInt(chunkSize)),         // Vec<u8> length prefix
           Buffer.from(chunk),               // raw bytes
         ]),
       });
