@@ -4,7 +4,11 @@ import { Connection, clusterApiUrl } from "@solana/web3.js";
  * Shared connection to public Solana devnet RPC.
  * This avoids API key issues and matches Solana Playground's approach.
  */
-export const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
+export const connection = new Connection(
+  process.env.NEXT_PUBLIC_SOLANA_RPC ??
+    'https://api.devnet.solana.com',   // fallback if env missing
+  'confirmed'
+);
 
 /**  
  * Milliseconds to wait between tx sends to match Solana Playground throughput

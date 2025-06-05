@@ -30,8 +30,8 @@ import { ensureDurableNonce } from "@/utils/nonce";
 // Break into smaller groups to avoid blockhash expiry
 const GROUP_SIZE = 45;    // ~45 TX per signAllTransactions()
 // TPU likes ≤ 12 packets per UDP burst
-const BURST_SIZE = 12;    // identical to Playground
-const BURST_WAIT = 14;    // ms (one 160 KB burst per slot)
+const BURST_SIZE = 1;      // 1 tx at a time
+const BURST_WAIT = 250;    // 250 ms between sends  ≈4 tx/s
 
 // Helper function for little-endian u32 encoding
 function leU32(n: number): Buffer {
