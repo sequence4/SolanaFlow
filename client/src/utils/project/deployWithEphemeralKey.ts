@@ -1,8 +1,7 @@
-import { PublicKey } from '@solana/web3.js';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { deployWithEphemeralKey } from '../../lib/ephemeralDeployment';
-import { projectApi } from '../api';
-import { toast } from '../toast';
+import { projectApi } from '../../api/projectApi';
+import { toast } from 'sonner';
 
 /**
  * Handles the deployment of a Solana program using an ephemeral key approach
@@ -36,7 +35,15 @@ export async function handleEphemeralDeploy(
     onProgress(95, 'Deployment successful, registering with server...');
 
     // 2. Update the server with the deployed program ID
-    await projectApi.updateProjectProgramId(projectId, deployResult.programId.toString());
+    // Store the program ID in the project context
+    await projectApi.updateProject(projectId, {
+      id: projectId,
+      details: {
+        projectState: {
+          programId: deployResult.programId.toString()
+        }
+      }
+    });
 
     onProgress(100, 'Deployment complete!');
 
