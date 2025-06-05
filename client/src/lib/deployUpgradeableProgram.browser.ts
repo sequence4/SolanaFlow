@@ -66,8 +66,6 @@ type DeployOptions = {
   wallet: WalletContextState;
   programId?: PublicKey;
   onProgress?: (progress: DeployProgress) => void;
-  /** Use an older blockhash for extremely slow networks (gives ~105 blocks validity) */
-  useSafeHash?: boolean;
 };
 
 type DeployResult = {
@@ -87,32 +85,6 @@ async function yieldToBrowser(ms?: number): Promise<void> {
 }
 
 /**
- * Gets a blockhash that's already 45 blocks old, giving you ~105 blocks of validity
- * Only use this in very slow networks or when you need extra buffer time
- */
-async function getSafeHash(conn: Connection): Promise<{ blockhash: string, lastValidBlockHeight: number }> {
-  const { blockhash, lastValidBlockHeight } =
-      await conn.getLatestBlockhash({ commitment: 'confirmed' });
-  
-  try {
-    // Try to get an older block if available (45 blocks old)
-    const safeStart = lastValidBlockHeight - 105;    // 45-block head-start
-    if (safeStart > 0) {
-      const oldBlock = await conn.getBlock(safeStart, { commitment: 'confirmed' });
-      if (oldBlock && oldBlock.blockhash) {
-        console.log(`[DEPLOY] Using older blockhash with ~105 blocks of validity remaining`);
-        return { blockhash: oldBlock.blockhash, lastValidBlockHeight };
-      }
-    }
-  } catch (err) {
-    console.warn(`[DEPLOY] Could not get older blockhash, using latest: ${err}`);
-  }
-  
-  // Fall back to latest if older block retrieval fails
-  return { blockhash, lastValidBlockHeight };
-}
-
-/**
  * Deploys a Solana program using the BPF Upgradeable Loader
  * This function implements the full deployment flow:
  * 1. Create buffer account
@@ -129,7 +101,6 @@ export async function deployUpgradeableProgram(
     wallet,
     onProgress,
     programId: userProvidedProgramId,
-    useSafeHash,
   } = options;
   
   if (!wallet.publicKey || !wallet.signTransaction) {
@@ -319,22 +290,9 @@ export async function deployUpgradeableProgram(
     let batchIndex = 0;
     for (const group of groups) {
       // ── 2. attach ONE fresh hash to the whole group ──────────────────────────
-      let grpHash: string;
-      let lvh: number;
-
-      if (useSafeHash) {
-        // Use a hash that's already ~45 blocks old for extra validity time
-        const safeHashInfo = await getSafeHash(connection);
-        grpHash = safeHashInfo.blockhash;
-        lvh = safeHashInfo.lastValidBlockHeight;
-      } else {
-        // Use the latest hash with standard validity
-        const { value: { blockhash, lastValidBlockHeight } } =
-          await rpcWithRetry<{ value: { blockhash: string; lastValidBlockHeight: number } }>(
-            connection, "getLatestBlockhash", [{ commitment: "confirmed" }], "confirmed");
-        grpHash = blockhash;
-        lvh = lastValidBlockHeight;
-      }
+      const { value: { blockhash: grpHash, lastValidBlockHeight: lvh } } =
+        await rpcWithRetry<{ value: { blockhash: string; lastValidBlockHeight: number } }>(
+          connection, "getLatestBlockhash", [{ commitment: "confirmed" }], "confirmed");
 
       for (const tx of group) {
         tx.recentBlockhash = grpHash;
