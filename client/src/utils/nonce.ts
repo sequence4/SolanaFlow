@@ -51,7 +51,23 @@ export async function ensureDurableNonce(
   tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
   tx.partialSign(nonceKP);
   const signed = await wallet.signTransaction!(tx);
-  await connection.sendRawTransaction(signed.serialize(), { skipPreflight: true });
+
+  // 🚀 fire the tx
+  const sig = await connection.sendRawTransaction(signed.serialize(), {
+    skipPreflight: true,
+  });
+
+  // 🕒 1️⃣ wait for confirmation (commitment "confirmed")
+  await connection.confirmTransaction(sig, "confirmed");
+
+  // 🕒 2️⃣ poll until RPC returns a populated nonce (max 20 × 250 ms)
+  for (let i = 0; i < 20; i++) {
+    const info = await connection.getNonce(nonceKP.publicKey, "confirmed");
+    if (info?.nonce) break;
+    await new Promise((r) => setTimeout(r, 250));
+    if (i === 19)
+      throw new Error("Nonce account initialisation timed out after 5 s");
+  }
 
   // 6️⃣ persist for next sessions
   if (typeof window !== "undefined") {
