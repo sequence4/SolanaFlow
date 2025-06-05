@@ -1,18 +1,12 @@
-import { Connection } from "@solana/web3.js";
+import { Connection, clusterApiUrl } from "@solana/web3.js";
 
 /**
- * Shared connection to Helius Dev-net RPC.
- * NOTE: the key is public because all requests are made client-side.
- *       Swap to a server-side proxy (no NEXT_PUBLIC_ prefix) for main-net.
- *       Helius Developer tier → 5 TPS soft limit.
+ * Shared connection to public Solana devnet RPC.
+ * This avoids API key issues and matches Solana Playground's approach.
  */
-const RPC_URL = process.env.NEXT_PUBLIC_SOLANA_RPC;
-if (!RPC_URL) throw new Error("❌  NEXT_PUBLIC_SOLANA_RPC is missing");
+export const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
 
 /**  
- * Milliseconds to wait between tx sends so we stay < 5 TPS  
- * 1000 / (1000 / RATE_LIMIT_MS) ≈ 4.5 TPS – keeps Helius happy
+ * Milliseconds to wait between tx sends to match Solana Playground throughput
  */
-export const RATE_LIMIT_MS = 220;
-
-export const connection = new Connection(RPC_URL, "confirmed"); 
+export const RATE_LIMIT_MS = 14; 
