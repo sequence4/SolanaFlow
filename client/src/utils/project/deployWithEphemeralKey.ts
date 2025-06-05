@@ -1,4 +1,5 @@
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { Connection, PublicKey } from '@solana/web3.js';
+import type { WalletContextState } from '@solana/wallet-adapter-react';
 import { deployWithEphemeralKey } from '../../lib/ephemeralDeployment';
 import { projectApi } from '../../api/projectApi';
 import { toast } from 'sonner';
@@ -10,13 +11,11 @@ import { toast } from 'sonner';
 export async function handleEphemeralDeploy(
   projectId: string, 
   programSoData: ArrayBuffer,
+  connection: Connection,
+  wallet: WalletContextState,
   onProgress: (progress: number, message: string) => void
 ) {
   try {
-    // Use wallet adapter from context
-    const wallet = useWallet();
-    const { connection } = useConnection();
-
     if (!wallet.publicKey || !wallet.signTransaction) {
       throw new Error('Wallet not connected or does not support signing');
     }
