@@ -25,10 +25,12 @@ import {
 } from "@/utils/constants";
 import type { SendOptions } from '@solana/web3.js';
 
-// --- grouping & timing ---------------------------------------------------
-const GROUP_SIZE = 25;    // max legacy-TX per wallet popup
-const BURST_SIZE = 8;     // how many TX we fire before a tiny delay
-const BURST_WAIT = 40;    // ms – keeps us < 5 TPS (Helius soft limit)
+// ── batching tuned to Solana Playground ──────────────────────────
+// one wallet popup handles ≤ 90 legacy TX; most binaries fit in 1 prompt
+const GROUP_SIZE = 90;    // << 90 TX per signAllTransactions()
+// TPU likes ≤ 12 packets per UDP burst
+const BURST_SIZE = 12;    // << identical to Playground
+const BURST_WAIT = 20;    // ms – keeps us ≲ 5 TPS and is safely below 1 slot
 
 // Helper function for little-endian u32 encoding
 function leU32(n: number): Buffer {
@@ -239,10 +241,7 @@ export async function deployUpgradeableProgram(
       writeTx.feePayer = payer;
       writeTxs.push(writeTx);
       
-      if (chunkIndex % 20 === 0) {
-        // give the event-loop 1 ms - less frequent for better performance on large binaries
-        await yieldToBrowser(1);
-      }
+      // Don't yield during chunking (match Playground behavior)
     }
     
     const deployIx = new TransactionInstruction({
@@ -328,7 +327,7 @@ export async function deployUpgradeableProgram(
       // 3️⃣ fire signed TX quickly, but throttle in small bursts
       const sigs: string[] = [];
       for (let i = 0; i < signed.length; i++) {
-        if (i % BURST_SIZE === 0) await throttle(BURST_WAIT);
+        if (i !== 0 && i % BURST_SIZE === 0) await throttle(BURST_WAIT);
         sigs.push(await connection.sendRawTransaction(signed[i].serialize(), SEND_OPTS));
       }
 
