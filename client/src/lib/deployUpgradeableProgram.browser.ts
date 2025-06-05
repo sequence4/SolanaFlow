@@ -13,6 +13,7 @@ import {
   SYSVAR_RENT_PUBKEY,
   SYSVAR_CLOCK_PUBKEY,
   ComputeBudgetProgram,
+  NONCE_ACCOUNT_LENGTH
 } from "@solana/web3.js";
 import { connection as devnetConnection, RATE_LIMIT_MS } from "@/utils/connection";
 import { WalletContextState } from "@solana/wallet-adapter-react";
@@ -31,6 +32,56 @@ const GROUP_SIZE = 90;    // << 90 TX per signAllTransactions()
 // TPU likes ≤ 12 packets per UDP burst
 const BURST_SIZE = 12;    // << identical to Playground
 const BURST_WAIT = 20;    // ms – keeps us ≲ 5 TPS and is safely below 1 slot
+
+// For durable nonce support
+let NONCE_KEY: Keypair | null = null;
+
+/**
+ * Creates a durable nonce account if one doesn't exist yet
+ * @returns The keypair for the nonce account
+ */
+async function initializeNonceAccount(
+  connection: Connection,
+  payer: PublicKey,
+  wallet: WalletContextState
+): Promise<Keypair> {
+  // Use existing nonce account if we've already created one
+  if (NONCE_KEY) return NONCE_KEY;
+  
+  // Generate a new nonce account keypair
+  NONCE_KEY = Keypair.generate();
+  console.log(`[DEPLOY] Creating nonce account: ${NONCE_KEY.publicKey.toBase58()}`);
+  
+  // Calculate rent
+  const nonceRent = await connection.getMinimumBalanceForRentExemption(NONCE_ACCOUNT_LENGTH);
+  
+  // Create instruction to initialize nonce account
+  const createNonceIx = SystemProgram.createNonceAccount({
+    fromPubkey: payer,
+    noncePubkey: NONCE_KEY.publicKey,
+    authorizedPubkey: payer,
+    lamports: nonceRent,
+  });
+  
+  // Create transaction
+  const createNonceTx = new Transaction().add(createNonceIx);
+  createNonceTx.feePayer = payer;
+  
+  // Get blockhash for this transaction only
+  const { blockhash } = await connection.getLatestBlockhash('confirmed');
+  createNonceTx.recentBlockhash = blockhash;
+  
+  // Sign with wallet and nonce keypair
+  createNonceTx.partialSign(NONCE_KEY);
+  const signedTx = await wallet.signTransaction!(createNonceTx);
+  
+  // Send and confirm
+  const signature = await connection.sendRawTransaction(signedTx.serialize(), { skipPreflight: false });
+  await connection.confirmTransaction(signature, 'confirmed');
+  
+  console.log(`[DEPLOY] Nonce account created successfully: ${signature}`);
+  return NONCE_KEY;
+}
 
 // Helper function for little-endian u32 encoding
 function leU32(n: number): Buffer {
@@ -106,6 +157,10 @@ export async function deployUpgradeableProgram(
   // Cache the payer's public key to avoid repeated null checks
   const payer = wallet.publicKey;
   
+  // Initialize the durable nonce account (create if needed)
+  const nonceKey = await initializeNonceAccount(connection, payer, wallet);
+  console.log(`[DEPLOY] Using nonce account: ${nonceKey.publicKey.toBase58()}`);
+  
   // Convert ArrayBuffer to Uint8Array for processing
   const programData = new Uint8Array(soBytes);
   const dataLength = programData.length;
@@ -171,10 +226,19 @@ export async function deployUpgradeableProgram(
       .add(initBufIx);      // initialise buffer, authority = wallet
     
     createBufferTx.feePayer = payer;
-    const { value: { blockhash, lastValidBlockHeight: lvh } } =
-      await rpcWithRetry<{ value: { blockhash: string; lastValidBlockHeight: number } }>(connection, "getLatestBlockhash",
-        [{ commitment: "confirmed" }], "confirmed");
-    createBufferTx.recentBlockhash = blockhash;
+    
+    // Add nonce advance instruction at the beginning
+    const advanceNonceIx = SystemProgram.nonceAdvance({
+      noncePubkey: nonceKey.publicKey,
+      authorizedPubkey: payer,
+    });
+    createBufferTx.instructions.unshift(advanceNonceIx);
+    
+    // Set nonceInfo to tell the SDK this is a nonced transaction
+    createBufferTx.nonceInfo = {
+      nonce: nonceKey.publicKey.toString(),
+      nonceInstruction: advanceNonceIx,
+    };
     
     // Sign with wallet + bufferKey
     createBufferTx.partialSign(bufferKey);
@@ -185,15 +249,8 @@ export async function deployUpgradeableProgram(
     );
     signatures.push(createBufferSig);
     
-    // Wait for confirmation with full form
-    await connection.confirmTransaction(
-      { 
-        signature: createBufferSig, 
-        blockhash, 
-        lastValidBlockHeight: lvh 
-      },
-      'confirmed'  // match the commitment used for the hash
-    );
+    // Wait for confirmation with simpler form for nonced transactions
+    await connection.confirmTransaction(createBufferSig, 'confirmed');
     console.log(`[DEPLOY] Buffer created successfully. Signature: ${createBufferSig}`);
     
     // 3. Write program data in chunks
@@ -313,11 +370,27 @@ export async function deployUpgradeableProgram(
     }
 
     for (const [gIdx, group] of groups.entries()) {
-      // 1️⃣ fresh hash *before* signing this batch
-      const { blockhash: grpHash, lastValidBlockHeight: lvh } =
-        await connection.getLatestBlockhash('confirmed');
-
-      group.forEach(tx => { tx.recentBlockhash = grpHash; });
+      // Create nonce advance instruction for each transaction in the group
+      for (const tx of group) {
+        // Create nonce advance instruction - MUST be first instruction
+        const advanceIx = SystemProgram.nonceAdvance({
+          noncePubkey: nonceKey.publicKey,
+          authorizedPubkey: payer,
+        });
+        
+        // Add to beginning of instructions
+        tx.instructions.unshift(advanceIx);
+        
+        // Set nonceInfo to tell the SDK this is a nonced transaction
+        tx.nonceInfo = {
+          nonce: nonceKey.publicKey.toString(),  // nonce must be a string
+          nonceInstruction: advanceIx,
+        };
+        
+        // No need to set recentBlockhash - it will be derived from the nonce
+      }
+      
+      // Partial sign with program keypair if needed
       if (programKeypair) group.find(tx => tx === deployTx)?.partialSign(programKeypair);
 
       // 2️⃣ one wallet prompt for this batch
@@ -331,8 +404,8 @@ export async function deployUpgradeableProgram(
         sigs.push(await connection.sendRawTransaction(signed[i].serialize(), SEND_OPTS));
       }
 
-      // 4️⃣ confirm last sig; others are in the same / later slot
-      await connection.confirmTransaction({ signature: sigs.at(-1)!, blockhash: grpHash, lastValidBlockHeight: lvh }, 'confirmed');
+      // 4️⃣ confirm last sig; for nonced transactions we only need the signature
+      await connection.confirmTransaction(sigs.at(-1)!, 'confirmed');
 
       // 5️⃣ verify every status
       const st = await connection.getSignatureStatuses(sigs);
