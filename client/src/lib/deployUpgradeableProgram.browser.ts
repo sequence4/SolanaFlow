@@ -41,8 +41,8 @@ function leU32(n: number): Buffer {
 }
 
 // Shared chunk size across upload logic
-// 900 B payload + nonceAdvance instr + metadata ≤ 1 232-byte tx cap
-export const MAX_CHUNK_SIZE = 900;   // was 1 024
+// 850 B payload keeps write-tx ≈1 212 B, safely <1 232-byte limit
+export const MAX_CHUNK_SIZE = 850;   // was 900
 export const HEADER_LEN = BPF_BUFFER_HEADER_LEN;
 
 // Bypass RPC simulation for all non-funding TXs;
