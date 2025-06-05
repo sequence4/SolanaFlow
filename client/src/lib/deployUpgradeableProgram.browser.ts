@@ -12,6 +12,7 @@ import {
   Keypair,
   SYSVAR_RENT_PUBKEY,
   SYSVAR_CLOCK_PUBKEY,
+  ComputeBudgetProgram,
 } from "@solana/web3.js";
 import { connection as devnetConnection, RATE_LIMIT_MS } from "@/utils/connection";
 import { WalletContextState } from "@solana/wallet-adapter-react";
@@ -42,7 +43,7 @@ const SEND_OPTS: SendOptions = { skipPreflight: true, maxRetries: 5 };
 // Phantom (current versions) cap signAllTransactions at ~100 TXs; stay well below.
 const MAX_BATCH = 12;  // 12×900 B ≃ 10 KB – sim & preflight finish < 20 s
 // Phantom UI stays reliable below 100 tx; use a safe margin.
-const PROMPT_GROUP_SIZE = 90;          // one Phantom pop-up handles ≤ 90 tx
+const PROMPT_GROUP_SIZE = 30;          // one Phantom pop-up handles ≤ 30 tx
 
 type DeployProgress = {
   stage: 'create' | 'write' | 'deploy' | 'complete';
@@ -126,7 +127,9 @@ export async function deployUpgradeableProgram(
   
   // Rent-exempt lamports for the buffer's exact length
   const lamports = await connection.getMinimumBalanceForRentExemption(bufferSpace);
-  const progLamports = await connection.getMinimumBalanceForRentExemption(0);
+  const progLamports = programKeypair
+    ? await connection.getMinimumBalanceForRentExemption(0)
+    : 0;
   
   console.log(`[DEPLOY] Buffer: ${bufferKey.publicKey.toBase58()}`);
   console.log(`[DEPLOY] Program ID: ${effectiveProgramId.toBase58()}`);
@@ -157,7 +160,11 @@ export async function deployUpgradeableProgram(
     
     onProgress?.({ stage: 'create', uploaded: 0, total: dataLength });
 
+    const priorityIx = ComputeBudgetProgram.setComputeUnitPrice({
+      microLamports: 10_000,          // ≈0.00001 SOL
+    });
     const createBufferTx = new Transaction()
+      .add(priorityIx)                // must be first
       .add(createBufAcct)   // create account
       .add(initBufIx);      // initialise buffer, authority = wallet
     
@@ -226,7 +233,10 @@ export async function deployUpgradeableProgram(
         ]),
       });
       
-      const writeTx = new Transaction().add(writeIx);
+      const priorityIx = ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 });
+      const writeTx = new Transaction()
+        .add(priorityIx)
+        .add(writeIx);
       writeTx.feePayer = payer;
       writeTxs.push(writeTx);
       
@@ -267,6 +277,9 @@ export async function deployUpgradeableProgram(
       deployTx = deployTx.add(createProgAcct);
     }
     deployTx = deployTx.add(deployIx);
+    
+    const deployPriorityIx = ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 });
+    deployTx.instructions.unshift(deployPriorityIx);   // prepend
     
     deployTx.feePayer = payer;
     
