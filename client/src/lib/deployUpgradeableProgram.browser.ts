@@ -29,7 +29,7 @@ import type { SendOptions } from '@solana/web3.js';
 // Override in .env (e.g. NEXT_PUBLIC_TX_BURST_SIZE=5 NEXT_PUBLIC_TX_BURST_WAIT=100
 // when you move to QuickNode Build).
 const BURST_SIZE = Number(process.env.NEXT_PUBLIC_TX_BURST_SIZE ?? 1);
-const BURST_WAIT = Number(process.env.NEXT_PUBLIC_TX_BURST_WAIT ?? 250); // ms
+const BURST_WAIT = Number(process.env.NEXT_PUBLIC_TX_BURST_WAIT ?? 350); // ms
 
 // Helper function for little-endian u32 encoding
 function leU32(n: number): Buffer {
@@ -207,7 +207,12 @@ export async function deployUpgradeableProgram(
         { pubkey: bufferKey.publicKey,   isSigner: false, isWritable: true },
         { pubkey: bufferAuthority.publicKey, isSigner: true,  isWritable: false },
       ],
-      data: leU32(0),                           // only the 4-byte tag
+      // tag = 0  |  COption::Some (u32 = 1)  |  <32-byte authority pubkey>
+      data: Buffer.concat([
+        leU32(0),                // InitializeBuffer
+        leU32(1),                // COption::Some
+        bufferAuthority.publicKey.toBuffer(),
+      ]),
     });
     
     onProgress?.({ stage: 'create', uploaded: 0, total: dataLength });
