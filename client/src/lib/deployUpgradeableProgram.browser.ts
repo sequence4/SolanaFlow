@@ -350,36 +350,42 @@ export async function deployUpgradeableProgram(
       // ❶ stamp the blockhash
       group.forEach(tx => { tx.recentBlockhash = blockhash });
 
-      // ❷ Pre-sign local (off-chain) keys
-      const locals = [bufferAuthority, programKeypair, bufferKey]
-        .filter((kp): kp is Keypair => kp !== null);
-      group.forEach(tx =>
-        locals.forEach(kp => {
-          if (tx.signatures.some(s => s.publicKey.equals(kp.publicKey))) {
-            tx.partialSign(kp);
-          }
-        }),
-      );
-
-      // ❸ Ask Phantom ONLY for txs that need the wallet
+      // ❷ Ask Phantom ONLY for txs that need the wallet
       const needsWallet = group.filter(
         tx => tx.feePayer?.equals(payer) ||            // wallet pays fee
               tx.signatures.some(s => s.publicKey.equals(payer)), // or is an additional signer
       );
 
+      // ❸ Let Phantom add its signatures FIRST
+      const signedByWallet = [];
       if (needsWallet.length) {
         if (!wallet.signAllTransactions) {
           throw new Error("Wallet doesn't support signing multiple transactions");
         }
         const signedSubset = await wallet.signAllTransactions(needsWallet);
-        // merge the wallet sigs back into original objects
+        
+        // merge Phantom-signed copies back into the original array
         needsWallet.forEach((orig, i) => {
-          const signed = signedSubset[i];
-          orig.addSignature(payer, signed.signatures.find(s => s.publicKey.equals(payer))!.signature!);
+          const withWallet = signedSubset[i];
+          orig.addSignature(
+            payer,
+            withWallet.signatures.find(s => s.publicKey.equals(payer))!.signature!
+          );
         });
       }
 
-      // ❹ fire & confirm
+      // ❹ NOW append purely-offline signatures
+      const locals = [bufferAuthority, programKeypair, bufferKey]
+        .filter((kp): kp is Keypair => kp !== null);
+      group.forEach(tx =>
+        locals.forEach(kp => {
+          if (tx.signatures.some(s => s.publicKey.equals(kp.publicKey))) {
+            tx.partialSign(kp);        // safe – Phantom already signed
+          }
+        })
+      );
+
+      // ❺ fire & confirm
       const sigs = [];
       for (let i = 0; i < group.length; i++) {
         if (i !== 0 && i % BURST_SIZE === 0) await throttle(BURST_WAIT);
