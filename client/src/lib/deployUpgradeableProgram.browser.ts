@@ -347,39 +347,45 @@ export async function deployUpgradeableProgram(
 
     // Helper to send and confirm transactions for a group
     async function sendAndConfirm(group: Transaction[], blockhash: string, lastValidBlockHeight: number) {
-      /* 1️⃣  Send the ORIGINAL Transaction objects to Phantom.
-             → Never copy-paste signatures – keep Phantom's fully-signed Tx
-             → We'll add the off-chain sigs afterwards                           */
-      const txsNeedingWalletSig = group.filter(
-        tx => tx.feePayer && tx.feePayer.equals(payer)
-      );
+      /* 1️⃣  PRE-SIGN all purely off-chain keys _before_ Phantom ever sees the Tx */
+      const addLocalSignatures = (tx: Transaction) => {
+        const locals = [bufferAuthority, programKeypair, bufferKey]
+          .filter((kp): kp is Keypair => kp !== null && kp !== undefined);
+        locals.forEach(kp => tx.partialSign(kp));   // only once, _before_ Phantom
+      };
+      group.forEach(addLocalSignatures);
+
+      /* 2️⃣  Ask Phantom to sign ONLY the Tx's whose fee-payer == wallet */
+      const needsWallet = group.filter(tx => tx.feePayer?.equals(payer));
 
       let signed: Transaction[];
-      if (txsNeedingWalletSig.length) {
+      if (needsWallet.length) {
         if (!wallet.signAllTransactions) {
           throw new Error("Wallet doesn't support signing multiple transactions");
         }
-        const signedSubset = await wallet.signAllTransactions(txsNeedingWalletSig);
-
-        /* ⬇️  Replace the original objects with Phantom-signed ones — keep order */
+        const subset = await wallet.signAllTransactions(needsWallet);   // Phantom returns NEW objects
+        
+        /* 3️⃣  Keep Phantom's objects and RE-APPLY the _already computed_ local sigs with addSignature() */
         signed = group.map(tx => {
-          const i = txsNeedingWalletSig.indexOf(tx);
-          return i === -1 ? tx : signedSubset[i];
+          const i = needsWallet.indexOf(tx);
+          const withWallet = i === -1 ? tx : subset[i];
+
+          const localKeys = [bufferAuthority, programKeypair, bufferKey]
+            .filter((kp): kp is Keypair => kp !== null && kp !== undefined);
+            
+          localKeys.forEach(kp => {
+            if (withWallet.signatures.every(s => !s.publicKey.equals(kp.publicKey))) {
+              const sig = tx.signatures.find(s => s.publicKey.equals(kp.publicKey))?.signature;
+              if (sig) {
+                withWallet.addSignature(kp.publicKey, sig);   // does NOT touch other sigs
+              }
+            }
+          });
+          return withWallet;
         });
       } else {
         signed = group;
       }
-
-      /* 2️⃣  NOW add the purely off-chain signatures */
-      signed.forEach(tx => {
-        if (tx.signatures.some(s => s.publicKey.equals(bufferAuthority.publicKey)))
-          tx.partialSign(bufferAuthority);
-        if (programKeypair &&
-            tx.signatures.some(s => s.publicKey.equals(programKeypair.publicKey)))
-          tx.partialSign(programKeypair);
-        if (tx.signatures.some(s => s.publicKey.equals(bufferKey.publicKey)))
-          tx.partialSign(bufferKey);
-      });
 
       console.log(`[DEPLOY] Batch signed (${signed.length} TX)`);
 
