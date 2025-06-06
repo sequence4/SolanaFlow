@@ -207,11 +207,7 @@ export async function deployUpgradeableProgram(
         { pubkey: bufferKey.publicKey,   isSigner: false, isWritable: true },
         { pubkey: bufferAuthority.publicKey, isSigner: true,  isWritable: false },
       ],
-      data: Buffer.concat([
-        leU32(0),                               // 0 = InitializeBuffer
-        Buffer.from([1]),                       // Option<Pubkey>::Some (1 byte)
-        bufferAuthority.publicKey.toBuffer(),   // authority = ephem key
-      ]),
+      data: leU32(0),                           // only the 4-byte tag
     });
     
     onProgress?.({ stage: 'create', uploaded: 0, total: dataLength });
