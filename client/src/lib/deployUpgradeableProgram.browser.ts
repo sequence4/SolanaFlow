@@ -88,7 +88,7 @@ type DeployResult = {
  * so you have extra runway after signing.
  */
 // Less runway now that signing is quick
-const SAFE_OFFSET = 10;    // ≈5 s on Devnet
+const SAFE_OFFSET = 0;    // use the freshest block-hash
 async function getSafeBlockhash(conn: Connection) {
   const latest = await conn.getLatestBlockhash('confirmed');
   const currentSlot = await conn.getSlot('confirmed');
@@ -325,8 +325,18 @@ export async function deployUpgradeableProgram(
     
     // groups[0] = createBufferTx + ALL writes, groups[1] = deployTx
     const groups: Transaction[][] = [];
-    groups.push(writeTxs.slice(0, -1)); // everything except last
-    groups.push([writeTxs.at(-1)!]);    // last (deploy)
+    
+    // First group is just the createBufferTx (includes funding the bufferAuthority)
+    groups.push([createBufferTx]);
+    
+    // --- split all write-TXs into ≤25-TX chunks ---------------------------
+    const WRITE_BATCH = 25;            // ~10 s at current throttle
+    for (let i = 1; i < writeTxs.length - 1; i += WRITE_BATCH) {
+      groups.push(writeTxs.slice(i, Math.min(i + WRITE_BATCH, writeTxs.length - 1)));
+    }
+    
+    // Last group is just the deployTx
+    groups.push([writeTxs[writeTxs.length - 1]]);
 
     // Helper to send and confirm transactions for a group
     async function sendAndConfirm(group: Transaction[], blockhash: string, lastValidBlockHeight: number) {
