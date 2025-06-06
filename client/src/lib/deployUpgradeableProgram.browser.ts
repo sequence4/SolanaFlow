@@ -382,10 +382,7 @@ export async function deployUpgradeableProgram(
           localKeys.forEach(kp => {
             /* only attach if the compiled message needs this signer */
             if (withWallet.signatures.some(s => s.publicKey.equals(kp.publicKey))) {
-              const sig = tx.signatures.find(s => s.publicKey.equals(kp.publicKey))?.signature;
-              if (sig) {
-                withWallet.addSignature(kp.publicKey, sig);   // does NOT touch other sigs
-              }
+              withWallet.partialSign(kp);
             }
           });
           return withWallet;
