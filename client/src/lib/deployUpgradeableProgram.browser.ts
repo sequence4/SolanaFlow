@@ -217,12 +217,7 @@ export async function deployUpgradeableProgram(
         { pubkey: bufferKey.publicKey,   isSigner: false, isWritable: true },
         { pubkey: bufferAuthority.publicKey, isSigner: true,  isWritable: false },
       ],
-      // tag = 0  |  COption::Some (u32 = 1)  |  <32-byte authority pubkey>
-      data: Buffer.concat([
-        leU32(0),                // InitializeBuffer
-        leU32(1),                // COption::Some
-        bufferAuthority.publicKey.toBuffer(),
-      ]),
+      data: Buffer.from([0]),   // one-byte tag, nothing else
     });
     
     onProgress?.({ stage: 'create', uploaded: 0, total: dataLength });
@@ -267,9 +262,9 @@ export async function deployUpgradeableProgram(
           { pubkey: bufferAuthority.publicKey, isSigner: true,  isWritable: false },
         ],
         data: Buffer.concat([
-          leU32(1),                         // tag = Write
-          leU32(offset),                    // offset
-          Buffer.from(chunk),               // raw bytes
+          Buffer.from([1]),  // tag = Write
+          leU32(offset),
+          Buffer.from(chunk),
         ]),
       });
       
@@ -294,8 +289,8 @@ export async function deployUpgradeableProgram(
         { pubkey: payer,        isSigner: true,  isWritable: false },
       ],
       data: Buffer.concat([
-        leU32(2),                       // Loader instruction tag 2 = DeployWithMaxDataLen
-        leU64(bufferSpace),             // max_data_len (u64)
+        Buffer.from([2]),    // tag = DeployWithMaxDataLen
+        leU64(bufferSpace),  // max_data_len (u64)
       ]),
     });
     
@@ -420,8 +415,8 @@ export async function deployUpgradeableProgram(
               { pubkey: payer,            isSigner: true,  isWritable: true },
             ],
             data: Buffer.concat([
-              leU32(5),                      // 5 = ExtendProgram
-              leU64(newMax),                 // new max_data_len (u64)
+              Buffer.from([6]), // tag = ExtendProgram
+              leU64(newMax),    // additional_bytes (u64)
             ]),
           });
 
