@@ -31,8 +31,8 @@ const GROUP_SIZE = 10_000;
 
 // Break into smaller groups to avoid blockhash expiry
 // TPU likes ≤ 12 packets per UDP burst
-const BURST_SIZE = 1;      // 1 tx at a time (≈4 tx/s with 250ms wait)
-const BURST_WAIT = 250;    // 250 ms between sends - stays under Helius 5 tx/s limit
+const BURST_SIZE = 5;      // 1 tx at a time (≈4 tx/s with 250ms wait)
+const BURST_WAIT = 100;    // 250 ms between sends - stays under Helius 5 tx/s limit
 
 // Helper function for little-endian u32 encoding
 function leU32(n: number): Buffer {
@@ -71,6 +71,44 @@ type DeployResult = {
   programId: PublicKey;
   signatures: string[];
 };
+
+/**
+ * Returns a blockhash that is ~SAFE_OFFSET slots old,
+ * so you have extra runway after signing.
+ */
+const SAFE_OFFSET = 100;   // ≈45–50 s on Devnet
+async function getSafeBlockhash(conn: Connection) {
+  const latest = await conn.getLatestBlockhash('confirmed');
+  const currentSlot = await conn.getSlot('confirmed');
+  const targetSlot = Math.max(0, currentSlot - SAFE_OFFSET);
+
+  // query that older slot; fall back to latest if rpc/node can't serve it
+  try {
+    const oldBlock = await conn.getBlock(targetSlot, { commitment: 'confirmed' });
+    if (oldBlock?.blockhash) {
+      return { 
+        blockhash: oldBlock.blockhash,
+        lastValidBlockHeight: latest.lastValidBlockHeight - SAFE_OFFSET 
+      };
+    }
+  } catch (_) { /* ignore – rare on Devnet */ }
+
+  return latest;  // use the fresh one if lookup fails
+}
+
+// Helper function for confirming transactions with proper blockhash tracking
+async function confirmWithBlockhash(
+  conn: Connection,
+  signature: string,
+  blockhash: string,
+  lastValidBlockHeight: number,
+) {
+  const res = await conn.confirmTransaction(
+    { signature, blockhash, lastValidBlockHeight },
+    'confirmed'
+  );
+  if (res.value.err) throw new Error(JSON.stringify(res.value.err));
+}
 
 /**
  * Yields to the browser's event loop, allowing UI updates
@@ -268,8 +306,8 @@ export async function deployUpgradeableProgram(
     }
 
     for (const [gIdx, group] of groups.entries()) {
-      // 🆕 fetch a recent blockhash once for this batch
-      const { blockhash } = await connection.getLatestBlockhash('confirmed'); // valid ~150 slots
+      // 🆕 fetch a safer blockhash (≈100 slots old) for this batch
+      const { blockhash, lastValidBlockHeight } = await getSafeBlockhash(connection);
       group.forEach(tx => { tx.recentBlockhash = blockhash; });
       
       // sign buffer-creation tx only now that it has a blockhash
@@ -289,8 +327,13 @@ export async function deployUpgradeableProgram(
         sigs.push(await connection.sendRawTransaction(signed[i].serialize(), SEND_OPTS));
       }
 
-      // 4️⃣ confirm only the LAST signature of this group
-      await connection.confirmTransaction(sigs.at(-1)!, 'confirmed');
+      // 4️⃣ confirm only the LAST signature of this group using long-form confirmation
+      await confirmWithBlockhash(
+        connection,
+        sigs.at(-1)!,
+        blockhash,
+        lastValidBlockHeight
+      );
 
       // 5️⃣ verify every status
       const st = await connection.getSignatureStatuses(sigs);
