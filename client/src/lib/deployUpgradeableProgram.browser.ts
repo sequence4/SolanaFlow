@@ -23,16 +23,12 @@ import {
 } from "@/utils/constants";
 import type { SendOptions } from '@solana/web3.js';
 
-// We want exactly TWO wallet prompts:
-//   • prompt #1  → createBufferTx + ALL write chunks
-//   • prompt #2  → single deployTx
-// So we set GROUP_SIZE to a huge number so nothing splits.
-const GROUP_SIZE = 10_000;
-
-// Break into smaller groups to avoid blockhash expiry
-// TPU likes ≤ 12 packets per UDP burst
-const BURST_SIZE = 5;      // 1 tx at a time (≈4 tx/s with 250ms wait)
-const BURST_WAIT = 100;    // 250 ms between sends - stays under Helius 5 tx/s limit
+// ── Throttle settings ──────────────────────────────────────────────
+// Defaults replicate SolPG's public-cluster pacing ≈ 4 TX/s.
+// Override in .env (e.g. NEXT_PUBLIC_TX_BURST_SIZE=5 NEXT_PUBLIC_TX_BURST_WAIT=100
+// when you move to QuickNode Build).
+const BURST_SIZE = Number(process.env.NEXT_PUBLIC_TX_BURST_SIZE ?? 1);
+const BURST_WAIT = Number(process.env.NEXT_PUBLIC_TX_BURST_WAIT ?? 250); // ms
 
 // Helper function for little-endian u32 encoding
 function leU32(n: number): Buffer {
@@ -154,6 +150,7 @@ export async function deployUpgradeableProgram(
   const signatures: string[] = [];
   
   console.log(`[DEPLOY] Starting program deployment, program size: ${dataLength} bytes`);
+  console.log(`[DEPLOY] Throttle: ${BURST_SIZE} tx every ${BURST_WAIT} ms`);
   
   // 1. Create a *real* buffer account (Keypair, not PDA)
   const bufferKey = Keypair.generate();
@@ -288,7 +285,10 @@ export async function deployUpgradeableProgram(
     }
     deployTx = deployTx.add(deployIx);
     
-    const deployPriorityIx = ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 60_000 });
+    // Priority fee – env-driven, default 60 000 µ◎ like SolPG
+    const CU_PRICE = Number(process.env.NEXT_PUBLIC_SOL_PRIORITY_FEE ?? 60_000);
+    const deployPriorityIx =
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: CU_PRICE });
     deployTx.instructions.unshift(deployPriorityIx);   // prepend
     
     deployTx.feePayer = payer;
@@ -300,34 +300,31 @@ export async function deployUpgradeableProgram(
     groups.push(writeTxs.slice(0, -1)); // everything except last
     groups.push([writeTxs.at(-1)!]);    // last (deploy)
 
-    // Ensure wallet supports signAllTransactions
-    if (!wallet.signAllTransactions) {
-      throw new Error("Wallet doesn't support signing multiple transactions");
-    }
-
-    for (const [gIdx, group] of groups.entries()) {
-      // 🆕 fetch a safer blockhash (≈100 slots old) for this batch
-      const { blockhash, lastValidBlockHeight } = await getSafeBlockhash(connection);
-      group.forEach(tx => { tx.recentBlockhash = blockhash; });
-      
+    // Helper to send and confirm transactions for a group
+    async function sendAndConfirm(group: Transaction[], blockhash: string, lastValidBlockHeight: number) {
       // sign buffer-creation tx only now that it has a blockhash
       group.find(tx => tx === createBufferTx)?.partialSign(bufferKey);
       
       // Partial sign with program keypair if needed
       if (programKeypair) group.find(tx => tx === deployTx)?.partialSign(programKeypair);
 
-      // 2️⃣ one wallet prompt for this batch
+      // Ensure wallet supports signAllTransactions
+      if (!wallet.signAllTransactions) {
+        throw new Error("Wallet doesn't support signing multiple transactions");
+      }
+      
+      // One wallet prompt for this batch
       const signed = await wallet.signAllTransactions(group);
-      console.log(`[DEPLOY] Batch ${gIdx + 1}/${groups.length} signed (${signed.length} TX)`);
+      console.log(`[DEPLOY] Batch signed (${signed.length} TX)`);
 
-      // 3️⃣ fire signed TX quickly, but throttle in small bursts
+      // Fire signed TX quickly, but throttle in small bursts
       const sigs: string[] = [];
       for (let i = 0; i < signed.length; i++) {
         if (i !== 0 && i % BURST_SIZE === 0) await throttle(BURST_WAIT);
         sigs.push(await connection.sendRawTransaction(signed[i].serialize(), SEND_OPTS));
       }
 
-      // 4️⃣ confirm only the LAST signature of this group using long-form confirmation
+      // Confirm only the LAST signature of this group using long-form confirmation
       await confirmWithBlockhash(
         connection,
         sigs.at(-1)!,
@@ -335,15 +332,69 @@ export async function deployUpgradeableProgram(
         lastValidBlockHeight
       );
 
-      // 5️⃣ verify every status
+      // Verify every status
       const st = await connection.getSignatureStatuses(sigs);
       st.value.forEach((v, ix) => { if (v?.err) throw new Error(`TX ${ix} failed: ${JSON.stringify(v.err)}`); });
-
-      signatures.push(...sigs);
       
-      // Log buffer creation success if this was the first group
-      if (gIdx === 0) {
-        console.log(`[DEPLOY] Buffer created successfully. Signature: ${sigs[0]}`);
+      return sigs;
+    }
+
+    for (const [gIdx, group] of groups.entries()) {
+      try {
+        // Fetch a safer blockhash (≈100 slots old) for this batch
+        const { blockhash, lastValidBlockHeight } = await getSafeBlockhash(connection);
+        group.forEach(tx => { tx.recentBlockhash = blockhash; });
+        
+        const sigs = await sendAndConfirm(group, blockhash, lastValidBlockHeight);
+        signatures.push(...sigs);
+        
+        // Log buffer creation success if this was the first group
+        if (gIdx === 0) {
+          console.log(`[DEPLOY] Buffer created successfully. Signature: ${sigs[0]}`);
+        }
+      } catch (e: any) {
+        // Handle AccountDataTooSmall error for program upgrades
+        if (userProvidedProgramId && /AccountDataTooSmall/.test(e.message)) {
+          console.warn("[DEPLOY] Program data too small – extending and retrying");
+
+          // Bump max_data_len by 10%
+          const newMax = bufferSpace + Math.ceil(bufferSpace * 0.10);
+
+          const extendIx = new TransactionInstruction({
+            programId: BPF_UPGRADE_LOADER_ID,
+            keys: [
+              { pubkey: programDataPubkey, isSigner: false, isWritable: true },
+              { pubkey: payer,            isSigner: true,  isWritable: true },
+            ],
+            data: Buffer.concat([
+              leU32(5),                      // 5 = ExtendProgram (or tag 2 re-used)
+              Buffer.from(new Uint32Array([newMax]).buffer),
+            ]),
+          });
+
+          const extendTx = new Transaction().add(extendIx);
+          extendTx.feePayer = payer;
+          
+          const { blockhash, lastValidBlockHeight } = await getSafeBlockhash(connection);
+          extendTx.recentBlockhash = blockhash;
+
+          const signed = await wallet.signTransaction(extendTx);
+          const sig = await connection.sendRawTransaction(signed.serialize(), SEND_OPTS);
+          await confirmWithBlockhash(
+            connection,
+            sig,
+            blockhash,
+            lastValidBlockHeight
+          );
+
+          console.log(`[DEPLOY] Program extended successfully. Signature: ${sig}`);
+          
+          // Now re-run the original upgrade logic
+          return await deployUpgradeableProgram(options);
+        }
+        
+        // Re-throw other errors
+        throw e;
       }
     }
     
