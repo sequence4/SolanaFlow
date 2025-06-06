@@ -173,7 +173,6 @@ export async function deployUpgradeableProgram(
     createBufferTx.feePayer = payer;
     
     // 👉 DO NOT send or confirm yet – just queue it
-    createBufferTx.partialSign(bufferKey);
     const writeTxs: Transaction[] = [createBufferTx];  // start with buffer creation as first tx
     
     // 3. Write program data in chunks
@@ -272,6 +271,9 @@ export async function deployUpgradeableProgram(
       // 🆕 fetch a recent blockhash once for this batch
       const { blockhash } = await connection.getLatestBlockhash('confirmed'); // valid ~150 slots
       group.forEach(tx => { tx.recentBlockhash = blockhash; });
+      
+      // sign buffer-creation tx only now that it has a blockhash
+      group.find(tx => tx === createBufferTx)?.partialSign(bufferKey);
       
       // Partial sign with program keypair if needed
       if (programKeypair) group.find(tx => tx === deployTx)?.partialSign(programKeypair);
