@@ -41,6 +41,13 @@ function leU32(n: number): Buffer {
   return buf;
 }
 
+// Helper for u32 buffer (for ExtendProgram)
+function leU32_buf(n: number): Buffer {
+  const b = Buffer.alloc(4);
+  b.writeUInt32LE(n, 0);
+  return b;
+}
+
 // Helper for little-endian u64 encoding
 function leU64(n: number | bigint): Buffer {
   const buf = Buffer.alloc(8);
@@ -215,7 +222,7 @@ export async function deployUpgradeableProgram(
       programId: BPF_UPGRADE_LOADER_ID,
       keys: [
         { pubkey: bufferKey.publicKey,   isSigner: false, isWritable: true },
-        { pubkey: bufferAuthority.publicKey, isSigner: true,  isWritable: false },
+        { pubkey: bufferAuthority.publicKey, isSigner: false, isWritable: false },
       ],
       data: Buffer.from([0]),   // one-byte tag, nothing else
     });
@@ -262,8 +269,9 @@ export async function deployUpgradeableProgram(
           { pubkey: bufferAuthority.publicKey, isSigner: true,  isWritable: false },
         ],
         data: Buffer.concat([
-          Buffer.from([1]),  // tag = Write
-          leU32(offset),
+          Buffer.from([1]),        // tag
+          leU32(offset),           // offset
+          leU64(chunk.length),     // Vec<u8> length (u64 per bincode)
           Buffer.from(chunk),
         ]),
       });
@@ -279,18 +287,18 @@ export async function deployUpgradeableProgram(
     const deployIx = new TransactionInstruction({
       programId: BPF_UPGRADE_LOADER_ID,
       keys: [
-        { pubkey: payer,        isSigner: true,  isWritable: true },
-        { pubkey: programDataPubkey,        isSigner: false, isWritable: true },
-        { pubkey: effectiveProgramId,       isSigner: !!programKeypair, isWritable: true },
-        { pubkey: bufferKey.publicKey,      isSigner: false, isWritable: true },
-        { pubkey: SYSVAR_RENT_PUBKEY,       isSigner: false, isWritable: false },
-        { pubkey: SYSVAR_CLOCK_PUBKEY,      isSigner: false, isWritable: false },
-        { pubkey: SystemProgram.programId,  isSigner: false, isWritable: false },
-        { pubkey: payer,        isSigner: true,  isWritable: false },
+        { pubkey: payer,               isSigner: true,  isWritable: true },   // payer
+        { pubkey: programDataPubkey,   isSigner: false, isWritable: true },
+        { pubkey: effectiveProgramId,  isSigner: !!programKeypair, isWritable: true },
+        { pubkey: bufferKey.publicKey, isSigner: false, isWritable: true },
+        { pubkey: SYSVAR_RENT_PUBKEY,  isSigner: false, isWritable: false },
+        { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        { pubkey: bufferAuthority.publicKey, isSigner: true,  isWritable: false }, // authority
       ],
       data: Buffer.concat([
-        Buffer.from([2]),    // tag = DeployWithMaxDataLen
-        leU64(bufferSpace),  // max_data_len (u64)
+        Buffer.from([2]),              // tag = DeployWithMaxDataLen
+        leU64(bufferSpace),            // max_data_len (u64)
       ]),
     });
     
@@ -415,8 +423,8 @@ export async function deployUpgradeableProgram(
               { pubkey: payer,            isSigner: true,  isWritable: true },
             ],
             data: Buffer.concat([
-              Buffer.from([6]), // tag = ExtendProgram
-              leU64(newMax),    // additional_bytes (u64)
+              Buffer.from([6]),   // tag
+              leU32_buf(newMax),  // additional_bytes (u32)
             ]),
           });
 
