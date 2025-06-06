@@ -222,9 +222,13 @@ export async function deployUpgradeableProgram(
       programId: BPF_UPGRADE_LOADER_ID,
       keys: [
         { pubkey: bufferKey.publicKey,   isSigner: false, isWritable: true },
-        { pubkey: bufferAuthority.publicKey, isSigner: false, isWritable: false },
+        { pubkey: bufferAuthority.publicKey, isSigner: true,  isWritable: false },
       ],
-      data: Buffer.from([0]),   // one-byte tag, nothing else
+      data: Buffer.concat([
+        leU32(0),          // InitializeBuffer
+        leU32(1),          // COption::Some
+        bufferAuthority.publicKey.toBuffer(),
+      ]),
     });
     
     onProgress?.({ stage: 'create', uploaded: 0, total: dataLength });
@@ -269,10 +273,9 @@ export async function deployUpgradeableProgram(
           { pubkey: bufferAuthority.publicKey, isSigner: true,  isWritable: false },
         ],
         data: Buffer.concat([
-          Buffer.from([1]),        // tag
-          leU32(offset),           // offset
-          leU64(chunk.length),     // Vec<u8> length (u64 per bincode)
-          Buffer.from(chunk),
+          leU32(1),                // Write
+          leU32(offset),
+          Buffer.from(chunk),      // raw bytes only
         ]),
       });
       
@@ -297,7 +300,7 @@ export async function deployUpgradeableProgram(
         { pubkey: bufferAuthority.publicKey, isSigner: true,  isWritable: false }, // authority
       ],
       data: Buffer.concat([
-        Buffer.from([2]),              // tag = DeployWithMaxDataLen
+        leU32(2),          // tag = DeployWithMaxDataLen
         leU64(bufferSpace),            // max_data_len (u64)
       ]),
     });
@@ -346,8 +349,14 @@ export async function deployUpgradeableProgram(
       // sign buffer-creation tx only now that it has a blockhash
       group.find(tx => tx === createBufferTx)?.partialSign(bufferKey);
       
-      // every tx also needs the buffer authority signature
-      group.forEach(tx => tx.partialSign(bufferAuthority));
+      // add bufferAuthority sig ONLY on TXs that list it as a signer
+      group
+        .filter(tx =>
+          tx.signatures.some(sig =>
+            sig.publicKey.equals(bufferAuthority.publicKey)
+          )
+        )
+        .forEach(tx => tx.partialSign(bufferAuthority));
       
       // Partial sign with program keypair if needed
       if (programKeypair) group.find(tx => tx === deployTx)?.partialSign(programKeypair);
@@ -423,7 +432,7 @@ export async function deployUpgradeableProgram(
               { pubkey: payer,            isSigner: true,  isWritable: true },
             ],
             data: Buffer.concat([
-              Buffer.from([6]),   // tag
+              leU32(6),   // tag = ExtendProgram
               leU32_buf(newMax),  // additional_bytes (u32)
             ]),
           });
