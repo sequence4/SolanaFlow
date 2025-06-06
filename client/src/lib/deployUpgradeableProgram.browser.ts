@@ -351,7 +351,13 @@ export async function deployUpgradeableProgram(
       const addLocalSignatures = (tx: Transaction) => {
         const locals = [bufferAuthority, programKeypair, bufferKey]
           .filter((kp): kp is Keypair => kp !== null && kp !== undefined);
-        locals.forEach(kp => tx.partialSign(kp));   // only once, _before_ Phantom
+        
+        locals.forEach(kp => {
+          /* only sign if this tx actually expects that pubkey */
+          if (tx.signatures.some(s => s.publicKey.equals(kp.publicKey))) {
+            tx.partialSign(kp);
+          }
+        });
       };
       group.forEach(addLocalSignatures);
 
