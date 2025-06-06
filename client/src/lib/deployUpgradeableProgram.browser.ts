@@ -336,7 +336,7 @@ export async function deployUpgradeableProgram(
     groups.push([createBufferTx]);
     
     // --- split all write-TXs into ≤25-TX chunks ---------------------------
-    const WRITE_BATCH = 25;            // ~10 s at current throttle
+    const WRITE_BATCH = 20;            // ~10 s at current throttle
     for (let i = 1; i < writeTxs.length - 1; i += WRITE_BATCH) {
       groups.push(writeTxs.slice(i, Math.min(i + WRITE_BATCH, writeTxs.length - 1)));
     }
