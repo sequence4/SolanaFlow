@@ -28,13 +28,23 @@ import type { SendOptions } from '@solana/web3.js';
 // Defaults replicate SolPG's public-cluster pacing ≈ 4 TX/s.
 // Override in .env (e.g. NEXT_PUBLIC_TX_BURST_SIZE=5 NEXT_PUBLIC_TX_BURST_WAIT=100
 // when you move to QuickNode Build).
-const BURST_SIZE = Number(process.env.NEXT_PUBLIC_TX_BURST_SIZE ?? 1);
-const BURST_WAIT = Number(process.env.NEXT_PUBLIC_TX_BURST_WAIT ?? 350); // ms
+//const BURST_SIZE = Number(process.env.NEXT_PUBLIC_TX_BURST_SIZE ?? 1);
+//const BURST_WAIT = Number(process.env.NEXT_PUBLIC_TX_BURST_WAIT ?? 350); // ms
+const BURST_SIZE = 1;
+const BURST_WAIT = 400; // ms
+
 
 // Helper function for little-endian u32 encoding
 function leU32(n: number): Buffer {
   const buf = Buffer.alloc(4);
   buf.writeUInt32LE(n, 0);
+  return buf;
+}
+
+// Helper for little-endian u64 encoding
+function leU64(n: number | bigint): Buffer {
+  const buf = Buffer.alloc(8);
+  buf.writeBigUInt64LE(BigInt(n), 0);
   return buf;
 }
 
@@ -285,7 +295,7 @@ export async function deployUpgradeableProgram(
       ],
       data: Buffer.concat([
         leU32(2),                       // Loader instruction tag 2 = DeployWithMaxDataLen
-        Buffer.from(new Uint32Array([bufferSpace]).buffer),
+        leU64(bufferSpace),             // max_data_len (u64)
       ]),
     });
     
@@ -400,8 +410,8 @@ export async function deployUpgradeableProgram(
               { pubkey: payer,            isSigner: true,  isWritable: true },
             ],
             data: Buffer.concat([
-              leU32(5),                      // 5 = ExtendProgram (or tag 2 re-used)
-              Buffer.from(new Uint32Array([newMax]).buffer),
+              leU32(5),                      // 5 = ExtendProgram
+              leU64(newMax),                 // new max_data_len (u64)
             ]),
           });
 
