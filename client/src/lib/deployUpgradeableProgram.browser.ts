@@ -249,9 +249,9 @@ export async function deployUpgradeableProgram(
         ]),
       });
       
-      // Don't add priority fee for simple writes, only needed for deploy tx
+      // Fee-payer = bufferAuthority, so wallet never signs these writes
       const writeTx = new Transaction().add(writeIx);
-      writeTx.feePayer = payer;
+      writeTx.feePayer = bufferAuthority.publicKey;
       writeTxs.push(writeTx);
       
       // Don't yield during chunking (match Playground behavior)
