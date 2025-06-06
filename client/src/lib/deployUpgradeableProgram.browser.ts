@@ -13,6 +13,7 @@ import {
   SYSVAR_RENT_PUBKEY,
   SYSVAR_CLOCK_PUBKEY,
   ComputeBudgetProgram,
+  LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import { connection as devnetConnection } from "@/utils/connection";
 import { WalletContextState } from "@solana/wallet-adapter-react";
@@ -41,6 +42,10 @@ function leU32(n: number): Buffer {
 // 850 B payload keeps write-tx ≈1 212 B, safely <1 232-byte limit
 export const MAX_CHUNK_SIZE = 900;
 export const HEADER_LEN = BPF_BUFFER_HEADER_LEN;
+
+// ── Funding for the in-browser buffer authority ───────────────────────────
+// 0.02 SOL covers ≈300–400 Write TXs with plenty of head-room.
+const AUTHORITY_FUND_LAMPORTS = Math.round(0.02 * LAMPORTS_PER_SOL);
 
 // Bypass RPC simulation for all non-funding TXs;
 // retries help if the TPU drops a packet in browser env.
@@ -179,7 +184,14 @@ export async function deployUpgradeableProgram(
   console.log(`[DEPLOY] Program ID: ${effectiveProgramId.toBase58()}`);
   
   try {
-    // 2. (a) Allocate the buffer with SystemProgram
+    // 2. (a) Fund the bufferAuthority and allocate the buffer account
+    const fundAuthorityIx = SystemProgram.transfer({
+      fromPubkey: payer,
+      toPubkey: bufferAuthority.publicKey,
+      lamports: AUTHORITY_FUND_LAMPORTS,
+    });
+
+    // (b) Allocate the buffer with SystemProgram
     const createBufAcct = SystemProgram.createAccount({
       fromPubkey: payer,
       newAccountPubkey: bufferKey.publicKey,
@@ -188,7 +200,7 @@ export async function deployUpgradeableProgram(
       programId: BPF_UPGRADE_LOADER_ID,
     });
 
-    // 2. (b) Initialise the buffer: proper bincode serialization with tag and COption
+    // 2. (c) Initialise the buffer: proper bincode serialization with tag and COption
     const initBufIx = new TransactionInstruction({
       programId: BPF_UPGRADE_LOADER_ID,
       keys: [
@@ -196,9 +208,9 @@ export async function deployUpgradeableProgram(
         { pubkey: bufferAuthority.publicKey, isSigner: true,  isWritable: false },
       ],
       data: Buffer.concat([
-        leU32(0),                     // tag = InitializeBuffer
-        leU32(1),                     // COption::Some discriminant
-        bufferAuthority.publicKey.toBuffer(), // authority = ephem key
+        leU32(0),                               // 0 = InitializeBuffer
+        Buffer.from([1]),                       // Option<Pubkey>::Some (1 byte)
+        bufferAuthority.publicKey.toBuffer(),   // authority = ephem key
       ]),
     });
     
@@ -206,8 +218,9 @@ export async function deployUpgradeableProgram(
 
     // No priority fee needed for buffer creation, only for deploy
     const createBufferTx = new Transaction()
-      .add(createBufAcct)   // create account
-      .add(initBufIx);      // initialise buffer, authority = wallet
+      .add(fundAuthorityIx) // top-up bufferAuthority
+      .add(createBufAcct)   // create buffer account
+      .add(initBufIx);      // initialise buffer, authority = bufferAuthority
     
     createBufferTx.feePayer = payer;
     
@@ -315,13 +328,25 @@ export async function deployUpgradeableProgram(
       // Partial sign with program keypair if needed
       if (programKeypair) group.find(tx => tx === deployTx)?.partialSign(programKeypair);
 
-      // Ensure wallet supports signAllTransactions
-      if (!wallet.signAllTransactions) {
-        throw new Error("Wallet doesn't support signing multiple transactions");
+      /* ── NEW: ask Phantom to sign **only** the TXs that include `payer` ── */
+      const needsWallet = group.filter(tx =>
+        tx.signatures.some(sig => sig.publicKey.equals(payer))
+      );
+
+      let signed: Transaction[];
+      if (needsWallet.length) {
+        if (!wallet.signAllTransactions) {
+          throw new Error("Wallet doesn't support signing multiple transactions");
+        }
+        const signedSubset = await wallet.signAllTransactions(needsWallet);
+        // merge back while preserving original order
+        let i = 0;
+        signed = group.map(tx => (needsWallet.includes(tx) ? signedSubset[i++] : tx));
+      } else {
+        // no wallet signature needed for this group
+        signed = group;
       }
       
-      // One wallet prompt for this batch
-      const signed = await wallet.signAllTransactions(group);
       console.log(`[DEPLOY] Batch signed (${signed.length} TX)`);
 
       // Fire signed TX quickly, but throttle in small bursts
