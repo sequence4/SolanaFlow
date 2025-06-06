@@ -380,7 +380,8 @@ export async function deployUpgradeableProgram(
             .filter((kp): kp is Keypair => kp !== null && kp !== undefined);
             
           localKeys.forEach(kp => {
-            if (withWallet.signatures.every(s => !s.publicKey.equals(kp.publicKey))) {
+            /* only attach if the compiled message needs this signer */
+            if (withWallet.signatures.some(s => s.publicKey.equals(kp.publicKey))) {
               const sig = tx.signatures.find(s => s.publicKey.equals(kp.publicKey))?.signature;
               if (sig) {
                 withWallet.addSignature(kp.publicKey, sig);   // does NOT touch other sigs
