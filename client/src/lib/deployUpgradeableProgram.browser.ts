@@ -84,7 +84,7 @@ async function getSafeBlockhash(conn: Connection) {
     if (oldBlock?.blockhash) {
       return { 
         blockhash: oldBlock.blockhash,
-        lastValidBlockHeight: latest.lastValidBlockHeight - SAFE_OFFSET 
+        lastValidBlockHeight: latest.lastValidBlockHeight
       };
     }
   } catch (_) { /* ignore – rare on Devnet */ }
