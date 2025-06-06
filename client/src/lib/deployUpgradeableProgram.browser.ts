@@ -13,7 +13,6 @@ import {
   SYSVAR_RENT_PUBKEY,
   SYSVAR_CLOCK_PUBKEY,
   ComputeBudgetProgram,
-  NonceAccount,
 } from "@solana/web3.js";
 import { connection as devnetConnection, RATE_LIMIT_MS } from "@/utils/connection";
 import { WalletContextState } from "@solana/wallet-adapter-react";
@@ -24,7 +23,6 @@ import {
   BPF_BUFFER_HEADER_LEN 
 } from "@/utils/constants";
 import type { SendOptions } from '@solana/web3.js';
-import { ensureDurableNonce } from "@/utils/nonce";
 
 // We want exactly TWO wallet prompts:
 //   • prompt #1  → createBufferTx + ALL write chunks
@@ -33,10 +31,9 @@ import { ensureDurableNonce } from "@/utils/nonce";
 const GROUP_SIZE = 10_000;
 
 // Break into smaller groups to avoid blockhash expiry
-const GROUP_SIZE_OLD = 10_000;    // ~45 TX per signAllTransactions()
 // TPU likes ≤ 12 packets per UDP burst
-const BURST_SIZE = 1;      // 1 tx at a time
-const BURST_WAIT = 250;    // 250 ms between sends  ≈4 tx/s
+const BURST_SIZE = 2;      // 2 tx at a time
+const BURST_WAIT = 250;    // 250 ms between sends  ≈4-5 tx/s
 
 // Helper function for little-endian u32 encoding
 function leU32(n: number): Buffer {
@@ -88,37 +85,6 @@ async function yieldToBrowser(ms?: number): Promise<void> {
 }
 
 /**
- * Stamps a durable nonce onto `tx` and prepends the obligatory
- * `AdvanceNonceAccount` instruction.  Wallet (payer) MUST be the nonce
- * authority.
- */
-async function applyDurableNonce(
-  tx: Transaction,
-  connection: Connection,
-  payer: PublicKey,
-  noncePubkey: PublicKey
-): Promise<void> {
-  // ⬇️ get the current value stored in the nonce account
-  const nonceAcct = (await connection.getNonce(
-    noncePubkey,
-    "confirmed"
-  )) as NonceAccount;
-  const durableHash = nonceAcct.nonce;
-
-  // stamp the durable hash
-  tx.recentBlockhash = durableHash;
-
-  // ensure advance instruction is first
-  tx.nonceInfo = {
-    nonce: durableHash,
-    nonceInstruction: SystemProgram.nonceAdvance({
-      noncePubkey: noncePubkey,
-      authorizedPubkey: payer,
-    }),
-  };
-}
-
-/**
  * Deploys a Solana program using the BPF Upgradeable Loader
  * This function implements the full deployment flow:
  * 1. Create buffer account
@@ -143,9 +109,6 @@ export async function deployUpgradeableProgram(
   
   // Cache the payer's public key to avoid repeated null checks
   const payer = wallet.publicKey;
-  
-  // Get or create a durable nonce account
-  const noncePubkey = await ensureDurableNonce(connection, wallet);
   
   // Convert ArrayBuffer to Uint8Array for processing
   const programData = new Uint8Array(soBytes);
@@ -212,9 +175,6 @@ export async function deployUpgradeableProgram(
       .add(initBufIx);      // initialise buffer, authority = wallet
     
     createBufferTx.feePayer = payer;
-    
-    // Apply durable nonce instead of ephemeral blockhash
-    await applyDurableNonce(createBufferTx, connection, payer, noncePubkey);
     
     // 👉 DO NOT send or confirm yet – just queue it
     createBufferTx.partialSign(bufferKey);
@@ -315,10 +275,9 @@ export async function deployUpgradeableProgram(
     }
 
     for (const [gIdx, group] of groups.entries()) {
-      // 1️⃣ Apply durable nonce *sequentially* to stay under 10 RPC calls/sec
-      for (const tx of group) {
-        await applyDurableNonce(tx, connection, payer, noncePubkey);
-      }
+      // 🆕 fetch a recent blockhash once for this batch
+      const { blockhash } = await connection.getLatestBlockhash('confirmed'); // valid ~150 slots
+      group.forEach(tx => { tx.recentBlockhash = blockhash; });
       
       // Partial sign with program keypair if needed
       if (programKeypair) group.find(tx => tx === deployTx)?.partialSign(programKeypair);
@@ -335,14 +294,7 @@ export async function deployUpgradeableProgram(
       }
 
       // 4️⃣ confirm only the LAST signature of this group
-      await connection.confirmTransaction(
-        {
-          signature: sigs.at(-1)!,
-          lastValidBlockHeight: (await connection.getLatestBlockhash()).lastValidBlockHeight,
-          blockhash: (await connection.getLatestBlockhash()).blockhash,
-        },
-        'confirmed'
-      );
+      await connection.confirmTransaction(sigs.at(-1)!, 'confirmed');
 
       // 5️⃣ verify every status
       const st = await connection.getSignatureStatuses(sigs);
