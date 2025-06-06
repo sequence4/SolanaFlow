@@ -216,25 +216,13 @@ export async function deployUpgradeableProgram(
     // Apply durable nonce instead of ephemeral blockhash
     await applyDurableNonce(createBufferTx, connection, payer, noncePubkey);
     
-    // Sign with wallet + bufferKey
+    // 👉 DO NOT send or confirm yet – just queue it
     createBufferTx.partialSign(bufferKey);
-    const signedCreateBufferTx = await wallet.signTransaction(createBufferTx);
-    const createBufferSig = await connection.sendRawTransaction(
-      signedCreateBufferTx.serialize(),
-      SEND_OPTS
-    );
-    signatures.push(createBufferSig);
-    
-    // Wait for confirmation
-    await connection.confirmTransaction(createBufferSig, 'confirmed');
-    console.log(`[DEPLOY] Buffer created successfully. Signature: ${createBufferSig}`);
+    const writeTxs: Transaction[] = [createBufferTx];  // start with buffer creation as first tx
     
     // 3. Write program data in chunks
     const numChunks = Math.ceil(dataLength / MAX_CHUNK_SIZE);
     console.log(`[DEPLOY] Writing program data in ${numChunks} chunks of max ${MAX_CHUNK_SIZE} bytes each`);
-    
-    // Prepare an array to collect chunk uploads
-    const writeTxs: Transaction[] = [];
     
     for (let chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
       // offset is from start of the payload area (after the 48-byte ProgramData header)
@@ -361,6 +349,11 @@ export async function deployUpgradeableProgram(
       st.value.forEach((v, ix) => { if (v?.err) throw new Error(`TX ${ix} failed: ${JSON.stringify(v.err)}`); });
 
       signatures.push(...sigs);
+      
+      // Log buffer creation success if this was the first group
+      if (gIdx === 0) {
+        console.log(`[DEPLOY] Buffer created successfully. Signature: ${sigs[0]}`);
+      }
     }
     
     // 4. Deploy from buffer
