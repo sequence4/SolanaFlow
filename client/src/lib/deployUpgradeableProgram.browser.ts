@@ -72,7 +72,8 @@ type DeployResult = {
  * Returns a blockhash that is ~SAFE_OFFSET slots old,
  * so you have extra runway after signing.
  */
-const SAFE_OFFSET = 100;   // ≈45–50 s on Devnet
+// Less runway now that signing is quick
+const SAFE_OFFSET = 10;    // ≈5 s on Devnet
 async function getSafeBlockhash(conn: Connection) {
   const latest = await conn.getLatestBlockhash('confirmed');
   const currentSlot = await conn.getSlot('confirmed');
@@ -155,6 +156,9 @@ export async function deployUpgradeableProgram(
   // 1. Create a *real* buffer account (Keypair, not PDA)
   const bufferKey = Keypair.generate();
   
+  // 👉 NEW: short-lived key that will be the buffer authority
+  const bufferAuthority = Keypair.generate();
+  
   // Generate a keypair only when we are _creating_ a new program
   const programKeypair: Keypair | null = userProvidedProgramId ? null : Keypair.generate();
   
@@ -188,13 +192,13 @@ export async function deployUpgradeableProgram(
     const initBufIx = new TransactionInstruction({
       programId: BPF_UPGRADE_LOADER_ID,
       keys: [
-        { pubkey: bufferKey.publicKey, isSigner: false, isWritable: true },
-        { pubkey: payer,  isSigner: true,  isWritable: false },
+        { pubkey: bufferKey.publicKey,   isSigner: false, isWritable: true },
+        { pubkey: bufferAuthority.publicKey, isSigner: true,  isWritable: false },
       ],
       data: Buffer.concat([
         leU32(0),                     // tag = InitializeBuffer
         leU32(1),                     // COption::Some discriminant
-        payer.toBuffer(), // 32-byte authority pubkey
+        bufferAuthority.publicKey.toBuffer(), // authority = ephem key
       ]),
     });
     
@@ -235,8 +239,8 @@ export async function deployUpgradeableProgram(
       const writeIx = new TransactionInstruction({
         programId: BPF_UPGRADE_LOADER_ID,
         keys: [
-          { pubkey: bufferKey.publicKey, isSigner: false, isWritable: true },
-          { pubkey: payer,   isSigner: true,  isWritable: false },
+          { pubkey: bufferKey.publicKey,      isSigner: false, isWritable: true },
+          { pubkey: bufferAuthority.publicKey, isSigner: true,  isWritable: false },
         ],
         data: Buffer.concat([
           leU32(1),                         // tag = Write
@@ -304,6 +308,9 @@ export async function deployUpgradeableProgram(
     async function sendAndConfirm(group: Transaction[], blockhash: string, lastValidBlockHeight: number) {
       // sign buffer-creation tx only now that it has a blockhash
       group.find(tx => tx === createBufferTx)?.partialSign(bufferKey);
+      
+      // every tx also needs the buffer authority signature
+      group.forEach(tx => tx.partialSign(bufferAuthority));
       
       // Partial sign with program keypair if needed
       if (programKeypair) group.find(tx => tx === deployTx)?.partialSign(programKeypair);
