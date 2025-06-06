@@ -350,28 +350,40 @@ export async function deployUpgradeableProgram(
       // ❶ stamp the blockhash
       group.forEach(tx => { tx.recentBlockhash = blockhash });
 
-      // ❷ Let Phantom sign **first** (it returns brand-new Tx objects)
-      if (!wallet.signAllTransactions) {
-        throw new Error("Wallet doesn't support signing multiple transactions");
-      }
-      const phantomSigned = await wallet.signAllTransactions(group);
-
-      // ❸ Re-attach ONLY the offline sigs that the tx actually expects
-      const locals = [bufferAuthority, programKeypair, bufferKey].filter((kp): kp is Keypair => !!kp);
-      phantomSigned.forEach(tx => {
+      // ❷ Pre-sign local (off-chain) keys
+      const locals = [bufferAuthority, programKeypair, bufferKey]
+        .filter((kp): kp is Keypair => kp !== null);
+      group.forEach(tx =>
         locals.forEach(kp => {
           if (tx.signatures.some(s => s.publicKey.equals(kp.publicKey))) {
-            tx.partialSign(kp);          // now safely appended
+            tx.partialSign(kp);
           }
+        }),
+      );
+
+      // ❸ Ask Phantom ONLY for txs that need the wallet
+      const needsWallet = group.filter(
+        tx => tx.feePayer?.equals(payer) ||            // wallet pays fee
+              tx.signatures.some(s => s.publicKey.equals(payer)), // or is an additional signer
+      );
+
+      if (needsWallet.length) {
+        if (!wallet.signAllTransactions) {
+          throw new Error("Wallet doesn't support signing multiple transactions");
+        }
+        const signedSubset = await wallet.signAllTransactions(needsWallet);
+        // merge the wallet sigs back into original objects
+        needsWallet.forEach((orig, i) => {
+          const signed = signedSubset[i];
+          orig.addSignature(payer, signed.signatures.find(s => s.publicKey.equals(payer))!.signature!);
         });
-      });
+      }
 
       // ❹ fire & confirm
-      const fullySigned = phantomSigned;
       const sigs = [];
-      for (let i = 0; i < fullySigned.length; i++) {
+      for (let i = 0; i < group.length; i++) {
         if (i !== 0 && i % BURST_SIZE === 0) await throttle(BURST_WAIT);
-        sigs.push(await connection.sendRawTransaction(fullySigned[i].serialize(), SEND_OPTS));
+        sigs.push(await connection.sendRawTransaction(group[i].serialize(), SEND_OPTS));
       }
       
       // Confirm only the LAST signature of this group using long-form confirmation
