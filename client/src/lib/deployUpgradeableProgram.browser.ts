@@ -32,8 +32,8 @@ const GROUP_SIZE = 10_000;
 
 // Break into smaller groups to avoid blockhash expiry
 // TPU likes ≤ 12 packets per UDP burst
-const BURST_SIZE = 2;      // 2 tx at a time
-const BURST_WAIT = 250;    // 250 ms between sends  ≈4-5 tx/s
+const BURST_SIZE = 1;      // 1 tx at a time (≈4 tx/s with 250ms wait)
+const BURST_WAIT = 250;    // 250 ms between sends - stays under Helius 5 tx/s limit
 
 // Helper function for little-endian u32 encoding
 function leU32(n: number): Buffer {
@@ -166,11 +166,8 @@ export async function deployUpgradeableProgram(
     
     onProgress?.({ stage: 'create', uploaded: 0, total: dataLength });
 
-    const priorityIx = ComputeBudgetProgram.setComputeUnitPrice({
-      microLamports: 60_000,          // ≈0.00006 SOL
-    });
+    // No priority fee needed for buffer creation, only for deploy
     const createBufferTx = new Transaction()
-      .add(priorityIx)                // must be first
       .add(createBufAcct)   // create account
       .add(initBufIx);      // initialise buffer, authority = wallet
     
@@ -215,10 +212,8 @@ export async function deployUpgradeableProgram(
         ]),
       });
       
-      const priorityIx = ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 60_000 });
-      const writeTx = new Transaction()
-        .add(priorityIx)
-        .add(writeIx);
+      // Don't add priority fee for simple writes, only needed for deploy tx
+      const writeTx = new Transaction().add(writeIx);
       writeTx.feePayer = payer;
       writeTxs.push(writeTx);
       
