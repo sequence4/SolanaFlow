@@ -14,9 +14,8 @@ import {
   SYSVAR_CLOCK_PUBKEY,
   ComputeBudgetProgram,
 } from "@solana/web3.js";
-import { connection as devnetConnection, RATE_LIMIT_MS } from "@/utils/connection";
+import { connection as devnetConnection } from "@/utils/connection";
 import { WalletContextState } from "@solana/wallet-adapter-react";
-import { rpcWithRetry } from "@/utils/rpcRetry";
 import { throttle } from "@/utils/rateLimiter";
 import { 
   BPF_UPGRADE_LOADER_ID,
