@@ -350,28 +350,28 @@ export async function deployUpgradeableProgram(
       // ❶ set block-hash once
       group.forEach(tx => { tx.recentBlockhash = blockhash });
 
-      // ❷ local (off-chain) signatures
-      const locals = [bufferAuthority, programKeypair, bufferKey]
-          .filter((kp): kp is Keypair => !!kp);
-      group.forEach(tx => {
-        locals.forEach(kp => {
-          if (tx.signatures.some(s => s.publicKey.equals(kp.publicKey))) {
-            tx.partialSign(kp);
-          }
-        });
-      });
-
-      // ❸ have Phantom sign *everything* that includes the wallet as fee-payer
+      // ❷ have Phantom sign all transactions (it returns brand-new objects)
       if (!wallet.signAllTransactions) {
         throw new Error("Wallet doesn't support signing multiple transactions");
       }
-      const fullySigned = await wallet.signAllTransactions(group);
+      const phantomSigned = await wallet.signAllTransactions(group);
+
+      // ❸ re-attach local signatures that Phantom discarded
+      phantomSigned.forEach(tx => {
+        [bufferAuthority, programKeypair, bufferKey]
+          .filter((kp): kp is Keypair => !!kp)
+          .forEach(kp => {
+            if (tx.signatures.some(s => s.publicKey.equals(kp.publicKey))) {
+              tx.partialSign(kp);  // add signature back
+            }
+          });
+      });
 
       // ❹ fire & confirm
       const sigs = [];
-      for (let i = 0; i < fullySigned.length; i++) {
+      for (let i = 0; i < phantomSigned.length; i++) {
         if (i !== 0 && i % BURST_SIZE === 0) await throttle(BURST_WAIT);
-        sigs.push(await connection.sendRawTransaction(fullySigned[i].serialize(), SEND_OPTS));
+        sigs.push(await connection.sendRawTransaction(phantomSigned[i].serialize(), SEND_OPTS));
       }
       
       // Confirm only the LAST signature of this group using long-form confirmation
