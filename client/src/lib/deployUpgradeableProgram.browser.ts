@@ -347,31 +347,31 @@ export async function deployUpgradeableProgram(
 
     // Helper to send and confirm transactions for a group
     async function sendAndConfirm(group: Transaction[], blockhash: string, lastValidBlockHeight: number) {
-      // ❶ set block-hash once
+      // ❶ stamp the blockhash
       group.forEach(tx => { tx.recentBlockhash = blockhash });
 
-      // ❷ have Phantom sign all transactions (it returns brand-new objects)
+      // ❷ pre-sign ALL offline keys _before_ Phantom sees the tx
+      const locals = [bufferAuthority, programKeypair, bufferKey]
+                     .filter((kp): kp is Keypair => !!kp);
+      group.forEach(tx => {
+        locals.forEach(kp => {
+          if (tx.signatures.find(s => s.publicKey.equals(kp.publicKey))) {
+            tx.partialSign(kp);
+          }
+        });
+      });
+
+      // ❸ Phantom now adds **its** sigs without dropping ours
       if (!wallet.signAllTransactions) {
         throw new Error("Wallet doesn't support signing multiple transactions");
       }
-      const phantomSigned = await wallet.signAllTransactions(group);
-
-      // ❸ re-attach local signatures that Phantom discarded
-      phantomSigned.forEach(tx => {
-        [bufferAuthority, programKeypair, bufferKey]
-          .filter((kp): kp is Keypair => !!kp)
-          .forEach(kp => {
-            if (tx.signatures.some(s => s.publicKey.equals(kp.publicKey))) {
-              tx.partialSign(kp);  // add signature back
-            }
-          });
-      });
+      const fullySigned = await wallet.signAllTransactions(group);
 
       // ❹ fire & confirm
       const sigs = [];
-      for (let i = 0; i < phantomSigned.length; i++) {
+      for (let i = 0; i < fullySigned.length; i++) {
         if (i !== 0 && i % BURST_SIZE === 0) await throttle(BURST_WAIT);
-        sigs.push(await connection.sendRawTransaction(phantomSigned[i].serialize(), SEND_OPTS));
+        sigs.push(await connection.sendRawTransaction(fullySigned[i].serialize(), SEND_OPTS));
       }
       
       // Confirm only the LAST signature of this group using long-form confirmation
