@@ -26,9 +26,14 @@ import {
 import type { SendOptions } from '@solana/web3.js';
 import { ensureDurableNonce } from "@/utils/nonce";
 
-// ── batching tuned to Solana Playground ──────────────────────────
+// We want exactly TWO wallet prompts:
+//   • prompt #1  → createBufferTx + ALL write chunks
+//   • prompt #2  → single deployTx
+// So we set GROUP_SIZE to a huge number so nothing splits.
+const GROUP_SIZE = 10_000;
+
 // Break into smaller groups to avoid blockhash expiry
-const GROUP_SIZE = 45;    // ~45 TX per signAllTransactions()
+const GROUP_SIZE_OLD = 10_000;    // ~45 TX per signAllTransactions()
 // TPU likes ≤ 12 packets per UDP burst
 const BURST_SIZE = 1;      // 1 tx at a time
 const BURST_WAIT = 250;    // 250 ms between sends  ≈4 tx/s
@@ -311,11 +316,10 @@ export async function deployUpgradeableProgram(
     
     writeTxs.push(deployTx);   // after the loop, before signAllTransactions
     
-    // ── slice all prepared TX into groups of ≤ GROUP_SIZE ────────────────
+    // groups[0] = createBufferTx + ALL writes, groups[1] = deployTx
     const groups: Transaction[][] = [];
-    for (let i = 0; i < writeTxs.length; i += GROUP_SIZE) {
-      groups.push(writeTxs.slice(i, i + GROUP_SIZE));
-    }
+    groups.push(writeTxs.slice(0, -1)); // everything except last
+    groups.push([writeTxs.at(-1)!]);    // last (deploy)
 
     // Ensure wallet supports signAllTransactions
     if (!wallet.signAllTransactions) {
@@ -324,8 +328,8 @@ export async function deployUpgradeableProgram(
 
     for (const [gIdx, group] of groups.entries()) {
       // 1️⃣ Apply durable nonce *sequentially* to stay under 10 RPC calls/sec
-      for (let i = 0; i < group.length; i++) {
-        await applyDurableNonce(group[i], connection, payer, noncePubkey);
+      for (const tx of group) {
+        await applyDurableNonce(tx, connection, payer, noncePubkey);
       }
       
       // Partial sign with program keypair if needed
@@ -342,8 +346,15 @@ export async function deployUpgradeableProgram(
         sigs.push(await connection.sendRawTransaction(signed[i].serialize(), SEND_OPTS));
       }
 
-      // 4️⃣ confirm last sig; others are in the same / later slot
-      await connection.confirmTransaction(sigs.at(-1)!, 'confirmed');
+      // 4️⃣ confirm only the LAST signature of this group
+      await connection.confirmTransaction(
+        {
+          signature: sigs.at(-1)!,
+          lastValidBlockHeight: (await connection.getLatestBlockhash()).lastValidBlockHeight,
+          blockhash: (await connection.getLatestBlockhash()).blockhash,
+        },
+        'confirmed'
+      );
 
       // 5️⃣ verify every status
       const st = await connection.getSignatureStatuses(sigs);
