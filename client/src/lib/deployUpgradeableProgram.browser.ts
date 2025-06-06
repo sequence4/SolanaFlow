@@ -350,24 +350,24 @@ export async function deployUpgradeableProgram(
       // ❶ stamp the blockhash
       group.forEach(tx => { tx.recentBlockhash = blockhash });
 
-      // ❷ pre-sign ALL offline keys _before_ Phantom sees the tx
-      const locals = [bufferAuthority, programKeypair, bufferKey]
-                     .filter((kp): kp is Keypair => !!kp);
-      group.forEach(tx => {
+      // ❷ Let Phantom sign **first** (it returns brand-new Tx objects)
+      if (!wallet.signAllTransactions) {
+        throw new Error("Wallet doesn't support signing multiple transactions");
+      }
+      const phantomSigned = await wallet.signAllTransactions(group);
+
+      // ❸ Re-attach ONLY the offline sigs that the tx actually expects
+      const locals = [bufferAuthority, programKeypair, bufferKey].filter((kp): kp is Keypair => !!kp);
+      phantomSigned.forEach(tx => {
         locals.forEach(kp => {
-          if (tx.signatures.find(s => s.publicKey.equals(kp.publicKey))) {
-            tx.partialSign(kp);
+          if (tx.signatures.some(s => s.publicKey.equals(kp.publicKey))) {
+            tx.partialSign(kp);          // now safely appended
           }
         });
       });
 
-      // ❸ Phantom now adds **its** sigs without dropping ours
-      if (!wallet.signAllTransactions) {
-        throw new Error("Wallet doesn't support signing multiple transactions");
-      }
-      const fullySigned = await wallet.signAllTransactions(group);
-
       // ❹ fire & confirm
+      const fullySigned = phantomSigned;
       const sigs = [];
       for (let i = 0; i < fullySigned.length; i++) {
         if (i !== 0 && i % BURST_SIZE === 0) await throttle(BURST_WAIT);
