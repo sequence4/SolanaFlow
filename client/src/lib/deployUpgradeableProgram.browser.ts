@@ -347,7 +347,18 @@ export async function deployUpgradeableProgram(
     // ── One fresh block-hash for the whole deploy ──────────────────────
     const { blockhash: sharedBlockhash, lastValidBlockHeight: sharedLvb } =
       await getSafeBlockhash(connection);
-    writeTxs.forEach(tx => (tx.recentBlockhash = sharedBlockhash));
+    
+    // CRITICAL: Must set recentBlockhash BEFORE calling Phantom
+    // Phantom will clone the transactions, and clones need the blockhash already set
+    writeTxs.forEach(tx => {
+      tx.recentBlockhash = sharedBlockhash;
+    });
+    
+    // Debug check - uncomment if you suspect blockhash issues
+    // writeTxs.forEach((tx, i) => {
+    //   if (!tx.recentBlockhash)
+    //     console.warn(`❌ Tx #${i} has no recentBlockhash`);
+    // });
     
     // ── Single Phantom prompt ───────────────────────────────────────
     if (!wallet.signAllTransactions) {
@@ -357,11 +368,46 @@ export async function deployUpgradeableProgram(
     // NOTE: Phantom signs on the message hash. Never touch recentBlockhash
     // after signAllTransactions() or signatures become invalid.
     
-    // Sign EVERY tx (createBuffer + writes + deploy) in one go
-    const phantomSignedAll = await wallet.signAllTransactions(writeTxs);
-
-    // Overwrite the originals so we keep any priority-fee ixs Phantom injected
-    phantomSignedAll.forEach((tx, i) => (writeTxs[i] = tx));
+    // Sign transactions in batches to avoid Chrome's message size limits
+    /**
+     * Phantom → content-script → service-worker has a hard 4 MB message limit.
+     * 40 TXs ≈ 3.8 MB, safely under the cap on all Chromium builds.
+     * You can override this in .env with NEXT_PUBLIC_SIGN_BATCH_SIZE.
+     */
+    const SIGN_BATCH_SIZE = Number(
+      process.env.NEXT_PUBLIC_SIGN_BATCH_SIZE ?? 40
+    );
+    
+    if (writeTxs.length > SIGN_BATCH_SIZE) {
+      console.log(`[DEPLOY] Large program - signing in batches of ${SIGN_BATCH_SIZE}`);
+      
+      // Sign in chunks to avoid "disconnected port" errors with large programs
+      for (let i = 0; i < writeTxs.length; i += SIGN_BATCH_SIZE) {
+        const batchEnd = Math.min(i + SIGN_BATCH_SIZE, writeTxs.length);
+        const batch = writeTxs.slice(i, batchEnd);
+        console.log(`[DEPLOY] Signing batch ${i / SIGN_BATCH_SIZE + 1}: transactions ${i+1}-${batchEnd}`);
+        
+        const signedBatch = await wallet.signAllTransactions(batch);
+        signedBatch.forEach((tx, j) => { writeTxs[i + j] = tx; });
+        
+        // Give Phantom's service-worker time to breathe before the next chunk
+        await yieldToBrowser(50);   // 50 ms is plenty
+      }
+    } else {
+      // Sign EVERY tx (createBuffer + writes + deploy) in one go for small programs
+      const phantomSignedAll = await wallet.signAllTransactions(writeTxs);
+      phantomSignedAll.forEach((tx, i) => (writeTxs[i] = tx));
+    }
+    
+    /*
+     * Sanity-check: every TX should now contain the wallet's signature.
+     * Uncomment if you ever doubt that Phantom returned a complete batch.
+     */
+    // writeTxs.forEach((tx, i) => {
+    //   if (!tx.signatures.some(
+    //         s => s.publicKey.equals(payer) && s.signature))
+    //     console.warn(`❌ Tx #${i} is still unsigned by wallet`);
+    // });
     
     // ── Slice the now-signed array into send batches ───────────────────
     const groups: Transaction[][] = [];
