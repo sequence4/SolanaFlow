@@ -56,7 +56,7 @@ function leU64(n: number | bigint): Buffer {
 
 // Shared chunk size across upload logic
 // 850 B payload keeps write-tx ≈1 212 B, safely <1 232-byte limit
-export const MAX_CHUNK_SIZE = 900;
+export const MAX_CHUNK_SIZE = 850;  // leaves ~60-byte head-room for priority-fee ix
 export const HEADER_LEN = BPF_BUFFER_HEADER_LEN;
 
 // ── SendOptions presets ──────────────────────────────────────────────
@@ -344,21 +344,6 @@ export async function deployUpgradeableProgram(
     
     writeTxs.push(deployTx);   // after the loop, before signAllTransactions
     
-    // groups[0] = createBufferTx + ALL writes, groups[1] = deployTx
-    const groups: Transaction[][] = [];
-    
-    // First group is just the createBufferTx (includes funding the bufferAuthority)
-    groups.push([createBufferTx]);
-    
-    // --- split all write-TXs into ≤25-TX chunks ---------------------------
-    const WRITE_BATCH = 20;            // ~10 s at current throttle
-    for (let i = 1; i < writeTxs.length - 1; i += WRITE_BATCH) {
-      groups.push(writeTxs.slice(i, Math.min(i + WRITE_BATCH, writeTxs.length - 1)));
-    }
-    
-    // Last group is just the deployTx
-    groups.push([writeTxs[writeTxs.length - 1]]);
-
     // ── Single Phantom prompt ───────────────────────────────────────
     if (!wallet.signAllTransactions) {
       throw new Error("Wallet doesn't support signAllTransactions");
@@ -369,6 +354,17 @@ export async function deployUpgradeableProgram(
 
     // Overwrite the originals so we keep any priority-fee ixs Phantom injected
     phantomSignedAll.forEach((tx, i) => (writeTxs[i] = tx));
+    
+    // ── Slice the now-signed array into send batches ───────────────────
+    const groups: Transaction[][] = [];
+    groups.push([writeTxs[0]]);                   // create-buffer tx
+
+    const WRITE_BATCH = 20;                       // keep existing batch size
+    for (let i = 1; i < writeTxs.length - 1; i += WRITE_BATCH) {
+      groups.push(writeTxs.slice(i, Math.min(i + WRITE_BATCH, writeTxs.length - 1)));
+    }
+
+    groups.push([writeTxs.at(-1)!]);              // deploy tx
 
     // Helper to send and confirm transactions for a group
     async function sendAndConfirm(group: Transaction[], blockhash: string, lastValidBlockHeight: number, groupType: 'bookend' | 'write') {
