@@ -63,9 +63,11 @@ export const HEADER_LEN = BPF_BUFFER_HEADER_LEN;
 // 0.02 SOL covers ≈300–400 Write TXs with plenty of head-room.
 const AUTHORITY_FUND_LAMPORTS = Math.round(0.02 * LAMPORTS_PER_SOL);
 
-// Bypass RPC simulation for all non-funding TXs;
-// retries help if the TPU drops a packet in browser env.
-const SEND_OPTS: SendOptions = { skipPreflight: true, maxRetries: 5 };
+// ── SendOptions presets ──────────────────────────────────────────────
+// Book-end TXs (create-buffer & deploy): run full simulation, retry hard
+const TX_OPTS: SendOptions    = { skipPreflight: false, maxRetries: 15 };
+// Bulk write TXs: skip simulation for speed, but keep a high retry budget
+const WRITE_OPTS: SendOptions = { skipPreflight: true,  maxRetries: 15 };
 
 type DeployProgress = {
   stage: 'create' | 'write' | 'deploy' | 'complete';
@@ -341,7 +343,7 @@ export async function deployUpgradeableProgram(
     groups.push([writeTxs[writeTxs.length - 1]]);
 
     // Helper to send and confirm transactions for a group
-    async function sendAndConfirm(group: Transaction[], blockhash: string, lastValidBlockHeight: number) {
+    async function sendAndConfirm(group: Transaction[], blockhash: string, lastValidBlockHeight: number, groupType: 'bookend' | 'write') {
       // ❶ stamp the blockhash
       group.forEach(tx => { tx.recentBlockhash = blockhash });
 
@@ -372,7 +374,15 @@ export async function deployUpgradeableProgram(
       const sigs = [];
       for (let i = 0; i < group.length; i++) {
         if (i !== 0 && i % BURST_SIZE === 0) await throttle(BURST_WAIT);
-        sigs.push(await connection.sendRawTransaction(group[i].serialize(), SEND_OPTS));
+        // choose opts based on group type
+        const opts = groupType === 'bookend' ? TX_OPTS : WRITE_OPTS;
+        if (!opts.skipPreflight) {
+          const sim = await connection.simulateTransaction(group[i]);
+          if (sim.value.err) {
+            throw new Error(`Pre-flight failed: ${JSON.stringify(sim.value.err)}`);
+          }
+        }
+        sigs.push(await connection.sendRawTransaction(group[i].serialize(), opts));
       }
       
       // Confirm only the LAST signature of this group using long-form confirmation
@@ -396,7 +406,9 @@ export async function deployUpgradeableProgram(
         const { blockhash, lastValidBlockHeight } = await getSafeBlockhash(connection);
         group.forEach(tx => { tx.recentBlockhash = blockhash; });
         
-        const sigs = await sendAndConfirm(group, blockhash, lastValidBlockHeight);
+        // First and last groups are bookends, middle groups are writes
+        const groupType = (gIdx === 0 || gIdx === groups.length - 1) ? 'bookend' : 'write';
+        const sigs = await sendAndConfirm(group, blockhash, lastValidBlockHeight, groupType);
         signatures.push(...sigs);
         
         // Log buffer creation success if this was the first group
@@ -430,7 +442,7 @@ export async function deployUpgradeableProgram(
           extendTx.recentBlockhash = blockhash;
 
           const signed = await wallet.signTransaction(extendTx);
-          const sig = await connection.sendRawTransaction(signed.serialize(), SEND_OPTS);
+          const sig = await connection.sendRawTransaction(signed.serialize(), TX_OPTS);
           await confirmWithBlockhash(
             connection,
             sig,
