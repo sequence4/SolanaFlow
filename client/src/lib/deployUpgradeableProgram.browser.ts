@@ -12,7 +12,6 @@ import {
   Keypair,
   SYSVAR_RENT_PUBKEY,
   SYSVAR_CLOCK_PUBKEY,
-  ComputeBudgetProgram,
   LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import { connection as devnetConnection } from "@/utils/connection";
@@ -249,8 +248,8 @@ export async function deployUpgradeableProgram(
     console.log(`[DEPLOY] Writing program data in ${numChunks} chunks of max ${MAX_CHUNK_SIZE} bytes each`);
     
     for (let chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
-      // offset is from start of the payload area (after the 48-byte ProgramData header)
-      const offset = chunkIndex * MAX_CHUNK_SIZE;
+      // offset must skip the 48-byte Upgradeable-Loader header
+      const offset = HEADER_LEN + chunkIndex * MAX_CHUNK_SIZE;
       const chunkEnd = Math.min((chunkIndex + 1) * MAX_CHUNK_SIZE, dataLength);
       const chunkSize = chunkEnd - chunkIndex * MAX_CHUNK_SIZE;
       const chunk = programData.slice(chunkIndex * MAX_CHUNK_SIZE, chunkEnd);
@@ -320,11 +319,7 @@ export async function deployUpgradeableProgram(
     }
     deployTx = deployTx.add(deployIx);
     
-    // Priority fee – env-driven, default 60 000 µ◎ like SolPG
-    const CU_PRICE = Number(process.env.NEXT_PUBLIC_SOL_PRIORITY_FEE ?? 60_000);
-    const deployPriorityIx =
-      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: CU_PRICE });
-    deployTx.instructions.unshift(deployPriorityIx);   // prepend
+    // Let Phantom inject its own priority-fee ix; don't add one manually
     
     deployTx.feePayer = payer;
     
@@ -350,29 +345,17 @@ export async function deployUpgradeableProgram(
       // ❶ stamp the blockhash
       group.forEach(tx => { tx.recentBlockhash = blockhash });
 
-      // ❷ Ask Phantom ONLY for txs that need the wallet
-      const needsWallet = group.filter(
-        tx => tx.feePayer?.equals(payer) ||            // wallet pays fee
-              tx.signatures.some(s => s.publicKey.equals(payer)), // or is an additional signer
-      );
-
-      // ❸ Let Phantom add its signatures FIRST
-      const signedByWallet = [];
-      if (needsWallet.length) {
-        if (!wallet.signAllTransactions) {
-          throw new Error("Wallet doesn't support signing multiple transactions");
-        }
-        const signedSubset = await wallet.signAllTransactions(needsWallet);
-        
-        // merge Phantom-signed copies back into the original array
-        needsWallet.forEach((orig, i) => {
-          const withWallet = signedSubset[i];
-          orig.addSignature(
-            payer,
-            withWallet.signatures.find(s => s.publicKey.equals(payer))!.signature!
-          );
-        });
+      // ❸ Let Phantom sign the ENTIRE batch first and keep the returned (mutated) objects
+      if (!wallet.signAllTransactions) {
+        throw new Error("Wallet doesn't support signAllTransactions");
       }
+
+      const phantomSigned = await wallet.signAllTransactions(group);
+
+      // overwrite each slot so `group` now holds Phantom-mutated versions
+      phantomSigned.forEach((tx, i) => {
+        group[i] = tx;
+      });
 
       // ❹ NOW append purely-offline signatures
       const locals = [bufferAuthority, programKeypair, bufferKey]
