@@ -344,11 +344,19 @@ export async function deployUpgradeableProgram(
     
     writeTxs.push(deployTx);   // after the loop, before signAllTransactions
     
+    // ── One fresh block-hash for the whole deploy ──────────────────────
+    const { blockhash: sharedBlockhash, lastValidBlockHeight: sharedLvb } =
+      await getSafeBlockhash(connection);
+    writeTxs.forEach(tx => (tx.recentBlockhash = sharedBlockhash));
+    
     // ── Single Phantom prompt ───────────────────────────────────────
     if (!wallet.signAllTransactions) {
       throw new Error("Wallet doesn't support signAllTransactions");
     }
-
+    
+    // NOTE: Phantom signs on the message hash. Never touch recentBlockhash
+    // after signAllTransactions() or signatures become invalid.
+    
     // Sign EVERY tx (createBuffer + writes + deploy) in one go
     const phantomSignedAll = await wallet.signAllTransactions(writeTxs);
 
@@ -369,7 +377,7 @@ export async function deployUpgradeableProgram(
     // Helper to send and confirm transactions for a group
     async function sendAndConfirm(group: Transaction[], blockhash: string, lastValidBlockHeight: number, groupType: 'bookend' | 'write') {
       // ❶ stamp the blockhash
-      group.forEach(tx => { tx.recentBlockhash = blockhash });
+      // (removed - we already have the blockhash set)
 
       // ❷ append purely-offline signatures
       const locals = [bufferAuthority, programKeypair, bufferKey]
@@ -414,13 +422,9 @@ export async function deployUpgradeableProgram(
 
     for (const [gIdx, group] of groups.entries()) {
       try {
-        // Fetch a safer blockhash (≈100 slots old) for this batch
-        const { blockhash, lastValidBlockHeight } = await getSafeBlockhash(connection);
-        group.forEach(tx => { tx.recentBlockhash = blockhash; });
-        
         // First and last groups are bookends, middle groups are writes
         const groupType = (gIdx === 0 || gIdx === groups.length - 1) ? 'bookend' : 'write';
-        const sigs = await sendAndConfirm(group, blockhash, lastValidBlockHeight, groupType);
+        const sigs = await sendAndConfirm(group, sharedBlockhash, sharedLvb, groupType);
         signatures.push(...sigs);
         
         // Log buffer creation success if this was the first group
