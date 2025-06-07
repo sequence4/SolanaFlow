@@ -29,8 +29,8 @@ import type { SendOptions } from '@solana/web3.js';
 // when you move to QuickNode Build).
 //const BURST_SIZE = Number(process.env.NEXT_PUBLIC_TX_BURST_SIZE ?? 1);
 //const BURST_WAIT = Number(process.env.NEXT_PUBLIC_TX_BURST_WAIT ?? 350); // ms
-const BURST_SIZE = 1;
-const BURST_WAIT = 400; // ms
+const BURST_SIZE = 6;   // send six txs per burst
+const BURST_WAIT = 150; // wait 150 ms between bursts
 
 
 // Helper function for little-endian u32 encoding
@@ -359,24 +359,23 @@ export async function deployUpgradeableProgram(
     // Last group is just the deployTx
     groups.push([writeTxs[writeTxs.length - 1]]);
 
+    // ── Single Phantom prompt ───────────────────────────────────────
+    if (!wallet.signAllTransactions) {
+      throw new Error("Wallet doesn't support signAllTransactions");
+    }
+
+    // Sign EVERY tx (createBuffer + writes + deploy) in one go
+    const phantomSignedAll = await wallet.signAllTransactions(writeTxs);
+
+    // Overwrite the originals so we keep any priority-fee ixs Phantom injected
+    phantomSignedAll.forEach((tx, i) => (writeTxs[i] = tx));
+
     // Helper to send and confirm transactions for a group
     async function sendAndConfirm(group: Transaction[], blockhash: string, lastValidBlockHeight: number, groupType: 'bookend' | 'write') {
       // ❶ stamp the blockhash
       group.forEach(tx => { tx.recentBlockhash = blockhash });
 
-      // ❸ Let Phantom sign the ENTIRE batch first and keep the returned (mutated) objects
-      if (!wallet.signAllTransactions) {
-        throw new Error("Wallet doesn't support signAllTransactions");
-      }
-
-      const phantomSigned = await wallet.signAllTransactions(group);
-
-      // overwrite each slot so `group` now holds Phantom-mutated versions
-      phantomSigned.forEach((tx, i) => {
-        group[i] = tx;
-      });
-
-      // ❹ NOW append purely-offline signatures
+      // ❷ append purely-offline signatures
       const locals = [bufferAuthority, programKeypair, bufferKey]
         .filter((kp): kp is Keypair => kp !== null);
       group.forEach(tx =>
@@ -387,7 +386,7 @@ export async function deployUpgradeableProgram(
         })
       );
 
-      // ❺ fire & confirm
+      // ❸ fire & confirm
       const sigs = [];
       for (let i = 0; i < group.length; i++) {
         if (i !== 0 && i % BURST_SIZE === 0) await throttle(BURST_WAIT);
