@@ -59,10 +59,6 @@ function leU64(n: number | bigint): Buffer {
 export const MAX_CHUNK_SIZE = 900;
 export const HEADER_LEN = BPF_BUFFER_HEADER_LEN;
 
-// ── Funding for the in-browser buffer authority ───────────────────────────
-// 0.02 SOL covers ≈300–400 Write TXs with plenty of head-room.
-const AUTHORITY_FUND_LAMPORTS = Math.round(0.02 * LAMPORTS_PER_SOL);
-
 // ── SendOptions presets ──────────────────────────────────────────────
 // Book-end TXs (create-buffer & deploy): run full simulation, retry hard
 const TX_OPTS: SendOptions    = { skipPreflight: false, maxRetries: 15 };
@@ -142,6 +138,21 @@ async function yieldToBrowser(ms?: number): Promise<void> {
 }
 
 /**
+ * Rough fee budget: base fee (5 000 lamports) × (#signatures per tx)
+ * We assume: 1 sig per chunk-write (bufferAuthority) and 2 sigs on book-ends
+ * Add 25 % cushion for Phantom priority fees.
+ */
+function estimateAuthorityLamports(numChunks: number): number {
+  const BASE_FEE = 5_000;               // lamports per signature (fixed)
+  const bookendTxs  = 2;                // create-buffer + deploy
+  const writeTxs    = numChunks;        // one write tx per chunk
+  const sigs        = bookendTxs * 1    // bufferAuthority signs both
+                    + writeTxs * 1;     // bufferAuthority signs every write
+  const raw         = sigs * BASE_FEE;
+  return Math.floor(raw * 1.25);        // +25 % cushion
+}
+
+/**
  * Deploys a Solana program using the BPF Upgradeable Loader
  * This function implements the full deployment flow:
  * 1. Create buffer account
@@ -203,10 +214,16 @@ export async function deployUpgradeableProgram(
   
   try {
     // 2. (a) Fund the bufferAuthority and allocate the buffer account
+    const authLamports = estimateAuthorityLamports(Math.ceil(dataLength / MAX_CHUNK_SIZE));
+    if (authLamports > 0.1 * LAMPORTS_PER_SOL) {
+      console.warn(
+        `[DEPLOY] Large program – topping bufferAuthority with ${(authLamports / LAMPORTS_PER_SOL).toFixed(3)} SOL`
+      );
+    }
     const fundAuthorityIx = SystemProgram.transfer({
       fromPubkey: payer,
       toPubkey: bufferAuthority.publicKey,
-      lamports: AUTHORITY_FUND_LAMPORTS,
+      lamports: authLamports,
     });
 
     // (b) Allocate the buffer with SystemProgram
