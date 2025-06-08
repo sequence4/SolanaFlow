@@ -12,6 +12,7 @@ DROP TABLE IF EXISTS "solanaproject"               CASCADE;
 
 DROP TABLE IF EXISTS "Task"                        CASCADE;
 DROP TABLE IF EXISTS "SolanaProject"               CASCADE;
+DROP TABLE IF EXISTS cleanup_queue               CASCADE;
 
 CREATE TABLE "solanaproject" (
   id             UUID PRIMARY KEY,
@@ -96,3 +97,17 @@ ALTER TABLE warm_container_pool
 CREATE UNIQUE INDEX IF NOT EXISTS warm_pool_port_nonzero_uniq
            ON warm_container_pool (port)
         WHERE port <> 0;
+
+-- ─────────────────────────────────────────────────────────────
+--  Cleanup queue (no FK — simply holds project_id for later)
+-- ─────────────────────────────────────────────────────────────
+DROP TABLE IF EXISTS cleanup_queue CASCADE;
+
+CREATE TABLE cleanup_queue (
+  project_id UUID         NOT NULL,   -- plain UUID; no FK needed
+  queued_at  TIMESTAMPTZ  DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_cleanup_queue_queued
+    ON cleanup_queue (queued_at DESC);
+-- ─────────────────────────────────────────────────────────────
