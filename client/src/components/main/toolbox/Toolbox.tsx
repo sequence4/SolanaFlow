@@ -37,6 +37,10 @@ import { useEnsureProjectId } from '@/hooks/useEnsureProjectId';
 import { ProgramDeployer } from '@/components/ProgramDeployer';
 import { projectApi } from '@/api/projectApi';
 
+// Add this constant after the imports section
+// Prevent duplicate "wallet not connected" toasts
+const WALLET_TOAST_ID = 'wallet-not-connected';
+
 export const Toolbox = () => {
     const [isExpanded] = useState(true);
     const { projectContext, setProjectContext } = useContext(ProjectContext);
@@ -194,12 +198,26 @@ export const Toolbox = () => {
     }, [isBuilding, ensureId, setIsBuilding, taskLogs, projectContext, setProjectContext, setArtifactUrl]);
     
     const handleDeployClick = useCallback(() => {
+        // 🔒 Gate: require an attached wallet
+        if (!walletSigner.isConnected) {
+            toast.error('Please connect your wallet first', {
+                id: WALLET_TOAST_ID,        // ← this keeps Sonner from stacking duplicates
+                duration: 4000,             // optional – feel free to tweak
+            });
+            return;                       // ⛔︎ stop here – nothing else should run
+        }
+
         if (!projectContext.details?.projectState?.built) {
-            toast.error("Please build first");
+            toast.error('Please build first', { id: 'need-build' });
             return;
         }
+
         setIsDeployModalOpen(true);
-    }, [projectContext.details?.projectState?.built, setIsDeployModalOpen]);
+    }, [
+        walletSigner.isConnected,
+        projectContext.details?.projectState?.built,
+        setIsDeployModalOpen,
+    ]);
     
     const handleDeploySuccess = useCallback((programId: string) => {
         // Update project context with deployed status and program ID
