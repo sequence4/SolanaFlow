@@ -150,42 +150,27 @@ export const Toolbox = () => {
                 
                 taskLogs.addSystemLog("✅ Build completed successfully!");
                 
-                // Persist the built flag to the server first
-                if (projectContext.id) {
-                    try {
-                        await projectApi.updateProject(projectContext.id, {
-                            details: {
-                                projectState: { built: true }
-                            }
-                        });
-                        
-                        // Update local context only after successful server update
-                        setProjectContext(prev => ({
-                            ...prev,
-                            details: {
-                                ...prev.details!,
-                                projectState: {
-                                    ...prev.details!.projectState,
-                                    built: true,      // mark build done
-                                    deployed: false   // reset deployed status
-                                }
-                            }
-                        }));
-                    } catch (error) {
-                        console.error("Failed to persist build state:", error);
-                        // Still update local state for UX continuity
-                        setProjectContext(prev => ({
-                            ...prev,
-                            details: {
-                                ...prev.details!,
-                                projectState: {
-                                    ...prev.details!.projectState,
-                                    built: true,
-                                    deployed: false
-                                }
-                            }
-                        }));
+                // 1.  **Always** update the local context immediately so the UI reacts
+                setProjectContext(prev => ({
+                  ...prev,
+                  details: {
+                    ...prev.details!,
+                    projectState: {
+                      ...prev.details!.projectState,
+                      built: true,          // ➜ enables Deploy button
+                      deployed: false
                     }
+                  }
+                }));
+                
+                // 2.  Fire-and-forget persistence (best effort)
+                if (projectContext.id) {
+                  projectApi.updateProject(projectContext.id, {
+                    details: { projectState: { built: true } }
+                  }).catch(err => {
+                    console.error("Failed to persist build state:", err);
+                    // UI is already updated, so just log
+                  });
                 }
                 
                 toast.success("Build completed");
