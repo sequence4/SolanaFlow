@@ -390,13 +390,15 @@ export const handleConfirmNewProject = async (
     console.log(`[DEBUG_PROJECT_CONFIRM] ensured id=${id}`);
 
     /* ------------------------------------------------------------------
-     * 3. Persist *rest* of metadata (details.projectState etc.)
-     *    ⚠️ saveProject now bails early if id is falsy, so we're safe.
+     * 3. Persist metadata *only if* we already had details to save.
+     *    This skips an unnecessary PUT right after a fresh create.
      * ------------------------------------------------------------------ */
-    await saveProject(
-      { ...projectContext, id, name, description },
-      setProjectContext,
-    );
+    if (projectContext.details && Object.keys(projectContext.details).length) {
+      await saveProject(
+        { ...projectContext, id, name, description },
+        setProjectContext,
+      );
+    }
 
     /* House-keeping */
     setProjectsRefreshCounter(c => c + 1);

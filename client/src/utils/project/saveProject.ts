@@ -52,7 +52,7 @@ export const saveProject = async (
   console.log('projectInfoToSave', projectInfoToSave);
 
   if (!projectContext.id) {
-    console.warn('[saveProject] called without id – ensureId() must run first');
+    console.warn('[saveProject] skipped: ctx.id missing (ensureId() must run first)');
     return null;
   }
 

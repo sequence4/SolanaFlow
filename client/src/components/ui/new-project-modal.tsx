@@ -5,7 +5,7 @@ import { useState } from "react"
 import { Github, Info, Upload } from "lucide-react"
 
 import { Button } from "./button"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "./dialog"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "./dialog"
 import { Input } from "./input"
 import { Label } from "./label"
 import { Textarea } from "./textarea"
