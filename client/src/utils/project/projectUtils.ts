@@ -58,6 +58,8 @@ export function getSafeProjectContext(
         projectFiles: fetched.details?.projectState?.projectFiles || { lib: "", mod: "", state: "" },
         fileTree: fetched.details?.projectState?.fileTree || undefined,
         programId: fetched.details?.projectState?.programId || '',
+        built: fetched.details?.projectState?.built || false,
+        deployed: fetched.details?.projectState?.deployed || false,
       }
     }
   };
@@ -337,6 +339,8 @@ export const handleNewProjectClick = (
         instructions: [],
         projectFiles: { lib: '', mod: '', state: '' },
         fileTree: undefined,
+        built: false,
+        deployed: false,
       },
     },
   });
@@ -400,6 +404,8 @@ export const handleConfirmNewProject = async (
           instructions: [],
           projectFiles: { lib: "", mod: "", state: "" },
           fileTree: undefined,
+          built: false,
+          deployed: false,
         },
       },
     };
