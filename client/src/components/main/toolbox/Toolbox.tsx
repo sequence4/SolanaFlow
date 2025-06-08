@@ -98,7 +98,7 @@ export const Toolbox = () => {
             data.description, 
             projectsRefreshCounter, 
             setProjectsRefreshCounter, 
-            setUxOpenPanel,
+            setUxOpenPanel as (p: string) => void,
             setFileTree,
             setSelectedFile,
             taskLogs

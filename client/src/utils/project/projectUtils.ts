@@ -1,6 +1,7 @@
 import React from "react";
 import { toast } from "sonner";
 import { projectApi } from "@/api/projectApi";
+import { ensureId } from '@/utils/project/ensureId';
 import { ProjectContextType, ProjectStateUpdater, SaveProjectResponse } from "@/context/project/ProjectContextTypes";
 import { saveProject } from "./saveProject";
 import { fetchFilesAndCodes } from "@/utils/files/fetchFilesAndCodes";
@@ -8,6 +9,7 @@ import { FileTreeItemType } from "@/interfaces/FileTreeItemType";
 import { UxOpenPanel } from "@/context/ux/UxContextTypes";
 import { pollTaskStatus4 } from "@/utils/task/taskUtils";
 import { Step } from '@/context/logs/TaskLogsContext';
+import { useTaskLogs } from "@/context/logs/useTaskLogs";
 
 export const fetchProjects = async (
     page: number, 
@@ -362,126 +364,47 @@ interface TaskLogActions {
 export const handleConfirmNewProject = async (
   projectContext: ProjectContextType,
   setProjectContext: React.Dispatch<React.SetStateAction<ProjectContextType>>,
-  localProjectName: string,
-  localProjectDescription: string,
+  name: string,
+  description: string,
   projectsRefreshCounter: number,
-  setProjectsRefreshCounter: (n: number) => void,
-  setUxOpenPanel: (panel: UxOpenPanel) => void,
-  setFileTree: (tree: FileTreeItemType | null) => void,
-  setSelectedFile: (file: FileTreeItemType | null) => void,
-  taskLogs?: TaskLogActions
+  setProjectsRefreshCounter: React.Dispatch<React.SetStateAction<number>>,
+  setUxOpenPanel: (p: string) => void,
+  setFileTree: any,
+  setSelectedFile: any,
+  taskLogs: ReturnType<typeof useTaskLogs>,
 ) => {
-  console.log(`[DEBUG_PROJECT_CONFIRM] Starting handleConfirmNewProject for project name=${localProjectName}`);
-  
-  if (!taskLogs) {
-      console.warn("TaskLogs not provided to handleConfirmNewProject. Progress UI will not display.");
-      return;
-  }
-
-  taskLogs.setProgress(0);
-  const initialSteps = [...projectCreationSteps]; 
-  taskLogs.setSteps(initialSteps);
-  taskLogs.setIsVisible(true);
-  taskLogs.addSystemLog(`Creating new project: ${localProjectName}...`);
-  let success = false;
-  await new Promise(resolve => setTimeout(resolve, 15000));
   try {
-    taskLogs.setProgress(20); 
-    taskLogs.addSystemLog("Preparing container environment...");
-    await new Promise(resolve => setTimeout(resolve, 8000));
-    
-    const newContext: ProjectContextType = {
-      id: "", 
-      name: localProjectName,
-      description: localProjectDescription,
-      details: {
-        setProjectState: projectContext.details?.setProjectState || (() => {}),
-        projectState: {
-          mode: "basic",
-          nodes: [],
-          edges: [],
-          config: {},
-          instructions: [],
-          projectFiles: { lib: "", mod: "", state: "" },
-          fileTree: undefined,
-          built: false,
-          deployed: false,
-        },
-      },
-    };
-    setProjectContext(newContext);
-    setFileTree(null);
-    setSelectedFile(null);
-    taskLogs.addSystemLog("Local context initialized.");
+    /* ------------------------------------------------------------------
+     * 1. Optimistic local update (instant UX feedback)
+     * ------------------------------------------------------------------ */
+    setProjectContext(prev => ({              // no DB traffic yet
+      ...prev,
+      name,
+      description,
+    }));
 
-    taskLogs.setProgress(40); 
-    taskLogs.addSystemLog("Saving project metadata...");
-    await new Promise(resolve => setTimeout(resolve, 20000));
-    
-    const saveResponse: SaveProjectResponse | null = await saveProject(newContext, setProjectContext);
-    if (!saveResponse || !saveResponse.project?.id) {
-      throw new Error("Failed to save project metadata.");
-    }
-    taskLogs.addSystemLog(`Metadata saved (Project ID: ${saveResponse.project.id}).`);
-    const backendTaskId = saveResponse.directoryTask?.taskId;
+    /* ------------------------------------------------------------------
+     * 2. Ensure we have a DB id (cheap INSERT if missing)
+     * ------------------------------------------------------------------ */
+    const id = await ensureId(projectContext, setProjectContext);
+    console.log(`[DEBUG_PROJECT_CONFIRM] ensured id=${id}`);
 
-    taskLogs.setProgress(60); 
-    taskLogs.addSystemLog("Initializing base code (Backend Task)...");
-    await new Promise(resolve => setTimeout(resolve, 10000));
-    if (backendTaskId) {
-      taskLogs.addSystemLog(`Backend task started (ID: ${backendTaskId}). Monitoring...`);
-      try {
-        const finalStatus = await pollTaskStatus4(backendTaskId);
-        
-        if (finalStatus === 'succeed' || finalStatus === 'finished') {
-          taskLogs.addSystemLog("Backend tasks (Code Init, Deps Install, Verification) completed successfully.");
-          success = true; 
-        } else if (finalStatus === 'warning') {
-          taskLogs.addSystemLog("Backend tasks completed with warnings.");
-          success = true; 
-        } else {
-          throw new Error(`Backend task failed with status: ${finalStatus}`);
-        }
-      } catch (pollError) {
-        throw pollError; 
-      }
-    } else {
-      taskLogs.addSystemLog("No backend task ID. Assuming local setup suffices.");
-      success = true;
-    }
+    /* ------------------------------------------------------------------
+     * 3. Persist *rest* of metadata (details.projectState etc.)
+     *    ⚠️ saveProject now bails early if id is falsy, so we're safe.
+     * ------------------------------------------------------------------ */
+    await saveProject(
+      { ...projectContext, id, name, description },
+      setProjectContext,
+    );
 
-    if(success){
-        taskLogs.setProgress(80);
-        taskLogs.addSystemLog("Backend processing finished.");
-        await new Promise(resolve => setTimeout(resolve, 500));
-    }
-
-    setProjectsRefreshCounter(projectsRefreshCounter + 1);
-    
-    if (success) {
-       const successStep: Step = {
-          icon: "CheckCircle", 
-          message: "Project created successfully!",
-          details: "All steps completed. Your project is ready."
-       };
-       taskLogs.setSteps([...initialSteps, successStep]); 
-       taskLogs.setProgress(100); 
-       taskLogs.addSystemLog("Project creation finalized!");
-    } else {
-       taskLogs.setProgress(100);
-       taskLogs.addSystemLog("Project creation failed before finalization step.");
-    }
-
-  } catch (error) {
-    console.error("Failed to create new project:", error);
-    taskLogs.addSystemLog(`Error during project creation: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    taskLogs.setProgress(100);
-    success = false; 
-  } finally {
-    if (taskLogs) {
-       await new Promise(resolve => setTimeout(resolve, success ? 3000 : 4000)); 
-       taskLogs.setIsVisible(false);
-    }
+    /* House-keeping */
+    setProjectsRefreshCounter(c => c + 1);
+    setUxOpenPanel('workflow');
+  } catch (err) {
+    console.error('[handleConfirmNewProject] fatal:', err);
+    taskLogs.addSystemLog(`❌ Failed to create new project: ${String(err)}`);
+    throw err;                                 // let caller toast the error
   }
 };
 
