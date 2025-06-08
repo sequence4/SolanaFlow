@@ -23,6 +23,7 @@ const defaultValue: IProjectContextValue = {
         instructions: [],
         projectFiles: { lib: '', mod: '', state: '' },
         fileTree: undefined,
+        built: false,
       },
       setProjectState: () => {},
     },

@@ -35,6 +35,7 @@ import { runDeployPipelineWithLogs } from '@/utils/deploy/deployPipeline';
 import { useWalletSigner } from '@/utils/wallet';
 import { useEnsureProjectId } from '@/hooks/useEnsureProjectId';
 import { ProgramDeployer } from '@/components/ProgramDeployer';
+import { projectApi } from '@/api/projectApi';
 
 export const Toolbox = () => {
     const [isExpanded] = useState(true);
@@ -148,6 +149,30 @@ export const Toolbox = () => {
                 });
                 
                 taskLogs.addSystemLog("✅ Build completed successfully!");
+                
+                // Set the built flag to true in the context
+                setProjectContext(prev => ({
+                    ...prev,
+                    details: {
+                        ...prev.details!,
+                        projectState: {
+                            ...prev.details!.projectState,
+                            built: true,      // mark build done
+                            deployed: false   // reset deployed status
+                        }
+                    }
+                }));
+                
+                // Persist the built flag to the server
+                if (projectContext.id) {
+                    await projectApi.updateProject(projectContext.id, {
+                        ...projectContext,
+                        details: {
+                            projectState: { built: true }  // delta update is enough
+                        }
+                    });
+                }
+                
                 toast.success("Build completed");
                 
             } catch (error) {
@@ -169,7 +194,7 @@ export const Toolbox = () => {
     };
     
     const handleDeployClick = () => {
-        if (!projectContext.details?.projectState?.deployed) {
+        if (!projectContext.details?.projectState?.built) {
             toast.error("Please build first");
             return;
         }
@@ -186,11 +211,27 @@ export const Toolbox = () => {
                     projectState: {
                         ...projectContext.details.projectState,
                         deployed: true,
+                        built: false,    // reset built flag so next deploy requires a rebuild
                         programId
                     }
                 }
             };
             setProjectContext(updatedContext);
+            
+            // Persist the updated state to the server
+            if (projectContext.id) {
+                projectApi.updateProject(projectContext.id, {
+                    details: {
+                        projectState: { 
+                            deployed: true,
+                            built: false,
+                            programId
+                        }
+                    }
+                }).catch(err => {
+                    console.error("Failed to persist deployment state:", err);
+                });
+            }
         }
         
         // Close the deploy modal
@@ -325,7 +366,7 @@ export const Toolbox = () => {
                         <div className="relative">
                             <button 
                                 onClick={handleDeployClick}
-                                disabled={!projectContext.details?.projectState?.deployed || !walletSigner.isConnected || isDeploying}
+                                disabled={!projectContext.details?.projectState?.built || !walletSigner.isConnected || isDeploying}
                                 className="w-full cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center"
                             >
                                 {isDeploying ? (

@@ -27,6 +27,7 @@ export interface ProjectStateType {
   instructions?: InstructionType[];
   projectFiles?: any;
   fileTree?: FileTreeItemType;
+  built?: boolean;
   deployed?: boolean;
 }
 
@@ -99,5 +100,6 @@ export const savedKeys: (keyof ProjectStateType)[] = [
     'instructions',
     'projectFiles',
     'fileTree',
+    'built',
     'deployed',
 ];

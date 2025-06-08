@@ -197,9 +197,21 @@ export const editProject = async (
     }
 
     if (details !== undefined) {
-      updateQuery += `, details = $${valueIndex}`;
-      updateValues.push(JSON.stringify(details));
-      valueIndex++;
+      // Handle case when details contains projectState.built
+      if (details.projectState && details.projectState.built !== undefined) {
+        // Use jsonb_set to update only the specific nested field
+        updateQuery += `, details = jsonb_set(
+          COALESCE(details, '{}'::jsonb),
+          '{projectState,built}',
+          '${details.projectState.built}'::jsonb,
+          true
+        )`;
+      } else {
+        // Regular update for other cases
+        updateQuery += `, details = $${valueIndex}`;
+        updateValues.push(JSON.stringify(details));
+        valueIndex++;
+      }
     }
 
     updateQuery += ` WHERE id = $${valueIndex} AND org_id = $${
