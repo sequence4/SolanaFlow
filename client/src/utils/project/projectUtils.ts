@@ -24,11 +24,13 @@ export const fetchProjects = async (
     setError(null);
 
     try {
-      const { data, totalPages } = await projectApi.listProjects(page, limit, search);
-      console.log("data", data);
-      console.log("totalPages", totalPages);
+      const { data: list, totalPages } = 
+        await projectApi.listProjects(page, limit, search);
 
-      setProjects(data ?? []);
+      console.log('projects-list', list);
+      console.log('totalPages', totalPages);
+
+      setProjects(list);                 // safe: always an array now
       setTotalPages(totalPages);
     } catch (err) {
       setError('Failed to load projects. Please try again.');

@@ -7,7 +7,7 @@ import ProjectContext from '@/context/project/ProjectContext';
 import FileContext from '@/context/file/FileContext';
 import UxContext from '@/context/ux/UxContext';
 import 'simplebar-react/dist/simplebar.min.css';
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { NewProjectModal } from '@/components/ui/new-project-modal';
 import ProjectListPopover from '../workflow/ProjectListPopover';
@@ -583,8 +583,13 @@ export const Toolbox = () => {
             )}
 
             <Dialog open={isProjectListModalOpen} onOpenChange={(open) => setIsProjectListModalOpen(open)}>
-                <DialogContent className="bg-[#111827] text-slate-100" 
-                style={{width: "fit-content", border: "1px solid rgb(36, 45, 68)"}}>
+                <DialogContent 
+                    aria-describedby="project-list-desc"
+                    className="bg-[#111827] text-slate-100" 
+                    style={{width: "fit-content", border: "1px solid rgb(36, 45, 68)"}}>
+                    <DialogDescription id="project-list-desc" className="sr-only">
+                        Select a project from your list of SolanaFlow projects.
+                    </DialogDescription>
                     <ProjectListPopover
                         modalIsOpen={isProjectListModalOpen}
                         refreshTrigger={projectsRefreshCounter}

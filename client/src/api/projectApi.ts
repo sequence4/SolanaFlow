@@ -86,17 +86,29 @@ export const projectApi = {
     }
   },
 
-  listProjects: async (
-    page = 1, limit = 10, search?: string
-  ): Promise<{ data: any[]; totalPages: number }> => {
+  listProjects: async (page = 1, limit = 10, search?: string)
+  : Promise<{ data: any[]; totalPages: number }> => {
     try {
       const resp = await api.get('/org/projects', {
         params: { page, limit, search },
       });
-      return resp.data;              // already { data, totalPages }
+
+      // ── normalise every possible server reply shape ───────────────
+      const payload = resp.data ?? {};                   // axios .data
+
+      // If server returned an *array* directly, wrap it
+      if (Array.isArray(payload)) {
+        return { data: payload, totalPages: 1 };
+      }
+
+      // Otherwise expect { data: … , totalPages: … }
+      return {
+        data:      payload.data      ?? [],
+        totalPages: payload.totalPages ?? 1,
+      };
     } catch (error) {
       console.error('Error listing projects:', error);
-      throw error;
+      return { data: [], totalPages: 1 }; // Fail gracefully
     }
   },
 
