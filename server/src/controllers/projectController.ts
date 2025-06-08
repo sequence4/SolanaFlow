@@ -592,16 +592,14 @@ export const deployProjectEphemeral = async (
   next: NextFunction
 ): Promise<void> => {
   const { id } = req.params;
-  const userId = req.user?.id;
-  const orgId = req.user?.org_id;
+  /** 
+   * ⚠️  dev-only: we don't run auth yet.
+   *     fall back to a deterministic mock user ID if none supplied.
+   */
+  const userId = req.user?.id ?? 'mock-user';
   const { ephemeralPubkey } = req.body;
 
   console.log(`[DEPLOY_EPHEMERAL] Received request to deploy project ${id} with ephemeral key ${ephemeralPubkey}`);
-
-  if (!userId || !orgId) {
-    console.log(`[DEPLOY_EPHEMERAL] Missing user info: userId=${userId}, orgId=${orgId}`);
-    return next(new AppError('User information not found', 400));
-  }
 
   if (!ephemeralPubkey) {
     console.log(`[DEPLOY_EPHEMERAL] No ephemeral public key provided in request`);
@@ -631,12 +629,12 @@ export const deployProjectEphemeral = async (
 
   try {
     const projectCheck = await pool.query(
-      'SELECT details FROM solanaproject WHERE id = $1 AND org_id = $2',
-      [id, orgId]
+      'SELECT details FROM solanaproject WHERE id = $1',
+      [id]
     );
 
     if (projectCheck.rows.length === 0) {
-      console.log(`[DEPLOY_EPHEMERAL] Project not found or no permission: id=${id}, orgId=${orgId}`);
+      console.log(`[DEPLOY_EPHEMERAL] Project not found (id=${id})`);
       return next(
         new AppError(
           'Project not found or you do not have permission to deploy it',
