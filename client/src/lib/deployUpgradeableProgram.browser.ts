@@ -416,17 +416,6 @@ export async function deployUpgradeableProgram(
     //         s => s.publicKey.equals(payer) && s.signature))
     //     console.warn(`❌ Tx #${i} is still unsigned by wallet`);
     // });
-    
-    // ── Slice the now-signed array into send batches ───────────────────
-    const groups: Transaction[][] = [];
-    groups.push([writeTxs[0]]);                   // create-buffer tx
-
-    const WRITE_BATCH = 20;                       // keep existing batch size
-    for (let i = 1; i < writeTxs.length - 1; i += WRITE_BATCH) {
-      groups.push(writeTxs.slice(i, Math.min(i + WRITE_BATCH, writeTxs.length - 1)));
-    }
-
-    groups.push([writeTxs.at(-1)!]);              // deploy tx
 
     // Helper to send and confirm transactions for a group
     async function sendAndConfirm(group: Transaction[], blockhash: string, lastValidBlockHeight: number, groupType: 'bookend' | 'write') {
@@ -474,6 +463,24 @@ export async function deployUpgradeableProgram(
       return sigs;
     }
 
+    // ── Slice the now-fully-signed array into send batches ─────────────
+    //    (build AFTER we add offline sigs ↓)
+    const groups: Transaction[][] = [];
+    groups.push([writeTxs[0]]);                   // create-buffer tx
+
+    const WRITE_BATCH = 20;                       // keep existing batch size
+    for (let i = 1; i < writeTxs.length - 1; i += WRITE_BATCH) {
+      groups.push(writeTxs.slice(i, Math.min(i + WRITE_BATCH, writeTxs.length - 1)));
+    }
+
+    groups.push([writeTxs.at(-1)!]);              // deploy tx
+    
+    // Optional debug: verify all signatures are present
+    // writeTxs.forEach((tx,i)=>{
+    //   console.debug(`[SIGCHK] tx#${i} signedBy=${tx.signatures
+    //        .filter(s=>s.signature!==null).map(s=>s.publicKey.toBase58())}`);
+    // });
+    
     for (const [gIdx, group] of groups.entries()) {
       try {
         // First and last groups are bookends, middle groups are writes
