@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { NewProjectModal } from '@/components/ui/new-project-modal';
 import ProjectListPopover from '../workflow/ProjectListPopover';
 import { toast } from "sonner";
+import { toast as sonnerToast } from 'sonner';
 import PulseLoader from "react-spinners/PulseLoader";
 import { handleConfirmNewProject, handleOpenProject, handleSaveClick } from '@/utils/project/projectUtils';
 import { useTaskLogs } from '@/context/logs/useTaskLogs';
@@ -200,15 +201,17 @@ export const Toolbox = () => {
     const handleDeployClick = useCallback(() => {
         // 🔒 Gate: require an attached wallet
         if (!walletSigner.isConnected) {
-            toast.error('Please connect your wallet first', {
-                id: WALLET_TOAST_ID,        // ← this keeps Sonner from stacking duplicates
-                duration: 4000,             // optional – feel free to tweak
+            // Use regular toast with ID to prevent duplicates
+            sonnerToast.error('Please connect your wallet first', {
+                id: WALLET_TOAST_ID,
+                duration: 4000,
             });
-            return;                       // ⛔︎ stop here – nothing else should run
+            return;
         }
 
         if (!projectContext.details?.projectState?.built) {
-            toast.error('Please build first', { id: 'need-build' });
+            // Use regular toast with ID to prevent duplicates
+            sonnerToast.error('Please build first', { id: 'need-build' });
             return;
         }
 
@@ -384,8 +387,8 @@ export const Toolbox = () => {
                         <div className="relative">
                             <button 
                                 onClick={handleDeployClick}
-                                disabled={!projectContext.details?.projectState.built || !walletSigner.isConnected || isDeploying}
-                                className="w-full cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center"
+                                disabled={!projectContext.details?.projectState?.built || isDeploying}
+                                className={`w-full ${!walletSigner.isConnected ? 'opacity-70' : ''} cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center`}
                             >
                                 {isDeploying ? (
                                     <PulseLoader
