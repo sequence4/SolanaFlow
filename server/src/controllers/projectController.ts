@@ -107,10 +107,8 @@ export const createProjectDirectory = async (
   res: Response,
   next: NextFunction
 ) => {
-  const org_id = req.user?.org_id;
   const userId = req.user?.id;
-
-  if (!org_id || !userId) return next(new AppError('User organization not found', 400)); 
+  // org_id checks temporarily disabled until auth lands
 
   try {
     const { name, description, projectId = '' } = req.body;
@@ -157,11 +155,8 @@ export const editProject = async (
 ) => {
   const { id } = req.params;
   const { name, description, details } = req.body;
-  const org_id = req.user?.org_id;
-
-  if (!org_id) {
-    return next(new AppError('User organization not found', 400));
-  }
+  const userId = req.user?.id;
+  // org_id checks temporarily disabled until auth lands
 
   const client = await pool.connect();
 
@@ -169,8 +164,8 @@ export const editProject = async (
     await client.query('BEGIN');
 
     const projectCheck = await client.query(
-      'SELECT * FROM solanaproject WHERE id = $1 AND org_id = $2',
-      [id, org_id]
+      'SELECT * FROM solanaproject WHERE id = $1',
+      [id]
     );
 
     if (projectCheck.rows.length === 0) {
@@ -196,22 +191,28 @@ export const editProject = async (
       valueIndex++;
     }
 
-    if (details.projectState && details.projectState.built !== undefined) {
-      // Use jsonb_set with parameterized value for safety
-      updateQuery += `, details = jsonb_set(
-        COALESCE(details, '{}'::jsonb),
-        '{projectState,built}',
-        to_jsonb($${valueIndex}),
-        true
-      )`;
-      updateValues.push(details.projectState.built);
-      valueIndex++;
+    if (details !== undefined) {
+      // Handle case when details contains projectState.built
+      if (details.projectState && details.projectState.built !== undefined) {
+        // Use jsonb_set to update only the specific nested field
+        updateQuery += `, details = jsonb_set(
+          COALESCE(details, '{}'::jsonb),
+          '{projectState,built}',
+          to_jsonb($${valueIndex}),
+          true
+        )`;
+        updateValues.push(details.projectState.built);
+        valueIndex++;
+      } else {
+        // Regular update for other cases
+        updateQuery += `, details = $${valueIndex}`;
+        updateValues.push(JSON.stringify(details));
+        valueIndex++;
+      }
     }
 
-    updateQuery += ` WHERE id = $${valueIndex} AND org_id = $${
-      valueIndex + 1
-    } RETURNING *`;
-    updateValues.push(id, org_id);
+    updateQuery += ` WHERE id = $${valueIndex} RETURNING *`;
+    updateValues.push(id);
 
     const result = await client.query(updateQuery, updateValues);
 
@@ -242,29 +243,23 @@ export const getProjectDetails = async (
 ): Promise<void> => {
   const { id } = req.params;
   const userId = req.user?.id;
-  const orgId = req.user?.org_id;
+  // org_id checks temporarily disabled until auth lands
 
-  console.log(`[DEBUG_PROJECT] getProjectDetails called for id=${id}, userId=${userId}, orgId=${orgId}`);
-
-  if (!userId || !orgId) {
-    console.log(`[DEBUG_PROJECT] getProjectDetails failed - missing userId or orgId`);
-    next(new AppError('User information not found', 400));
-    return;
-  }
+  console.log(`[DEBUG_PROJECT] getProjectDetails called for id=${id}, userId=${userId}`);
 
   try {
     console.log(`[DEBUG_PROJECT] Querying database for project id=${id}`);
     const projectResult = await pool.query(
       `
-      SELECT id, name, description, org_id, root_path, details, container_url, last_updated, created_at
+      SELECT id, name, description, root_path, details, container_url, last_updated, created_at
       FROM solanaproject
-      WHERE id = $1 AND org_id = $2
+      WHERE id = $1
     `,
-      [id, orgId]
+      [id]
     );
 
     if (projectResult.rows.length === 0) {
-      console.log(`[DEBUG_PROJECT] No project found for id=${id}, orgId=${orgId}`);
+      console.log(`[DEBUG_PROJECT] No project found for id=${id}`);
       next(
         new AppError('Project not found or you do not have permission to access it', 404)
       );
@@ -405,17 +400,13 @@ export const setCluster = async (
   next: NextFunction
 ) => {
   const { id } = req.params;
-  const userId = req.user?.id;
-  const orgId = req.user?.org_id;
-
-  if (!userId || !orgId) {
-    return next(new AppError('User information not found', 400));
-  }
+  const userId = req.user?.id ?? 'mock-user';
+  // org_id checks temporarily disabled until auth lands
 
   try {
     const projectCheck = await pool.query(
-      'SELECT * FROM solanaproject WHERE id = $1 AND org_id = $2',
-      [id, orgId]
+      'SELECT * FROM solanaproject WHERE id = $1',
+      [id]
     );
 
     if (projectCheck.rows.length === 0) {
@@ -440,16 +431,13 @@ export const buildProject = async (
   next: NextFunction
 ): Promise<void> => {
   const { id } = req.params;
-  const userId = req.user?.id;
-  const orgId = req.user?.org_id;
+  const userId = req.user?.id ?? 'mock-user';
+  // org_id checks temporarily disabled until auth lands
 
-  if (!userId || !orgId) {
-    return next(new AppError('User information not found', 400));
-  }
   try {
     const projectCheck = await pool.query(
-      'SELECT details FROM solanaproject WHERE id = $1 AND org_id = $2',
-      [id, orgId]
+      'SELECT details FROM solanaproject WHERE id = $1',
+      [id]
     );
 
     if (projectCheck.rows.length === 0) {
@@ -541,15 +529,13 @@ export const deployProject = async (
   next: NextFunction
 ): Promise<void> => {
   const { id } = req.params;
-  const userId = req.user?.id;
-  const orgId = req.user?.org_id;
-
-  if (!userId || !orgId) return next(new AppError('User information not found', 400));
+  const userId = req.user?.id ?? 'mock-user';
+  // org_id checks temporarily disabled until auth lands
 
   try {
     const projectCheck = await pool.query(
-      'SELECT details FROM solanaproject WHERE id = $1 AND org_id = $2',
-      [id, orgId]
+      'SELECT details FROM solanaproject WHERE id = $1',
+      [id]
     );
 
     if (projectCheck.rows.length === 0) {
@@ -832,15 +818,13 @@ export const installPackages = async (
 ) => {
   const { id } = req.params;
   const { packages } = req.body;
-  const userId = req.user?.id;
-  const orgId = req.user?.org_id;
-
-  if (!userId || !orgId) return next(new AppError('User information not found', 400));
+  const userId = req.user?.id ?? 'mock-user';
+  // org_id checks temporarily disabled until auth lands
   
   try {
     const projectCheck = await pool.query(
-      'SELECT * FROM solanaproject WHERE id = $1 AND org_id = $2',
-      [id, orgId]
+      'SELECT * FROM solanaproject WHERE id = $1',
+      [id]
     );
 
     if (projectCheck.rows.length === 0) {
@@ -871,12 +855,8 @@ export const installNodeDependencies = async (
 ) => {
   const { projectId } = req.params;
   const { packages } = req.body;
-  const userId = req.user?.id;
-  const orgId = req.user?.org_id;
-
-  if (!userId || !orgId) {
-    return next(new AppError('User information not found', 400));
-  }
+  const userId = req.user?.id ?? 'mock-user';
+  // org_id checks temporarily disabled until auth lands
 
   if (!packages || !Array.isArray(packages)) {
     return next(new AppError('Packages array is required', 400));

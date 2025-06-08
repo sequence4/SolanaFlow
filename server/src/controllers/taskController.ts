@@ -10,12 +10,8 @@ export const listProjectTasks = async (
   res: Response,
   next: NextFunction
 ) => {
-  const userId = req.user?.id;
-  const orgId = req.user?.org_id;
-
-  if (!userId || !orgId) {
-    return next(new AppError('User information not found', 400));
-  }
+  const userId = req.user?.id ?? 'mock-user';
+  // org_id checks temporarily disabled until auth lands
 
   const {
     page = 1,
@@ -30,17 +26,16 @@ export const listProjectTasks = async (
              sp.name as project_name
       FROM task t
       JOIN solanaproject sp ON t.project_id = sp.id
-      WHERE sp.org_id = $1
     `;
-    const queryParams: any[] = [orgId];
+    const queryParams: any[] = [];
 
     if (projectId) {
-      query += ` AND t.project_id = $${queryParams.length + 1}`;
+      query += `${queryParams.length === 0 ? ' WHERE' : ' AND'} t.project_id = $${queryParams.length + 1}`;
       queryParams.push(projectId);
     }
 
     if (status) {
-      query += ` AND t.status = $${queryParams.length + 1}`;
+      query += `${queryParams.length === 0 ? ' WHERE' : ' AND'} t.status = $${queryParams.length + 1}`;
       queryParams.push(status);
     }
 
@@ -80,12 +75,9 @@ export const getTaskStatus = async (
   next: NextFunction
 ) => {
   const { taskId } = req.params;
-  const userId = req.user?.id;
-  const orgId = req.user?.org_id;
+  const userId = req.user?.id ?? 'mock-user';
+  // org_id checks temporarily disabled until auth lands
 
-  if (!userId || !orgId) {
-    return next(new AppError('User information not found', 400));
-  }
   try {
     const result = await pool.query(
       `
@@ -93,9 +85,9 @@ export const getTaskStatus = async (
              sp.name as project_name
       FROM task t
       JOIN solanaproject sp ON t.project_id = sp.id
-      WHERE t.id = $1 AND sp.org_id = $2
+      WHERE t.id = $1
     `,
-      [taskId, orgId]
+      [taskId]
     );
 
     if (result.rows.length === 0) {
@@ -122,10 +114,8 @@ export const streamTask = async (
   next: NextFunction,
 ) => {
   const { taskId } = req.params;
-  const userId = req.user?.id;
-  const orgId  = req.user?.org_id;
-
-  if (!userId || !orgId) return next(new AppError('User not found', 400));
+  const userId = req.user?.id ?? 'mock-user';
+  // org_id checks temporarily disabled until auth lands
 
   /*  SSE headers  */
   res.writeHead(200, {
