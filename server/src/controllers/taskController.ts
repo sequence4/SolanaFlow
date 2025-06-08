@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import pool from '../config/database';
 import { AppError } from '../middleware/errorHandler';
+import { getTaskById } from '../utils/taskUtils';
 
 import { PaginatedResponse, TaskQueryParams } from 'src/types';
 
@@ -113,4 +114,51 @@ export const getTaskStatus = async (
   } catch (error) {
     next(error);
   }
+};
+
+export const streamTask = async (
+  req: Request<{ taskId: string }>,
+  res: Response,
+  next: NextFunction,
+) => {
+  const { taskId } = req.params;
+  const userId = req.user?.id;
+  const orgId  = req.user?.org_id;
+
+  if (!userId || !orgId) return next(new AppError('User not found', 400));
+
+  /*  SSE headers  */
+  res.writeHead(200, {
+    'Content-Type':  'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection':    'keep-alive',
+    'X-Accel-Buffering': 'no'   // disable nginx buffering
+  });
+  res.flushHeaders();
+
+  let lastStatus = '';
+  const interval = setInterval(async () => {
+    try {
+      const { status, result } = await getTaskById(taskId);
+
+      if (status !== lastStatus) {
+        res.write(`data: ${JSON.stringify({ status, result })}\n\n`);
+        lastStatus = status;
+      }
+
+      if (['succeed', 'failed', 'finished', 'warning'].includes(status)) {
+        clearInterval(interval);
+        res.end();
+      }
+    } catch (err) {
+      clearInterval(interval);
+      res.write(`event: error\ndata: ${JSON.stringify({ message: (err as Error).message })}\n\n`);
+      res.end();
+    }
+  }, 1000);
+
+  // Clean up when client disconnects
+  res.on('close', () => {
+    clearInterval(interval);
+  });
 };

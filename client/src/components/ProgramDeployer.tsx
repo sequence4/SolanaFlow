@@ -5,7 +5,13 @@ import { toast } from 'sonner';
 import { downloadArtifact } from '@/api/projectArtifact';
 import { deployUpgradeableProgram } from '@/lib/deployUpgradeableProgram.browser';
 import { Button } from '@/components/ui/button';
-import { Rocket, AlertTriangle, Info } from 'lucide-react';
+import { Rocket, AlertTriangle } from 'lucide-react';
+import {
+  createEphemeralKey,
+  deployBackend,
+  streamTaskStatus,
+  getTaskStatus,
+} from '@/api/projectDeploy';
 import {
   Dialog,
   DialogContent,
@@ -44,6 +50,7 @@ export function ProgramDeployer({
   const [deployStage, setDeployStage] = useState<string>('');
   const [currentChunk, setCurrentChunk] = useState(0);
   const [totalChunks, setTotalChunks] = useState(0);
+  const [backendTaskId, setBackendTaskId] = useState<string | null>(null);
 
   // Load the program bytes when the modal opens
   useEffect(() => {
@@ -146,6 +153,88 @@ export function ProgramDeployer({
     }
   }, [wallet, programBytes, projectId, onSuccess, onClose, taskLogs]);
 
+  /* ------------------------------------------------------------------ *
+   *  NEW : backend-side deploy (Anchor CLI inside container)
+   * ------------------------------------------------------------------ */
+  const handleDeployBackend = useCallback(async () => {
+    if (isLoading) return;
+    setIsLoading(true);
+    taskLogs.setIsVisible(true);
+    setProgress(0);
+    taskLogs.addSystemLog('🚀 Starting backend deploy…');
+
+    try {
+      /* 1 – request ephemeral key */
+      const epk = await createEphemeralKey(projectId);
+      taskLogs.addSystemLog(`🔑 Ephemeral key: ${epk}`);
+
+      /* 2 – kick off backend task */
+      const { taskId } = await deployBackend(projectId, epk);
+      setBackendTaskId(taskId);
+      taskLogs.addSystemLog(`🛠️  Backend task id: ${taskId}`);
+
+      /* 3 – open SSE */
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      let finalProgramId: string | null = null;
+
+      const ctrl = streamTaskStatus(taskId, ev => {
+        taskLogs.addSystemLog(`📡 ${ev.status}`);
+
+        if (ev.result && typeof ev.result === 'string') {
+          try {
+            const parsed = JSON.parse(ev.result);
+            if (parsed.programId) finalProgramId = parsed.programId;
+          } catch { /* ignore non-JSON */ }
+        }
+
+        if (['succeed', 'failed', 'finished', 'warning'].includes(ev.status)) {
+          ctrl.abort(); // stop SSE
+        }
+      }, token);
+
+      /* 4 – fallback: wait until SSE closes then confirm via REST */
+      await new Promise<void>((resolve) => {
+        ctrl.signal.addEventListener('abort', () => resolve());
+      });
+
+      /* if SSE didn't deliver programId, fetch once via REST */
+      if (!finalProgramId) {
+        const { result } = await getTaskStatus(taskId);
+        if (result) {
+          try {
+            const parsed = JSON.parse(result);
+            finalProgramId = parsed.programId ?? null;
+          } catch {/* ignore */}
+        }
+      }
+
+      if (!finalProgramId) throw new Error('Program ID not found in task result');
+
+      /* 5 – success UX */
+      toast.success('Program deployed (backend)', {
+        description: `Program ID: ${finalProgramId}`,
+        action: {
+          label: 'Explorer',
+          onClick: () =>
+            window.open(
+              `https://explorer.solana.com/address/${finalProgramId}?cluster=devnet`,
+              '_blank',
+            ),
+        },
+      });
+
+      onSuccess(finalProgramId);
+      onClose();
+    } catch (err: any) {
+      console.error(err);
+      taskLogs.addSystemLog(`❌ ${err.message}`);
+      toast.error('Backend deploy failed', { description: err.message });
+    } finally {
+      setIsLoading(false);
+      setBackendTaskId(null);
+    }
+  }, [isLoading, projectId, taskLogs, onSuccess, onClose]);
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !isLoading && !open && onClose()}>
       <DialogContent className="bg-[#121214] border-[#2a2a2d] text-white sm:max-w-md">
@@ -188,16 +277,25 @@ export function ProgramDeployer({
               
               {isLoading && (
                 <div className="space-y-2 mt-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-[#6e6e76]">
-                      {deployStage === 'create' ? 'Creating buffer...' :
-                       deployStage === 'write' ? `Writing chunk ${currentChunk}/${totalChunks}...` :
-                       deployStage === 'deploy' ? 'Finalizing deployment...' :
-                       deployStage === 'complete' ? 'Deployment complete!' : 'Preparing...'}
-                    </span>
-                    <span className="text-sm text-[#6e6e76]">{progress}%</span>
-                  </div>
-                  <Progress value={progress} aria-label="deployment progress" />
+                  {!backendTaskId ? (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-[#6e6e76]">
+                          {deployStage === 'create' ? 'Creating buffer...' :
+                           deployStage === 'write' ? `Writing chunk ${currentChunk}/${totalChunks}...` :
+                           deployStage === 'deploy' ? 'Finalizing deployment...' :
+                           deployStage === 'complete' ? 'Deployment complete!' : 'Preparing...'}
+                        </span>
+                        <span className="text-sm text-[#6e6e76]">{progress}%</span>
+                      </div>
+                      <Progress value={progress} aria-label="deployment progress" />
+                    </>
+                  ) : (
+                    <div className="flex items-center space-x-2 text-sm text-[#6e6e76]">
+                      <span>Backend deploy running…</span>
+                      <span className="animate-pulse">⏳</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -224,12 +322,26 @@ export function ProgramDeployer({
             disabled={isLoading || !bytesLoaded || !wallet.publicKey}
             className="w-full sm:w-auto bg-[#4d7cfe] hover:bg-[#4d7cfe]/90 text-white flex items-center"
           >
-            {isLoading ? (
+            {isLoading && !backendTaskId ? (
               <span>Deploying...</span>
             ) : (
               <>
                 <Rocket className="h-4 w-4 mr-2" />
-                <span>Deploy to Devnet</span>
+                <span>Deploy in browser</span>
+              </>
+            )}
+          </Button>
+          <Button
+            onClick={handleDeployBackend}
+            disabled={isLoading || !bytesLoaded}
+            className="w-full sm:w-auto bg-[#22c55e] hover:bg-[#22c55e]/90 text-white flex items-center"
+          >
+            {isLoading && backendTaskId ? (
+              <span>Deploying…</span>
+            ) : (
+              <>
+                <Rocket className="h-4 w-4 mr-2" />
+                <span>Deploy via server</span>
               </>
             )}
           </Button>
