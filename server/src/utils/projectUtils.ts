@@ -500,20 +500,8 @@ export const startAnchorDeployTask = async (
       const result = await runCommand(deployCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true }).catch(async (error: any) => {
         console.error('Error during deployment:', sanitizedTaskId, error);
         
-        console.log(`[EPHEMERAL_DEBUG] Deployment failed. Trying direct anchor deploy with -k flag...`);
-        try {
-          const directDeployCmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && anchor deploy -k ${containerWalletPath} --url devnet 2>&1"`;
-          console.log(`[DEPLOY_DEBUG] Running fallback command: ${directDeployCmd}`);
-          const fallbackResult = await runCommand(directDeployCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
-          console.log(`[EPHEMERAL_DEBUG] Direct deploy result (first 1000 chars):\n${fallbackResult.substring(0, 1000)}`);
-          
-          if (fallbackResult.includes('Program Id:')) {
-            console.log(`[EPHEMERAL_DEBUG] Direct deploy succeeded!`);
-            return fallbackResult;
-          }
-        } catch (fallbackErr: any) {
-          console.error(`[EPHEMERAL_DEBUG] Fallback deploy also failed: ${fallbackErr.message}`);
-        }
+        console.log(`[EPHEMERAL_DEBUG] Deployment failed.`);
+        // Fallback removed - modern Anchor only accepts --provider.wallet
         
         const errorResult = JSON.stringify({
           status: 'failed',
