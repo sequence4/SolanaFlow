@@ -16,6 +16,7 @@ import {
   compileTsController,
   startContainer,
   getContainerUrl,
+  listProjects,
 } from '../controllers/projectController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { buildProject, testProject, getBuildArtifact } from '../controllers/projectController';
@@ -33,6 +34,7 @@ const DEV_AUTH = (req: any, _res: any, next: () => void) => {
 const guard = DEV_AUTH;              // <-- flip back to authMiddleware later
 // ----------------------------------------------------------------------------
 
+router.get('/org/projects', guard, listProjects);
 router.post('/run-command', authMiddleware, runCommandController);
 router.post('/compile-ts', authMiddleware, compileTsController);
 router.post('/create', guard, createProject);

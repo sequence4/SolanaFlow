@@ -18,7 +18,7 @@ export const fetchProjects = async (
     setTotalPages: (totalPages: number) => void, 
     setLoading: (loading: boolean) => void, 
     setError: (error: string | null) => void,
-    limit = 3 
+    limit = 10 
 ) => {
     setLoading(true);
     setError(null);

@@ -87,15 +87,13 @@ export const projectApi = {
   },
 
   listProjects: async (
-    page: number = 1,
-    limit: number = 10,
-    search?: string
-  ): Promise<ListProjectsResponse> => {
+    page = 1, limit = 10, search?: string
+  ): Promise<{ data: any[]; totalPages: number }> => {
     try {
-      const response = await api.get('/org/projects', {
+      const resp = await api.get('/org/projects', {
         params: { page, limit, search },
       });
-      return response.data.projects;
+      return resp.data;              // already { data, totalPages }
     } catch (error) {
       console.error('Error listing projects:', error);
       throw error;
