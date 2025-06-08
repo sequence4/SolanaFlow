@@ -27,8 +27,8 @@ export interface ProjectStateType {
   instructions?: InstructionType[];
   projectFiles?: any;
   fileTree?: FileTreeItemType;
-  built?: boolean;
-  deployed?: boolean;
+  built: boolean;
+  deployed: boolean;
 }
 
 export interface ProjectDetailsType {

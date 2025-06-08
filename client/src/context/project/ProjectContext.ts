@@ -24,6 +24,7 @@ const defaultValue: IProjectContextValue = {
         projectFiles: { lib: '', mod: '', state: '' },
         fileTree: undefined,
         built: false,
+        deployed: false,
       },
       setProjectState: () => {},
     },

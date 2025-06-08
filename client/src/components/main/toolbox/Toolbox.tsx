@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useContext, useState, useRef, useEffect } from 'react';
+import React, { useContext, useState, useRef, useEffect, useCallback } from 'react';
 import '@/styles/toolbox/toolboxStyle.css';
 import { NodeItems } from '@/components/main/toolbox/workflowToolbox/NodeItems';
 import ProjectContext from '@/context/project/ProjectContext';
@@ -111,7 +111,7 @@ export const Toolbox = () => {
         );
     };
     
-    const handleBuildClick = async () => {
+    const handleBuildClick = useCallback(async () => {
         if (isBuilding) return;
         
         try {
@@ -150,27 +150,42 @@ export const Toolbox = () => {
                 
                 taskLogs.addSystemLog("✅ Build completed successfully!");
                 
-                // Set the built flag to true in the context
-                setProjectContext(prev => ({
-                    ...prev,
-                    details: {
-                        ...prev.details!,
-                        projectState: {
-                            ...prev.details!.projectState,
-                            built: true,      // mark build done
-                            deployed: false   // reset deployed status
-                        }
-                    }
-                }));
-                
-                // Persist the built flag to the server
+                // Persist the built flag to the server first
                 if (projectContext.id) {
-                    await projectApi.updateProject(projectContext.id, {
-                        ...projectContext,
-                        details: {
-                            projectState: { built: true }  // delta update is enough
-                        }
-                    });
+                    try {
+                        await projectApi.updateProject(projectContext.id, {
+                            details: {
+                                projectState: { built: true }
+                            }
+                        });
+                        
+                        // Update local context only after successful server update
+                        setProjectContext(prev => ({
+                            ...prev,
+                            details: {
+                                ...prev.details!,
+                                projectState: {
+                                    ...prev.details!.projectState,
+                                    built: true,      // mark build done
+                                    deployed: false   // reset deployed status
+                                }
+                            }
+                        }));
+                    } catch (error) {
+                        console.error("Failed to persist build state:", error);
+                        // Still update local state for UX continuity
+                        setProjectContext(prev => ({
+                            ...prev,
+                            details: {
+                                ...prev.details!,
+                                projectState: {
+                                    ...prev.details!.projectState,
+                                    built: true,
+                                    deployed: false
+                                }
+                            }
+                        }));
+                    }
                 }
                 
                 toast.success("Build completed");
@@ -191,17 +206,17 @@ export const Toolbox = () => {
             });
             setIsBuilding(false);
         }
-    };
+    }, [isBuilding, ensureId, setIsBuilding, taskLogs, projectContext, setProjectContext, setArtifactUrl]);
     
-    const handleDeployClick = () => {
+    const handleDeployClick = useCallback(() => {
         if (!projectContext.details?.projectState?.built) {
             toast.error("Please build first");
             return;
         }
         setIsDeployModalOpen(true);
-    };
+    }, [projectContext.details?.projectState?.built, setIsDeployModalOpen]);
     
-    const handleDeploySuccess = (programId: string) => {
+    const handleDeploySuccess = useCallback((programId: string) => {
         // Update project context with deployed status and program ID
         if (projectContext.details?.projectState) {
             const updatedContext = {
@@ -236,7 +251,7 @@ export const Toolbox = () => {
         
         // Close the deploy modal
         setIsDeployModalOpen(false);
-    };
+    }, [projectContext, setProjectContext]);
     
     const projectDeployed = !!projectContext?.details?.projectState?.deployed;
     const canDeploy = fileTree !== null || projectDeployed;
@@ -366,7 +381,7 @@ export const Toolbox = () => {
                         <div className="relative">
                             <button 
                                 onClick={handleDeployClick}
-                                disabled={!projectContext.details?.projectState?.built || !walletSigner.isConnected || isDeploying}
+                                disabled={!projectContext.details?.projectState.built || !walletSigner.isConnected || isDeploying}
                                 className="w-full cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center"
                             >
                                 {isDeploying ? (
@@ -377,8 +392,13 @@ export const Toolbox = () => {
                                     />
                                 ) : (
                                     <>
-                                        <Rocket className={`h-4 w-4 mr-2 ${projectDeployed ? "text-[#9de19f]" : ""}`} />
-                                        <span>{projectDeployed ? "Program Deployed" : "Deploy Program"}</span>
+                                        <Rocket 
+                                            className={`h-4 w-4 mr-2 ${
+                                                projectContext.details?.projectState.built ? "text-[#4d7cfe]" : 
+                                                projectContext.details?.projectState.deployed ? "text-[#9de19f]" : ""
+                                            }`} 
+                                        />
+                                        <span>{projectContext.details?.projectState.deployed ? "Program Deployed" : "Deploy Program"}</span>
                                     </>
                                 )}
                             </button>
