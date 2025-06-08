@@ -390,14 +390,21 @@ export const handleConfirmNewProject = async (
     console.log(`[DEBUG_PROJECT_CONFIRM] ensured id=${id}`);
 
     /* ------------------------------------------------------------------
-     * 3. Persist metadata *only if* we already had details to save.
-     *    This skips an unnecessary PUT right after a fresh create.
+     * 3. Persist metadata only when we already have something meaningful
+     *    to save.  Right after the very first CREATE the projectState
+     *    object is still empty – a PUT would be pointless traffic.
      * ------------------------------------------------------------------ */
-    if (projectContext.details && Object.keys(projectContext.details).length) {
-      await saveProject(
-        { ...projectContext, id, name, description },
-        setProjectContext,
+    const state = projectContext.details?.projectState;
+    const hasMeaningfulState =
+      !!state &&
+      Object.keys(state).some(
+        k => Array.isArray((state as any)[k])
+          ? (state as any)[k].length            // non-empty array
+          : (state as any)[k] !== undefined     // any other truthy value
       );
+
+    if (hasMeaningfulState) {
+      await saveProject({ ...projectContext, id, name, description }, setProjectContext);
     }
 
     /* House-keeping */

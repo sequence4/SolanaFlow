@@ -51,6 +51,12 @@ export const saveProject = async (
   const projectInfoToSave = detailsToSave(projectContext);
   console.log('projectInfoToSave', projectInfoToSave);
 
+  // Skip hitting the API if there is literally nothing to write
+  if (!projectInfoToSave.details?.projectState || !Object.keys(projectInfoToSave.details.projectState).length) {
+    console.warn('[saveProject] skipped: nothing to persist yet');
+    return null;
+  }
+
   if (!projectContext.id) {
     console.warn('[saveProject] skipped: ctx.id missing (ensureId() must run first)');
     return null;

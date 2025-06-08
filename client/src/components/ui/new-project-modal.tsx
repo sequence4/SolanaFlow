@@ -31,7 +31,10 @@ export function NewProjectModal({ open, onOpenChange, onSubmit }: NewProjectModa
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[550px] bg-gradient-to-b from-[#111827] to-[#0f1623] border-[#1f2937] text-slate-100 p-0 overflow-hidden shadow-xl shadow-black/40 rounded-xl">
+      <DialogContent
+        aria-describedby={undefined}
+        className="sm:max-w-[550px] bg-gradient-to-b from-[#111827] to-[#0f1623] border-[#1f2937] text-slate-100 p-0 overflow-hidden shadow-xl shadow-black/40 rounded-xl"
+      >
         <form onSubmit={handleSubmit}>
           <DialogHeader className="px-7 pt-7 pb-3">
             <div className="flex items-center space-x-2">
