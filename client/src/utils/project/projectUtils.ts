@@ -28,7 +28,7 @@ export const fetchProjects = async (
       console.log("data", data);
       console.log("totalPages", totalPages);
 
-      setProjects(data);
+      setProjects(data ?? []);
       setTotalPages(totalPages);
     } catch (err) {
       setError('Failed to load projects. Please try again.');
