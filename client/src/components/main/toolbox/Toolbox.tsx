@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { NewProjectModal } from '@/components/ui/new-project-modal';
 import ProjectListPopover from '../workflow/ProjectListPopover';
 import { toast } from "sonner";
-import { toast as sonnerToast } from 'sonner';
 import PulseLoader from "react-spinners/PulseLoader";
 import { handleConfirmNewProject, handleOpenProject, handleSaveClick } from '@/utils/project/projectUtils';
 import { useTaskLogs } from '@/context/logs/useTaskLogs';
@@ -199,22 +198,24 @@ export const Toolbox = () => {
     }, [isBuilding, ensureId, setIsBuilding, taskLogs, projectContext, setProjectContext, setArtifactUrl]);
     
     const handleDeployClick = useCallback(() => {
-        // 🔒 Gate: require an attached wallet
+        /* ----- Wallet gate ---------------------------------------------------- */
         if (!walletSigner.isConnected) {
-            // Use regular toast with ID to prevent duplicates
-            sonnerToast.error('Please connect your wallet first', {
+            // Sonner will deduplicate toasts with the same ID automatically
+            toast.error('Please connect your wallet first', {
                 id: WALLET_TOAST_ID,
                 duration: 4000,
             });
             return;
         }
 
+        /* ----- Build gate ----------------------------------------------------- */
         if (!projectContext.details?.projectState?.built) {
-            // Use regular toast with ID to prevent duplicates
-            sonnerToast.error('Please build first', { id: 'need-build' });
+            // Sonner will deduplicate toasts with the same ID automatically
+            toast.error('Please build first', { id: 'need-build' });
             return;
         }
 
+        /* ----- Open modal ----------------------------------------------------- */
         setIsDeployModalOpen(true);
     }, [
         walletSigner.isConnected,
