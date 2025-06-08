@@ -83,7 +83,8 @@ export const createProject = async (
   next: NextFunction
 ) => {
   try {
-    const { name, description, details } = req.body;
+    const { name, description } = req.body;
+    const details = req.body.details ?? {};
     const safeName = (name && name.trim()) ? name : `Untitled-${new Date().toISOString().slice(0,10)}`;
 
     const project = await createProjectDb({ 
