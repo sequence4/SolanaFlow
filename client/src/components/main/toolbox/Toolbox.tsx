@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { NewProjectModal } from '@/components/ui/new-project-modal';
 import ProjectListPopover from '../workflow/ProjectListPopover';
 import { toast } from "sonner";
+import clsx from "clsx";
 import PulseLoader from "react-spinners/PulseLoader";
 import { handleConfirmNewProject, handleOpenProject, handleSaveClick } from '@/utils/project/projectUtils';
 import { useTaskLogs } from '@/context/logs/useTaskLogs';
@@ -40,6 +41,9 @@ import { projectApi } from '@/api/projectApi';
 // Add this constant after the imports section
 // Prevent duplicate "wallet not connected" toasts
 const WALLET_TOAST_ID = 'wallet-not-connected';
+
+/** Memo-friendly helpers */
+const NEED_BUILD_TOAST_ID = 'need-build';   // prevents duplicates
 
 export const Toolbox = () => {
     const [isExpanded] = useState(true);
@@ -197,10 +201,13 @@ export const Toolbox = () => {
         }
     }, [isBuilding, ensureId, setIsBuilding, taskLogs, projectContext, setProjectContext, setArtifactUrl]);
     
+    const projectDeployed = !!projectContext?.details?.projectState?.deployed;
+    const built = !!projectContext.details?.projectState?.built;
+    const canDeploy = fileTree !== null || projectDeployed;
+
     const handleDeployClick = useCallback(() => {
-        /* ----- Wallet gate ---------------------------------------------------- */
+        /* Wallet gate */
         if (!walletSigner.isConnected) {
-            // Sonner will deduplicate toasts with the same ID automatically
             toast.error('Please connect your wallet first', {
                 id: WALLET_TOAST_ID,
                 duration: 4000,
@@ -208,10 +215,12 @@ export const Toolbox = () => {
             return;
         }
 
-        /* ----- Build gate ----------------------------------------------------- */
-        if (!projectContext.details?.projectState?.built) {
-            // Sonner will deduplicate toasts with the same ID automatically
-            toast.error('Please build first', { id: 'need-build' });
+        /* Build gate */
+        if (!built) {
+            toast.error('Please build first', {
+                id: NEED_BUILD_TOAST_ID,
+                duration: 4000,
+            });
             return;
         }
 
@@ -219,7 +228,7 @@ export const Toolbox = () => {
         setIsDeployModalOpen(true);
     }, [
         walletSigner.isConnected,
-        projectContext.details?.projectState?.built,
+        built,
         setIsDeployModalOpen,
     ]);
     
@@ -259,9 +268,6 @@ export const Toolbox = () => {
         // Close the deploy modal
         setIsDeployModalOpen(false);
     }, [projectContext, setProjectContext]);
-    
-    const projectDeployed = !!projectContext?.details?.projectState?.deployed;
-    const canDeploy = fileTree !== null || projectDeployed;
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -386,10 +392,13 @@ export const Toolbox = () => {
                             )}
                         </button>
                         <div className="relative">
-                            <button 
+                            <button
                                 onClick={handleDeployClick}
-                                disabled={!projectContext.details?.projectState?.built || isDeploying}
-                                className={`w-full ${!walletSigner.isConnected ? 'opacity-70' : ''} cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center`}
+                                disabled={isDeploying}
+                                className={clsx(
+                                    'w-full cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center',
+                                    (!walletSigner.isConnected || !built) && 'opacity-70 cursor-not-allowed'
+                                )}
                             >
                                 {isDeploying ? (
                                     <PulseLoader
@@ -399,13 +408,8 @@ export const Toolbox = () => {
                                     />
                                 ) : (
                                     <>
-                                        <Rocket 
-                                            className={`h-4 w-4 mr-2 ${
-                                                projectContext.details?.projectState.built ? "text-[#4d7cfe]" : 
-                                                projectContext.details?.projectState.deployed ? "text-[#9de19f]" : ""
-                                            }`} 
-                                        />
-                                        <span>{projectContext.details?.projectState.deployed ? "Program Deployed" : "Deploy Program"}</span>
+                                        <Rocket className={`h-4 w-4 mr-2 ${projectDeployed ? "text-[#9de19f]" : ""}`} />
+                                        <span>{projectDeployed ? "Program Deployed" : "Deploy Program"}</span>
                                     </>
                                 )}
                             </button>
