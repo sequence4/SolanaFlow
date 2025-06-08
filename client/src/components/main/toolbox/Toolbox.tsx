@@ -28,6 +28,7 @@ import {
   Save,
   Plus,
   Rocket,
+  Hammer,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { runDeployPipelineWithLogs } from '@/utils/deploy/deployPipeline';
@@ -55,6 +56,7 @@ export const Toolbox = () => {
     const [projectsRefreshCounter, setProjectsRefreshCounter] = useState(0);
     
     const [isDeploying, setIsDeploying] = useState(false);
+    const [isBuilding, setIsBuilding] = useState(false);
     const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
     
     const taskLogs = useTaskLogs();
@@ -108,69 +110,70 @@ export const Toolbox = () => {
         );
     };
     
-    const handleDeployClick = async () => {
-        if (isDeploying) return;
+    const handleBuildClick = async () => {
+        if (isBuilding) return;
         
         try {
-            console.log('[deploy] Starting deploy process...');
+            console.log('[build] Starting build process...');
             const id = await ensureId();
-            console.log(`[deploy] Project ID ensured: ${id}`);
+            console.log(`[build] Project ID ensured: ${id}`);
             
-            // Check if the program has been built already
-            if (!projectContext.details?.projectState?.deployed) {
-                setIsDeploying(true);
+            setIsBuilding(true);
+            
+            // Run the build pipeline to compile the program
+            taskLogs.resetLogs();
+            taskLogs.setIsVisible(true);
+            taskLogs.addSystemLog("🔨 Building program...");
+            
+            const graph = {
+                ...(projectContext.details?.projectState ?? {}),
+                nodes: projectContext.details?.projectState?.nodes ?? [],
+            };
+            
+            try {
+                // Run the build pipeline
+                await new Promise<void>((resolve, reject) => {
+                    try {
+                        esRef.current = runDeployPipelineWithLogs(
+                            { ...projectContext, id },
+                            graph,
+                            taskLogs,
+                            setProjectContext,
+                            setArtifactUrl,
+                            (status?: 'error') => status === 'error' ? reject(new Error('Build failed')) : resolve()
+                        );
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
                 
-                // First, run the build pipeline to compile the program
-                taskLogs.resetLogs();
-                taskLogs.setIsVisible(true);
-                taskLogs.addSystemLog("🔨 Building program...");
+                taskLogs.addSystemLog("✅ Build completed successfully!");
+                toast.success("Build completed");
                 
-                const graph = {
-                    ...(projectContext.details?.projectState ?? {}),
-                    nodes: projectContext.details?.projectState?.nodes ?? [],
-                };
-                
-                try {
-                    // Run the build pipeline
-                    await new Promise<void>((resolve, reject) => {
-                        try {
-                            esRef.current = runDeployPipelineWithLogs(
-                                { ...projectContext, id },
-                                graph,
-                                taskLogs,
-                                setProjectContext,
-                                setArtifactUrl,
-                                (status?: 'error') => status === 'error' ? reject(new Error('Build failed')) : resolve()
-                            );
-                        } catch (error) {
-                            reject(error);
-                        }
-                    });
-                    
-                    taskLogs.addSystemLog("✅ Build completed successfully!");
-                    
-                    // Now open the deploy modal for wallet-based deployment
-                    setIsDeployModalOpen(true);
-                } catch (error) {
-                    console.error('[deploy] Build error:', error);
-                    taskLogs.addSystemLog(`❌ Error: ${error instanceof Error ? error.message : String(error)}`);
-                    toast.error("Build failed", {
-                        description: String(error)
-                    });
-                } finally {
-                    setIsDeploying(false);
-                }
-            } else {
-                // Program is already built, just open the deploy modal
-                setIsDeployModalOpen(true);
+            } catch (error) {
+                console.error('[build] Build error:', error);
+                taskLogs.addSystemLog(`❌ Error: ${error instanceof Error ? error.message : String(error)}`);
+                toast.error("Build failed", {
+                    description: String(error)
+                });
+            } finally {
+                setIsBuilding(false);
             }
         } catch (err) {
-            console.error('[deploy] Error:', err);
-            toast.error("Deployment error", {
+            console.error('[build] Error:', err);
+            toast.error("Build error", {
                 description: String(err)
             });
-            setIsDeploying(false);
+            setIsBuilding(false);
         }
+    };
+    
+    const handleDeployClick = () => {
+        if (!projectContext.details?.projectState?.deployed) {
+            toast.error("Please build first");
+            return;
+        }
+        setIsDeployModalOpen(true);
     };
     
     const handleDeploySuccess = (programId: string) => {
@@ -305,11 +308,25 @@ export const Toolbox = () => {
                     </div>
 
                     <div className="grid grid-cols-1 gap-2 mb-4">
+                        <button
+                            onClick={handleBuildClick}
+                            disabled={!fileTree || isBuilding}
+                            className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center"
+                        >
+                            {isBuilding ? (
+                                <PulseLoader color="#9de19f" size={3} cssOverride={{ display: 'inline-block', margin: 0 }} />
+                            ) : (
+                                <>
+                                    <Hammer className="h-4 w-4 mr-2 text-[#22c55e]" />
+                                    <span>Build</span>
+                                </>
+                            )}
+                        </button>
                         <div className="relative">
                             <button 
-                                className="w-full cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center"
                                 onClick={handleDeployClick}
-                                disabled={!canDeploy || !walletSigner.isConnected || isDeploying}
+                                disabled={!projectContext.details?.projectState?.deployed || !walletSigner.isConnected || isDeploying}
+                                className="w-full cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center"
                             >
                                 {isDeploying ? (
                                     <PulseLoader
