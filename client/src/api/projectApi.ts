@@ -64,22 +64,11 @@ export const projectApi = {
       const response = await api.post('/projects/create', projectInfo);
       console.log(`[DEBUG_API] createProject - Response:`, {
         message: response.data.message,
-        projectId: response.data.project?.id,
-        taskId: response.data.directoryTask?.taskId
+        projectId: response.data.project?.id
       });
       return response.data;
     } catch (error) {
       console.error('[DEBUG_API] Error creating project:', error);
-      throw error;
-    }
-  },
-
-  createProjectDirectory: async (name: string, description: string): Promise<{ message: string; rootPath: string; taskId: string }> => {
-    try {
-      const response = await api.post(`/projects/create-project-directory`, { name, description });
-      return response.data;
-    } catch (error) {
-      console.error('Error creating project directory:', error);
       throw error;
     }
   },

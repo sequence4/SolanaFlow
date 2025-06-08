@@ -34,7 +34,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { runDeployPipelineWithLogs } from '@/utils/deploy/deployPipeline';
 import { useWalletSigner } from '@/utils/wallet';
-import { useEnsureProjectId } from '@/hooks/useEnsureProjectId';
+import { ensureId } from '@/utils/project/ensureId';
 import { ProgramDeployer } from '@/components/ProgramDeployer';
 import { projectApi } from '@/api/projectApi';
 
@@ -69,7 +69,7 @@ export const Toolbox = () => {
     const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
     
     const taskLogs = useTaskLogs();
-    const { ensureId, modalOpen, setModalOpen, handleModalSubmit } = useEnsureProjectId(projectContext, setProjectContext);
+    const [modalOpen, setModalOpen] = useState(false);
     const walletSigner = useWalletSigner();
 
     useEffect(() => {
@@ -123,13 +123,13 @@ export const Toolbox = () => {
         if (isBuilding) return;
         
         try {
-            console.log('[build] Starting build process...');
-            const id = await ensureId();
-            console.log(`[build] Project ID ensured: ${id}`);
+            const id = await ensureId(projectContext, setProjectContext);
             
             setIsBuilding(true);
             
-            // Run the build pipeline to compile the program
+            // -----------------------------------------------------------------
+            //  Run the heavy build pipeline *after* the fast metadata insert
+            // -----------------------------------------------------------------
             taskLogs.resetLogs();
             taskLogs.setIsVisible(true);
             taskLogs.addSystemLog("🔨 Building program...");
@@ -199,7 +199,7 @@ export const Toolbox = () => {
             });
             setIsBuilding(false);
         }
-    }, [isBuilding, ensureId, setIsBuilding, taskLogs, projectContext, setProjectContext, setArtifactUrl]);
+    }, [isBuilding, setIsBuilding, taskLogs, projectContext, setProjectContext, setArtifactUrl]);
     
     const projectDeployed = !!projectContext?.details?.projectState?.deployed;
     const built = !!projectContext.details?.projectState?.built;
@@ -550,11 +550,25 @@ export const Toolbox = () => {
                 onSubmit={handleCreateProject}
             />
 
-            {/* Project creation modal triggered by ensureId() */}
+            {/* Project creation modal */}
             <NewProjectModal
                 open={modalOpen}
                 onOpenChange={setModalOpen}
-                onSubmit={handleModalSubmit}
+                onSubmit={async (data) => {
+                    const response = await projectApi.createProject({
+                        name: data.name,
+                        description: data.description,
+                    });
+                    
+                    setProjectContext(prev => ({
+                        ...prev,
+                        id: response.project.id,
+                        name: data.name,
+                        description: data.description,
+                    }));
+                    
+                    setModalOpen(false);
+                }}
             />
             
             {/* Program deployer modal */}

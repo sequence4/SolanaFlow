@@ -94,14 +94,14 @@ export const createProject = async (
 
     res.status(201).json({
       message: 'Project created successfully',
-      project,
-      directoryTask: { taskId: null, message: 'No directory work required' }
+      project
     });
   } catch (err) {
     next(err);
   }
 };
 
+/* Removed createProjectDirectory - functionality no longer needed
 export const createProjectDirectory = async (
   req: Request,
   res: Response,
@@ -147,6 +147,7 @@ export const createProjectDirectory = async (
     return next(new AppError('Failed to start project directory creation', 500));
   }
 };
+*/
 
 export const editProject = async (
   req: Request,

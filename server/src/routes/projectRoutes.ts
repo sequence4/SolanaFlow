@@ -11,7 +11,6 @@ import {
   deployProjectEphemeral,
   installPackages,
   setCluster,
-  createProjectDirectory,
   installNodeDependencies,
   runCommandController,
   compileTsController,
@@ -37,7 +36,6 @@ const guard = DEV_AUTH;              // <-- flip back to authMiddleware later
 router.post('/run-command', authMiddleware, runCommandController);
 router.post('/compile-ts', authMiddleware, compileTsController);
 router.post('/create', guard, createProject);
-router.post('/create-project-directory', authMiddleware, createProjectDirectory);
 router.put('/update/:id', authMiddleware, editProject);
 router.get('/details/:id', guard, getProjectDetails);
 router.delete('/:id', authMiddleware, deleteProject);
