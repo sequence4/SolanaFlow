@@ -37,10 +37,16 @@ const ProjectListPopover: React.FC<ProjectListPopoverProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      fetchProjects(page, search, setProjects, setTotalPages, setLoading, setError);
-    }
-  }, [isOpen, page, search, refreshTrigger]);
+    if (!isOpen) return;                 // only fetch when actually visible
+    fetchProjects(
+      page,
+      search,
+      setProjects,
+      setTotalPages,
+      setLoading,
+      setError
+    );
+  }, [isOpen, refreshTrigger, page, search]);
   
   return (
     <div className="bg-[#111827] text-white w-[460px] max-w-[460px] p-1 flex flex-col gap-4">
@@ -69,72 +75,57 @@ const ProjectListPopover: React.FC<ProjectListPopoverProps> = ({
         </div>
       </div>
 
-      {loading && (
-        <div className="mx-auto my-4 w-6 h-6 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
-      )}
       {error && <p className="my-4 text-red-500">{error}</p>}
-
-      {/* Loading skeleton */}
-      {loading && (
-        <div className="space-y-2 mb-4">
-          {[...Array(3)].map((_, i) => (
-            <div
-              key={i}
-              className="animate-pulse h-8 bg-[#1a1d29] rounded-md"
-            />
-          ))}
-        </div>
-      )}
 
       {/* Projects list */}
       <div className="space-y-2 mb-4 max-h-[300px] overflow-y-auto">
-        {projects && projects.length > 0 ? (
-          projects.map((project) => (
-            <div
-              key={project.id}
-              className="bg-[#131620] border border-[#2a2f3d] rounded-md p-3 flex justify-between items-start hover:border-blue-500 transition-colors cursor-pointer"
-            >
-              <div 
-                onClick={() => handleProjectClick(project.id, project.name, onProjectClick, closePopover)}
-                className="flex-1"
-              >
-                <h3 className="font-medium">{project.name}</h3>
-                <p className="text-xs text-gray-400">
-                  {shortenText(project.description || 'No description available')}
-                </p>
-                <p className="text-xs text-gray-400">
-                  Last updated: {new Date(project.last_updated).toLocaleString()}
-                </p>
-              </div>
-
-              {/* Delete button */}
-              <button 
-                className="text-gray-400 hover:text-red-500 transition-colors" 
-                aria-label="Delete project"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDeleteProject(
-                    project.id,
-                    page,
-                    search,
-                    setProjects,
-                    setTotalPages,
-                    setLoading,
-                    setError,
-                    projectContext,
-                    setProjectContext,
-                    setFileTree,
-                    setSelectedFile
-                  );
-                }}
-              >
-                <LuTrash2 size={16} className="cursor-pointer"/>
-              </button>
-            </div>
-          ))
-        ) : (
-          <p className="text-sm text-slate-500 px-1">No projects found …</p>
+        {loading && <p className="text-sm text-slate-500 p-3">Loading…</p>}
+        {!loading && projects.length === 0 && (
+          <p className="text-sm text-slate-500 p-3">You don't have any projects yet.</p>
         )}
+        {!loading && projects.length > 0 && projects.map((p) => (
+          <div
+            key={p.id}
+            className="bg-[#131620] border border-[#2a2f3d] rounded-md p-3 flex justify-between items-start hover:border-blue-500 transition-colors cursor-pointer"
+          >
+            <div 
+              onClick={() => handleProjectClick(p.id, p.name, onProjectClick, closePopover)}
+              className="flex-1"
+            >
+              <h3 className="font-medium">{p.name}</h3>
+              <p className="text-xs text-gray-400">
+                {shortenText(p.description || 'No description available')}
+              </p>
+              <p className="text-xs text-gray-400">
+                Last updated: {new Date(p.last_updated).toLocaleString()}
+              </p>
+            </div>
+
+            {/* Delete button */}
+            <button 
+              className="text-gray-400 hover:text-red-500 transition-colors" 
+              aria-label="Delete project"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteProject(
+                  p.id,
+                  page,
+                  search,
+                  setProjects,
+                  setTotalPages,
+                  setLoading,
+                  setError,
+                  projectContext,
+                  setProjectContext,
+                  setFileTree,
+                  setSelectedFile
+                );
+              }}
+            >
+              <LuTrash2 size={16} className="cursor-pointer"/>
+            </button>
+          </div>
+        ))}
       </div>
 
       <div className="flex items-center justify-center space-x-3 mr-4">
