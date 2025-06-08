@@ -16,12 +16,22 @@ import {
 } from "@solana/web3.js";
 import { connection as devnetConnection } from "@/utils/connection";
 import { WalletContextState } from "@solana/wallet-adapter-react";
-import { throttle } from "@/utils/rateLimiter";
+import { throttle }   from "@/utils/rateLimiter";
 import { 
   BPF_UPGRADE_LOADER_ID,
   BPF_BUFFER_HEADER_LEN 
 } from "@/utils/constants";
 import type { SendOptions } from '@solana/web3.js';
+
+/**
+ * Return true if the wallet's public key appears in the tx's
+ * `signatures` array with the `signature` field still unset.
+ */
+function needsWalletSig(tx: Transaction, walletPk: PublicKey): boolean {
+  return tx.signatures.some(
+    s => s.publicKey.equals(walletPk) && s.signature === null
+  );
+}
 
 // ── Throttle settings ──────────────────────────────────────────────
 // Defaults replicate SolPG's public-cluster pacing ≈ 4 TX/s.
@@ -368,34 +378,33 @@ export async function deployUpgradeableProgram(
       throw new Error("Wallet doesn't support signAllTransactions");
     }
 
-    /**
-     * We must send Phantom *only* the transactions that actually include
-     * the wallet as a signer (create-buffer and deploy).  Chunk-write TXs are
-     * signed solely by `bufferAuthority`, so Phantom would throw an error if
-     * we included them.
-     */
-    const txsNeedingWallet: Transaction[] = [writeTxs[0], writeTxs.at(-1)!];
+    // Pick out *only* those txs where `payer` must sign.
+    const txsNeedingWallet = writeTxs.filter(tx => needsWalletSig(tx, payer));
 
-    /* Optional batching: honour the same SIGN_BATCH_SIZE env var */
-    const SIGN_BATCH_SIZE = Number(process.env.NEXT_PUBLIC_SIGN_BATCH_SIZE ?? 40);
-
-    if (txsNeedingWallet.length > SIGN_BATCH_SIZE) {
-      for (let i = 0; i < txsNeedingWallet.length; i += SIGN_BATCH_SIZE) {
-        const chunk = txsNeedingWallet.slice(i, i + SIGN_BATCH_SIZE);
-        const signed = await wallet.signAllTransactions(chunk);
-        signed.forEach((tx, j) => {
-          const originalIndex = writeTxs.indexOf(chunk[j]);
-          writeTxs[originalIndex] = tx;            // overwrite with Phantom-mutated copy
-        });
-        await yieldToBrowser(50);                  // let the service-worker breathe
-      }
+    if (txsNeedingWallet.length === 0) {
+      console.warn("[DEPLOY] No transactions require wallet signature –- skipping Phantom prompt");
     } else {
-      const signed = await wallet.signAllTransactions(txsNeedingWallet);
-      /* Overwrite originals so we keep Phantom's priority-fee ix, etc. */
-      signed.forEach((tx, j) => {
-        const originalIndex = writeTxs.indexOf(txsNeedingWallet[j]);
-        writeTxs[originalIndex] = tx;
-      });
+      /* Optional batching: honour the same SIGN_BATCH_SIZE env var */
+      const SIGN_BATCH_SIZE = Number(process.env.NEXT_PUBLIC_SIGN_BATCH_SIZE ?? 30); // 30 ≈ 2.9 MB
+
+      if (txsNeedingWallet.length > SIGN_BATCH_SIZE) {
+        for (let i = 0; i < txsNeedingWallet.length; i += SIGN_BATCH_SIZE) {
+          const chunk = txsNeedingWallet.slice(i, i + SIGN_BATCH_SIZE);
+          const signed = await wallet.signAllTransactions(chunk);
+          signed.forEach((tx, j) => {
+            const originalIndex = writeTxs.indexOf(chunk[j]);
+            writeTxs[originalIndex] = tx;            // overwrite with Phantom-mutated copy
+          });
+          await yieldToBrowser(50);                  // let the service-worker breathe
+        }
+      } else {
+        const signed = await wallet.signAllTransactions(txsNeedingWallet);
+        /* Overwrite originals so we keep Phantom's priority-fee ix, etc. */
+        signed.forEach((tx, j) => {
+          const originalIndex = writeTxs.indexOf(txsNeedingWallet[j]);
+          writeTxs[originalIndex] = tx;
+        });
+      }
     }
     
     /*
@@ -427,13 +436,13 @@ export async function deployUpgradeableProgram(
       // ❷ append purely-offline signatures
       const locals = [bufferAuthority, programKeypair, bufferKey]
         .filter((kp): kp is Keypair => kp !== null);
-      group.forEach(tx =>
+      group.forEach(tx => {
         locals.forEach(kp => {
-          if (tx.signatures.some(s => s.publicKey.equals(kp.publicKey))) {
-            tx.partialSign(kp);        // safe – Phantom already signed
-          }
-        })
-      );
+          // sign only if *this* key hasn't signed yet
+          const entry = tx.signatures.find(s => s.publicKey.equals(kp.publicKey));
+          if (entry && entry.signature === null) tx.partialSign(kp);
+        });
+      });
 
       // ❸ fire & confirm
       const sigs = [];
