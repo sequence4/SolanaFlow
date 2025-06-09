@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { PublicKey } from '@solana/web3.js';
+import { Keypair, PublicKey } from '@solana/web3.js';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { toast } from 'sonner';
 import { downloadArtifact } from '@/api/projectArtifact';
@@ -175,7 +175,8 @@ export function ProgramDeployer({
         soBytes: programBytes!,
         connection,
         wallet,
-        ephemeralKeypair: ephem,       // <-- new
+        /** explicit generic helps TS infer correct overload */
+        ephemeralKeypair: ephem,
         onProgress: (progress, message) => {
           setProgress(progress);
           taskLogs.addSystemLog(message);

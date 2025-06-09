@@ -53,10 +53,13 @@ async function getSafeHash(conn: Connection): Promise<{ blockhash: string, lastV
 /**
  * Options for deploying a program using ephemeral key approach
  */
-interface EphemeralDeployOptions {
+export interface EphemeralDeployOptions {
   soBytes: ArrayBuffer;
   connection: Connection;
-  wallet: WalletContextState;
+  wallet: WalletContextState;           // fee-payer (Phantom)
+  /** The **already-generated** Keypair that must become program upgrade authority */
+  ephemeralKeypair: Keypair;
+  /** progress ∈ [0-100], plus human log line */
   onProgress?: (progress: number, message: string) => void;
   programId?: PublicKey;
 }
@@ -81,6 +84,7 @@ export async function deployWithEphemeralKey(
     soBytes,
     connection,
     wallet,
+    ephemeralKeypair,
     onProgress = () => {},
     programId: userProvidedProgramId,
   } = options;
@@ -101,9 +105,9 @@ export async function deployWithEphemeralKey(
   onProgress(0, "Generating ephemeral key...");
   console.log(`[EPHEMERAL_DEPLOY] Starting deployment, program size: ${dataLength} bytes`);
   
-  // 1. Generate an ephemeral keypair that only lives in RAM
-  const ephemeralKey = Keypair.generate();
-  console.log(`[EPHEMERAL_DEPLOY] Ephemeral key generated: ${ephemeralKey.publicKey.toBase58()}`);
+  // 1. Use the provided ephemeral keypair
+  const ephemeralKey = ephemeralKeypair;
+  console.log(`[EPHEMERAL_DEPLOY] Using ephemeral key: ${ephemeralKey.publicKey.toBase58()}`);
   
   // 2. Create a buffer account (using a real keypair, not PDA)
   const bufferKey = Keypair.generate();
