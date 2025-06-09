@@ -517,14 +517,24 @@ export const amendConfigFiles = async (
   /* ------------------------------------------------------------------ *
    * 2. Patch Anchor.toml
    * ------------------------------------------------------------------ */
+  // --- 2a. normalise the [programs.*] section name ---
   anchorLines = anchorLines.map(l =>
     l.trim() === '[programs.localnet]' ? '[programs.devnet]' : l,
   );
 
+  // ──────────────────────────────────────────────────────────────
+  // 2b. Ensure *registry.url* AND *provider.wallet* are present
+  // ──────────────────────────────────────────────────────────────
+
   /** ensure `[registry]` has a url key  */
   let regStart = anchorLines.findIndex(l => l.trim() === '[registry]');
   if (regStart === -1) {
-    anchorLines.push('', '[registry]', 'url = "https://api.apr.dev"', '');
+    anchorLines.push(
+      '',
+      '[registry]',
+      'url = "https://api.apr.dev"',   // 👈 Anchor needs this, or omit the entire [registry] block
+      ''
+    );
   } else {
     // search until next [section]
     let regEnd = anchorLines.length;
@@ -535,13 +545,24 @@ export const amendConfigFiles = async (
       .slice(regStart + 1, regEnd)
       .some(l => l.trim().startsWith('url ='));
     if (!hasUrl) {
-      anchorLines.splice(regStart + 1, 0, 'url = "https://api.apr.dev"');
+      anchorLines.splice(
+        regStart + 1,
+        0,
+        'url = "https://api.apr.dev"'   // Anchor CLI panics if [registry] exists but lacks url
+      );
     }
   }
 
   let providerStart = anchorLines.findIndex(l => l.trim() === '[provider]');
+  let foundWallet = false;
   if (providerStart === -1) {
-    anchorLines.push('', '[provider]', 'cluster = "Devnet"', '');
+    anchorLines.push(
+      '',
+      '[provider]',
+      'cluster = "Devnet"',
+      'wallet  = "~/.config/solana/id.json"',  // 👈 required – prevents "missing field `wallet`"
+      ''
+    );
   } else {
     let providerEnd = anchorLines.length;
     for (let i = providerStart + 1; i < anchorLines.length; i++) {
@@ -557,9 +578,14 @@ export const amendConfigFiles = async (
       anchorLines.splice(providerStart + 1, 0, 'cluster = "Devnet"');
     } else {
       for (let i = providerStart + 1; i < providerEnd; i++) {
-        if (anchorLines[i].trim().startsWith('cluster =')) {
+        const trimmed = anchorLines[i].trim();
+        if (trimmed.startsWith('cluster =')) {
           anchorLines[i] = 'cluster = "Devnet"';
         }
+        if (trimmed.startsWith('wallet =')) foundWallet = true;
+      }
+      if (!foundWallet) {
+        anchorLines.splice(providerEnd, 0, 'wallet  = "~/.config/solana/id.json"');
       }
     }
   }
