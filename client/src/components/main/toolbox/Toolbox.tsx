@@ -14,7 +14,7 @@ import ProjectListPopover from '../workflow/ProjectListPopover';
 import { toast } from "sonner";
 import clsx from "clsx";
 import PulseLoader from "react-spinners/PulseLoader";
-import { handleConfirmNewProject, handleOpenProject, handleSaveClick } from '@/utils/project/projectUtils';
+import { handleConfirmNewProject, handleOpenProject, handleSaveClick, handleNewProjectClick } from '@/utils/project/projectUtils';
 import { useTaskLogs } from '@/context/logs/useTaskLogs';
 import {
   Search,
@@ -85,6 +85,12 @@ export const Toolbox = () => {
     };
 
     const handleNewProject = () => {
+        handleNewProjectClick(
+            setProjectContext,
+            projectContext,
+            setFileTree,
+            setSelectedFile
+        );
         setIsNewProjectModalOpen(true);
     };
 
