@@ -10,6 +10,7 @@
 
 # local environment
 .env.*
+.env.local
 
 # testing
 /coverage
