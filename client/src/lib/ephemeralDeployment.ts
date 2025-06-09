@@ -11,7 +11,6 @@ import {
 } from '@solana/web3.js';
 import { BPF_UPGRADE_LOADER_ID } from '../utils/constants';
 import type { WalletContextState } from '@solana/wallet-adapter-react';
-// ← NEW: use the shared constant so one place controls rate
 import { RATE_LIMIT_MS } from '@/utils/connection';
 
 // ProgramData header: 4 (tag) + 8 (slot) + 4 (COption) + 32 (upgrade authority)  = 48 bytes
@@ -37,7 +36,11 @@ async function getSafeHash(conn: Connection): Promise<{ blockhash: string, lastV
     const currentSlot = await conn.getSlot('confirmed');
     const safeSlot    = currentSlot - 105;
     if (safeSlot > 0) {
-      const oldBlock = await conn.getBlock(safeSlot, { commitment: 'confirmed' });
+      // NEW: pass maxSupportedTransactionVersion so QuickNode doesn't reject the call
+      const oldBlock = await conn.getBlock(
+        safeSlot,
+        { commitment: 'confirmed', maxSupportedTransactionVersion: 0 },
+      );
       if (oldBlock && oldBlock.blockhash) {
         console.log(`[DEPLOY] Using older blockhash with ~105 blocks of validity remaining`);
         const safeHeight = lastValidBlockHeight - 105;
@@ -262,7 +265,9 @@ export async function deployWithEphemeralKey(
   }
   
   const writeSigs: string[] = [];
-  let lastSafeHashInfo: { blockhash: string, lastValidBlockHeight: number } | null = null;
+  let lastSafeHashInfo: { blockhash: string; lastValidBlockHeight: number } | null = await getSafeHash(connection);
+  
+  const SAFE_HASH_REFRESH_INTERVAL = 20;   // refresh every N chunks
 
   for (let i = 0; i < numChunks; i++) {
     const offset = i * CHUNK_SIZE;
@@ -288,11 +293,11 @@ export async function deployWithEphemeralKey(
     
     const writeTx = new Transaction().add(writeIx);
     
-    // Get a fresh blockhash for each write transaction
-    // We can use the safe hash approach to get more validity time
-    const safeHashInfo = await getSafeHash(connection);
-    
-    writeTx.recentBlockhash = safeHashInfo.blockhash;
+    // **Do NOT** fetch a new block-hash every chunk – reuse until interval reached
+    if (i % SAFE_HASH_REFRESH_INTERVAL === 0) {
+      lastSafeHashInfo = await getSafeHash(connection);
+    }
+    writeTx.recentBlockhash = lastSafeHashInfo!.blockhash;
     writeTx.feePayer = ephemeralKey.publicKey;
     
     // Sign with the ephemeral key
@@ -308,8 +313,6 @@ export async function deployWithEphemeralKey(
     
     // Small delay to avoid rate limiting
     await new Promise(res => setTimeout(res, RATE_LIMIT_MS));
-    
-    lastSafeHashInfo = safeHashInfo;
   }
   
   // 3.3 Wait for all write transactions to be confirmed

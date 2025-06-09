@@ -14,4 +14,4 @@ export const connection = new Connection(
 /**  
  * Milliseconds to wait between tx sends to match Solana Playground throughput
  */
-export const RATE_LIMIT_MS = 70;         // ≈14 tx/sec (under QN limit)
+export const RATE_LIMIT_MS = 120; // ≈8 tx/sec – fits QN free plan safely
