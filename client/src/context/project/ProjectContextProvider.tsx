@@ -22,6 +22,7 @@ const defaultContext: ProjectContextType = {
       projectFiles: { lib: '', mod: '', state: '' },
       fileTree: undefined,
       deployed: false,
+      built: false,
     },
   },
 };
@@ -59,6 +60,7 @@ const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
               fileTree: parsed?.details?.projectState?.fileTree || null,
               programId: parsed?.details?.projectState?.programId || null,
               deployed: parsed?.details?.projectState?.deployed || false,
+              built: parsed?.details?.projectState?.built || false,
             },
           },
         });
@@ -79,6 +81,8 @@ const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
         config: {},
         instructions: [],
         projectFiles: { lib: '', mod: '', state: '' },
+        built: false,
+        deployed: false,
       };
       
       const newState =
@@ -107,6 +111,7 @@ const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
         instructions: [],
         projectFiles: { lib: '', mod: '', state: '' },
         deployed: false,
+        built: false,
       };
 
       // Ensure details is not undefined with proper projectState
