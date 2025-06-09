@@ -508,17 +508,25 @@ export const getBuildArtifact = async (
 
 export const createEphemeralKeypair = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const ephemeral = Keypair.generate();
-    const ephemeralPubkeyString = ephemeral.publicKey.toBase58();
+    const { secretKey } = req.body ?? {};
+    const ephem = secretKey
+        ? Keypair.fromSecretKey(Uint8Array.from(secretKey))
+        : Keypair.generate();
+    const pubkey = ephem.publicKey.toBase58();
 
-    const ephemeralFilePath = path.join(APP_CONFIG.WALLETS_FOLDER, `${ephemeralPubkeyString}.json`);
-    fs.writeFileSync(ephemeralFilePath, JSON.stringify([...ephemeral.secretKey]));
+    const walletPath = path.join(
+        APP_CONFIG.WALLETS_FOLDER,
+        `${pubkey}.json`
+    );
+    fs.writeFileSync(walletPath, JSON.stringify(Array.from(ephem.secretKey)), { mode: 0o600 });
+    
+    // optional but useful – detect typos early
+    await runCommand(
+      `solana-keygen pubkey ${walletPath} | grep -q ${pubkey}`,
+      '.', 'verify-ephem', { skipSuccessUpdate: true }
+    ); // exits 1 if mismatch
 
-    console.log(`Created ephemeral keypair with public key ${ephemeralPubkeyString} and saved to ${ephemeralFilePath}`);
-
-    res.status(200).json({
-      ephemeralPubkey: ephemeralPubkeyString
-    });
+    res.status(200).json({ ephemeralPubkey: pubkey });
   } catch (err) {
     console.error('Error creating ephemeral keypair:', err);
     return next(new AppError('Failed to create ephemeral keypair', 500));

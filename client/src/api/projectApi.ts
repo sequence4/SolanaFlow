@@ -225,9 +225,18 @@ export const projectApi = {
     }
   },
 
-  createEphemeral: async (projectId: string): Promise<{ ephemeralPubkey: string }> => {
+  /**
+   * POST the 64-byte secret array so the backend can write <pubkey>.json.
+   */
+  createEphemeral: async (
+    projectId: string,
+    secretKey: number[]
+  ): Promise<{ ephemeralPubkey: string }> => {
     try {
-      const response = await api.post(`/projects/${projectId}/ephemeral`);
+      const response = await api.post(
+        `/projects/${projectId}/ephemeral`,
+        { secretKey }
+      );
       return response.data;
     } catch (err) {
       console.error('Error creating ephemeral:', err);

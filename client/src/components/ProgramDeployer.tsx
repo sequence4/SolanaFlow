@@ -12,6 +12,8 @@ import {
   streamTaskStatus,
   getTaskStatus,
 } from '@/api/projectDeploy';
+import { createAndRegisterEphemeral } from '@/utils/ephemeral/ephemeralKey';
+import { deployWithEphemeralKey } from '@/lib/ephemeralDeployment';
 import {
   Dialog,
   DialogContent,
@@ -164,76 +166,50 @@ export function ProgramDeployer({
     taskLogs.addSystemLog('🚀 Starting backend deploy…');
 
     try {
-      /* 1 – request ephemeral key */
-      const epk = await createEphemeralKey(projectId);
-      taskLogs.addSystemLog(`🔑 Ephemeral key: ${epk}`);
+      // 1. create key & tell backend
+      const ephem = await createAndRegisterEphemeral(projectId);
+      taskLogs.addSystemLog(`🔑 Ephemeral key: ${ephem.publicKey.toBase58()}`);
 
-      /* 2 – kick off backend task */
-      const { taskId } = await deployBackend(projectId, epk);
-      setBackendTaskId(taskId);
-      taskLogs.addSystemLog(`🛠️  Backend task id: ${taskId}`);
-
-      /* 3 – open SSE */
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-      let finalProgramId: string | null = null;
-
-      const ctrl = streamTaskStatus(taskId, ev => {
-        taskLogs.addSystemLog(`📡 ${ev.status}`);
-
-        if (ev.result && typeof ev.result === 'string') {
-          try {
-            const parsed = JSON.parse(ev.result);
-            if (parsed.programId) finalProgramId = parsed.programId;
-          } catch { /* ignore non-JSON */ }
+      // 2. run the local-wallet deploy signer that **pays fees**
+      const deployResult = await deployWithEphemeralKey({
+        soBytes: programBytes!,
+        connection,
+        wallet,
+        ephemeralKeypair: ephem,       // <-- new
+        onProgress: (progress, message) => {
+          setProgress(progress);
+          taskLogs.addSystemLog(message);
         }
-
-        if (['succeed', 'failed', 'finished', 'warning'].includes(ev.status)) {
-          ctrl.abort(); // stop SSE
-        }
-      }, token);
-
-      /* 4 – fallback: wait until SSE closes then confirm via REST */
-      await new Promise<void>((resolve) => {
-        ctrl.signal.addEventListener('abort', () => resolve());
       });
 
-      /* if SSE didn't deliver programId, fetch once via REST */
-      if (!finalProgramId) {
-        const { result } = await getTaskStatus(taskId);
-        if (result) {
-          try {
-            const parsed = JSON.parse(result);
-            finalProgramId = parsed.programId ?? null;
-          } catch {/* ignore */}
-        }
+      if (deployResult.success) {
+        onSuccess(deployResult.programId.toBase58());
       }
-
-      if (!finalProgramId) throw new Error('Program ID not found in task result');
-
+      
       /* 5 – success UX */
-      toast.success('Program deployed (backend)', {
-        description: `Program ID: ${finalProgramId}`,
+      toast.success('Program deployed with ephemeral key', {
+        description: `Program ID: ${deployResult.programId.toBase58()}`,
         action: {
           label: 'Explorer',
           onClick: () =>
             window.open(
-              `https://explorer.solana.com/address/${finalProgramId}?cluster=devnet`,
+              `https://explorer.solana.com/address/${deployResult.programId.toBase58()}?cluster=devnet`,
               '_blank',
             ),
         },
       });
 
-      onSuccess(finalProgramId);
+      onSuccess(deployResult.programId.toBase58());
       onClose();
     } catch (err: any) {
       console.error(err);
       taskLogs.addSystemLog(`❌ ${err.message}`);
-      toast.error('Backend deploy failed', { description: err.message });
+      toast.error('Ephemeral deploy failed', { description: err.message });
     } finally {
       setIsLoading(false);
       setBackendTaskId(null);
     }
-  }, [isLoading, projectId, taskLogs, onSuccess, onClose]);
+  }, [isLoading, projectId, programBytes, connection, wallet, taskLogs, onSuccess, onClose]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !isLoading && !open && onClose()}>
