@@ -368,6 +368,28 @@ export const startAnchorDeployTask = async (
 
       const rootPath = await getProjectRootPath(projectId);
 
+      /* ──────────────────────────────────────────────────────────
+       *  Symlink ./target/deploy → /usr/src/target/deploy
+       *  so anchor deploy sees the artefact in the warmed cache.
+       * ────────────────────────────────────────────────────────── */
+      {
+        // Build the one-liner (idempotent)
+        const linkCmd = [
+          `cd /usr/src/${rootPath}`,
+          "mkdir -p target",
+          "ln -sfn /usr/src/target/deploy target/deploy"
+        ].join(" && ");
+
+        // Execute inside the running container
+        await runCommand(
+          `docker exec ${containerName} bash -c '${linkCmd}'`,
+          ".",          // working dir irrelevant – we cd inside the command
+          `symlink-${projectId}-${Date.now()}`,    // unique task-id
+          { skipSuccessUpdate: true }
+        );
+        console.log(`[EPHEMERAL] Symlink created for ${rootPath}`);
+      }
+
       await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && solana config set --url https://api.devnet.solana.com"`, '.', sanitizedTaskId, { skipSuccessUpdate: true });
       
       let walletPath;
