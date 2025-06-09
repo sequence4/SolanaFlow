@@ -1,6 +1,6 @@
+import 'dotenv-flow/config'; 
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import authRoutes from '@/routes/authRoutes';
 import projectRoutes from '@/routes/projectRoutes';
 import fileRoutes from '@/routes/fileRoutes';
@@ -10,15 +10,12 @@ import aiRoutes from '@/routes/aiRoutes';
 import { errorHandler } from '@/middleware/errorHandler';
 import containerRoutes from '@/routes/containerRoutes';
 import cookieParser from 'cookie-parser';
-import 'dotenv-flow/config'; 
 import deployRoutes from '@/routes/deployRoutes';
 import workspaceRoutes from '@/routes/workspaceRoutes';
 import poolRoutes from '@/routes/poolRoutes';
 import internalCertRoute from '@/routes/internalCertRoute';
 import artifactRoute from '@/routes/artifactRoute';
 import { startCleanupWorker } from "./workers/cleanupWorker";
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 9999;

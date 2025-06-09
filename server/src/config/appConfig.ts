@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 import { AppError } from '../middleware/errorHandler';
-import dotenvFlow from 'dotenv-flow';
 
 const checkRootFolder = (folderPath: string) => {
   if (!fs.existsSync(folderPath)) {
