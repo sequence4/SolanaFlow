@@ -196,14 +196,14 @@ export const editProject = async (
     if (details !== undefined) {
       // Handle case when details contains projectState.built
       if (details.projectState && details.projectState.built !== undefined) {
-        // Use jsonb_set to update only the specific nested field
         updateQuery += `, details = jsonb_set(
           COALESCE(details, '{}'::jsonb),
           '{projectState,built}',
-          to_jsonb($${valueIndex}),
+          -- cast the parameter so Postgres knows it's boolean JSON
+          to_jsonb(($${valueIndex})::boolean),
           true
         )`;
-        updateValues.push(details.projectState.built);
+        updateValues.push(!!details.projectState.built); // ensure true | false
         valueIndex++;
       } else {
         // Regular update for other cases
