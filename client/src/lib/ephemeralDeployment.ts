@@ -16,8 +16,17 @@ import { RATE_LIMIT_MS } from '@/utils/connection';
 // ProgramData header: 4 (tag) + 8 (slot) + 4 (COption) + 32 (upgrade authority)  = 48 bytes
 const HEADER_LEN = 48;
 
+// Define instruction variants as enum
+enum LoaderIx {
+  InitializeBuffer = 0,
+  Write = 1, 
+  DeployWithMaxDataLen = 2,
+  SetAuthority = 3,
+  Upgrade = 4
+}
+
 // Chunk size for buffer writes (a bit smaller than max to allow for instruction overhead)
-const CHUNK_SIZE = 900;
+const CHUNK_SIZE = 880;
 
 // Re-use these options for every raw TX that the wallet does **not** sign.
 // Skipping pre-flight avoids "Blockhash not found" simulations.
@@ -220,9 +229,9 @@ export async function deployWithEphemeralKey(
       { pubkey: ephemeralKey.publicKey,isSigner: true,  isWritable: false },
     ],
     data: Buffer.concat([
-      Buffer.from(new Uint32Array([0]).buffer), // tag = InitializeBuffer
-      Buffer.from(new Uint32Array([1]).buffer), // COption::Some
-      ephemeralKey.publicKey.toBuffer(),        // authority
+      Buffer.from(Uint32Array.of(LoaderIx.InitializeBuffer).buffer), // tag = InitializeBuffer
+      Buffer.from(Uint32Array.of(1).buffer),                         // COption::Some
+      ephemeralKey.publicKey.toBuffer(),                             // authority
     ]),
   });
   createBufferTx.add(initBufferIx);
@@ -267,7 +276,7 @@ export async function deployWithEphemeralKey(
   const writeSigs: string[] = [];
   let lastSafeHashInfo: { blockhash: string; lastValidBlockHeight: number } | null = await getSafeHash(connection);
   
-  const SAFE_HASH_REFRESH_INTERVAL = 20;   // refresh every N chunks
+  const SAFE_HASH_REFRESH_INTERVAL = 32;   // refresh every N chunks
 
   for (let i = 0; i < numChunks; i++) {
     const offset = i * CHUNK_SIZE;
@@ -278,6 +287,14 @@ export async function deployWithEphemeralKey(
     onProgress(10 + Math.floor((i / numChunks) * 70), 
                `Writing chunk ${i+1}/${numChunks}...`);
     
+    // --- helper --------------------------------------------------
+    function u64LE(num: number) {
+      const buf = Buffer.alloc(8);
+      buf.writeBigUInt64LE(BigInt(num));
+      return buf;
+    }
+    // -------------------------------------------------------------
+    
     const writeIx = new TransactionInstruction({
       programId: BPF_UPGRADE_LOADER_ID,
       keys: [
@@ -285,9 +302,10 @@ export async function deployWithEphemeralKey(
         { pubkey: ephemeralKey.publicKey,isSigner: true,  isWritable: false },
       ],
       data: Buffer.concat([
-        Buffer.from(new Uint32Array([1]).buffer),        // tag = Write
-        Buffer.from(new Uint32Array([offset]).buffer),   // offset
-        Buffer.from(chunk),                              // payload
+        Buffer.from(Uint32Array.of(LoaderIx.Write).buffer),   // 4-byte tag      = Write
+        Buffer.from(Uint32Array.of(offset).buffer),           // 4-byte offset
+        u64LE(chunk.length),                                  // 8-byte Vec<u8> len  **NEW**
+        Buffer.from(chunk),                                   // chunk bytes
       ]),
     });
     
@@ -357,8 +375,8 @@ export async function deployWithEphemeralKey(
         { pubkey: ephemeralKey.publicKey,  isSigner: true,  isWritable: false }, // authority = buffer authority
       ],
       data: Buffer.concat([
-        Buffer.from([2]), // DeployWithMaxDataLen
-        Buffer.from(new Uint32Array([bufferSpace]).buffer),
+        Buffer.from(Uint8Array.of(LoaderIx.DeployWithMaxDataLen)), // DeployWithMaxDataLen
+        Buffer.from(Uint32Array.of(bufferSpace).buffer),
       ]),
     });
 
@@ -397,7 +415,7 @@ export async function deployWithEphemeralKey(
         { pubkey: SYSVAR_CLOCK_PUBKEY,  isSigner: false, isWritable: false },
         { pubkey: ephemeralKey.publicKey, isSigner: true,  isWritable: false }, // authority = buffer authority
       ],
-      data: Buffer.from([3]), // 3 = Upgrade
+      data: Buffer.from(Uint8Array.of(LoaderIx.Upgrade)), // Upgrade
     });
 
     const upgradeTx = new Transaction().add(upgradeIx);
@@ -428,7 +446,7 @@ export async function deployWithEphemeralKey(
       { pubkey: ephemeralKey.publicKey, isSigner: true,  isWritable: false }, // current authority
       { pubkey: walletPublicKey,        isSigner: false, isWritable: false }, // new authority
     ],
-    data: Buffer.from([4]), // SetAuthority
+    data: Buffer.from(Uint8Array.of(LoaderIx.SetAuthority)), // SetAuthority
   });
 
   const setAuthTx = new Transaction().add(setAuthIx);
