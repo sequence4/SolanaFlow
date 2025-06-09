@@ -8,7 +8,7 @@ import {
 import { TaskResponse } from './interfaces/Task';
 import axios from 'axios';
 
-const API_BASE = process.env.REACT_APP_API_BASE_URL!;   // we *expect* it
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL!;   // we *expect* it
 
 export const projectApi = {
 
