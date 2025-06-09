@@ -2,7 +2,6 @@ import fs from 'fs';
 import path from 'path';
 import { AppError } from '../middleware/errorHandler';
 import dotenvFlow from 'dotenv-flow';
-dotenvFlow.config({ purge_dotenv: true });
 
 const checkRootFolder = (folderPath: string) => {
   if (!fs.existsSync(folderPath)) {
