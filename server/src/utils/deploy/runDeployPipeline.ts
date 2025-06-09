@@ -10,6 +10,7 @@ import {
   startAnchorBuildTask,
   startAnchorDeployTask,
   getBuildArtifactTask,
+  runCommand
 } from "../projectUtils";
 import { waitForTaskCompletion, getTaskById } from "../taskUtils";
 import { deriveProgramId } from "../../utils/deriveProgramId";
@@ -64,6 +65,38 @@ export async function runDeployPipeline({
     const buildStatus = await waitForTaskCompletion(buildTask, buildRetries, 2_000);
     if (buildStatus !== 'succeed' && buildStatus !== 'finished') {
       throw new Error(`Build task ended with status: ${buildStatus}`);
+    }
+    
+    /* ------------------------------------------------------------------ *
+     * 3a ─ make ./target/deploy point at the warmed cache
+     * ------------------------------------------------------------------ */
+    {
+      // If prepEnv already gave you the project root use it, otherwise
+      // fall back to a helper that reads solanaproject.root_path
+      const projectFolder =
+        workspace.rootPath ??
+        (await import("../fileUtils").then(m =>
+          m.getProjectRootPath(projectId)
+        ));
+
+      sendProgress({
+        stage: "link-so",
+        message: "Linking target/deploy → /usr/src/target/deploy"
+      });
+
+      // One-liner executed *inside* the running container
+      const linkCmd = [
+        `cd /usr/src/${projectFolder}`,
+        "mkdir -p target",
+        "ln -sfn /usr/src/target/deploy target/deploy"
+      ].join(" && ");
+
+      // Generate a unique task ID for the symlink command
+      const symlinkTaskId = `symlink-${projectId}-${Date.now()}`;
+      
+      // `runCommand` already wraps child_process.exec for you
+      await runCommand(`docker exec ${workspace.containerName} bash -c '${linkCmd}'`,
+                       ".", symlinkTaskId, { skipSuccessUpdate: true });
     }
     
     console.log("[PIPELINE] ✅ build task", buildTask, "completed");
