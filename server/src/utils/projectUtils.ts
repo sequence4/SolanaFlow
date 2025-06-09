@@ -376,8 +376,10 @@ export const startAnchorDeployTask = async (
         // Build the one-liner (idempotent)
         const linkCmd = [
           `cd /usr/src/${rootPath}`,
-          "mkdir -p target",
-          "ln -sfn /usr/src/target/deploy target/deploy"
+          'rm -rf target/deploy',                // remove accidental dir, if any
+          'mkdir -p target',
+          // -T treats DEST as a file so ln never creates "deploy/deploy"
+          'ln -sfnT /usr/src/target/deploy target/deploy'
         ].join(" && ");
 
         // Execute inside the running container

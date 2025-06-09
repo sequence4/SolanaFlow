@@ -87,8 +87,10 @@ export async function runDeployPipeline({
       // One-liner executed *inside* the running container
       const linkCmd = [
         `cd /usr/src/${projectFolder}`,
-        "mkdir -p target",
-        "ln -sfn /usr/src/target/deploy target/deploy"
+        'rm -rf target/deploy',                // remove accidental dir, if any
+        'mkdir -p target',
+        // -T treats DEST as a file so ln never creates "deploy/deploy"
+        'ln -sfnT /usr/src/target/deploy target/deploy'
       ].join(" && ");
 
       // Generate a unique task ID for the symlink command

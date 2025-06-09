@@ -378,6 +378,22 @@ export const amendConfigFiles = async (
   const anchorSrc = await getFileContentBlocking(projectId, 'Anchor.toml', userId);
   console.log('[AMEND] Loaded Anchor.toml bytes:', anchorSrc.length);
 
+  /* ────────────────────────────────────────────────────────────────
+   * Strip any [programs.*] entries that have no matching crate name
+   * ──────────────────────────────────────────────────────────────── */
+  const realProgramNames = new Set(
+    (await listGeneratedPrograms(projectId, userId))
+      .map(p => p.split('/').pop())           // "programs/<name>" → "<name>"
+  );
+  const isKeyLine = (l: string) => /^\s*[A-Za-z0-9_\-]+\s*=/.test(l);
+  const orphanFilter = (l: string) => {
+    if (!isKeyLine(l)) return true;           // keep section headers / comments
+    const key = l.split('=')[0].trim();
+    return realProgramNames.has(key);         // keep only real program keys
+  };
+  /* anchorLines will be created a bit later – so build the raw array first */
+  let anchorLines = anchorSrc.split('\n').filter(orphanFilter);
+
   /* ------------------------------------------------------------------ *
    * 1b. Read workspace-root Cargo.toml for profile settings
    * ------------------------------------------------------------------ */
@@ -501,7 +517,7 @@ export const amendConfigFiles = async (
   /* ------------------------------------------------------------------ *
    * 2. Patch Anchor.toml
    * ------------------------------------------------------------------ */
-  let anchorLines = anchorSrc.split('\n').map(l =>
+  anchorLines = anchorLines.map(l =>
     l.trim() === '[programs.localnet]' ? '[programs.devnet]' : l,
   );
 
