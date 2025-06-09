@@ -11,6 +11,8 @@ import { pollTaskStatus4 } from "@/utils/task/taskUtils";
 import { Step } from '@/context/logs/TaskLogsContext';
 import { useTaskLogs } from "@/context/logs/useTaskLogs";
 
+export const PROJECTS_PAGE_SIZE = 10;
+
 export const fetchProjects = async (
     page: number, 
     search: string, 
@@ -18,7 +20,7 @@ export const fetchProjects = async (
     setTotalPages: (totalPages: number) => void, 
     setLoading: (loading: boolean) => void, 
     setError: (error: string | null) => void,
-    limit = 10 
+    limit = PROJECTS_PAGE_SIZE 
 ) => {
     setLoading(true);
     setError(null);
@@ -29,6 +31,13 @@ export const fetchProjects = async (
 
       console.log('projects-list', list);
       console.log('totalPages', totalPages);
+
+      // Guard against accidental "limit=0/1" regressions
+      if (list.length === 1 && totalPages > 1) {
+        console.warn(
+          'Project list fetched only one item – check limit parameter in fetchProjects'
+        );
+      }
 
       setProjects(list);                 // safe: always an array now
       setTotalPages(totalPages);
