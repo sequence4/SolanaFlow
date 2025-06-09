@@ -521,6 +521,24 @@ export const amendConfigFiles = async (
     l.trim() === '[programs.localnet]' ? '[programs.devnet]' : l,
   );
 
+  /** ensure `[registry]` has a url key  */
+  let regStart = anchorLines.findIndex(l => l.trim() === '[registry]');
+  if (regStart === -1) {
+    anchorLines.push('', '[registry]', 'url = "https://api.apr.dev"', '');
+  } else {
+    // search until next [section]
+    let regEnd = anchorLines.length;
+    for (let i = regStart + 1; i < anchorLines.length; i++) {
+      if (/^\[.*\]/.test(anchorLines[i].trim())) { regEnd = i; break; }
+    }
+    const hasUrl = anchorLines
+      .slice(regStart + 1, regEnd)
+      .some(l => l.trim().startsWith('url ='));
+    if (!hasUrl) {
+      anchorLines.splice(regStart + 1, 0, 'url = "https://api.apr.dev"');
+    }
+  }
+
   let providerStart = anchorLines.findIndex(l => l.trim() === '[provider]');
   if (providerStart === -1) {
     anchorLines.push('', '[provider]', 'cluster = "Devnet"', '');
