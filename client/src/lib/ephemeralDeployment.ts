@@ -11,6 +11,8 @@ import {
 } from '@solana/web3.js';
 import { BPF_UPGRADE_LOADER_ID } from '../utils/constants';
 import type { WalletContextState } from '@solana/wallet-adapter-react';
+// ← NEW: use the shared constant so one place controls rate
+import { RATE_LIMIT_MS } from '@/utils/connection';
 
 // ProgramData header: 4 (tag) + 8 (slot) + 4 (COption) + 32 (upgrade authority)  = 48 bytes
 const HEADER_LEN = 48;
@@ -252,6 +254,13 @@ export async function deployWithEphemeralKey(
   const numChunks = Math.ceil(dataLength / CHUNK_SIZE);
   console.log(`[EPHEMERAL_DEPLOY] Writing program in ${numChunks} chunks`);
   
+  if (RATE_LIMIT_MS < 50) {
+    console.warn(
+      `[DEPLOY] RATE_LIMIT_MS=${RATE_LIMIT_MS} may exceed QuickNode free burst limits; ` +
+      `consider raising it in client/src/utils/connection.ts`
+    );
+  }
+  
   const writeSigs: string[] = [];
   let lastSafeHashInfo: { blockhash: string, lastValidBlockHeight: number } | null = null;
 
@@ -298,7 +307,7 @@ export async function deployWithEphemeralKey(
     writeSigs.push(writeSig);
     
     // Small delay to avoid rate limiting
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise(res => setTimeout(res, RATE_LIMIT_MS));
     
     lastSafeHashInfo = safeHashInfo;
   }
