@@ -12,10 +12,9 @@ export async function markContainerForCleanup(
   containerName: string
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO cleanup_queue (container_name, project_id, queued_at)
-         VALUES ($1, $2, NOW())
-         ON CONFLICT (container_name) DO NOTHING`,
-    [containerName, projectId]
+    `INSERT INTO cleanup_queue (project_id)
+         VALUES ($1)`,
+    [projectId]
   );
 }
 

@@ -387,9 +387,13 @@ export const amendConfigFiles = async (
   );
   const isKeyLine = (l: string) => /^\s*[A-Za-z0-9_\-]+\s*=/.test(l);
   const orphanFilter = (l: string) => {
-    if (!isKeyLine(l)) return true;           // keep section headers / comments
+    if (!isKeyLine(l)) return true;
+
     const key = l.split('=')[0].trim();
-    return realProgramNames.has(key);         // keep only real program keys
+    // never drop keys that belong to provider / registry
+    if (['cluster', 'wallet', 'url'].includes(key)) return true;
+
+    return realProgramNames.has(key);          // only prune orphan program IDs
   };
   /* anchorLines will be created a bit later – so build the raw array first */
   let anchorLines = anchorSrc.split('\n').filter(orphanFilter);
