@@ -13,7 +13,6 @@ import { BPF_UPGRADE_LOADER_ID } from '../utils/constants';
 import type { WalletContextState } from '@solana/wallet-adapter-react';
 import { RATE_LIMIT_MS } from '@/utils/connection';
 import { createHash } from 'crypto';
-import { execSync } from 'child_process';
 
 // Buffer header = 4-byte state enum + 1-byte COption + 32-byte authority = 37 bytes
 const HEADER_LEN = 37;
@@ -29,41 +28,29 @@ enum LoaderIx {
 
 // Chunk size for buffer writes (a bit smaller than max to allow for instruction overhead)
 const CHUNK_SIZE = 880;
+const SAFE_HASH_REFRESH_INTERVAL = 32;   // refresh every N chunks
 
 // Re-use these options for every raw TX that the wallet does **not** sign.
 // Skipping pre-flight avoids "Blockhash not found" simulations.
-const SEND_OPTS: SendOptions = { skipPreflight: true };
+export const SEND_NO_PREFLIGHT: SendOptions = { skipPreflight: true };
+export const SEND_WITH_PREFLIGHT: SendOptions = { skipPreflight: false };
+
+const ONE_LAMPORT = BigInt(1);            // type anchor
 
 /**
  * Gets a blockhash that's already 45 blocks old, giving you ~105 blocks of validity
  * Only use this in very slow networks or when you need extra buffer time
  */
 async function getSafeHash(conn: Connection): Promise<{ blockhash: string, lastValidBlockHeight: number }> {
-  const { blockhash, lastValidBlockHeight } =
-      await conn.getLatestBlockhash({ commitment: 'confirmed' });
-  
-  try {
-    // Try to get an older **slot** if available (≈45 blocks old)
-    const currentSlot = await conn.getSlot('confirmed');
-    const safeSlot    = currentSlot - 105;
-    if (safeSlot > 0) {
-      // NEW: pass maxSupportedTransactionVersion so QuickNode doesn't reject the call
-      const oldBlock = await conn.getBlock(
-        safeSlot,
-        { commitment: 'confirmed', maxSupportedTransactionVersion: 0 },
-      );
-      if (oldBlock && oldBlock.blockhash) {
-        console.log(`[DEPLOY] Using older blockhash with ~105 blocks of validity remaining`);
-        const safeHeight = lastValidBlockHeight - 105;
-        return { blockhash: oldBlock.blockhash, lastValidBlockHeight: safeHeight };
-      }
-    }
-  } catch (err) {
-    console.warn(`[DEPLOY] Could not get older blockhash, using latest: ${err}`);
+  const latest = await conn.getLatestBlockhash('confirmed');
+  const slot   = await conn.getSlot('confirmed');
+
+  // Refresh only if the last-valid window is already <105 slots
+  if (latest.lastValidBlockHeight - slot <= 105) {
+    return latest;
   }
-  
-  // Fall back to latest if older block retrieval fails
-  return { blockhash, lastValidBlockHeight };
+  // otherwise keep using current hash
+  return latest;
 }
 
 /**
@@ -115,14 +102,6 @@ export async function deployWithEphemeralKey(
   let programId: PublicKey | null = null;
   
   try {
-    // Log toolchain versions
-    try {
-      console.log('[BUILD] anchor', execSync('anchor --version').toString().trim());
-      console.log('[BUILD] rustc',  execSync('rustc --version --verbose').toString().split('\n')[0]);
-    } catch (e) {
-      console.log('[BUILD] Could not determine toolchain versions:', e);
-    }
-    
     // Convert ArrayBuffer to Uint8Array for processing
     const programData = new Uint8Array(soBytes);
     
@@ -166,9 +145,25 @@ export async function deployWithEphemeralKey(
     console.log(`[EPHEMERAL_DEPLOY] Program ID: ${programId.toBase58()}`);
     console.log(`[EPHEMERAL_DEPLOY] Buffer: ${bufferKey.publicKey.toBase58()}`);
     
+    // ---------- Extra guards when upgrading ----------
+    if (!programKeypair) {
+      const programDataInfo = await connection.getAccountInfo(programDataPubkey, 'confirmed');
+      if (!programDataInfo) throw new Error('ProgramData PDA missing – wrong ID?');
+
+      const curAuthority = new PublicKey(programDataInfo.data.slice(32, 64));
+      if (!curAuthority.equals(walletPublicKey)) {
+        throw new Error('Wallet is NOT current upgrade authority');
+      }
+
+      const maxDataLen = programDataInfo.data.readUInt32LE(68); // DeployWithMaxDataLen spec
+      if (dataLength > maxDataLen) {
+        throw new Error(`Binary ${dataLength}B exceeds on-chain max ${maxDataLen}B`);
+      }
+    }
+    
     // Calculate rent-exempt balances
-    const bufferRent = await connection.getMinimumBalanceForRentExemption(bufferSpace);
-    const programRent = await connection.getMinimumBalanceForRentExemption(0);
+    const bufferRent = BigInt(await connection.getMinimumBalanceForRentExemption(bufferSpace));
+    const programRent = BigInt(await connection.getMinimumBalanceForRentExemption(0));
 
     // ───────────────────────────────────────────────
     // NEW: rent for the ProgramData account that the
@@ -176,39 +171,31 @@ export async function deployWithEphemeralKey(
     // Size = bufferSpace bytes (37-byte header + code)
     // ───────────────────────────────────────────────
     const programDataRent =
-      await connection.getMinimumBalanceForRentExemption(bufferSpace);
+      BigInt(await connection.getMinimumBalanceForRentExemption(bufferSpace));
     
-    // Calculate SOL needed for ephemeral key to pay for all transactions
-    // We need enough for:
-    // 1. Rent for buffer account
-    // 2. Rent for program account
-    // 3. Transaction fees for all write transactions (~175) and deploy transaction
+    // === Fee estimation & funding ===
     const writeTxCount = Math.ceil(dataLength / CHUNK_SIZE);
+    // Conservatively estimate fee - using a fixed value instead of prioritization fees
     const feePerTx = 10000; // conservative upper bound
-
+    
     // Transactions the ephemeral key must pay for:
     //   writeTxCount  – chunk writes
     //   +1            – createBufferTx
     //   +1            – deploy OR upgrade
     //   +1            – post-deploy SetAuthority
-    const totalFees = (writeTxCount + 3) * feePerTx;
-
-    // When upgrading an existing program we do **not** have to fund rent
-    // for a new Program account.
-    const programRentForFunding = programKeypair ? programRent : 0;
-
-    // add ProgramData rent plus a 0.1 SOL safety buffer for priority fees
-    const SAFETY_LAMPORTS   = 100_000_000;          // 0.1 SOL
-    const totalNeeded =
-      bufferRent + programRentForFunding + programDataRent + totalFees + SAFETY_LAMPORTS;
-
+    const totalFees = BigInt((writeTxCount + 3) * feePerTx);
+    const rentForProg = programKeypair ? programRent : BigInt(0);
+    const SAFETY_LAMPORTS = BigInt(100_000_000);            // 0.1 SOL
+    
+    const totalNeeded = bufferRent + rentForProg + programDataRent + totalFees + SAFETY_LAMPORTS;
+    
     console.table({
-      bufferRent,
-      programRentForFunding,
-      programDataRent,
-      totalFees,
-      SAFETY_LAMPORTS,
-      totalNeeded,
+      bufferRent:         bufferRent.toString(),
+      programRentForFunding: rentForProg.toString(),
+      programDataRent:    programDataRent.toString(),
+      totalFees:          totalFees.toString(),
+      SAFETY_LAMPORTS:    SAFETY_LAMPORTS.toString(),
+      totalNeeded:        totalNeeded.toString(),
     });
     
     onProgress(5, "Funding ephemeral key...");
@@ -218,7 +205,7 @@ export async function deployWithEphemeralKey(
       SystemProgram.transfer({
         fromPubkey: walletPublicKey,
         toPubkey: ephemeralKey.publicKey,
-        lamports: totalNeeded,
+        lamports: Number(totalNeeded),
       })
     );
     
@@ -256,8 +243,8 @@ export async function deployWithEphemeralKey(
         SystemProgram.createAccount({
           fromPubkey: ephemeralKey.publicKey,
           newAccountPubkey: bufferKey.publicKey,
-          // Must also fund ProgramData PDA rent
-          lamports: bufferRent + programDataRent,
+          // Only fund with buffer rent, not programDataRent
+          lamports: parseInt(bufferRent.toString()),
           space: bufferSpace,
           programId: BPF_UPGRADE_LOADER_ID,
         })
@@ -287,7 +274,7 @@ export async function deployWithEphemeralKey(
     // Send and confirm buffer creation
     const bufferSig = await connection.sendRawTransaction(
       createBufferTx.serialize(),
-      SEND_OPTS,
+      SEND_WITH_PREFLIGHT,
     );
     signatures.push(bufferSig);
     
@@ -313,14 +300,18 @@ export async function deployWithEphemeralKey(
     const writeSigs: string[] = [];
     let lastSafeHashInfo: { blockhash: string; lastValidBlockHeight: number } | null = await getSafeHash(connection);
     
-    const SAFE_HASH_REFRESH_INTERVAL = 32;   // refresh every N chunks
-
     // Set up WebSocket subscription for live logs
     const subId = connection.onLogs(
       bufferKey.publicKey,
       (l) => console.log('[ON-LOGS]', l.logs.join('\n')),
       'confirmed'
     );
+
+    // Handle SIGINT to remove the log listener
+    process.on('SIGINT', async () => {
+      await connection.removeOnLogsListener(subId);
+      process.exit(0);
+    });
 
     for (let i = 0; i < numChunks; i++) {
       const offset = i * CHUNK_SIZE;
@@ -381,7 +372,7 @@ export async function deployWithEphemeralKey(
       // We'll send them all quickly
       const writeSig = await connection.sendRawTransaction(
         writeTx.serialize(),
-        SEND_OPTS,
+        SEND_NO_PREFLIGHT,
       );
       writeSigs.push(writeSig);
       
@@ -435,7 +426,7 @@ export async function deployWithEphemeralKey(
       const createProgramAcct = SystemProgram.createAccount({
         fromPubkey: ephemeralKey.publicKey,
         newAccountPubkey: programKeypair.publicKey,
-        lamports: programRent,
+        lamports: Number(programRent),
         space: 0,
         programId: BPF_UPGRADE_LOADER_ID,
       });
@@ -477,7 +468,7 @@ export async function deployWithEphemeralKey(
       
       deployOrUpgradeSig = await connection.sendRawTransaction(
         deployTx.serialize(),
-        SEND_OPTS,
+        SEND_WITH_PREFLIGHT,
       );
       signatures.push(deployOrUpgradeSig);
 
@@ -519,7 +510,7 @@ export async function deployWithEphemeralKey(
 
       deployOrUpgradeSig = await connection.sendRawTransaction(
         upgradeTx.serialize(),
-        SEND_OPTS,
+        SEND_WITH_PREFLIGHT,
       );
       signatures.push(deployOrUpgradeSig);
 
@@ -552,7 +543,7 @@ export async function deployWithEphemeralKey(
 
     const authSig = await connection.sendRawTransaction(
       setAuthTx.serialize(),
-      SEND_OPTS,
+      SEND_WITH_PREFLIGHT,
     );
     signatures.push(authSig);
 
@@ -561,6 +552,13 @@ export async function deployWithEphemeralKey(
       lastValidBlockHeight: authHeight,
       signature: authSig,
     });
+
+    // Confirm authority actually changed
+    const pdaPost = await connection.getAccountInfo(programDataPubkey, 'confirmed');
+    const newAuth = new PublicKey(pdaPost!.data.slice(32, 64));
+    if (!newAuth.equals(walletPublicKey)) {
+      throw new Error('Authority transfer failed – PDA still held by old key');
+    }
 
     /* -----------------------------------------------------------------
      * 6 – SHA-256 the ProgramData PDA and compare again
@@ -590,6 +588,30 @@ export async function deployWithEphemeralKey(
     testTx.feePayer = walletPublicKey;
     const sim = await connection.simulateTransaction(testTx);
     console.log('[SIM-INVOKE] logs', sim.value.logs);
+
+    // --------- Close buffer & refund rent ----------
+    try {
+      const lamportsLeft = await connection.getBalance(bufferKey.publicKey, 'confirmed');
+      if (lamportsLeft > 0) {
+        const closeIx = SystemProgram.transfer({
+          fromPubkey: bufferKey.publicKey,
+          toPubkey: walletPublicKey,
+          lamports: lamportsLeft,
+        });
+        const closeTx = new Transaction().add(closeIx);
+        closeTx.feePayer = ephemeralKey.publicKey;
+
+        const { blockhash: cHash, lastValidBlockHeight: cHeight } =
+              await connection.getLatestBlockhash('confirmed');
+        closeTx.recentBlockhash = cHash;
+        closeTx.sign(ephemeralKey, bufferKey);
+
+        await connection.sendRawTransaction(closeTx.serialize(), SEND_WITH_PREFLIGHT);
+        console.log('[CLOSE] Buffer account closed; rent refunded');
+      }
+    } catch (e) {
+      console.warn('[CLOSE] Could not close buffer:', e);
+    }
 
     console.log(`[EPHEMERAL_DEPLOY] Program deployed successfully to ${programId.toBase58()}`);
     onProgress(100, "Deployment successful!");
