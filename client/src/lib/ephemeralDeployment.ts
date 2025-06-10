@@ -304,6 +304,12 @@ export async function deployWithEphemeralKey(
       onProgress(10 + Math.floor((i / numChunks) * 70), 
                  `Writing chunk ${i+1}/${numChunks}...`);
       
+      const offsetBuf = Buffer.allocUnsafe(4);
+      offsetBuf.writeUInt32LE(offset, 0);          // offset (u32 LE)
+
+      const lenBuf = Buffer.allocUnsafe(4);
+      lenBuf.writeUInt32LE(chunk.length, 0);       // length (u32 LE)
+
       const writeIx = new TransactionInstruction({
         programId: BPF_UPGRADE_LOADER_ID,
         keys: [
@@ -311,9 +317,10 @@ export async function deployWithEphemeralKey(
           { pubkey: ephemeralKey.publicKey,isSigner: true,  isWritable: false },
         ],
         data: Buffer.concat([
-          Buffer.from([LoaderIx.Write]),                // 1-byte tag
-          Buffer.from(Uint32Array.of(offset).buffer),   // 4-byte LE offset
-          Buffer.from(chunk),                           // raw bytes
+          Buffer.from([LoaderIx.Write]),   // tag (u8)  == 1
+          offsetBuf,                       // offset    (u32 LE)
+          lenBuf,                          // length    (u32 LE)
+          Buffer.from(chunk),              // raw bytes
         ]),
       });
       
