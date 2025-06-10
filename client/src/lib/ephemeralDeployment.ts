@@ -87,20 +87,7 @@ interface DeployResult {
   success: boolean;
 }
 
-/**
- * Encodes a positive integer using the same "little-endian base-128" varint
- * format that bincode's StandardOptions use on chain.
- */
-function encodeUvarint(value: number | bigint): Buffer {
-  let v = BigInt(value);
-  const out: number[] = [];
-  while (v >= BigInt(0x80)) {
-    out.push(Number((v & BigInt(0x7F)) | BigInt(0x80)));
-    v >>= BigInt(7);
-  }
-  out.push(Number(v));
-  return Buffer.from(out);
-}
+
 
 /**
  * Deploys a Solana program using an ephemeral key to handle bulk operations
@@ -305,10 +292,14 @@ export async function deployWithEphemeralKey(
         { pubkey: ephemeralKey.publicKey,isSigner: true,  isWritable: false },
       ],
       data: Buffer.concat([
-        Buffer.from([LoaderIx.Write]),       // 1-byte discriminant
-        encodeUvarint(offset),               // varint-u32 offset
-        encodeUvarint(chunk.length),         // varint-u64 length
-        Buffer.from(chunk),                  // raw bytes
+        Buffer.from([LoaderIx.Write]),                // 1-byte tag
+        Buffer.from(Uint32Array.of(offset).buffer),   // 4-byte LE offset
+        (() => {                                      // 8-byte LE length
+          const lenBuf = Buffer.alloc(8);
+          lenBuf.writeBigUInt64LE(BigInt(chunk.length));
+          return lenBuf;
+        })(),
+        Buffer.from(chunk),                           // raw bytes
       ]),
     });
     
@@ -379,7 +370,7 @@ export async function deployWithEphemeralKey(
       ],
       data: Buffer.concat([
         Buffer.from([LoaderIx.DeployWithMaxDataLen]), // DeployWithMaxDataLen (u8)
-        encodeUvarint(bufferSpace),                   // max_data_len (varint-u32)
+        Buffer.from(Uint32Array.of(bufferSpace).buffer), // max_data_len (4-byte LE u32)
       ]),
     });
 
