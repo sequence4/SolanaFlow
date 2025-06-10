@@ -16,13 +16,13 @@ import { RATE_LIMIT_MS } from '@/utils/connection';
 // ProgramData header: 4 (tag) + 8 (slot) + 4 (COption) + 32 (upgrade authority)  = 48 bytes
 const HEADER_LEN = 48;
 
-// Define instruction variants as enum
+// Define instruction variants as enum - matches on-chain order
 enum LoaderIx {
   InitializeBuffer = 0,
   Write = 1, 
   DeployWithMaxDataLen = 2,
-  SetAuthority = 3,
-  Upgrade = 4
+  Upgrade = 3,
+  SetAuthority = 4
 }
 
 // Chunk size for buffer writes (a bit smaller than max to allow for instruction overhead)
@@ -229,9 +229,9 @@ export async function deployWithEphemeralKey(
       { pubkey: ephemeralKey.publicKey,isSigner: true,  isWritable: false },
     ],
     data: Buffer.concat([
-      Buffer.from(Uint32Array.of(LoaderIx.InitializeBuffer).buffer), // tag = InitializeBuffer
-      Buffer.from(Uint32Array.of(1).buffer),                         // COption::Some
-      ephemeralKey.publicKey.toBuffer(),                             // authority
+      Buffer.from(Uint8Array.of(LoaderIx.InitializeBuffer)), // tag = InitializeBuffer (u8)
+      Buffer.from(Uint32Array.of(1).buffer),                 // COption::Some (u32)
+      ephemeralKey.publicKey.toBuffer(),                     // authority (PublicKey)
     ]),
   });
   createBufferTx.add(initBufferIx);
@@ -302,10 +302,10 @@ export async function deployWithEphemeralKey(
         { pubkey: ephemeralKey.publicKey,isSigner: true,  isWritable: false },
       ],
       data: Buffer.concat([
-        Buffer.from(Uint32Array.of(LoaderIx.Write).buffer),   // 4-byte tag      = Write
-        Buffer.from(Uint32Array.of(offset).buffer),           // 4-byte offset
-        u64LE(chunk.length),                                  // 8-byte Vec<u8> len  **NEW**
-        Buffer.from(chunk),                                   // chunk bytes
+        Buffer.from(Uint8Array.of(LoaderIx.Write)),          // 1-byte tag = Write (u8)
+        Buffer.from(Uint32Array.of(offset).buffer),          // 4-byte offset (u32)
+        u64LE(chunk.length),                                 // 8-byte Vec<u8> len (u64)
+        Buffer.from(chunk),                                  // chunk bytes
       ]),
     });
     
@@ -375,8 +375,8 @@ export async function deployWithEphemeralKey(
         { pubkey: ephemeralKey.publicKey,  isSigner: true,  isWritable: false }, // authority = buffer authority
       ],
       data: Buffer.concat([
-        Buffer.from(Uint8Array.of(LoaderIx.DeployWithMaxDataLen)), // DeployWithMaxDataLen
-        Buffer.from(Uint32Array.of(bufferSpace).buffer),
+        Buffer.from(Uint8Array.of(LoaderIx.DeployWithMaxDataLen)), // DeployWithMaxDataLen (u8)
+        Buffer.from(Uint32Array.of(bufferSpace).buffer),           // max_data_len (u32)
       ]),
     });
 
@@ -415,7 +415,7 @@ export async function deployWithEphemeralKey(
         { pubkey: SYSVAR_CLOCK_PUBKEY,  isSigner: false, isWritable: false },
         { pubkey: ephemeralKey.publicKey, isSigner: true,  isWritable: false }, // authority = buffer authority
       ],
-      data: Buffer.from(Uint8Array.of(LoaderIx.Upgrade)), // Upgrade
+      data: Buffer.from(Uint8Array.of(LoaderIx.Upgrade)), // Upgrade (u8)
     });
 
     const upgradeTx = new Transaction().add(upgradeIx);
@@ -446,7 +446,7 @@ export async function deployWithEphemeralKey(
       { pubkey: ephemeralKey.publicKey, isSigner: true,  isWritable: false }, // current authority
       { pubkey: walletPublicKey,        isSigner: false, isWritable: false }, // new authority
     ],
-    data: Buffer.from(Uint8Array.of(LoaderIx.SetAuthority)), // SetAuthority
+    data: Buffer.from(Uint8Array.of(LoaderIx.SetAuthority)), // SetAuthority (u8)
   });
 
   const setAuthTx = new Transaction().add(setAuthIx);
