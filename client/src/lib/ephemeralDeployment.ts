@@ -13,8 +13,8 @@ import { BPF_UPGRADE_LOADER_ID } from '../utils/constants';
 import type { WalletContextState } from '@solana/wallet-adapter-react';
 import { RATE_LIMIT_MS } from '@/utils/connection';
 
-// ProgramData header: 4 (tag) + 8 (slot) + 4 (COption) + 32 (upgrade authority)  = 48 bytes
-const HEADER_LEN = 48;
+// Buffer header: 4-byte tag + 1-byte COption + 32-byte authority = 37 bytes
+const HEADER_LEN = 37;
 
 // Define instruction variants as enum - matches on-chain order
 enum LoaderIx {
@@ -228,11 +228,7 @@ export async function deployWithEphemeralKey(
       { pubkey: bufferKey.publicKey,   isSigner: false, isWritable: true },
       { pubkey: ephemeralKey.publicKey,isSigner: true,  isWritable: false },
     ],
-    data: Buffer.concat([
-      Buffer.from(Uint8Array.of(LoaderIx.InitializeBuffer)), // tag = InitializeBuffer (u8)
-      Buffer.from(Uint32Array.of(1).buffer),                 // COption::Some (u32)
-      ephemeralKey.publicKey.toBuffer(),                     // authority (PublicKey)
-    ]),
+    data: Buffer.from(Uint8Array.of(LoaderIx.InitializeBuffer)), // just the tag
   });
   createBufferTx.add(initBufferIx);
   
@@ -284,8 +280,6 @@ export async function deployWithEphemeralKey(
     const chunkSize = end - offset;
     const chunk = programData.slice(offset, end);
     
-    const headerOffset = 40;   // 4 (tag) + 4 (option) + 32 (authority)
-    
     onProgress(10 + Math.floor((i / numChunks) * 70), 
                `Writing chunk ${i+1}/${numChunks}...`);
     
@@ -305,7 +299,7 @@ export async function deployWithEphemeralKey(
       ],
       data: Buffer.concat([
         Buffer.from(Uint8Array.of(LoaderIx.Write)),          // 1-byte tag = Write (u8)
-        Buffer.from(Uint32Array.of(headerOffset + offset).buffer),  // 4-byte offset (u32) after header
+        Buffer.from(Uint32Array.of(offset).buffer),          // 4-byte offset (u32) relative to data start
         u64LE(chunk.length),                                 // 8-byte Vec<u8> len (u64)
         Buffer.from(chunk),                                  // chunk bytes
       ]),
