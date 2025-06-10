@@ -87,8 +87,6 @@ interface DeployResult {
   success: boolean;
 }
 
-
-
 /**
  * Deploys a Solana program using an ephemeral key to handle bulk operations
  * while the wallet funds and maintains upgrade authority
@@ -112,364 +110,410 @@ export async function deployWithEphemeralKey(
   // Cache the payer's public key to avoid repeated null checks
   const walletPublicKey = wallet.publicKey;
   const signatures: string[] = [];
-  
-  // Convert ArrayBuffer to Uint8Array for processing
-  const programData = new Uint8Array(soBytes);
-  const dataLength = programData.length;
-  const bufferSpace = HEADER_LEN + dataLength;
-  
-  onProgress(0, "Generating ephemeral key...");
-  console.log(`[EPHEMERAL_DEPLOY] Starting deployment, program size: ${dataLength} bytes`);
-  
-  // 1. Use the provided ephemeral keypair
-  const ephemeralKey = ephemeralKeypair;
-  console.log(`[EPHEMERAL_DEPLOY] Using ephemeral key: ${ephemeralKey.publicKey.toBase58()}`);
-  
-  // 2. Create a buffer account (using a real keypair, not PDA)
-  const bufferKey = Keypair.generate();
-  
-  // ── Program-id setup ──────────────────────────────────────────
-  let programKeypair: Keypair | null = null;
   let programId: PublicKey;
+  
+  try {
+    // Convert ArrayBuffer to Uint8Array for processing
+    const programData = new Uint8Array(soBytes);
+    const dataLength = programData.length;
+    const bufferSpace = HEADER_LEN + dataLength;
+    
+    onProgress(0, "Generating ephemeral key...");
+    console.log(`[EPHEMERAL_DEPLOY] Starting deployment, program size: ${dataLength} bytes`);
+    
+    // 1. Use the provided ephemeral keypair
+    const ephemeralKey = ephemeralKeypair;
+    console.log(`[EPHEMERAL_DEPLOY] Using ephemeral key: ${ephemeralKey.publicKey.toBase58()}`);
+    
+    // 2. Create a buffer account (using a real keypair, not PDA)
+    const bufferKey = Keypair.generate();
+    
+    // ── Program-id setup ──────────────────────────────────────────
+    let programKeypair: Keypair | null = null;
 
-  if (userProvidedProgramId) {
-    // caller supplied target id → we will NOT create the account
-    programId = userProvidedProgramId;
-  } else {
-    programKeypair = Keypair.generate();               // new account we will fund
-    programId      = programKeypair.publicKey;
-  }
+    if (userProvidedProgramId) {
+      // caller supplied target id → we will NOT create the account
+      programId = userProvidedProgramId;
+    } else {
+      programKeypair = Keypair.generate();               // new account we will fund
+      programId      = programKeypair.publicKey;
+    }
 
-  const [programDataPubkey] = PublicKey.findProgramAddressSync(
-    [programId.toBuffer()],
-    BPF_UPGRADE_LOADER_ID,
-  );
-  
-  console.log(`[EPHEMERAL_DEPLOY] Program ID: ${programId.toBase58()}`);
-  console.log(`[EPHEMERAL_DEPLOY] Buffer: ${bufferKey.publicKey.toBase58()}`);
-  
-  // Calculate rent-exempt balances
-  const bufferRent = await connection.getMinimumBalanceForRentExemption(bufferSpace);
-  const programRent = await connection.getMinimumBalanceForRentExemption(0);
-  
-  // Calculate SOL needed for ephemeral key to pay for all transactions
-  // We need enough for:
-  // 1. Rent for buffer account
-  // 2. Rent for program account
-  // 3. Transaction fees for all write transactions (~175) and deploy transaction
-  const writeTxCount = Math.ceil(dataLength / CHUNK_SIZE);
-  const feePerTx = 10000; // conservative upper bound
+    const [programDataPubkey] = PublicKey.findProgramAddressSync(
+      [programId.toBuffer()],
+      BPF_UPGRADE_LOADER_ID,
+    );
+    
+    console.log(`[EPHEMERAL_DEPLOY] Program ID: ${programId.toBase58()}`);
+    console.log(`[EPHEMERAL_DEPLOY] Buffer: ${bufferKey.publicKey.toBase58()}`);
+    
+    // Calculate rent-exempt balances
+    const bufferRent = await connection.getMinimumBalanceForRentExemption(bufferSpace);
+    const programRent = await connection.getMinimumBalanceForRentExemption(0);
 
-  // Transactions the ephemeral key must pay for:
-  //   writeTxCount  – chunk writes
-  //   +1            – createBufferTx
-  //   +1            – deploy OR upgrade
-  //   +1            – post-deploy SetAuthority
-  const totalFees = (writeTxCount + 3) * feePerTx;
+    // ───────────────────────────────────────────────
+    // NEW: rent for the ProgramData account that the
+    // loader creates inside DeployWithMaxDataLen.
+    // Size = bufferSpace bytes (37-byte header + code)
+    // ───────────────────────────────────────────────
+    const programDataRent =
+      await connection.getMinimumBalanceForRentExemption(bufferSpace);
+    
+    // Calculate SOL needed for ephemeral key to pay for all transactions
+    // We need enough for:
+    // 1. Rent for buffer account
+    // 2. Rent for program account
+    // 3. Transaction fees for all write transactions (~175) and deploy transaction
+    const writeTxCount = Math.ceil(dataLength / CHUNK_SIZE);
+    const feePerTx = 10000; // conservative upper bound
 
-  // When upgrading an existing program we do **not** have to fund rent
-  // for a new Program account.
-  const programRentForFunding = programKeypair ? programRent : 0;
+    // Transactions the ephemeral key must pay for:
+    //   writeTxCount  – chunk writes
+    //   +1            – createBufferTx
+    //   +1            – deploy OR upgrade
+    //   +1            – post-deploy SetAuthority
+    const totalFees = (writeTxCount + 3) * feePerTx;
 
-  const totalNeeded = bufferRent + programRentForFunding + totalFees;
-  
-  onProgress(5, "Funding ephemeral key...");
-  
-  // 2.1 Create a transaction to fund the ephemeral key
-  const fundingTx = new Transaction().add(
-    SystemProgram.transfer({
-      fromPubkey: walletPublicKey,
-      toPubkey: ephemeralKey.publicKey,
-      lamports: totalNeeded,
-    })
-  );
-  
-  // 2.2 Get a fresh blockhash
-  const blockHashInfo = await connection.getLatestBlockhash('confirmed');
-  const blockhash = blockHashInfo.blockhash;
-  const lastValidBlockHeight = blockHashInfo.lastValidBlockHeight;
-  
-  fundingTx.recentBlockhash = blockhash;
-  fundingTx.feePayer = walletPublicKey;
-  
-  // 2.3 Have the wallet sign the funding transaction
-  const signedFundingTx = await wallet.signTransaction(fundingTx);
-  
-  // 2.4 Send and confirm the funding transaction
-  const fundingSig = await connection.sendRawTransaction(signedFundingTx.serialize());
-  signatures.push(fundingSig);
-  
-  // Wait for confirmation
-  await connection.confirmTransaction({
-    blockhash,
-    lastValidBlockHeight,
-    signature: fundingSig
-  });
-  
-  console.log(`[EPHEMERAL_DEPLOY] Funded ephemeral key with ${totalNeeded} lamports`);
-  
-  // 3. Now use the ephemeral key for buffer operations
-  
-  onProgress(10, "Creating buffer account...");
-  
-  // 3.1 Create the buffer account
-  const createBufferTx = new Transaction()
-    .add(
-      SystemProgram.createAccount({
-        fromPubkey: ephemeralKey.publicKey,
-        newAccountPubkey: bufferKey.publicKey,
-        lamports: bufferRent,
-        space: bufferSpace,
-        programId: BPF_UPGRADE_LOADER_ID,
+    // When upgrading an existing program we do **not** have to fund rent
+    // for a new Program account.
+    const programRentForFunding = programKeypair ? programRent : 0;
+
+    // add ProgramData rent plus a 0.1 SOL safety buffer for priority fees
+    const SAFETY_LAMPORTS   = 100_000_000;          // 0.1 SOL
+    const totalNeeded =
+      bufferRent + programRentForFunding + programDataRent + totalFees + SAFETY_LAMPORTS;
+
+    console.table({
+      bufferRent,
+      programRentForFunding,
+      programDataRent,
+      totalFees,
+      SAFETY_LAMPORTS,
+      totalNeeded,
+    });
+    
+    onProgress(5, "Funding ephemeral key...");
+    
+    // 2.1 Create a transaction to fund the ephemeral key
+    const fundingTx = new Transaction().add(
+      SystemProgram.transfer({
+        fromPubkey: walletPublicKey,
+        toPubkey: ephemeralKey.publicKey,
+        lamports: totalNeeded,
       })
     );
-  
-  const initBufferIx = new TransactionInstruction({
-    programId: BPF_UPGRADE_LOADER_ID,
-    keys: [
-      { pubkey: bufferKey.publicKey,   isSigner: false, isWritable: true },
-      { pubkey: ephemeralKey.publicKey,isSigner: true,  isWritable: false },
-    ],
-    data: Buffer.from([LoaderIx.InitializeBuffer]), // 1-byte discriminant – no extra fields
-  });
-  createBufferTx.add(initBufferIx);
-  
-  // Get a fresh blockhash for the buffer creation
-  const bufferBlockhashInfo = await connection.getLatestBlockhash('confirmed');
-  const bufferHash = bufferBlockhashInfo.blockhash;
-  const bufferHeight = bufferBlockhashInfo.lastValidBlockHeight;
     
-  createBufferTx.recentBlockhash = bufferHash;
-  createBufferTx.feePayer = ephemeralKey.publicKey;
-  
-  // Sign with both the ephemeral key and buffer key
-  createBufferTx.sign(ephemeralKey, bufferKey);
-  
-  // Send and confirm buffer creation
-  const bufferSig = await connection.sendRawTransaction(
-    createBufferTx.serialize(),
-    SEND_OPTS,
-  );
-  signatures.push(bufferSig);
-  
-  await connection.confirmTransaction({
-    blockhash: bufferHash,
-    lastValidBlockHeight: bufferHeight,
-    signature: bufferSig
-  });
-  
-  console.log(`[EPHEMERAL_DEPLOY] Buffer account created`);
-  
-  // 3.2 Write program data in chunks
-  const numChunks = Math.ceil(dataLength / CHUNK_SIZE);
-  console.log(`[EPHEMERAL_DEPLOY] Writing program in ${numChunks} chunks`);
-  
-  if (RATE_LIMIT_MS < 50) {
-    console.warn(
-      `[DEPLOY] RATE_LIMIT_MS=${RATE_LIMIT_MS} may exceed QuickNode free burst limits; ` +
-      `consider raising it in client/src/utils/connection.ts`
-    );
-  }
-  
-  const writeSigs: string[] = [];
-  let lastSafeHashInfo: { blockhash: string; lastValidBlockHeight: number } | null = await getSafeHash(connection);
-  
-  const SAFE_HASH_REFRESH_INTERVAL = 32;   // refresh every N chunks
-
-  for (let i = 0; i < numChunks; i++) {
-    const offset = i * CHUNK_SIZE;
-    const end = Math.min(offset + CHUNK_SIZE, dataLength);
-    const chunkSize = end - offset;
-    const chunk = programData.slice(offset, end);
+    // 2.2 Get a fresh blockhash
+    const blockHashInfo = await connection.getLatestBlockhash('confirmed');
+    const blockhash = blockHashInfo.blockhash;
+    const lastValidBlockHeight = blockHashInfo.lastValidBlockHeight;
     
-    onProgress(10 + Math.floor((i / numChunks) * 70), 
-               `Writing chunk ${i+1}/${numChunks}...`);
+    fundingTx.recentBlockhash = blockhash;
+    fundingTx.feePayer = walletPublicKey;
     
-    const writeIx = new TransactionInstruction({
+    // 2.3 Have the wallet sign the funding transaction
+    const signedFundingTx = await wallet.signTransaction(fundingTx);
+    
+    // 2.4 Send and confirm the funding transaction
+    const fundingSig = await connection.sendRawTransaction(signedFundingTx.serialize());
+    signatures.push(fundingSig);
+    
+    // Wait for confirmation
+    await connection.confirmTransaction({
+      blockhash,
+      lastValidBlockHeight,
+      signature: fundingSig
+    });
+    
+    console.log(`[EPHEMERAL_DEPLOY] Funded ephemeral key with ${totalNeeded} lamports`);
+    
+    // 3. Now use the ephemeral key for buffer operations
+    
+    onProgress(10, "Creating buffer account...");
+    
+    // 3.1 Create the buffer account
+    const createBufferTx = new Transaction()
+      .add(
+        SystemProgram.createAccount({
+          fromPubkey: ephemeralKey.publicKey,
+          newAccountPubkey: bufferKey.publicKey,
+          lamports: bufferRent,
+          space: bufferSpace,
+          programId: BPF_UPGRADE_LOADER_ID,
+        })
+      );
+    
+    const initBufferIx = new TransactionInstruction({
       programId: BPF_UPGRADE_LOADER_ID,
       keys: [
         { pubkey: bufferKey.publicKey,   isSigner: false, isWritable: true },
         { pubkey: ephemeralKey.publicKey,isSigner: true,  isWritable: false },
       ],
-      data: Buffer.concat([
-        Buffer.from([LoaderIx.Write]),                // 1-byte tag
-        Buffer.from(Uint32Array.of(offset).buffer),   // 4-byte LE offset
-        (() => {                                      // 8-byte LE length
-          const lenBuf = Buffer.alloc(8);
-          lenBuf.writeBigUInt64LE(BigInt(chunk.length));
-          return lenBuf;
-        })(),
-        Buffer.from(chunk),                           // raw bytes
-      ]),
+      data: Buffer.from([LoaderIx.InitializeBuffer]), // 1-byte discriminant – no extra fields
+    });
+    createBufferTx.add(initBufferIx);
+    
+    // Get a fresh blockhash for the buffer creation
+    const bufferBlockhashInfo = await connection.getLatestBlockhash('confirmed');
+    const bufferHash = bufferBlockhashInfo.blockhash;
+    const bufferHeight = bufferBlockhashInfo.lastValidBlockHeight;
+      
+    createBufferTx.recentBlockhash = bufferHash;
+    createBufferTx.feePayer = ephemeralKey.publicKey;
+    
+    // Sign with both the ephemeral key and buffer key
+    createBufferTx.sign(ephemeralKey, bufferKey);
+    
+    // Send and confirm buffer creation
+    const bufferSig = await connection.sendRawTransaction(
+      createBufferTx.serialize(),
+      SEND_OPTS,
+    );
+    signatures.push(bufferSig);
+    
+    await connection.confirmTransaction({
+      blockhash: bufferHash,
+      lastValidBlockHeight: bufferHeight,
+      signature: bufferSig
     });
     
-    const writeTx = new Transaction().add(writeIx);
+    console.log(`[EPHEMERAL_DEPLOY] Buffer account created`);
     
-    // **Do NOT** fetch a new block-hash every chunk – reuse until interval reached
-    if (i % SAFE_HASH_REFRESH_INTERVAL === 0) {
-      lastSafeHashInfo = await getSafeHash(connection);
+    // 3.2 Write program data in chunks
+    const numChunks = Math.ceil(dataLength / CHUNK_SIZE);
+    console.log(`[EPHEMERAL_DEPLOY] Writing program in ${numChunks} chunks`);
+    
+    if (RATE_LIMIT_MS < 50) {
+      console.warn(
+        `[DEPLOY] RATE_LIMIT_MS=${RATE_LIMIT_MS} may exceed QuickNode free burst limits; ` +
+        `consider raising it in client/src/utils/connection.ts`
+      );
     }
-    writeTx.recentBlockhash = lastSafeHashInfo!.blockhash;
-    writeTx.feePayer = ephemeralKey.publicKey;
     
-    // Sign with the ephemeral key
-    writeTx.sign(ephemeralKey);
+    const writeSigs: string[] = [];
+    let lastSafeHashInfo: { blockhash: string; lastValidBlockHeight: number } | null = await getSafeHash(connection);
     
-    // Send raw transaction without waiting for confirmation
-    // We'll send them all quickly
-    const writeSig = await connection.sendRawTransaction(
-      writeTx.serialize(),
-      SEND_OPTS,
-    );
-    writeSigs.push(writeSig);
-    
-    // Small delay to avoid rate limiting
-    await new Promise(res => setTimeout(res, RATE_LIMIT_MS));
-  }
-  
-  // 3.3 Wait for all write transactions to be confirmed
-  onProgress(80, "Verifying all writes...");
-  console.log(`[EPHEMERAL_DEPLOY] Waiting for all write transactions to confirm...`);
-  
-  await connection.confirmTransaction({
-    signature: writeSigs[writeSigs.length - 1],
-    blockhash: lastSafeHashInfo!.blockhash,
-    lastValidBlockHeight: lastSafeHashInfo!.lastValidBlockHeight,
-  });
-  const statuses = await connection.getSignatureStatuses(writeSigs);
-  statuses.value.forEach((st, i) => {
-    if (st && st.err) throw new Error(`Write TX #${i} failed: ${JSON.stringify(st.err)}`);
-  });
-  
-  // 4. Deploy **or** upgrade the program ------------------------------------
-  onProgress(85, programKeypair ? 'Deploying program…' : 'Upgrading program…');
+    const SAFE_HASH_REFRESH_INTERVAL = 32;   // refresh every N chunks
 
-  let deployOrUpgradeSig: string;
-
-  if (programKeypair) {
-    // ------- NEW PROGRAM (DeployWithMaxDataLen) ---------------------------
-    const createProgramAcct = SystemProgram.createAccount({
-      fromPubkey: ephemeralKey.publicKey,
-      newAccountPubkey: programKeypair.publicKey,
-      lamports: programRent,
-      space: 0,
-      programId: BPF_UPGRADE_LOADER_ID,
+    for (let i = 0; i < numChunks; i++) {
+      const offset = i * CHUNK_SIZE;
+      const end = Math.min(offset + CHUNK_SIZE, dataLength);
+      const chunkSize = end - offset;
+      const chunk = programData.slice(offset, end);
+      
+      onProgress(10 + Math.floor((i / numChunks) * 70), 
+                 `Writing chunk ${i+1}/${numChunks}...`);
+      
+      const writeIx = new TransactionInstruction({
+        programId: BPF_UPGRADE_LOADER_ID,
+        keys: [
+          { pubkey: bufferKey.publicKey,   isSigner: false, isWritable: true },
+          { pubkey: ephemeralKey.publicKey,isSigner: true,  isWritable: false },
+        ],
+        data: Buffer.concat([
+          Buffer.from([LoaderIx.Write]),                // 1-byte tag
+          Buffer.from(Uint32Array.of(offset).buffer),   // 4-byte LE offset
+          (() => {                                      // 8-byte LE length
+            const lenBuf = Buffer.alloc(8);
+            lenBuf.writeBigUInt64LE(BigInt(chunk.length));
+            return lenBuf;
+          })(),
+          Buffer.from(chunk),                           // raw bytes
+        ]),
+      });
+      
+      const writeTx = new Transaction().add(writeIx);
+      
+      // **Do NOT** fetch a new block-hash every chunk – reuse until interval reached
+      if (i % SAFE_HASH_REFRESH_INTERVAL === 0) {
+        lastSafeHashInfo = await getSafeHash(connection);
+      }
+      writeTx.recentBlockhash = lastSafeHashInfo!.blockhash;
+      writeTx.feePayer = ephemeralKey.publicKey;
+      
+      // Sign with the ephemeral key
+      writeTx.sign(ephemeralKey);
+      
+      // Send raw transaction without waiting for confirmation
+      // We'll send them all quickly
+      const writeSig = await connection.sendRawTransaction(
+        writeTx.serialize(),
+        SEND_OPTS,
+      );
+      writeSigs.push(writeSig);
+      
+      // Small delay to avoid rate limiting
+      await new Promise(res => setTimeout(res, RATE_LIMIT_MS));
+    }
+    
+    // 3.3 Wait for all write transactions to be confirmed
+    onProgress(80, "Verifying all writes...");
+    console.log(`[EPHEMERAL_DEPLOY] Waiting for all write transactions to confirm...`);
+    
+    await connection.confirmTransaction({
+      signature: writeSigs[writeSigs.length - 1],
+      blockhash: lastSafeHashInfo!.blockhash,
+      lastValidBlockHeight: lastSafeHashInfo!.lastValidBlockHeight,
     });
+    const statuses = await connection.getSignatureStatuses(writeSigs);
+    statuses.value.forEach((st, i) => {
+      if (st && st.err) throw new Error(`Write TX #${i} failed: ${JSON.stringify(st.err)}`);
+    });
+    
+    // 4. Deploy **or** upgrade the program ------------------------------------
+    onProgress(85, programKeypair ? 'Deploying program…' : 'Upgrading program…');
 
-    const deployIx = new TransactionInstruction({
+    let deployOrUpgradeSig: string;
+
+    if (programKeypair) {
+      // ------- NEW PROGRAM (DeployWithMaxDataLen) ---------------------------
+      const createProgramAcct = SystemProgram.createAccount({
+        fromPubkey: ephemeralKey.publicKey,
+        newAccountPubkey: programKeypair.publicKey,
+        lamports: programRent,
+        space: 0,
+        programId: BPF_UPGRADE_LOADER_ID,
+      });
+
+      const deployIx = new TransactionInstruction({
+        programId: BPF_UPGRADE_LOADER_ID,
+        keys: [
+          { pubkey: ephemeralKey.publicKey,  isSigner: true,  isWritable: true },  // payer
+          { pubkey: programDataPubkey,       isSigner: false, isWritable: true },
+          { pubkey: programKeypair.publicKey,isSigner: true,  isWritable: true },  // Program
+          { pubkey: bufferKey.publicKey,     isSigner: false, isWritable: true },
+          { pubkey: SYSVAR_RENT_PUBKEY,      isSigner: false, isWritable: false },
+          { pubkey: SYSVAR_CLOCK_PUBKEY,     isSigner: false, isWritable: false },
+          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+          { pubkey: ephemeralKey.publicKey,  isSigner: true,  isWritable: false }, // authority = buffer authority
+        ],
+        data: Buffer.concat([
+          Buffer.from([LoaderIx.DeployWithMaxDataLen]), // DeployWithMaxDataLen (u8)
+          Buffer.from(Uint32Array.of(bufferSpace).buffer), // max_data_len (4-byte LE u32)
+        ]),
+      });
+
+      const deployTx = new Transaction()
+        .add(createProgramAcct)
+        .add(deployIx);
+
+      const { blockhash: deployHash, lastValidBlockHeight: deployHeight } =
+            await connection.getLatestBlockhash('confirmed');
+      deployTx.recentBlockhash = deployHash;
+      deployTx.feePayer = ephemeralKey.publicKey;
+      deployTx.sign(ephemeralKey, programKeypair);      // wallet no longer signs
+
+      // Simulate the transaction first to catch any potential issues
+      const sim = await connection.simulateTransaction(deployTx);
+      if (sim.value.err) {
+        console.error('Simulation failure', sim.value.logs);
+        throw new Error('Final deploy simulation failed');
+      }
+      
+      deployOrUpgradeSig = await connection.sendRawTransaction(
+        deployTx.serialize(),
+        SEND_OPTS,
+      );
+      signatures.push(deployOrUpgradeSig);
+
+      await connection.confirmTransaction({
+        blockhash: deployHash,
+        lastValidBlockHeight: deployHeight,
+        signature: deployOrUpgradeSig,
+      });
+    } else {
+      // ------- EXISTING PROGRAM (Upgrade) ------------------------------------
+      const spillPubkey = walletPublicKey;   // lamports refund destination
+      const upgradeIx = new TransactionInstruction({
+        programId: BPF_UPGRADE_LOADER_ID,
+        keys: [
+          { pubkey: programDataPubkey,    isSigner: false, isWritable: true },
+          { pubkey: programId,            isSigner: false, isWritable: true },
+          { pubkey: bufferKey.publicKey,  isSigner: false, isWritable: true },
+          { pubkey: spillPubkey,          isSigner: false, isWritable: true },
+          { pubkey: SYSVAR_RENT_PUBKEY,   isSigner: false, isWritable: false },
+          { pubkey: SYSVAR_CLOCK_PUBKEY,  isSigner: false, isWritable: false },
+          { pubkey: ephemeralKey.publicKey, isSigner: true,  isWritable: false }, // authority = buffer authority
+        ],
+        data: Buffer.from([LoaderIx.Upgrade]), // Upgrade (u8)
+      });
+
+      const upgradeTx = new Transaction().add(upgradeIx);
+      const { blockhash: upHash, lastValidBlockHeight: upHeight } =
+            await connection.getLatestBlockhash('confirmed');
+      upgradeTx.recentBlockhash = upHash;
+      upgradeTx.feePayer = ephemeralKey.publicKey;
+      upgradeTx.sign(ephemeralKey);          // wallet already signed buffer writes
+
+      // Simulate the transaction first to catch any potential issues
+      const sim = await connection.simulateTransaction(upgradeTx);
+      if (sim.value.err) {
+        console.error('Simulation failure', sim.value.logs);
+        throw new Error('Final upgrade simulation failed');
+      }
+
+      deployOrUpgradeSig = await connection.sendRawTransaction(
+        upgradeTx.serialize(),
+        SEND_OPTS,
+      );
+      signatures.push(deployOrUpgradeSig);
+
+      await connection.confirmTransaction({
+        blockhash: upHash,
+        lastValidBlockHeight: upHeight,
+        signature: deployOrUpgradeSig,
+      });
+    }
+
+    // 5. Hand upgrade authority from ephemeral key → wallet -------------------
+    const setAuthIx = new TransactionInstruction({
       programId: BPF_UPGRADE_LOADER_ID,
       keys: [
-        { pubkey: ephemeralKey.publicKey,  isSigner: true,  isWritable: true },  // payer
-        { pubkey: programDataPubkey,       isSigner: false, isWritable: true },
-        { pubkey: programKeypair.publicKey,isSigner: true,  isWritable: true },  // Program
-        { pubkey: bufferKey.publicKey,     isSigner: false, isWritable: true },
-        { pubkey: SYSVAR_RENT_PUBKEY,      isSigner: false, isWritable: false },
-        { pubkey: SYSVAR_CLOCK_PUBKEY,     isSigner: false, isWritable: false },
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-        { pubkey: ephemeralKey.publicKey,  isSigner: true,  isWritable: false }, // authority = buffer authority
+        { pubkey: programDataPubkey,      isSigner: false, isWritable: true },
+        { pubkey: ephemeralKey.publicKey, isSigner: true,  isWritable: false }, // current authority
+        { pubkey: walletPublicKey,        isSigner: false, isWritable: false }, // new authority
       ],
-      data: Buffer.concat([
-        Buffer.from([LoaderIx.DeployWithMaxDataLen]), // DeployWithMaxDataLen (u8)
-        Buffer.from(Uint32Array.of(bufferSpace).buffer), // max_data_len (4-byte LE u32)
-      ]),
+      data: Buffer.from([LoaderIx.SetAuthority]), // SetAuthority (u8)
     });
 
-    const deployTx = new Transaction()
-      .add(createProgramAcct)
-      .add(deployIx);
+    const setAuthTx = new Transaction().add(setAuthIx);
+    setAuthTx.feePayer = ephemeralKey.publicKey;
 
-    const { blockhash: deployHash, lastValidBlockHeight: deployHeight } =
+    const { blockhash: authHash, lastValidBlockHeight: authHeight } =
           await connection.getLatestBlockhash('confirmed');
-    deployTx.recentBlockhash = deployHash;
-    deployTx.feePayer = ephemeralKey.publicKey;
-    deployTx.sign(ephemeralKey, programKeypair);      // wallet no longer signs
+    setAuthTx.recentBlockhash = authHash;
 
-    deployOrUpgradeSig = await connection.sendRawTransaction(
-      deployTx.serialize(),
+    setAuthTx.sign(ephemeralKey);
+
+    const authSig = await connection.sendRawTransaction(
+      setAuthTx.serialize(),
       SEND_OPTS,
     );
-    signatures.push(deployOrUpgradeSig);
+    signatures.push(authSig);
 
     await connection.confirmTransaction({
-      blockhash: deployHash,
-      lastValidBlockHeight: deployHeight,
-      signature: deployOrUpgradeSig,
-    });
-  } else {
-    // ------- EXISTING PROGRAM (Upgrade) ------------------------------------
-    const spillPubkey = walletPublicKey;   // lamports refund destination
-    const upgradeIx = new TransactionInstruction({
-      programId: BPF_UPGRADE_LOADER_ID,
-      keys: [
-        { pubkey: programDataPubkey,    isSigner: false, isWritable: true },
-        { pubkey: programId,            isSigner: false, isWritable: true },
-        { pubkey: bufferKey.publicKey,  isSigner: false, isWritable: true },
-        { pubkey: spillPubkey,          isSigner: false, isWritable: true },
-        { pubkey: SYSVAR_RENT_PUBKEY,   isSigner: false, isWritable: false },
-        { pubkey: SYSVAR_CLOCK_PUBKEY,  isSigner: false, isWritable: false },
-        { pubkey: ephemeralKey.publicKey, isSigner: true,  isWritable: false }, // authority = buffer authority
-      ],
-      data: Buffer.from([LoaderIx.Upgrade]), // Upgrade (u8)
+      blockhash: authHash,
+      lastValidBlockHeight: authHeight,
+      signature: authSig,
     });
 
-    const upgradeTx = new Transaction().add(upgradeIx);
-    const { blockhash: upHash, lastValidBlockHeight: upHeight } =
-          await connection.getLatestBlockhash('confirmed');
-    upgradeTx.recentBlockhash = upHash;
-    upgradeTx.feePayer = ephemeralKey.publicKey;
-    upgradeTx.sign(ephemeralKey);          // wallet already signed buffer writes
-
-    deployOrUpgradeSig = await connection.sendRawTransaction(
-      upgradeTx.serialize(),
-      SEND_OPTS,
-    );
-    signatures.push(deployOrUpgradeSig);
-
-    await connection.confirmTransaction({
-      blockhash: upHash,
-      lastValidBlockHeight: upHeight,
-      signature: deployOrUpgradeSig,
-    });
+    console.log(`[EPHEMERAL_DEPLOY] Program deployed successfully to ${programId.toBase58()}`);
+    onProgress(100, "Deployment successful!");
+    
+    return {
+      programId,
+      signatures,
+      success: true
+    };
+  } catch (e: any) {
+    console.error('RAW ERROR', e);
+    // web3.js puts logs in `e.logs` (v1.95+) or `e.data.logs` (older)
+    console.error('ERROR LOGS:', e.logs ?? e.data?.logs ?? []);
+    onProgress(99, "Deployment failed - check console for details");
+    return {
+      programId: programId!,
+      signatures,
+      success: false
+    };
   }
-
-  // 5. Hand upgrade authority from ephemeral key → wallet -------------------
-  const setAuthIx = new TransactionInstruction({
-    programId: BPF_UPGRADE_LOADER_ID,
-    keys: [
-      { pubkey: programDataPubkey,      isSigner: false, isWritable: true },
-      { pubkey: ephemeralKey.publicKey, isSigner: true,  isWritable: false }, // current authority
-      { pubkey: walletPublicKey,        isSigner: false, isWritable: false }, // new authority
-    ],
-    data: Buffer.from([LoaderIx.SetAuthority]), // SetAuthority (u8)
-  });
-
-  const setAuthTx = new Transaction().add(setAuthIx);
-  setAuthTx.feePayer = ephemeralKey.publicKey;
-
-  const { blockhash: authHash, lastValidBlockHeight: authHeight } =
-        await connection.getLatestBlockhash('confirmed');
-  setAuthTx.recentBlockhash = authHash;
-
-  setAuthTx.sign(ephemeralKey);
-
-  const authSig = await connection.sendRawTransaction(
-    setAuthTx.serialize(),
-    SEND_OPTS,
-  );
-  signatures.push(authSig);
-
-  await connection.confirmTransaction({
-    blockhash: authHash,
-    lastValidBlockHeight: authHeight,
-    signature: authSig,
-  });
-
-  console.log(`[EPHEMERAL_DEPLOY] Program deployed successfully to ${programId.toBase58()}`);
-  onProgress(100, "Deployment successful!");
-  
-  return {
-    programId,
-    signatures,
-    success: true
-  };
 } 
