@@ -284,6 +284,8 @@ export async function deployWithEphemeralKey(
     const chunkSize = end - offset;
     const chunk = programData.slice(offset, end);
     
+    const headerOffset = 40;   // 4 (tag) + 4 (option) + 32 (authority)
+    
     onProgress(10 + Math.floor((i / numChunks) * 70), 
                `Writing chunk ${i+1}/${numChunks}...`);
     
@@ -303,7 +305,7 @@ export async function deployWithEphemeralKey(
       ],
       data: Buffer.concat([
         Buffer.from(Uint8Array.of(LoaderIx.Write)),          // 1-byte tag = Write (u8)
-        Buffer.from(Uint32Array.of(offset).buffer),          // 4-byte offset (u32)
+        Buffer.from(Uint32Array.of(headerOffset + offset).buffer),  // 4-byte offset (u32) after header
         u64LE(chunk.length),                                 // 8-byte Vec<u8> len (u64)
         Buffer.from(chunk),                                  // chunk bytes
       ]),
