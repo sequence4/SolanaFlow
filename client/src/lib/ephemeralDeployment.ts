@@ -360,6 +360,11 @@ export async function deployWithEphemeralKey(
                     'lenLE', writeIx.data.slice(8,16));
         
         const simTx = new Transaction().add(writeIx);
+        // ① Add a recent block-hash so simulateTransaction passes
+        {
+          const { blockhash: simHash } = await connection.getLatestBlockhash('confirmed');
+          simTx.recentBlockhash = simHash;
+        }
         simTx.feePayer = walletPublicKey;
         simTx.sign(ephemeralKey);
         const { value:{err, logs} } = await connection.simulateTransaction(simTx);
@@ -596,6 +601,11 @@ export async function deployWithEphemeralKey(
       programId, keys: [], data: Buffer.alloc(0)   // will fail gracefully
     });
     const testTx = new Transaction().add(ix);
+    // ② Add a recent block-hash for the final simulate
+    {
+      const { blockhash: testHash } = await connection.getLatestBlockhash('confirmed');
+      testTx.recentBlockhash = testHash;
+    }
     testTx.feePayer = walletPublicKey;
     const sim = await connection.simulateTransaction(testTx);
     console.log('[SIM-INVOKE] logs', sim.value.logs);
