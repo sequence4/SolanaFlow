@@ -14,6 +14,18 @@ import type { WalletContextState } from '@solana/wallet-adapter-react';
 import { RATE_LIMIT_MS } from '@/utils/connection';
 import { createHash } from 'crypto';
 
+/** Little-endian helpers required by the loader */
+function u32LE(n: number): Buffer {
+  const b = Buffer.alloc(4);
+  b.writeUInt32LE(n, 0);
+  return b;
+}
+function u64LE(n: bigint): Buffer {
+  const b = Buffer.alloc(8);
+  b.writeBigUInt64LE(n, 0);
+  return b;
+}
+
 // Buffer header = 4-byte state enum + 1-byte COption + 32-byte authority = 37 bytes
 const HEADER_LEN = 37;
 
@@ -256,7 +268,7 @@ export async function deployWithEphemeralKey(
         { pubkey: bufferKey.publicKey,   isSigner: false, isWritable: true },
         { pubkey: ephemeralKey.publicKey,isSigner: true,  isWritable: false },
       ],
-      data: Buffer.from([LoaderIx.InitializeBuffer]), // 1-byte discriminant – no extra fields
+      data: u32LE(LoaderIx.InitializeBuffer),           // 4-byte tag
     });
     createBufferTx.add(initBufferIx);
     
@@ -324,8 +336,7 @@ export async function deployWithEphemeralKey(
       const offsetBuf = Buffer.allocUnsafe(4);
       offsetBuf.writeUInt32LE(offset, 0);          // offset (u32 LE)
 
-      const lenBuf = Buffer.allocUnsafe(4);
-      lenBuf.writeUInt32LE(chunk.length, 0);       // length (u32 LE)
+      const lenBuf = u64LE(BigInt(chunk.length));       // Vec<u8> len = u64 LE
 
       const writeIx = new TransactionInstruction({
         programId: BPF_UPGRADE_LOADER_ID,
@@ -334,19 +345,19 @@ export async function deployWithEphemeralKey(
           { pubkey: ephemeralKey.publicKey,isSigner: true,  isWritable: false },
         ],
         data: Buffer.concat([
-          Buffer.from([LoaderIx.Write]),   // tag (u8)  == 1
-          offsetBuf,                       // offset    (u32 LE)
-          lenBuf,                          // length    (u32 LE)
-          Buffer.from(chunk),              // raw bytes
+          u32LE(LoaderIx.Write),                          // 4-byte tag
+          offsetBuf,                                      // u32 offset
+          lenBuf,                                         // u64 length
+          Buffer.from(chunk),                             // raw bytes
         ]),
       });
       
       if (i === 0) {
         console.log('[DEBUG] first-chunk offset', offset,
                     'len', chunk.length,
-                    'tag', writeIx.data.slice(0,1),
-                    'offsetLE', writeIx.data.slice(1,5),
-                    'lenLE', writeIx.data.slice(5,9));
+                    'tagLE', writeIx.data.slice(0,4),
+                    'offsetLE', writeIx.data.slice(4,8),
+                    'lenLE', writeIx.data.slice(8,16));
         
         const simTx = new Transaction().add(writeIx);
         simTx.feePayer = walletPublicKey;
@@ -444,8 +455,8 @@ export async function deployWithEphemeralKey(
           { pubkey: ephemeralKey.publicKey,  isSigner: true,  isWritable: false }, // authority = buffer authority
         ],
         data: Buffer.concat([
-          Buffer.from([LoaderIx.DeployWithMaxDataLen]), // DeployWithMaxDataLen (u8)
-          Buffer.from(Uint32Array.of(bufferSpace).buffer), // max_data_len (4-byte LE u32)
+          u32LE(LoaderIx.DeployWithMaxDataLen),          // 4-byte tag
+          u64LE(BigInt(bufferSpace)),                    // max_data_len = usize = u64
         ]),
       });
 
@@ -491,7 +502,7 @@ export async function deployWithEphemeralKey(
           { pubkey: SYSVAR_CLOCK_PUBKEY,  isSigner: false, isWritable: false },
           { pubkey: ephemeralKey.publicKey, isSigner: true,  isWritable: false }, // authority = buffer authority
         ],
-        data: Buffer.from([LoaderIx.Upgrade]), // Upgrade (u8)
+        data: u32LE(LoaderIx.Upgrade), // Upgrade (u32 LE)
       });
 
       const upgradeTx = new Transaction().add(upgradeIx);
@@ -529,7 +540,7 @@ export async function deployWithEphemeralKey(
         { pubkey: ephemeralKey.publicKey, isSigner: true,  isWritable: false }, // current authority
         { pubkey: walletPublicKey,        isSigner: false, isWritable: false }, // new authority
       ],
-      data: Buffer.from([LoaderIx.SetAuthority]), // SetAuthority (u8)
+      data: u32LE(LoaderIx.SetAuthority), // SetAuthority (u32 LE)
     });
 
     const setAuthTx = new Transaction().add(setAuthIx);
