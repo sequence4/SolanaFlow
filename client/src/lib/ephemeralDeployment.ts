@@ -13,6 +13,7 @@ import { BPF_UPGRADE_LOADER_ID } from '../utils/constants';
 import type { WalletContextState } from '@solana/wallet-adapter-react';
 import { RATE_LIMIT_MS } from '@/utils/connection';
 import { createHash } from 'crypto';
+import { execSync } from 'child_process';
 
 // Buffer header = 4-byte state enum + 1-byte COption + 32-byte authority = 37 bytes
 const HEADER_LEN = 37;
@@ -114,8 +115,25 @@ export async function deployWithEphemeralKey(
   let programId: PublicKey | null = null;
   
   try {
+    // Log toolchain versions
+    try {
+      console.log('[BUILD] anchor', execSync('anchor --version').toString().trim());
+      console.log('[BUILD] rustc',  execSync('rustc --version --verbose').toString().split('\n')[0]);
+    } catch (e) {
+      console.log('[BUILD] Could not determine toolchain versions:', e);
+    }
+    
     // Convert ArrayBuffer to Uint8Array for processing
     const programData = new Uint8Array(soBytes);
+    
+    {
+      const magic = [...programData.slice(0, 4)];
+      console.log('[VERIFY] ELF magic', magic.map(b => b.toString(16).padStart(2,'0')));
+      if (magic.join() !== '127,69,76,70') {      // 0x7f 45 4c 46
+        throw new Error('❌ soBytes is not a valid ELF; aborting');
+      }
+    }
+    
     const dataLength = programData.length;
     const bufferSpace = HEADER_LEN + dataLength;
     
@@ -297,6 +315,13 @@ export async function deployWithEphemeralKey(
     
     const SAFE_HASH_REFRESH_INTERVAL = 32;   // refresh every N chunks
 
+    // Set up WebSocket subscription for live logs
+    const subId = connection.onLogs(
+      bufferKey.publicKey,
+      (l) => console.log('[ON-LOGS]', l.logs.join('\n')),
+      'confirmed'
+    );
+
     for (let i = 0; i < numChunks; i++) {
       const offset = i * CHUNK_SIZE;
       const end = Math.min(offset + CHUNK_SIZE, dataLength);
@@ -324,6 +349,21 @@ export async function deployWithEphemeralKey(
           Buffer.from(chunk),              // raw bytes
         ]),
       });
+      
+      if (i === 0) {
+        console.log('[DEBUG] first-chunk offset', offset,
+                    'len', chunk.length,
+                    'tag', writeIx.data.slice(0,1),
+                    'offsetLE', writeIx.data.slice(1,5),
+                    'lenLE', writeIx.data.slice(5,9));
+        
+        const simTx = new Transaction().add(writeIx);
+        simTx.feePayer = walletPublicKey;
+        simTx.sign(ephemeralKey);
+        const { value:{err, logs} } = await connection.simulateTransaction(simTx);
+        console.log('[SIM-WRITE] err', err, '\nlogs', logs);
+        if (err) throw new Error('Simulation of first Write failed: ' + JSON.stringify(err));
+      }
       
       const writeTx = new Transaction().add(writeIx);
       
@@ -359,9 +399,13 @@ export async function deployWithEphemeralKey(
       lastValidBlockHeight: lastSafeHashInfo!.lastValidBlockHeight,
     });
     const statuses = await connection.getSignatureStatuses(writeSigs);
-    statuses.value.forEach((st, i) => {
-      if (st && st.err) throw new Error(`Write TX #${i} failed: ${JSON.stringify(st.err)}`);
+    statuses.value.forEach((st, idx) => {
+      console.log('[WRITE-STATUS]', idx, st?.slot, st?.confirmations, st?.err);
+      if (st && st.err) throw new Error(`Write TX #${idx} failed: ${JSON.stringify(st.err)}`);
     });
+    
+    // Clean up WebSocket subscription
+    await connection.removeOnLogsListener(subId);
     
     /* -----------------------------------------------------------------
      * 3.4 – SHA-256 the finished buffer and compare to local .so
@@ -538,6 +582,14 @@ export async function deployWithEphemeralKey(
       }
       onProgress(98, 'On-chain program verified ✔︎');
     }
+
+    const ix = new TransactionInstruction({
+      programId, keys: [], data: Buffer.alloc(0)   // will fail gracefully
+    });
+    const testTx = new Transaction().add(ix);
+    testTx.feePayer = walletPublicKey;
+    const sim = await connection.simulateTransaction(testTx);
+    console.log('[SIM-INVOKE] logs', sim.value.logs);
 
     console.log(`[EPHEMERAL_DEPLOY] Program deployed successfully to ${programId.toBase58()}`);
     onProgress(100, "Deployment successful!");
