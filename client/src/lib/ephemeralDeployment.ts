@@ -12,6 +12,7 @@ import {
 import { BPF_UPGRADE_LOADER_ID } from '../utils/constants';
 import type { WalletContextState } from '@solana/wallet-adapter-react';
 import { RATE_LIMIT_MS } from '@/utils/connection';
+import { createHash } from 'crypto';
 
 // Buffer header = 4-byte state enum + 1-byte COption + 32-byte authority = 37 bytes
 const HEADER_LEN = 37;
@@ -362,6 +363,24 @@ export async function deployWithEphemeralKey(
       if (st && st.err) throw new Error(`Write TX #${i} failed: ${JSON.stringify(st.err)}`);
     });
     
+    /* -----------------------------------------------------------------
+     * 3.4 – SHA-256 the finished buffer and compare to local .so
+     * ----------------------------------------------------------------- */
+    {
+      const acct = await connection.getAccountInfo(bufferKey.publicKey, 'confirmed');
+      if (!acct) throw new Error('Buffer account disappeared before verification');
+
+      const remoteCode = acct.data.subarray(HEADER_LEN);     // strip 37-byte header
+      const localHash  = createHash('sha256').update(programData).digest('hex');
+      const remoteHash = createHash('sha256').update(remoteCode).digest('hex');
+
+      console.log('[VERIFY] buffer sha256', { localHash, remoteHash });
+      if (localHash !== remoteHash) {
+        throw new Error('❌ Buffer hash mismatch – aborting deploy');
+      }
+      onProgress(82, 'Buffer verified ✔︎');
+    }
+    
     // 4. Deploy **or** upgrade the program ------------------------------------
     onProgress(85, programKeypair ? 'Deploying program…' : 'Upgrading program…');
 
@@ -498,6 +517,27 @@ export async function deployWithEphemeralKey(
       lastValidBlockHeight: authHeight,
       signature: authSig,
     });
+
+    /* -----------------------------------------------------------------
+     * 6 – SHA-256 the ProgramData PDA and compare again
+     * ----------------------------------------------------------------- */
+    {
+      const progAcct = await connection.getAccountInfo(programDataPubkey, 'confirmed');
+      if (!progAcct) throw new Error('ProgramData account not found for final verification');
+
+      // ProgramData account has a 32-byte Slot + 32-byte Authority at the front
+      const PDA_HEADER = 64;
+      const remoteProg = progAcct.data.subarray(PDA_HEADER);
+
+      const finalHash = createHash('sha256').update(remoteProg).digest('hex');
+      const buildHash = createHash('sha256').update(programData).digest('hex');
+
+      console.log('[VERIFY] program sha256', { buildHash, finalHash });
+      if (finalHash !== buildHash) {
+        throw new Error('❌ Program hash mismatch – deployment corrupted');
+      }
+      onProgress(98, 'On-chain program verified ✔︎');
+    }
 
     console.log(`[EPHEMERAL_DEPLOY] Program deployed successfully to ${programId.toBase58()}`);
     onProgress(100, "Deployment successful!");
