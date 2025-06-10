@@ -110,7 +110,7 @@ export async function deployWithEphemeralKey(
   // Cache the payer's public key to avoid repeated null checks
   const walletPublicKey = wallet.publicKey;
   const signatures: string[] = [];
-  let programId: PublicKey;
+  let programId: PublicKey | null = null;
   
   try {
     // Convert ArrayBuffer to Uint8Array for processing
@@ -237,7 +237,8 @@ export async function deployWithEphemeralKey(
         SystemProgram.createAccount({
           fromPubkey: ephemeralKey.publicKey,
           newAccountPubkey: bufferKey.publicKey,
-          lamports: bufferRent,
+          // Must also fund ProgramData PDA rent
+          lamports: bufferRent + programDataRent,
           space: bufferSpace,
           programId: BPF_UPGRADE_LOADER_ID,
         })
@@ -511,7 +512,7 @@ export async function deployWithEphemeralKey(
     console.error('ERROR LOGS:', e.logs ?? e.data?.logs ?? []);
     onProgress(99, "Deployment failed - check console for details");
     return {
-      programId: programId!,
+      programId: programId ?? PublicKey.default,
       signatures,
       success: false
     };
