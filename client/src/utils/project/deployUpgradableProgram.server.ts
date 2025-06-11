@@ -344,8 +344,8 @@ export const handleDeployProgram = async (
       return;
     }
 
-    let taskData = await pollTaskStatus3(buildResponse.taskId);
-    taskData = taskData.task;
+    const buildStatus = await pollTaskStatus3(buildResponse.taskId); // { task: Task }
+    let taskData = buildStatus.task;                                // Task
     if (
       taskData.status === 'finished' || 
       taskData.status === 'succeed' ||
