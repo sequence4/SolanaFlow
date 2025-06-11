@@ -642,8 +642,8 @@ export async function deployWithEphemeralKey(
       const progAcct = await connection.getAccountInfo(programDataPubkey, 'confirmed');
       if (!progAcct) throw new Error('ProgramData account not found for final verification');
 
-      // ProgramData account has a 32-byte Slot + 32-byte Authority at the front
-      const PDA_HEADER = 64;
+      // ProgramData header = 4(tag)+8(slot)+1(opt)+32(key) = 45
+      const PDA_HEADER = PROGRAMDATA_HEADER;   // 45
       const remoteProg = progAcct.data.subarray(PDA_HEADER);
 
       const finalHash = createHash('sha256').update(remoteProg).digest('hex');
