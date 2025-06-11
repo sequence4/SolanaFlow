@@ -28,17 +28,27 @@ export const fetchFilesAndCodes = async (
     allFileContentTaskIds.push(response2.taskId);
 
     // poll for task completion
-    const updatedTree = await pollTaskStatus(response2.taskId);
+    const updatedTree = await pollTaskStatus<FileTreeItemType | FileTreeItemType[]>(
+      response2.taskId
+    );
     console.log('[DEBUG_FETCH_FILES] File tree task completed, tree retrieved');
 
     // populate each file's content
     let fileContentTaskIds: string[] = [];
     if (Array.isArray(updatedTree)) {
       console.log('[DEBUG_FETCH_FILES] Populating content for array tree');
-      fileContentTaskIds = await populateFileContent(updatedTree, projectId);
-    } else if (updatedTree && updatedTree.children) {
+      fileContentTaskIds = await populateFileContent(updatedTree as FileTreeItemType[], projectId);
+    } else if (
+      updatedTree &&
+      typeof updatedTree === 'object' &&
+      'children' in updatedTree &&
+      Array.isArray((updatedTree as FileTreeItemType).children)
+    ) {
       console.log('[DEBUG_FETCH_FILES] Populating content for tree with children');
-      fileContentTaskIds = await populateFileContent(updatedTree.children, projectId);
+      const children = (updatedTree as FileTreeItemType).children;
+      if (children) {
+        fileContentTaskIds = await populateFileContent(children, projectId);
+      }
     }
     
     // add all file content task IDs to our collection

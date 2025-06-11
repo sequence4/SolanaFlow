@@ -7,11 +7,11 @@ export interface Task {
   result?: unknown;
 }
 
-export const pollTaskStatus = async (
+export const pollTaskStatus = async <T = unknown>(
     taskId: string,
     interval: number = 1000,
     maxTries: number = 20
-  ): Promise<unknown> => {
+  ): Promise<T> => {
     let attemptCount = 0;
   
     while (attemptCount < maxTries) {
@@ -22,7 +22,7 @@ export const pollTaskStatus = async (
         const { status, result } = taskData.task;
   
         if (status === 'succeed') {
-          return JSON.parse(result || '{}');
+          return JSON.parse(result || '{}') as T;
         } else if (status === 'failed') {
           throw new Error('Task failed on the backend.');
         } else if (status === 'queued' || status === 'doing') {
