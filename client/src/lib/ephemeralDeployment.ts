@@ -558,15 +558,11 @@ export async function deployWithEphemeralKey(
     const setAuthIx = new TransactionInstruction({
       programId: BPF_UPGRADE_LOADER_ID,
       keys: [
-        { pubkey: programDataPubkey,      isSigner: false, isWritable: true },
+        { pubkey: programDataPubkey,      isSigner: false, isWritable: true },  // ProgramData
         { pubkey: ephemeralKey.publicKey, isSigner: true,  isWritable: false }, // current authority
+        { pubkey: walletPublicKey,        isSigner: false, isWritable: false }, // NEW -- the future authority
       ],
-      // tag (4) + COption<Pubkey>  (1-byte Some + 32-byte new authority)
-      data: Buffer.concat([
-        u32LE(LoaderIx.SetAuthority),
-        Buffer.from([1]),                 // COption<Pubkey>::Some
-        walletPublicKey.toBuffer(),       // new upgrade authority
-      ]),
+      data: u32LE(LoaderIx.SetAuthority), // ✅ only 4-byte tag
     });
 
     const setAuthTx = new Transaction().add(setAuthIx);
