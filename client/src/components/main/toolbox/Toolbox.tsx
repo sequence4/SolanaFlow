@@ -155,7 +155,8 @@ export const Toolbox = () => {
                             taskLogs,
                             setProjectContext,
                             setArtifactUrl,
-                            (status?: 'error') => status === 'error' ? reject(new Error('Build failed')) : resolve()
+                            (status?: 'error') => status === 'error' ? reject(new Error('Build failed')) : resolve(),
+                            setFileTree
                         );
                     } catch (error) {
                         reject(error);
@@ -205,7 +206,7 @@ export const Toolbox = () => {
             });
             setIsBuilding(false);
         }
-    }, [isBuilding, setIsBuilding, taskLogs, projectContext, setProjectContext, setArtifactUrl]);
+    }, [isBuilding, setIsBuilding, taskLogs, projectContext, setProjectContext, setArtifactUrl, setFileTree]);
     
     const projectDeployed = !!projectContext?.details?.projectState?.deployed;
     const built = !!projectContext.details?.projectState?.built;

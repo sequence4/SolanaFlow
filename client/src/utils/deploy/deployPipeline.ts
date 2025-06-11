@@ -1,5 +1,7 @@
 import { deployPipeline as sseDeploy } from '@/api/deployPipeline';
 import { ProjectContextType } from '@/context/project/ProjectContextTypes';
+import { useContext } from 'react';
+import FileContext from '@/context/file/FileContext';
 
 export function runDeployPipelineWithLogs(
   projectContext: ProjectContextType,
@@ -13,6 +15,7 @@ export function runDeployPipelineWithLogs(
   setProjectContext: React.Dispatch<React.SetStateAction<ProjectContextType>>,
   setArtifactUrl?: (url: string) => void,
   onComplete?: (status?: 'error') => void,
+  setFileTree?: (tree: any) => void,
 ) {
   
   taskLogs.resetLogs();
@@ -46,6 +49,12 @@ export function runDeployPipelineWithLogs(
         console.error("[deployPipeline] failed to decode artefact:", err);
         taskLogs.addSystemLog("⚠️  Unable to create download link for artefact");
       }
+    }
+
+    if (msg.fileTree && setFileTree) {
+      console.log(`[deployPipeline] Received fileTree with ${msg.fileTree.length} items`);
+      taskLogs.addSystemLog(`📂 Received project file tree with ${msg.fileTree.length} items`);
+      setFileTree(msg.fileTree);
     }
 
     if (msg.stage === 'deploy-done' || msg.stage === 'done' || msg.stage === 'completed') {
