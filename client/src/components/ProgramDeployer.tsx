@@ -107,6 +107,9 @@ export function ProgramDeployer({
     setDeployStage('fund');           // optional label for UI
     taskLogs.addSystemLog("🚀 Starting browser-side program deployment...");
     taskLogs.setIsVisible(true);
+
+    // 🖌️  let React flush this paint BEFORE the wallet popup blocks the thread
+    await new Promise(r => setTimeout(r, 0));
     
     try {
       // const connection = new Connection('https://api.devnet.solana.com', 'confirmed');
@@ -183,6 +186,9 @@ export function ProgramDeployer({
     taskLogs.setIsVisible(true);
     setProgress(1);                   // bar visible while wallet prompt is open
     taskLogs.addSystemLog('🚀 Starting backend deploy…');
+
+    // 🖌️  let React flush this paint BEFORE the wallet popup blocks the thread
+    await new Promise(r => setTimeout(r, 0));
 
     try {
       // 1. create key & tell backend
