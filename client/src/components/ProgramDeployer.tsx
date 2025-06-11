@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Keypair, PublicKey } from '@solana/web3.js';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { toast } from 'sonner';
@@ -65,7 +65,12 @@ export function ProgramDeployer({
   const [deployStage, setDeployStage] = useState<string>('');
   const [currentChunk, setCurrentChunk] = useState(0);
   const [totalChunks, setTotalChunks] = useState(0);
-  const [backendTaskId, setBackendTaskId] = useState<string | null>(null);
+
+  // ────────────────────────────────────────────────────────────────
+  //  Guards that survive React 18 Strict-Mode double-mounts
+  // ────────────────────────────────────────────────────────────────
+  const backendStartedRef = useRef(false);   // true ⇢ deploy already scheduled for this dialog open
+  const backendRunningRef = useRef(false);   // true ⇢ promise currently inflight, ignore any more clicks
 
   // Load the program bytes when the modal opens
   useEffect(() => {
@@ -180,62 +185,74 @@ export function ProgramDeployer({
   /* ------------------------------------------------------------------ *
    *  NEW : backend-side deploy (Anchor CLI inside container)
    * ------------------------------------------------------------------ */
-  const handleDeployBackend = useCallback(async () => {
-    if (isLoading) return;
-    setIsLoading(true);
-    taskLogs.setIsVisible(true);
-    setProgress(1);                   // bar visible while wallet prompt is open
-    taskLogs.addSystemLog('🚀 Starting backend deploy…');
+  const handleDeployBackend = useCallback(
+    async (event?: React.MouseEvent<HTMLButtonElement>) => {
+      event?.preventDefault();                 // blocks hidden form submit
 
-    // 🖌️  let React flush this paint BEFORE the wallet popup blocks the thread
-    await new Promise(r => setTimeout(r, 0));
+      /* Strict-Mode & double-click guards */
+      if (backendRunningRef.current) return;   // re-entrancy
+      if (backendStartedRef.current) return;   // dev re-mount
+      backendRunningRef.current = true;
+      backendStartedRef.current = true;
 
-    try {
-      // 1. create key & tell backend
-      const ephem = await createAndRegisterEphemeral(projectId);
-      taskLogs.addSystemLog(`🔑 Ephemeral key: ${ephem.publicKey.toBase58()}`);
+      if (isLoading) return;                  // legacy guard
+      setIsLoading(true);
+      taskLogs.setIsVisible(true);
+      setProgress(1);                   // bar visible while wallet prompt is open
+      taskLogs.addSystemLog('🚀 Starting backend deploy…');
 
-      // 2. run the local-wallet deploy signer that **pays fees**
-      const deployResult = await deployWithEphemeralKey({
-        soBytes: programBytes!,
-        connection,
-        wallet,
-        /** explicit generic helps TS infer correct overload */
-        ephemeralKeypair: ephem,
-        onProgress: (progress, message) => {
-          setProgress(progress);
-          taskLogs.addSystemLog(message);
+      // 🖌️  let React flush this paint BEFORE the wallet popup blocks the thread
+      await new Promise(r => setTimeout(r, 0));
+
+      try {
+        // 1. create key & tell backend
+        const ephem = await createAndRegisterEphemeral(projectId);
+        taskLogs.addSystemLog(`🔑 Ephemeral key: ${ephem.publicKey.toBase58()}`);
+
+        // 2. run the local-wallet deploy signer that **pays fees**
+        const deployResult = await deployWithEphemeralKey({
+          soBytes: programBytes!,
+          connection,
+          wallet,
+          /** explicit generic helps TS infer correct overload */
+          ephemeralKeypair: ephem,
+          onProgress: (progress, message) => {
+            setProgress(progress);
+            taskLogs.addSystemLog(message);
+          }
+        });
+
+        if (deployResult.success) {
+          onSuccess(deployResult.programId.toBase58());
         }
-      });
+        
+        /* 5 – success UX */
+        toast.success('Program deployed with ephemeral key', {
+          description: `Program ID: ${deployResult.programId.toBase58()}`,
+          action: {
+            label: 'Explorer',
+            onClick: () =>
+              window.open(
+                `https://explorer.solana.com/address/${deployResult.programId.toBase58()}?cluster=devnet`,
+                '_blank',
+              ),
+          },
+        });
 
-      if (deployResult.success) {
         onSuccess(deployResult.programId.toBase58());
-      }
-      
-      /* 5 – success UX */
-      toast.success('Program deployed with ephemeral key', {
-        description: `Program ID: ${deployResult.programId.toBase58()}`,
-        action: {
-          label: 'Explorer',
-          onClick: () =>
-            window.open(
-              `https://explorer.solana.com/address/${deployResult.programId.toBase58()}?cluster=devnet`,
-              '_blank',
-            ),
-        },
-      });
+        onClose();
+      } catch (err: any) {
+        console.error(err);
+        taskLogs.addSystemLog(`❌ ${err.message}`);
+        toast.error('Ephemeral deploy failed', { description: err.message });
+      } finally {
+        setIsLoading(false);           // re-enable UI
+        setProgress(0);                // hide bar only now
 
-      onSuccess(deployResult.programId.toBase58());
-      onClose();
-    } catch (err: any) {
-      console.error(err);
-      taskLogs.addSystemLog(`❌ ${err.message}`);
-      toast.error('Ephemeral deploy failed', { description: err.message });
-    } finally {
-      setIsLoading(false);
-      setBackendTaskId(null);
-    }
-  }, [isLoading, projectId, programBytes, connection, wallet, taskLogs, onSuccess, onClose]);
+        backendRunningRef.current = false;
+        backendStartedRef.current = false;  // dialog can deploy again if reopened
+      }
+    }, [isLoading, projectId, programBytes, connection, wallet, taskLogs, onSuccess, onClose]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !isLoading && !open && onClose()}>
@@ -279,25 +296,18 @@ export function ProgramDeployer({
               
               {isLoading && (
                 <div className="space-y-2 mt-4">
-                  {!backendTaskId ? (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-[#6e6e76]">
-                          {deployStage === 'create' ? 'Creating buffer...' :
-                           deployStage === 'write' ? `Writing chunk ${currentChunk}/${totalChunks}...` :
-                           deployStage === 'deploy' ? 'Finalizing deployment...' :
-                           deployStage === 'complete' ? 'Deployment complete!' : 'Preparing...'}
-                        </span>
-                        <span className="text-sm text-[#6e6e76]">{progress}%</span>
-                      </div>
-                      <Progress value={progress} aria-label="deployment progress" />
-                    </>
-                  ) : (
-                    <div className="flex items-center space-x-2 text-sm text-[#6e6e76]">
-                      <span>Backend deploy running…</span>
-                      <span className="animate-pulse">⏳</span>
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-[#6e6e76]">
+                        {deployStage === 'create' ? 'Creating buffer...' :
+                         deployStage === 'write' ? `Writing chunk ${currentChunk}/${totalChunks}...` :
+                         deployStage === 'deploy' ? 'Finalizing deployment...' :
+                         deployStage === 'complete' ? 'Deployment complete!' : 'Preparing...'}
+                      </span>
+                      <span className="text-sm text-[#6e6e76]">{progress}%</span>
                     </div>
-                  )}
+                    <Progress value={progress} aria-label="deployment progress" />
+                  </>
                 </div>
               )}
             </div>
@@ -324,7 +334,7 @@ export function ProgramDeployer({
             disabled={isLoading || !bytesLoaded || !wallet.publicKey}
             className="w-full sm:w-auto bg-[#4d7cfe] hover:bg-[#4d7cfe]/90 text-white flex items-center"
           >
-            {isLoading && !backendTaskId ? (
+            {isLoading ? (
               <span>Deploying...</span>
             ) : (
               <>
@@ -334,11 +344,12 @@ export function ProgramDeployer({
             )}
           </Button>
           <Button
+            type="button"                      /* stops implicit form submit */
             onClick={handleDeployBackend}
             disabled={isLoading || !bytesLoaded}
             className="w-full sm:w-auto bg-[#22c55e] hover:bg-[#22c55e]/90 text-white flex items-center"
           >
-            {isLoading && backendTaskId ? (
+            {isLoading ? (
               <span>Deploying…</span>
             ) : (
               <>
