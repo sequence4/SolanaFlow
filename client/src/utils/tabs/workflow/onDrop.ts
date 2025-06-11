@@ -1,4 +1,5 @@
 import React from "react";
+import { DragEvent } from 'react';
 import { InstructionType, ProjectStateType, ProjectContextType } from "@/context/project/ProjectContextTypes";
 import { UxOpenPanel } from "@/context/ux/UxContextTypes";
 import { duplicateFlowNodesAndEdges } from "./dropUtils";
@@ -19,18 +20,18 @@ function isOnChainData(draggedData: any): boolean {
 }
 
 export async function handleDrop(
-    event: React.DragEvent<HTMLDivElement>,
+    event: DragEvent<HTMLDivElement>,
     setUxOpenPanel: React.Dispatch<React.SetStateAction<UxOpenPanel>>,
     setProjectState: React.Dispatch<React.SetStateAction<ProjectStateType>>,
     maxInstructions = 20,
     walletPubkey?: string,
     projectId?: string,
     setProjectContext?: React.Dispatch<React.SetStateAction<ProjectContextType>>,
-    reactFlow?: any
+    reactFlow?: { project: (pos: { x: number; y: number }) => { x: number; y: number } }
 ) {
     event.preventDefault();
 
-    const draggedData = JSON.parse(event.dataTransfer.getData("application/reactflow"));
+    const draggedData: { nodes: any[]; code?: any; category?: string } = JSON.parse(event.dataTransfer.getData("application/reactflow"));
     if (!Array.isArray(draggedData.nodes) || draggedData.nodes.length === 0) return;
 
     const reactFlowBounds = event.currentTarget.getBoundingClientRect();

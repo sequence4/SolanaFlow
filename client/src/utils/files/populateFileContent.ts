@@ -37,7 +37,7 @@ export async function populateFileContent(
             }
             
             try {
-              content = await pollTaskStatus2(taskId);
+              content = await pollTaskStatus2<string>(taskId);
               node.code = content;
               console.debug(`[populateFileContent] Loaded content for ${node.path} on attempt #${attempts}`);
             } catch (pollError) {

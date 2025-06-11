@@ -37,11 +37,11 @@ export const pollTaskStatus = async <T = unknown>(
     throw new Error('Polling timed out. Task did not complete in time.');
 };
 
-export const pollTaskStatus2 = async (
+export const pollTaskStatus2 = async <T = unknown>(
   taskId: string,
   interval: number = 1000,
   maxTries: number = 20
-): Promise<unknown> => {
+): Promise<T> => {
   let attemptCount = 0;
 
   while (attemptCount < maxTries) {
@@ -52,7 +52,7 @@ export const pollTaskStatus2 = async (
       const { status, result } = taskData.task;
 
       if (status === 'succeed') {
-        return result;
+        return result as T;
       } else if (status === 'failed') {
         throw new Error('Task failed on the backend.');
       } else if (status === 'queued' || status === 'doing') {
