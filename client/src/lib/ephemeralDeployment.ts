@@ -29,6 +29,8 @@ function u64LE(n: bigint): Buffer {
 // Buffer header = 4-byte state enum + 1-byte COption + 32-byte authority = 37 bytes
 const HEADER_LEN = 37;
 
+// ProgramData account layout constants
+const PROGRAMDATA_HEADER = 45; /* 4(tag)+8(slot)+1(opt)+32(key) */
 // 4-byte tag + 8-byte slot + 1-byte COption = 13
 const PROGRAMDATA_AUTHORITY_OFFSET = 13;
 
@@ -573,6 +575,13 @@ export async function deployWithEphemeralKey(
     setAuthTx.recentBlockhash = authHash;
 
     setAuthTx.sign(ephemeralKey);
+    
+    // Simulate the transaction first to catch any potential issues
+    const simResult = await connection.simulateTransaction(setAuthTx);
+    if (simResult.value.err) {
+      console.error('SetAuthority simulation failure:', simResult.value.logs);
+      throw new Error('SetAuthority simulation failed');
+    }
 
     const authSig = await connection.sendRawTransaction(
       setAuthTx.serialize(),
@@ -580,39 +589,49 @@ export async function deployWithEphemeralKey(
     );
     signatures.push(authSig);
 
-    await connection.confirmTransaction({
+    const authResult = await connection.confirmTransaction({
       blockhash: authHash,
       lastValidBlockHeight: authHeight,
       signature: authSig,
     });
+    
+    if (authResult.value.err) {
+      throw new Error(`SetAuthority transaction failed: ${JSON.stringify(authResult.value.err)}`);
+    }
+    
+    // Optionally fetch the transaction to check for runtime errors
+    const txInfo = await connection.getParsedTransaction(authSig, 'confirmed');
+    if (txInfo?.meta?.err) {
+      throw new Error(`SetAuthority had runtime error: ${JSON.stringify(txInfo.meta.err)}`);
+    }
 
-    // Confirm authority actually changed with retries for RPC cache lag
-    let retries = 6;                       // ~3 sec max
+    // Use `confirmed` (or even `processed`) first, then fall back to `finalized`
+    const COMMIT = 'confirmed';          // <— faster than finalized
+
+    let retries = 40;                    // ~20 s max with 500 ms sleep
     let newAuth: PublicKey | null = null;
 
     while (retries-- > 0) {
-      const pdaInfo = await connection.getAccountInfo(
-        programDataPubkey,
-        // finalized guarantees the fork is rooted
-        { commitment: 'finalized' } as any
-      );
+      const pdaInfo = await connection.getAccountInfo(programDataPubkey, COMMIT as any);
       if (pdaInfo) {
-        newAuth = new PublicKey(
-          pdaInfo.data.slice(
-            PROGRAMDATA_AUTHORITY_OFFSET,
-            PROGRAMDATA_AUTHORITY_OFFSET + 32,
-          ),
-        );
-        if (newAuth.equals(walletPublicKey)) break;     // success
+        const optTag = pdaInfo.data[PROGRAMDATA_AUTHORITY_OFFSET];   // COption tag
+        if (optTag === 1) {                                          // Some(pubkey)
+          newAuth = new PublicKey(
+            pdaInfo.data.slice(
+              PROGRAMDATA_AUTHORITY_OFFSET + 1,
+              PROGRAMDATA_AUTHORITY_OFFSET + 33,
+            ),
+          );
+          if (newAuth.equals(walletPublicKey)) break;                // ✅ success
+        }
       }
-      // short back-off
       await new Promise(r => setTimeout(r, 500));
     }
 
     if (!newAuth?.equals(walletPublicKey)) {
       throw new Error(
-        'Authority transfer failed – PDA still held by old key ' +
-        `(saw ${newAuth?.toBase58()})`
+        `Authority transfer not visible after ${(40 - retries) * 0.5}s – ` +
+        `check RPC lag or tx failure (sig ${authSig})`
       );
     }
 
