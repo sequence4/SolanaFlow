@@ -584,7 +584,6 @@ export const Toolbox = () => {
                     isOpen={isDeployModalOpen}
                     onClose={() => setIsDeployModalOpen(false)}
                     onSuccess={handleDeploySuccess}
-                    taskLogs={taskLogs}
                 />
             )}
 
