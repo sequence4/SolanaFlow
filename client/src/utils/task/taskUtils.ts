@@ -1,10 +1,17 @@
 import { taskApi } from "@/api/taskApi";
 
+export interface Task {
+  id: string;
+  name: string;
+  status: 'queued' | 'doing' | 'succeed' | 'failed' | 'finished' | 'warning';
+  result?: unknown;
+}
+
 export const pollTaskStatus = async (
     taskId: string,
     interval: number = 1000,
     maxTries: number = 20
-  ): Promise<any> => {
+  ): Promise<unknown> => {
     let attemptCount = 0;
   
     while (attemptCount < maxTries) {
@@ -34,7 +41,7 @@ export const pollTaskStatus2 = async (
   taskId: string,
   interval: number = 1000,
   maxTries: number = 20
-): Promise<any> => {
+): Promise<unknown> => {
   let attemptCount = 0;
 
   while (attemptCount < maxTries) {
@@ -64,7 +71,7 @@ export const pollTaskStatus2 = async (
 export const pollTaskStatus3 = async (
   taskId: string,
   interval: number = 1000,
-): Promise<any> => {
+): Promise<{task: Task}> => {
   let attemptCount = 0;
   console.log(`[DEBUG_TASK] Starting pollTaskStatus3 for taskId=${taskId}`);
 

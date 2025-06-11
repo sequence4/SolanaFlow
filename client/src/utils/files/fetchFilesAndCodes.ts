@@ -108,7 +108,7 @@ export const fetchFilesAndCodes = async (
               programId: prevContext.details?.projectState?.programId,
               instructions: prevContext.details?.projectState?.instructions,
               projectFiles: prevContext.details?.projectState?.projectFiles,
-              deployed: prevContext.details?.projectState?.deployed
+              deployed: prevContext.details?.projectState?.deployed ?? false
             }
           }
         };
