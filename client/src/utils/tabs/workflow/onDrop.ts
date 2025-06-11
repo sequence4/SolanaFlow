@@ -1,5 +1,6 @@
 import React from "react";
 import { DragEvent } from 'react';
+import type { ReactFlowInstance } from 'reactflow';
 import { InstructionType, ProjectStateType, ProjectContextType } from "@/context/project/ProjectContextTypes";
 import { UxOpenPanel } from "@/context/ux/UxContextTypes";
 import { duplicateFlowNodesAndEdges } from "./dropUtils";
@@ -27,7 +28,7 @@ export async function handleDrop(
     walletPubkey?: string,
     projectId?: string,
     setProjectContext?: React.Dispatch<React.SetStateAction<ProjectContextType>>,
-    reactFlow?: { project: (pos: { x: number; y: number }) => { x: number; y: number } }
+    reactFlow?: ReactFlowInstance | undefined
 ) {
     event.preventDefault();
 
