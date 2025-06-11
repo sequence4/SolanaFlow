@@ -590,16 +590,34 @@ export async function deployWithEphemeralKey(
       signature: authSig,
     });
 
-    // Confirm authority actually changed
-    const pdaPost = await connection.getAccountInfo(programDataPubkey, 'confirmed');
-    const newAuth = new PublicKey(
-      pdaPost!.data.slice(
-        PROGRAMDATA_AUTHORITY_OFFSET,
-        PROGRAMDATA_AUTHORITY_OFFSET + 32,
-      ),
-    );
-    if (!newAuth.equals(walletPublicKey)) {
-      throw new Error('Authority transfer failed – PDA still held by old key');
+    // Confirm authority actually changed with retries for RPC cache lag
+    let retries = 6;                       // ~3 sec max
+    let newAuth: PublicKey | null = null;
+
+    while (retries-- > 0) {
+      const pdaInfo = await connection.getAccountInfo(
+        programDataPubkey,
+        // finalized guarantees the fork is rooted
+        { commitment: 'finalized' } as any
+      );
+      if (pdaInfo) {
+        newAuth = new PublicKey(
+          pdaInfo.data.slice(
+            PROGRAMDATA_AUTHORITY_OFFSET,
+            PROGRAMDATA_AUTHORITY_OFFSET + 32,
+          ),
+        );
+        if (newAuth.equals(walletPublicKey)) break;     // success
+      }
+      // short back-off
+      await new Promise(r => setTimeout(r, 500));
+    }
+
+    if (!newAuth?.equals(walletPublicKey)) {
+      throw new Error(
+        'Authority transfer failed – PDA still held by old key ' +
+        `(saw ${newAuth?.toBase58()})`
+      );
     }
 
     /* -----------------------------------------------------------------
