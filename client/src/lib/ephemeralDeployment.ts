@@ -29,6 +29,9 @@ function u64LE(n: bigint): Buffer {
 // Buffer header = 4-byte state enum + 1-byte COption + 32-byte authority = 37 bytes
 const HEADER_LEN = 37;
 
+// 4-byte tag + 8-byte slot + 1-byte COption = 13
+const PROGRAMDATA_AUTHORITY_OFFSET = 13;
+
 // Define instruction variants as enum - matches on-chain order
 enum LoaderIx {
   InitializeBuffer = 0,
@@ -168,7 +171,12 @@ export async function deployWithEphemeralKey(
       const programDataInfo = await connection.getAccountInfo(programDataPubkey, 'confirmed');
       if (!programDataInfo) throw new Error('ProgramData PDA missing – wrong ID?');
 
-      const curAuthority = new PublicKey(programDataInfo.data.slice(32, 64));
+      const curAuthority = new PublicKey(
+        programDataInfo.data.slice(
+          PROGRAMDATA_AUTHORITY_OFFSET,
+          PROGRAMDATA_AUTHORITY_OFFSET + 32,
+        ),
+      );
       if (!curAuthority.equals(walletPublicKey)) {
         throw new Error('Wallet is NOT current upgrade authority');
       }
@@ -584,7 +592,12 @@ export async function deployWithEphemeralKey(
 
     // Confirm authority actually changed
     const pdaPost = await connection.getAccountInfo(programDataPubkey, 'confirmed');
-    const newAuth = new PublicKey(pdaPost!.data.slice(32, 64));
+    const newAuth = new PublicKey(
+      pdaPost!.data.slice(
+        PROGRAMDATA_AUTHORITY_OFFSET,
+        PROGRAMDATA_AUTHORITY_OFFSET + 32,
+      ),
+    );
     if (!newAuth.equals(walletPublicKey)) {
       throw new Error('Authority transfer failed – PDA still held by old key');
     }
