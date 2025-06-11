@@ -589,11 +589,11 @@ export async function deployWithEphemeralKey(
     );
     signatures.push(authSig);
 
-    const authResult = await connection.confirmTransaction({
-      blockhash: authHash,
-      lastValidBlockHeight: authHeight,
-      signature: authSig,
-    });
+    // ⚡ Use the lighter 'confirmed' level so we return in ~1–2 s instead of ~15 s
+    const authResult = await connection.confirmTransaction(
+      { blockhash: authHash, lastValidBlockHeight: authHeight, signature: authSig },
+      'confirmed',
+    );
     
     if (authResult.value.err) {
       throw new Error(`SetAuthority transaction failed: ${JSON.stringify(authResult.value.err)}`);
@@ -604,14 +604,18 @@ export async function deployWithEphemeralKey(
     if (txInfo?.meta?.err) {
       throw new Error(`SetAuthority had runtime error: ${JSON.stringify(txInfo.meta.err)}`);
     }
+    
+    onProgress(90, 'Authority tx confirmed — verifying on-chain…');
 
-    // Use `confirmed` (or even `processed`) first, then fall back to `finalized`
-    const COMMIT = 'finalized';          // Devnet nodes show PDA sooner in this layer
-    let retries = 120;                   // 60 s max with 500 ms sleep
+    // ---------- Verify the authority change  ----------
+    // Try 'confirmed' for ≤60 s (120×0.5 s); fall back to 'finalized' once
+    const COMMIT_PRIMARY   = 'confirmed';
+    const COMMIT_FALLBACK  = 'finalized';
+    let retries = 120;
     let newAuth: PublicKey | null = null;
 
     while (retries-- > 0) {
-      const pdaInfo = await connection.getAccountInfo(programDataPubkey, COMMIT as any);
+      const pdaInfo = await connection.getAccountInfo(programDataPubkey, COMMIT_PRIMARY as any);
       if (pdaInfo) {
         const optTag = pdaInfo.data[PROGRAMDATA_AUTHORITY_OFFSET];   // COption tag
         if (optTag === 1) {                                          // Some(pubkey)
@@ -628,10 +632,25 @@ export async function deployWithEphemeralKey(
     }
 
     if (!newAuth?.equals(walletPublicKey)) {
-      throw new Error(
-        `Authority transfer not visible after ${(120 - retries) * 0.5}s – ` +
-        `check RPC lag or tx failure (sig ${authSig})`
-      );
+      // one last shot at the heavier commitment before bailing out
+      const finalPda = await connection.getAccountInfo(programDataPubkey, COMMIT_FALLBACK as any);
+      if (
+        finalPda &&
+        finalPda.data[PROGRAMDATA_AUTHORITY_OFFSET] === 1 &&
+        new PublicKey(
+          finalPda.data.slice(
+            PROGRAMDATA_AUTHORITY_OFFSET + 1,
+            PROGRAMDATA_AUTHORITY_OFFSET + 33,
+          ),
+        ).equals(walletPublicKey)
+      ) {
+        newAuth = walletPublicKey; // ✅ success, just slower RPC
+      } else {
+        throw new Error(
+          `Authority transfer not visible after ${(120 - retries) * 0.5}s – ` +
+          `possible RPC lag or tx failure (sig ${authSig})`,
+        );
+      }
     }
 
     /* -----------------------------------------------------------------

@@ -111,6 +111,7 @@ export function ProgramDeployer({
           ephemeralKeypair: ephem,
           onProgress: (progress, message) => {
             setProgress(progress);
+            setDeployStage(message);   // NEW – let UI text update
             console.log(message);
           }
         });
@@ -191,10 +192,7 @@ export function ProgramDeployer({
                   <>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-[#6e6e76]">
-                        {deployStage === 'create' ? 'Creating buffer...' :
-                         deployStage === 'write' ? `Writing chunk ${currentChunk}/${totalChunks}...` :
-                         deployStage === 'deploy' ? 'Finalizing deployment...' :
-                         deployStage === 'complete' ? 'Deployment complete!' : 'Preparing...'}
+                        {deployStage || 'Preparing...'}
                       </span>
                       <span className="text-sm text-[#6e6e76]">{progress}%</span>
                     </div>
