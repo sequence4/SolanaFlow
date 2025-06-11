@@ -103,7 +103,8 @@ export function ProgramDeployer({
     }
 
     setIsLoading(true);
-    setProgress(0);
+    setProgress(1);                   // start bar at 1 %
+    setDeployStage('fund');           // optional label for UI
     taskLogs.addSystemLog("🚀 Starting browser-side program deployment...");
     taskLogs.setIsVisible(true);
     
@@ -180,7 +181,7 @@ export function ProgramDeployer({
     if (isLoading) return;
     setIsLoading(true);
     taskLogs.setIsVisible(true);
-    setProgress(0);
+    setProgress(1);                   // bar visible while wallet prompt is open
     taskLogs.addSystemLog('🚀 Starting backend deploy…');
 
     try {

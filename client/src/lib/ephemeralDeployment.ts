@@ -606,9 +606,8 @@ export async function deployWithEphemeralKey(
     }
 
     // Use `confirmed` (or even `processed`) first, then fall back to `finalized`
-    const COMMIT = 'confirmed';          // <— faster than finalized
-
-    let retries = 40;                    // ~20 s max with 500 ms sleep
+    const COMMIT = 'finalized';          // Devnet nodes show PDA sooner in this layer
+    let retries = 120;                   // 60 s max with 500 ms sleep
     let newAuth: PublicKey | null = null;
 
     while (retries-- > 0) {
@@ -630,7 +629,7 @@ export async function deployWithEphemeralKey(
 
     if (!newAuth?.equals(walletPublicKey)) {
       throw new Error(
-        `Authority transfer not visible after ${(40 - retries) * 0.5}s – ` +
+        `Authority transfer not visible after ${(120 - retries) * 0.5}s – ` +
         `check RPC lag or tx failure (sig ${authSig})`
       );
     }
