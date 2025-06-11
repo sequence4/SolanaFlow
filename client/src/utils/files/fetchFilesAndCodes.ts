@@ -42,7 +42,8 @@ export const fetchFilesAndCodes = async (
       updatedTree &&
       typeof updatedTree === 'object' &&
       'children' in updatedTree &&
-      Array.isArray((updatedTree as FileTreeItemType).children)
+      Array.isArray((updatedTree as FileTreeItemType).children) &&
+      (updatedTree as FileTreeItemType).children !== undefined
     ) {
       console.log('[DEBUG_FETCH_FILES] Populating content for tree with children');
       const children = (updatedTree as FileTreeItemType).children;
@@ -82,7 +83,19 @@ export const fetchFilesAndCodes = async (
     }
 
     // build a single root node
-    const singleRoot = buildSingleRootNode(updatedTree, projectContext.name || "Project");
+    /* Ensure we always pass an array to buildSingleRootNode */
+    const treeArray: FileTreeItemType[] = Array.isArray(updatedTree)
+      ? updatedTree                                  // already an array
+      : 'children' in updatedTree && 
+        Array.isArray((updatedTree as FileTreeItemType).children) && 
+        (updatedTree as FileTreeItemType).children !== undefined
+          ? (updatedTree as FileTreeItemType).children || []  // take the children array or empty array if null
+          : [updatedTree as FileTreeItemType];           // fallback – wrap single node
+
+    const singleRoot = buildSingleRootNode(
+      treeArray,
+      projectContext.name || "Project"
+    );
     console.log("[DEBUG_FETCH_FILES] Built single root node");
 
     // if we have a single root, set it in fileContext
@@ -118,7 +131,8 @@ export const fetchFilesAndCodes = async (
               programId: prevContext.details?.projectState?.programId,
               instructions: prevContext.details?.projectState?.instructions,
               projectFiles: prevContext.details?.projectState?.projectFiles,
-              deployed: prevContext.details?.projectState?.deployed ?? false
+              deployed: prevContext.details?.projectState?.deployed ?? false,
+              built: prevContext.details?.projectState?.built ?? false
             }
           }
         };
