@@ -61,7 +61,7 @@ export function ProgramDeployer({
   const [bytesLoaded, setBytesLoaded] = useState(false);
   const [programBytes, setProgramBytes] = useState<ArrayBuffer | null>(null);
   const [byteLength, setByteLength] = useState(0);
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgress] = useState<number | null>(null);
   const [deployStage, setDeployStage] = useState<string>('');
   const [currentChunk, setCurrentChunk] = useState(0);
   const [totalChunks, setTotalChunks] = useState(0);
@@ -195,7 +195,7 @@ export function ProgramDeployer({
       backendRunningRef.current = true;
       backendStartedRef.current = true;
 
-      if (isLoading) return;                  // legacy guard
+      if (isLoading) return;                  
       setIsLoading(true);
       taskLogs.setIsVisible(true);
       setProgress(1);                   // bar visible while wallet prompt is open
@@ -247,7 +247,7 @@ export function ProgramDeployer({
         toast.error('Ephemeral deploy failed', { description: err.message });
       } finally {
         setIsLoading(false);           // re-enable UI
-        setProgress(0);                // hide bar only now
+        setProgress(null);             // hide bar fully
 
         backendRunningRef.current = false;
         backendStartedRef.current = false;  // dialog can deploy again if reopened
@@ -294,7 +294,7 @@ export function ProgramDeployer({
                 </div>
               )}
               
-              {isLoading && (
+              {isLoading && progress !== null && (
                 <div className="space-y-2 mt-4">
                   <>
                     <div className="flex items-center justify-between">
