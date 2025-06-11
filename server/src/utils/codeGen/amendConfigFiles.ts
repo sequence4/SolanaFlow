@@ -385,7 +385,7 @@ export const amendConfigFiles = async (
     (await listGeneratedPrograms(projectId, userId))
       .map(p => p.split('/').pop())           // "programs/<name>" → "<name>"
   );
-  const isKeyLine = (l: string) => /^\s*[A-Za-z0-9_\-]+\s*=/.test(l);
+  const isKeyLine = (l: string) => /^\s*[A-Za-z0-9_-]+\s*=/.test(l);
   const orphanFilter = (l: string) => {
     if (!isKeyLine(l)) return true;
 
