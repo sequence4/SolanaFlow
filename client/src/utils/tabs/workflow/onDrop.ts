@@ -1,6 +1,6 @@
 import React from "react";
 import { DragEvent } from 'react';
-import type { ReactFlowInstance } from 'reactflow';
+import type { ReactFlowInstance, Node, Edge } from '@xyflow/react';
 import { InstructionType, ProjectStateType, ProjectContextType } from "@/context/project/ProjectContextTypes";
 import { UxOpenPanel } from "@/context/ux/UxContextTypes";
 import { duplicateFlowNodesAndEdges } from "./dropUtils";
@@ -28,7 +28,7 @@ export async function handleDrop(
     walletPubkey?: string,
     projectId?: string,
     setProjectContext?: React.Dispatch<React.SetStateAction<ProjectContextType>>,
-    reactFlow?: ReactFlowInstance | undefined
+    reactFlow?: ReactFlowInstance<Node, Edge>
 ) {
     event.preventDefault();
 
@@ -41,9 +41,9 @@ export async function handleDrop(
     const pointerY = event.clientY - reactFlowBounds.top;
 
     let dropPosition;
-    if (reactFlow && reactFlow.project) {
-        dropPosition = reactFlow.project({ x: pointerX, y: pointerY });
-        console.log("Using ReactFlow project - Drop position:", dropPosition);
+    if (reactFlow) {
+        dropPosition = reactFlow.screenToFlowPosition({ x: pointerX, y: pointerY });
+        console.log("Using ReactFlow screenToFlowPosition - Drop position:", dropPosition);
     } else {
         dropPosition = { x: pointerX, y: pointerY };
         console.log("Using direct coordinates - Drop position:", dropPosition);
