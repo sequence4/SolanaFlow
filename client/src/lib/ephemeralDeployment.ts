@@ -42,6 +42,12 @@ enum LoaderIx {
 const CHUNK_SIZE = 880;
 const SAFE_HASH_REFRESH_INTERVAL = 32;   // refresh every N chunks
 
+/**
+ * Size of a Program account = UpgradeableLoaderState::program_len()
+ * See upstream loader source – constant is 36 bytes.
+ */
+const PROGRAM_ACCOUNT_SPACE = 36;
+
 // Re-use these options for every raw TX that the wallet does **not** sign.
 // Skipping pre-flight avoids "Blockhash not found" simulations.
 export const SEND_NO_PREFLIGHT: SendOptions = { skipPreflight: true };
@@ -126,7 +132,7 @@ export async function deployWithEphemeralKey(
     }
     
     const dataLength = programData.length;
-    const bufferSpace = HEADER_LEN + dataLength;
+    const bufferSpace = HEADER_LEN + dataLength;  // bufferSpace = 37-byte Buffer header + raw code length
     
     onProgress(0, "Generating ephemeral key...");
     console.log(`[EPHEMERAL_DEPLOY] Starting deployment, program size: ${dataLength} bytes`);
@@ -175,7 +181,9 @@ export async function deployWithEphemeralKey(
     
     // Calculate rent-exempt balances
     const bufferRent = BigInt(await connection.getMinimumBalanceForRentExemption(bufferSpace));
-    const programRent = BigInt(await connection.getMinimumBalanceForRentExemption(0));
+    const programRent = BigInt(
+      await connection.getMinimumBalanceForRentExemption(PROGRAM_ACCOUNT_SPACE),
+    );
 
     // ───────────────────────────────────────────────
     // NEW: rent for the ProgramData account that the
@@ -205,6 +213,7 @@ export async function deployWithEphemeralKey(
       bufferRent:         bufferRent.toString(),
       programRentForFunding: rentForProg.toString(),
       programDataRent:    programDataRent.toString(),
+      programAccountSpace: PROGRAM_ACCOUNT_SPACE,
       totalFees:          totalFees.toString(),
       SAFETY_LAMPORTS:    SAFETY_LAMPORTS.toString(),
       totalNeeded:        totalNeeded.toString(),
@@ -443,7 +452,7 @@ export async function deployWithEphemeralKey(
         fromPubkey: ephemeralKey.publicKey,
         newAccountPubkey: programKeypair.publicKey,
         lamports: Number(programRent),
-        space: 0,
+        space: PROGRAM_ACCOUNT_SPACE,
         programId: BPF_UPGRADE_LOADER_ID,
       });
 
@@ -461,7 +470,7 @@ export async function deployWithEphemeralKey(
         ],
         data: Buffer.concat([
           u32LE(LoaderIx.DeployWithMaxDataLen),          // 4-byte tag
-          u64LE(BigInt(bufferSpace)),                    // max_data_len = usize = u64
+          u64LE(BigInt(dataLength)),                     // raw .so size only
         ]),
       });
 
