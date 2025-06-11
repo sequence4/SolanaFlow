@@ -110,7 +110,7 @@ export function ProgramDeployer({
     try {
       // const connection = new Connection('https://api.devnet.solana.com', 'confirmed');
       
-      const result = await deployUpgradeableProgram({
+      const deployResult = await deployUpgradeableProgram({
         soBytes: programBytes,
         connection,
         wallet,
@@ -147,7 +147,8 @@ export function ProgramDeployer({
         }
       });
       
-      const { programId, signatures } = result;
+      // TypeScript: deployResult is non-null from this point onward
+      const { programId, signatures } = deployResult!;
       
       // Show success message
       toast.success("Program deployed successfully", {
