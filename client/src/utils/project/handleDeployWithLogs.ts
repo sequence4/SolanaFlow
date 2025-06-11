@@ -1,3 +1,5 @@
+/*
+
 import { Step } from "@/context/logs/TaskLogsContext";
 import { useTaskLogs } from "@/context/logs/useTaskLogs";
 import { ProjectContextType } from "@/context/project/ProjectContextTypes";
@@ -139,3 +141,8 @@ export async function handleDeployWithLogs(
     return success;
   }
 } 
+*/
+
+export const handleDeployWithLogs = async () => {
+  return null;
+};

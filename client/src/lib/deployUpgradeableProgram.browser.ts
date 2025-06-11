@@ -2,6 +2,7 @@
  * BROWSER-side deployer (uses WalletAdapter + signAllTransactions).
  * Server-side deployer lives in "@/utils/project/deployUpgradableProgram.server".
  */
+/*
 import {
   Connection,
   PublicKey,
@@ -23,10 +24,7 @@ import {
 } from "@/utils/constants";
 import type { SendOptions } from '@solana/web3.js';
 
-/**
- * Return true if the wallet's public key appears in the tx's
- * `signatures` array with the `signature` field still unset.
- */
+
 function needsWalletSig(tx: Transaction, walletPk: PublicKey): boolean {
   return tx.signatures.some(
     s => s.publicKey.equals(walletPk) && s.signature === null
@@ -85,7 +83,6 @@ type DeployProgress = {
 
 type DeployOptions = {
   soBytes: ArrayBuffer;
-  /** optional – defaults to shared dev-net connection */
   connection?: Connection;
   wallet: WalletContextState;
   programId?: PublicKey;
@@ -97,10 +94,6 @@ type DeployResult = {
   signatures: string[];
 };
 
-/**
- * Returns a blockhash that is ~SAFE_OFFSET slots old,
- * so you have extra runway after signing.
- */
 // Less runway now that signing is quick
 const SAFE_OFFSET = 0;    // use the freshest block-hash
 async function getSafeBlockhash(conn: Connection) {
@@ -117,7 +110,7 @@ async function getSafeBlockhash(conn: Connection) {
         lastValidBlockHeight: latest.lastValidBlockHeight
       };
     }
-  } catch (_) { /* ignore – rare on Devnet */ }
+  } catch (_) {  }
 
   return latest;  // use the fresh one if lookup fails
 }
@@ -136,10 +129,6 @@ async function confirmWithBlockhash(
   if (res.value.err) throw new Error(JSON.stringify(res.value.err));
 }
 
-/**
- * Yields to the browser's event loop, allowing UI updates
- * @param ms Optional timeout in milliseconds (defaults to requestAnimationFrame timing ~16ms)
- */
 async function yieldToBrowser(ms?: number): Promise<void> {
   if (ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -147,11 +136,7 @@ async function yieldToBrowser(ms?: number): Promise<void> {
   return new Promise(resolve => requestAnimationFrame(() => resolve()));
 }
 
-/**
- * Rough fee budget: base fee (5 000 lamports) × (#signatures per tx)
- * We assume: 1 sig per chunk-write (bufferAuthority) and 2 sigs on book-ends
- * Add 25 % cushion for Phantom priority fees.
- */
+
 function estimateAuthorityLamports(numChunks: number): number {
   const BASE_FEE = 5_000;               // lamports per signature (fixed)
   const bookendTxs  = 2;                // create-buffer + deploy
@@ -162,13 +147,7 @@ function estimateAuthorityLamports(numChunks: number): number {
   return Math.floor(raw * 1.25);        // +25 % cushion
 }
 
-/**
- * Deploys a Solana program using the BPF Upgradeable Loader
- * This function implements the full deployment flow:
- * 1. Create buffer account
- * 2. Write program data in chunks
- * 3. Deploy program from buffer
- */
+
 export async function deployUpgradeableProgram(
   options: DeployOptions,
 ): Promise<DeployResult> {
@@ -384,7 +363,6 @@ export async function deployUpgradeableProgram(
     if (txsNeedingWallet.length === 0) {
       console.warn("[DEPLOY] No transactions require wallet signature –- skipping Phantom prompt");
     } else {
-      /* Optional batching: honour the same SIGN_BATCH_SIZE env var */
       const SIGN_BATCH_SIZE = Number(process.env.NEXT_PUBLIC_SIGN_BATCH_SIZE ?? 30); // 30 ≈ 2.9 MB
 
       if (txsNeedingWallet.length > SIGN_BATCH_SIZE) {
@@ -399,7 +377,6 @@ export async function deployUpgradeableProgram(
         }
       } else {
         const signed = await wallet.signAllTransactions(txsNeedingWallet);
-        /* Overwrite originals so we keep Phantom's priority-fee ix, etc. */
         signed.forEach((tx, j) => {
           const originalIndex = writeTxs.indexOf(txsNeedingWallet[j]);
           writeTxs[originalIndex] = tx;
@@ -407,10 +384,6 @@ export async function deployUpgradeableProgram(
       }
     }
     
-    /*
-     * Sanity-check: every TX should now contain the wallet's signature.
-     * Uncomment if you ever doubt that Phantom returned a complete batch.
-     */
     // writeTxs.forEach((tx, i) => {
     //   if (!tx.signatures.some(
     //         s => s.publicKey.equals(payer) && s.signature))
@@ -570,3 +543,8 @@ export async function deployUpgradeableProgram(
     throw new Error(`Program deployment failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 } 
+*/
+
+export const deployUpgradeableProgram = async () => {
+  return null;
+};

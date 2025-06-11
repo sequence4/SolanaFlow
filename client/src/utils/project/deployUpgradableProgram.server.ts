@@ -1,3 +1,4 @@
+/*
 import React from 'react';
 import { toaster } from '@/components/ui/toaster'; 
 import { ProjectContextType } from '@/context/project/ProjectContextTypes';
@@ -161,7 +162,6 @@ export async function deployUpgradeableProgramServer(
 
         const txSig = await connection.sendRawTransaction(writeTx.serialize(), {
           skipPreflight: false,
-          /** MUST match the commitment used for getLatestBlockhash */
           preflightCommitment: 'confirmed',
         });
 
@@ -263,8 +263,9 @@ export async function deployUpgradeableProgramServer(
   console.log('Upgradeable program deployed to:', deployedPubkey.toBase58());
   return deployedPubkey;
 }
+*/
 
-
+/*
 export const handleDeployProgram = async (
   projectContext: ProjectContextType,
   setProjectContext: React.Dispatch<React.SetStateAction<ProjectContextType>>,
@@ -640,13 +641,11 @@ export const handleDeployProgram = async (
                       console.log('Program deployed successfully with ID:', deployedProgramId.toBase58());
                       
                       // Show success message with program ID to the user
-                      /*
                       toaster.create({
                         title: 'Deployment successful',
                         description: `Program ID: ${deployedProgramId.toBase58()}`,
                         type: 'success',
                       });
-                      */
                       
                       // Store the program ID in project context
                       setProjectContext(prev => ({
@@ -816,7 +815,7 @@ export const handleDeployProgram = async (
                 });
                 return;
               }
-                */
+             
               
               try {
                 const deployedProgramId = new PublicKey(cleanedProgramId);
@@ -953,4 +952,9 @@ export const handleDeployProgram = async (
       type: 'error',
     });
   }
+};
+  */
+
+export const handleDeployProgram = async () => {
+  return null;
 };
