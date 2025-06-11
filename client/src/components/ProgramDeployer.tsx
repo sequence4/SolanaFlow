@@ -3,16 +3,8 @@ import { Keypair, PublicKey } from '@solana/web3.js';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { toast } from 'sonner';
 import { downloadArtifact } from '@/api/projectArtifact';
-// Avoid importing the actual implementation which is returning null
-// import { deployUpgradeableProgram } from '@/lib/deployUpgradeableProgram.browser';
 import { Button } from '@/components/ui/button';
 import { Rocket, AlertTriangle } from 'lucide-react';
-import {
-  createEphemeralKey,
-  deployBackend,
-  streamTaskStatus,
-  getTaskStatus,
-} from '@/api/projectDeploy';
 import { createAndRegisterEphemeral } from '@/utils/ephemeral/ephemeralKey';
 import { deployWithEphemeralKey } from '@/lib/ephemeralDeployment';
 import {
@@ -26,35 +18,18 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { connection } from "@/utils/connection";
 
-// Mock implementation to satisfy TypeScript
-const deployUpgradeableProgram = async ({
-  soBytes,
-  connection,
-  wallet,
-  onProgress
-}: any): Promise<{ programId: PublicKey; signatures: string[] }> => {
-  // This is a placeholder implementation
-  const programId = new PublicKey("11111111111111111111111111111111");
-  return { programId, signatures: ["dummy-signature"] };
-};
-
 interface ProgramDeployerProps {
   projectId: string;
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (programId: string) => void;
-  taskLogs: {
-    addSystemLog: (message: string) => void;
-    setIsVisible: (visible: boolean) => void;
-  };
 }
 
-export function ProgramDeployer({ 
-  projectId, 
-  isOpen, 
-  onClose, 
+export function ProgramDeployer({
+  projectId,
+  isOpen,
+  onClose,
   onSuccess,
-  taskLogs
 }: ProgramDeployerProps) {
   const wallet = useWallet();
   const [isLoading, setIsLoading] = useState(false);
@@ -83,17 +58,16 @@ export function ProgramDeployer({
     if (!projectId) return;
     
     setIsLoading(true);
-    taskLogs.addSystemLog("🔍 Fetching compiled program...");
+    console.log("🔍 Fetching compiled program...");
     
     try {
       const bytes = await downloadArtifact(projectId);
       setProgramBytes(bytes);
       setByteLength(bytes.byteLength);
       setBytesLoaded(true);
-      taskLogs.addSystemLog(`✅ Program fetched: ${bytes.byteLength.toLocaleString()} bytes`);
+      console.log(`✅ Program fetched: ${bytes.byteLength.toLocaleString()} bytes`);
     } catch (error) {
       console.error("Failed to load program bytes:", error);
-      taskLogs.addSystemLog(`❌ Failed to load program: ${error instanceof Error ? error.message : String(error)}`);
       toast.error("Failed to load program", {
         description: error instanceof Error ? error.message : String(error)
       });
@@ -102,90 +76,10 @@ export function ProgramDeployer({
     }
   };
 
-  const handleDeploy = useCallback(async () => {
-    if (!wallet.publicKey || !wallet.signTransaction || !programBytes) {
-      return;
-    }
-
-    setIsLoading(true);
-    setProgress(1);                   // start bar at 1 %
-    setDeployStage('fund');           // optional label for UI
-    taskLogs.addSystemLog("🚀 Starting browser-side program deployment...");
-    taskLogs.setIsVisible(true);
-
-    // 🖌️  let React flush this paint BEFORE the wallet popup blocks the thread
-    await new Promise(r => setTimeout(r, 0));
-    
-    try {
-      // const connection = new Connection('https://api.devnet.solana.com', 'confirmed');
-      
-      const deployResult = await deployUpgradeableProgram({
-        soBytes: programBytes,
-        connection,
-        wallet,
-        onProgress: (progressInfo: any) => {
-          const percentComplete = Math.floor((progressInfo.uploaded / progressInfo.total) * 100);
-          setProgress(percentComplete);
-          setDeployStage(progressInfo.stage);
-          
-          if (progressInfo.chunkIndex !== undefined && progressInfo.totalChunks !== undefined) {
-            setCurrentChunk(progressInfo.chunkIndex + 1);
-            setTotalChunks(progressInfo.totalChunks);
-          }
-          
-          // Log progress to task logs
-          if (progressInfo.stage === 'create') {
-            taskLogs.addSystemLog("🏗️ Creating program buffer...");
-          } else if (progressInfo.stage === 'write') {
-            if (progressInfo.chunkIndex === 0) {
-              taskLogs.addSystemLog(`📦 Writing program data in ${progressInfo.totalChunks} chunks...`);
-            }
-            if (progressInfo.chunkIndex !== undefined && progressInfo.chunkIndex % 5 === 0) {
-              const percent = Math.floor((progressInfo.uploaded / progressInfo.total) * 100);
-              taskLogs.addSystemLog(`📤 Uploaded ${percent}% (chunk ${progressInfo.chunkIndex + 1}/${progressInfo.totalChunks})`);
-            }
-          } else if (progressInfo.stage === 'deploy') {
-            taskLogs.addSystemLog("🔄 Finalizing deployment...");
-          } else if (progressInfo.stage === 'complete') {
-            taskLogs.addSystemLog(`✅ Deployment complete!`);
-            if (progressInfo.programId) {
-              taskLogs.addSystemLog(`📝 Program ID: ${progressInfo.programId.toBase58()}`);
-              taskLogs.addSystemLog(`🔍 View on Explorer: https://explorer.solana.com/address/${progressInfo.programId.toBase58()}?cluster=devnet`);
-            }
-          }
-        }
-      });
-      
-      // TypeScript: deployResult is non-null from this point onward
-      const { programId, signatures } = deployResult!;
-      
-      // Show success message
-      toast.success("Program deployed successfully", {
-        description: `Program ID: ${programId.toBase58()}`,
-        action: {
-          label: "View on Explorer",
-          onClick: () => window.open(`https://explorer.solana.com/address/${programId.toBase58()}?cluster=devnet`, '_blank')
-        }
-      });
-      
-      // Call the success callback
-      onSuccess(programId.toBase58());
-      onClose();
-    } catch (error) {
-      console.error("Deployment failed:", error);
-      taskLogs.addSystemLog(`❌ Deployment failed: ${error instanceof Error ? error.message : String(error)}`);
-      toast.error("Deployment failed", {
-        description: error instanceof Error ? error.message : String(error)
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [wallet, programBytes, projectId, onSuccess, onClose, taskLogs]);
-
   /* ------------------------------------------------------------------ *
-   *  NEW : backend-side deploy (Anchor CLI inside container)
+   *  Deploy with ephemeral key
    * ------------------------------------------------------------------ */
-  const handleDeployBackend = useCallback(
+  const handleDeploy = useCallback(
     async (event?: React.MouseEvent<HTMLButtonElement>) => {
       event?.preventDefault();                 // blocks hidden form submit
 
@@ -197,9 +91,8 @@ export function ProgramDeployer({
 
       if (isLoading) return;                  
       setIsLoading(true);
-      taskLogs.setIsVisible(true);
       setProgress(1);                   // bar visible while wallet prompt is open
-      taskLogs.addSystemLog('🚀 Starting backend deploy…');
+      console.log('🚀 Starting deployment…');
 
       // 🖌️  let React flush this paint BEFORE the wallet popup blocks the thread
       await new Promise(r => setTimeout(r, 0));
@@ -207,7 +100,7 @@ export function ProgramDeployer({
       try {
         // 1. create key & tell backend
         const ephem = await createAndRegisterEphemeral(projectId);
-        taskLogs.addSystemLog(`🔑 Ephemeral key: ${ephem.publicKey.toBase58()}`);
+        console.log(`🔑 Ephemeral key: ${ephem.publicKey.toBase58()}`);
 
         // 2. run the local-wallet deploy signer that **pays fees**
         const deployResult = await deployWithEphemeralKey({
@@ -218,7 +111,7 @@ export function ProgramDeployer({
           ephemeralKeypair: ephem,
           onProgress: (progress, message) => {
             setProgress(progress);
-            taskLogs.addSystemLog(message);
+            console.log(message);
           }
         });
 
@@ -243,8 +136,7 @@ export function ProgramDeployer({
         onClose();
       } catch (err: any) {
         console.error(err);
-        taskLogs.addSystemLog(`❌ ${err.message}`);
-        toast.error('Ephemeral deploy failed', { description: err.message });
+        toast.error('Deployment failed', { description: err.message });
       } finally {
         setIsLoading(false);           // re-enable UI
         setProgress(null);             // hide bar fully
@@ -252,7 +144,7 @@ export function ProgramDeployer({
         backendRunningRef.current = false;
         backendStartedRef.current = false;  // dialog can deploy again if reopened
       }
-    }, [isLoading, projectId, programBytes, connection, wallet, taskLogs, onSuccess, onClose]);
+    }, [isLoading, projectId, programBytes, connection, wallet, onSuccess, onClose]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !isLoading && !open && onClose()}>
@@ -329,23 +221,9 @@ export function ProgramDeployer({
           >
             Cancel
           </Button>
-          <Button 
-            onClick={handleDeploy}
-            disabled={isLoading || !bytesLoaded || !wallet.publicKey}
-            className="w-full sm:w-auto bg-[#4d7cfe] hover:bg-[#4d7cfe]/90 text-white flex items-center"
-          >
-            {isLoading ? (
-              <span>Deploying...</span>
-            ) : (
-              <>
-                <Rocket className="h-4 w-4 mr-2" />
-                <span>Deploy in browser</span>
-              </>
-            )}
-          </Button>
           <Button
             type="button"                      /* stops implicit form submit */
-            onClick={handleDeployBackend}
+            onClick={handleDeploy}
             disabled={isLoading || !bytesLoaded}
             className="w-full sm:w-auto bg-[#22c55e] hover:bg-[#22c55e]/90 text-white flex items-center"
           >
@@ -354,7 +232,7 @@ export function ProgramDeployer({
             ) : (
               <>
                 <Rocket className="h-4 w-4 mr-2" />
-                <span>Deploy via server</span>
+                <span>Deploy</span>
               </>
             )}
           </Button>
