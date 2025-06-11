@@ -2,6 +2,7 @@ import React, { useState, useContext, useEffect } from 'react';
 import ProjectContext from '@/context/project/ProjectContext';
 import FileContext from '@/context/file/FileContext';
 import UxContext from '@/context/ux/UxContext';
+import { handleNewProjectClick } from '@/utils/project/projectUtils';
 import { handleConfirmNewProject, handleOpenProject, handleSaveClick } from '@/utils/project/projectUtils';
 import { useTaskLogs } from '@/context/logs/useTaskLogs';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -21,7 +22,7 @@ export const ProjectInfo: React.FC = () => {
     const [projectsRefreshCounter, setProjectsRefreshCounter] = useState(0);
     const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
     const [isProjectListModalOpen, setIsProjectListModalOpen] = useState(false);
-    const { resetLogs, setSteps, setProgress, setIsVisible, addSystemLog } = useTaskLogs();
+    const taskLogs = useTaskLogs();
 
     const buttonTextColor = useColorModeValue('var(--toolbar-button-text-light)', 'var(--toolbar-button-text-dark)');
 
@@ -30,12 +31,18 @@ export const ProjectInfo: React.FC = () => {
     }, [projectContext]);
 
     const handleNewProjectToggle = () => {
-        setIsNewProjectModalOpen(true);
+        handleNewProjectClick(
+            setProjectContext,     // clears id, nodes, etc.
+            projectContext,
+            setFileTree,
+            setSelectedFile
+        );
+        setIsNewProjectModalOpen(true);  // now open the modal
     };
 
     const handleCreateProject = (data: { name: string; description: string; repoUrl?: string }) => {
         // Reset logs before starting new project creation
-        resetLogs();
+        taskLogs.resetLogs();
         
         handleConfirmNewProject(
             projectContext, 
@@ -44,10 +51,10 @@ export const ProjectInfo: React.FC = () => {
             data.description, 
             projectsRefreshCounter, 
             setProjectsRefreshCounter, 
-            setUxOpenPanel,
+            setUxOpenPanel as (p: string) => void,
             setFileTree,
             setSelectedFile,
-            { setSteps, setProgress, setIsVisible, addSystemLog, resetLogs }
+            taskLogs
         );
         setIsNewProjectModalOpen(false);
     };

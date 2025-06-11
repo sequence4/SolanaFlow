@@ -39,11 +39,14 @@ RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
 WORKDIR /tmp
 RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
     --mount=type=cache,id=sccache,target=/opt/sccache,sharing=locked \
+    export CARGO_TARGET_DIR=/usr/src/target && \
     anchor init anchor-template --no-git --no-install \
  && (cd anchor-template && anchor build) \
  && rm -rf anchor-template/node_modules \
  && mv anchor-template /usr/src/anchor-template \
- && rm -rf /tmp/*
+ && rm -rf /tmp/* \
+ && mkdir -p /cache-seed \
+ && cp -a /usr/src/target /cache-seed/target
 
 # quick smoke-test
 RUN solana --version && cargo build-sbf --version && anchor --version
@@ -118,3 +121,7 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/* && strip /usr/local/bin/solana*
 
 EXPOSE 3000
 CMD ["node", ".next/standalone/server.js"]
+
+# create a separate stage for seeding the target volume
+FROM solana-toolchain AS seed-target
+COPY --from=solana-toolchain /cache-seed/target /target-seed

@@ -1,8 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 import { AppError } from '../middleware/errorHandler';
-import dotenvFlow from 'dotenv-flow';
-dotenvFlow.config({ purge_dotenv: true });
 
 const checkRootFolder = (folderPath: string) => {
   if (!fs.existsSync(folderPath)) {
@@ -35,16 +33,14 @@ export const APP_CONFIG = {
   TOKEN_EXPIRATION: '7d',
   MAX_FILE_SIZE: 1024 * 1024 * 5,
   BETA_CODE: process.env.BETA_CODE as string,
+  CLEANUP_POLL_MS: Number(process.env.CLEANUP_POLL_MS ?? 3600000),
+  CLEANUP_STALE_MS: Number(process.env.CLEANUP_STALE_MS ?? 86400000),
 };
 
 const requiredEnvVars = [
   'JWT_SECRET',
   'ROOT_FOLDER',
-  'DB_USER',
-  'DB_HOST',
-  'DB_NAME',
-  'DB_PASSWORD',
-  'DB_PORT',
+  'DATABASE_URL',
 ];
 
 requiredEnvVars.forEach((envVar) => {

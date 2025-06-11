@@ -5,7 +5,7 @@ import { useState } from "react"
 import { Github, Info, Upload } from "lucide-react"
 
 import { Button } from "./button"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "./dialog"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "./dialog"
 import { Input } from "./input"
 import { Label } from "./label"
 import { Textarea } from "./textarea"
@@ -31,7 +31,10 @@ export function NewProjectModal({ open, onOpenChange, onSubmit }: NewProjectModa
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[550px] bg-gradient-to-b from-[#111827] to-[#0f1623] border-[#1f2937] text-slate-100 p-0 overflow-hidden shadow-xl shadow-black/40 rounded-xl">
+      <DialogContent
+        aria-describedby="new-project-desc"
+        className="sm:max-w-[550px] bg-gradient-to-b from-[#111827] to-[#0f1623] border-[#1f2937] text-slate-100 p-0 overflow-hidden shadow-xl shadow-black/40 rounded-xl"
+      >
         <form onSubmit={handleSubmit}>
           <DialogHeader className="px-7 pt-7 pb-3">
             <div className="flex items-center space-x-2">
@@ -41,6 +44,9 @@ export function NewProjectModal({ open, onOpenChange, onSubmit }: NewProjectModa
               </DialogTitle>
             </div>
             <p className="text-slate-400 text-sm mt-2 ml-5">Configure your project settings and repository details</p>
+            <DialogDescription id="new-project-desc" className="sr-only">
+              Create a SolanaFlow project by entering a name and description.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="px-7 py-5">

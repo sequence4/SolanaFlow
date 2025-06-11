@@ -1,4 +1,8 @@
 import { execSync } from "child_process";
+import { Agent, setGlobalDispatcher } from "undici";
+
+/* Increase TCP connect timeout from Undici's default 10 s → 60 s */
+setGlobalDispatcher(new Agent({ connect: { timeout: 60_000 } }));
 
 export async function resolveContainerUrl(name: string): Promise<string> {
   if (name.startsWith('failed-container-')) {
@@ -15,23 +19,29 @@ export async function resolveContainerUrl(name: string): Promise<string> {
   const m = out.match(/:(\d+)$/);
   if (!m) throw new Error(`port parse fail for ${name}`);
 
-  const port   = m[1]; 
-  const host   = process.env.PUBLIC_FQDN ?? `${port}.ws.solanaflow.io`;
-  const scheme = process.env.CONTAINER_URL_SCHEME ?? "https";
+  const port   = m[1];
 
-  return process.env.PUBLIC_FQDN
-    ? `${scheme}://${host}:${port}`
-    : `${scheme}://${host}`;
+  /* ① Explicit FQDN → respect it. ② Otherwise use loop-back */
+  const host   = process.env.PUBLIC_FQDN ?? "127.0.0.1";
+  const scheme = process.env.CONTAINER_URL_SCHEME ?? "http";
+
+  return `${scheme}://${host}:${port}`;
 }
 
-export async function isUrlAlive(url: string): Promise<boolean> {
-  try {
-    const response = await fetch(url, { method: "HEAD" });
-    return response.status >= 200 && response.status < 300;
-  } catch (error) {
-    console.error(`URL check failed for ${url}:`, error);
-    return false;
+export async function isUrlAlive(
+  url: string,
+  retries = 10,
+  delayMs = 2_000,
+): Promise<boolean> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const r = await fetch(url, { method: "HEAD" });
+      if (r.ok) return true;
+    } catch { /* ignore & retry */ }
+    await new Promise(res => setTimeout(res, delayMs));
   }
+  console.error(`URL check failed for ${url} after ${retries} attempts`);
+  return false;
 }
 
 export async function folderExists(container: string, path: string): Promise<boolean> {

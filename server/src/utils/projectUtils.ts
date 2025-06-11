@@ -9,6 +9,7 @@ import { normalizeProjectName } from './stringUtils';
 import pool from 'src/config/database';
 import { pruneContainerResources } from './container/pruneContainer';
 import { startProjectContainer } from './container/startProjectContainer';
+import { Connection, sendAndConfirmRawTransaction } from '@solana/web3.js';
 
 //const USER_WORKSPACE_IMAGE = "ghcr.io/sequence4/solanaflow:latest";
 
@@ -195,8 +196,8 @@ export const getBuildArtifactTask = async (projectId: string): Promise<{ status:
     // Create a temporary task ID for the command execution
     const tempTaskId = uuidv4();
     
-    // find the first .so inside target/deploy
-    const locateCmd = `docker exec ${containerName} bash -c "find /usr/src/${rootPath}/target/deploy -maxdepth 1 -name '*.so' | head -n 1"`;
+    // find the first .so inside the correct target directory
+    const locateCmd = `docker exec ${containerName} bash -c 'cd /usr/src/${rootPath} && SO_DIR="\${CARGO_TARGET_DIR:-target}/deploy" && find "$SO_DIR" -maxdepth 1 -name "*.so" | head -n 1'`;
     const containerSoPath = (await runCommand(locateCmd, '.', tempTaskId, { skipSuccessUpdate: true })).trim();
 
     if (!containerSoPath) {
@@ -245,11 +246,12 @@ cd /usr/src/${rootPath}
 echo "===== Running anchor build ====="
 anchor build
 
-# ── find the first .so file Anchor just produced ──
-SO_PATH=$(find target/deploy -maxdepth 1 -name '*.so' | head -n 1)
+# ── determine the correct target directory and find the first .so file ──
+SO_DIR="\${CARGO_TARGET_DIR:-target}/deploy"
+SO_PATH=$(find "$SO_DIR" -maxdepth 1 -name '*.so' | head -n 1)
 
 if [[ -z "$SO_PATH" ]]; then
-  echo "BUILD_FAILURE: no .so in target/deploy"
+  echo "BUILD_FAILURE: no .so in $SO_DIR"
   exit 1
 fi
 
@@ -295,9 +297,9 @@ echo "BUILD_SUCCESS: $SO_PATH"
           { skipSuccessUpdate: true }
         );
         
-        // look for the *first* .so produced under target/deploy
+        // look for the *first* .so produced under the correct target directory
         const soFileCheck = await runCommand(
-          `docker exec ${containerName} /bin/bash -c "if ls /usr/src/${rootPath}/target/deploy/*.so 1>/dev/null 2>&1; then echo 'BUILD_SUCCESS'; else echo 'BUILD_FAILURE'; fi"`,
+          `docker exec ${containerName} bash -c 'cd /usr/src/${rootPath} && SO_DIR="\${CARGO_TARGET_DIR:-target}/deploy" && if ls "$SO_DIR"/*.so 1>/dev/null 2>&1; then echo "BUILD_SUCCESS"; else echo "BUILD_FAILURE"; fi'`,
           '.',
           sanitizedTaskId,
           { skipSuccessUpdate: true }
@@ -348,6 +350,12 @@ export const startAnchorDeployTask = async (
   const taskId = await createTask('Anchor Deploy', creatorId, projectId);
   let programId: string | null = null;
   const sanitizedTaskId = taskId.trim().replace(/,$/, '');
+  
+  if (ephemeralPubkey === 'SIGNED') {
+    console.log('[BUILD] signed-tx path – skipping container key copy');
+    await updateTaskStatus(sanitizedTaskId, 'succeed', 'Signed tx already broadcast by frontend');
+    return sanitizedTaskId;
+  }
 
   console.log(`[DEPLOY_DEBUG] Starting anchor deploy task ${sanitizedTaskId} for project ${projectId}${ephemeralPubkey ? ' with ephemeral key: ' + ephemeralPubkey : ''}`);
 
@@ -359,6 +367,30 @@ export const startAnchorDeployTask = async (
       }
 
       const rootPath = await getProjectRootPath(projectId);
+
+      /* ──────────────────────────────────────────────────────────
+       *  Symlink ./target/deploy → /usr/src/target/deploy
+       *  so anchor deploy sees the artefact in the warmed cache.
+       * ────────────────────────────────────────────────────────── */
+      {
+        // Build the one-liner (idempotent)
+        const linkCmd = [
+          `cd /usr/src/${rootPath}`,
+          'rm -rf target/deploy',                // remove accidental dir, if any
+          'mkdir -p target',
+          // -T treats DEST as a file so ln never creates "deploy/deploy"
+          'ln -sfnT /usr/src/target/deploy target/deploy'
+        ].join(" && ");
+
+        // Execute inside the running container
+        await runCommand(
+          `docker exec ${containerName} bash -c '${linkCmd}'`,
+          ".",          // working dir irrelevant – we cd inside the command
+          `symlink-${projectId}-${Date.now()}`,    // unique task-id
+          { skipSuccessUpdate: true }
+        );
+        console.log(`[EPHEMERAL] Symlink created for ${rootPath}`);
+      }
 
       await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && solana config set --url https://api.devnet.solana.com"`, '.', sanitizedTaskId, { skipSuccessUpdate: true });
       
@@ -492,20 +524,8 @@ export const startAnchorDeployTask = async (
       const result = await runCommand(deployCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true }).catch(async (error: any) => {
         console.error('Error during deployment:', sanitizedTaskId, error);
         
-        console.log(`[EPHEMERAL_DEBUG] Deployment failed. Trying direct anchor deploy with -k flag...`);
-        try {
-          const directDeployCmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && anchor deploy -k ${containerWalletPath} --url devnet 2>&1"`;
-          console.log(`[DEPLOY_DEBUG] Running fallback command: ${directDeployCmd}`);
-          const fallbackResult = await runCommand(directDeployCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
-          console.log(`[EPHEMERAL_DEBUG] Direct deploy result (first 1000 chars):\n${fallbackResult.substring(0, 1000)}`);
-          
-          if (fallbackResult.includes('Program Id:')) {
-            console.log(`[EPHEMERAL_DEBUG] Direct deploy succeeded!`);
-            return fallbackResult;
-          }
-        } catch (fallbackErr: any) {
-          console.error(`[EPHEMERAL_DEBUG] Fallback deploy also failed: ${fallbackErr.message}`);
-        }
+        console.log(`[EPHEMERAL_DEBUG] Deployment failed.`);
+        // Fallback removed - modern Anchor only accepts --provider.wallet
         
         const errorResult = JSON.stringify({
           status: 'failed',
@@ -1083,4 +1103,20 @@ EOF`;
   await runCommand(`docker exec ${containerName} rm -rf ${tempRunnerDir}`, '.', taskId);
 
   return commandResult;
+}
+
+/**
+ * Relays a fully-signed deploy transaction (base64) to Devnet and
+ * returns the confirmed signature string.
+ */
+export async function broadcastSignedTx(projectId: string, encodedTx: string): Promise<string> {
+  // TODO: verify that the deployed program address matches the current project
+  // before relaying, to prevent malicious reuse of this endpoint.
+  // NOTE: encodedTx must be base64-encoded. If using Phantom, call 
+  // tx.serialize({ verifySignatures: false }).toString('base64') before sending.
+  console.log(`[broadcastSignedTx] project ${projectId} relaying…`);
+  const conn = new Connection('https://api.devnet.solana.com', 'confirmed');
+  const raw  = Buffer.from(encodedTx, 'base64');
+  const sig  = await sendAndConfirmRawTransaction(conn, raw);
+  return sig;
 }

@@ -37,10 +37,16 @@ const ProjectListPopover: React.FC<ProjectListPopoverProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      fetchProjects(page, search, setProjects, setTotalPages, setLoading, setError);
-    }
-  }, [isOpen, page, search, refreshTrigger]);
+    if (!isOpen) return;                 // only fetch when actually visible
+    fetchProjects(
+      page,
+      search,
+      setProjects,
+      setTotalPages,
+      setLoading,
+      setError
+    );
+  }, [isOpen, refreshTrigger, page, search]);
   
   return (
     <div className="bg-[#111827] text-white w-[460px] max-w-[460px] p-1 flex flex-col gap-4">
@@ -69,28 +75,29 @@ const ProjectListPopover: React.FC<ProjectListPopoverProps> = ({
         </div>
       </div>
 
-      {loading && (
-        <div className="mx-auto my-4 w-6 h-6 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
-      )}
       {error && <p className="my-4 text-red-500">{error}</p>}
 
       {/* Projects list */}
       <div className="space-y-2 mb-4 max-h-[300px] overflow-y-auto">
-        {projects.map((project) => (
+        {loading && <p className="text-sm text-slate-500 p-3">Loading…</p>}
+        {!loading && projects.length === 0 && (
+          <p className="text-sm text-slate-500 p-3">You don't have any projects yet.</p>
+        )}
+        {!loading && projects.length > 0 && projects.map((p) => (
           <div
-            key={project.id}
+            key={p.id}
             className="bg-[#131620] border border-[#2a2f3d] rounded-md p-3 flex justify-between items-start hover:border-blue-500 transition-colors cursor-pointer"
           >
             <div 
-              onClick={() => handleProjectClick(project.id, project.name, onProjectClick, closePopover)}
+              onClick={() => handleProjectClick(p.id, p.name, onProjectClick, closePopover)}
               className="flex-1"
             >
-              <h3 className="font-medium">{project.name}</h3>
+              <h3 className="font-medium">{p.name}</h3>
               <p className="text-xs text-gray-400">
-                {shortenText(project.description || 'No description available')}
+                {shortenText(p.description || 'No description available')}
               </p>
               <p className="text-xs text-gray-400">
-                Last updated: {new Date(project.last_updated).toLocaleString()}
+                Last updated: {new Date(p.last_updated).toLocaleString()}
               </p>
             </div>
 
@@ -101,7 +108,7 @@ const ProjectListPopover: React.FC<ProjectListPopoverProps> = ({
               onClick={(e) => {
                 e.stopPropagation();
                 handleDeleteProject(
-                  project.id,
+                  p.id,
                   page,
                   search,
                   setProjects,

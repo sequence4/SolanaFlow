@@ -9,6 +9,7 @@
 !.yarn/versions
 
 # local environment
+.env.*
 .env.local
 
 # testing

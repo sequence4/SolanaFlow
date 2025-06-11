@@ -59,7 +59,8 @@ export async function prepEnv(
   if (rented) {
     // warm-start: use the container as-is
     containerName = rented.name;
-    containerUrl = rented.url;
+    /* Rebuild URL so it uses 127.0.0.1, not the public hostname */
+    containerUrl  = await resolveContainerUrl(rented.name);
   } else {
     // cold-start fallback: spin up a brand-new workspace
     try {

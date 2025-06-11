@@ -29,5 +29,9 @@
   },
   "scripts": {
     "ci": "pnpm install --frozen-lockfile && pnpm -r run type-check && pnpm -r run lint && pnpm -r run test"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.98.0",
+    "buffer": "^6.0.3"
   }
 }

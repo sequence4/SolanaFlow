@@ -1,8 +1,10 @@
+/*
+
 import { Step } from "@/context/logs/TaskLogsContext";
 import { useTaskLogs } from "@/context/logs/useTaskLogs";
 import { ProjectContextType } from "@/context/project/ProjectContextTypes";
 import { PublicKey } from "@solana/web3.js";
-import { handleDeployProgram } from "./deployUpgradableProgram";
+import { handleDeployProgram } from "./deployUpgradableProgram.server";
 import { toast } from "sonner";
 import { Cluster } from "@solana/web3.js";
 
@@ -139,3 +141,8 @@ export async function handleDeployWithLogs(
     return success;
   }
 } 
+*/
+
+export const handleDeployWithLogs = async () => {
+  return null;
+};

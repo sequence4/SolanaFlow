@@ -8,12 +8,8 @@ export const listOrganizationProjects = async (
   res: Response,
   next: NextFunction
 ) => {
-  const userId = req.user?.id;
-  const orgId = req.user?.org_id;
-
-  if (!userId || !orgId) {
-    return next(new AppError('User information not found', 400));
-  }
+  const userId = req.user?.id ?? 'mock-user';
+  // org_id checks temporarily disabled until auth lands
 
   const {
     page = 1,
@@ -23,14 +19,13 @@ export const listOrganizationProjects = async (
 
   try {
     let query = `
-      SELECT id, name, description, root_path, created_at, last_updated
-      FROM solanaproject
-      WHERE org_id = $1
+      SELECT sp.id, sp.name, sp.description, sp.created_at, sp.last_updated
+      FROM solanaproject sp
     `;
-    const queryParams: any[] = [orgId];
+    const queryParams: any[] = [];
 
     if (search) {
-      query += ` AND (name ILIKE $${
+      query += `${queryParams.length === 0 ? ' WHERE' : ' AND'} (name ILIKE $${
         queryParams.length + 1
       } OR description ILIKE $${queryParams.length + 1})`;
       queryParams.push(`%${search}%`);

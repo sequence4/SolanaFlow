@@ -37,6 +37,7 @@
         "slugify": "^1.6.6",
         "ts-node": "^10.9.2",
         "tweetnacl": "^1.0.3",
+        "undici": "^5.29.0",
         "uuid": "^11.1.0"
     },
     "devDependencies": {

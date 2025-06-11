@@ -1,10 +1,17 @@
 import { taskApi } from "@/api/taskApi";
 
-export const pollTaskStatus = async (
+export interface Task {
+  id: string;
+  name: string;
+  status: 'queued' | 'doing' | 'succeed' | 'failed' | 'finished' | 'warning';
+  result?: unknown;
+}
+
+export const pollTaskStatus = async <T = unknown>(
     taskId: string,
     interval: number = 1000,
     maxTries: number = 20
-  ): Promise<any> => {
+  ): Promise<T> => {
     let attemptCount = 0;
   
     while (attemptCount < maxTries) {
@@ -15,7 +22,7 @@ export const pollTaskStatus = async (
         const { status, result } = taskData.task;
   
         if (status === 'succeed') {
-          return JSON.parse(result || '{}');
+          return JSON.parse(result || '{}') as T;
         } else if (status === 'failed') {
           throw new Error('Task failed on the backend.');
         } else if (status === 'queued' || status === 'doing') {
@@ -30,11 +37,11 @@ export const pollTaskStatus = async (
     throw new Error('Polling timed out. Task did not complete in time.');
 };
 
-export const pollTaskStatus2 = async (
+export const pollTaskStatus2 = async <T = unknown>(
   taskId: string,
   interval: number = 1000,
   maxTries: number = 20
-): Promise<any> => {
+): Promise<T> => {
   let attemptCount = 0;
 
   while (attemptCount < maxTries) {
@@ -45,7 +52,7 @@ export const pollTaskStatus2 = async (
       const { status, result } = taskData.task;
 
       if (status === 'succeed') {
-        return result;
+        return result as T;
       } else if (status === 'failed') {
         throw new Error('Task failed on the backend.');
       } else if (status === 'queued' || status === 'doing') {
@@ -64,7 +71,7 @@ export const pollTaskStatus2 = async (
 export const pollTaskStatus3 = async (
   taskId: string,
   interval: number = 1000,
-): Promise<any> => {
+): Promise<{task: Task}> => {
   let attemptCount = 0;
   console.log(`[DEBUG_TASK] Starting pollTaskStatus3 for taskId=${taskId}`);
 

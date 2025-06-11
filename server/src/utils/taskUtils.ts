@@ -45,6 +45,30 @@ export async function updateTaskStatus(
   }
 }
 
+export async function getTaskById(
+  id: string
+): Promise<{ status: string; result: string | null }> {
+  const client = await pool.connect();
+  try {
+    const sanitizedTaskId = id.trim().replace(/,$/, '');
+    const result = await client.query(
+      'SELECT status, result FROM task WHERE id = $1',
+      [sanitizedTaskId]
+    );
+    
+    if (result.rows.length === 0) {
+      throw new Error(`Task with ID ${sanitizedTaskId} not found`);
+    }
+    
+    return { 
+      status: result.rows[0].status,
+      result: result.rows[0].result 
+    };
+  } finally {
+    client.release();
+  }
+}
+
 export async function ensureDirectoryExists(
   dirPath: string,
   containerName?: string
@@ -95,7 +119,7 @@ export async function waitForTaskCompletion(
       const client = await pool.connect();
       try {
         const result = await client.query(
-          'SELECT status FROM task WHERE id = $1',
+          'SELECT status, result FROM task WHERE id = $1',
           [taskId]
         );
         
@@ -105,10 +129,12 @@ export async function waitForTaskCompletion(
         }
         
         const status = result.rows[0].status;
-        console.log(`[DEBUG_TASK_BACKEND] Task ${taskId} status: ${status} (attempt ${retries + 1}/${maxRetries})`);
+        const hasResult = result.rows[0].result !== null;
+        
+        console.log(`[DEBUG_TASK_BACKEND] Task ${taskId} status: ${status}, has result: ${hasResult} (attempt ${retries + 1}/${maxRetries})`);
         
         if (finalStates.includes(status)) {
-          console.log(`[DEBUG_TASK_BACKEND] Task ${taskId} reached final state: ${status}`);
+          console.log(`[DEBUG_TASK_BACKEND] Task ${taskId} reached final state: ${status} with result`);
           return status;
         }
       } finally {
@@ -134,7 +160,7 @@ export async function waitForTaskCompletion(
  * one of the final states or we run out of retries.
  *
  * Returns the full row as `{ task: { status: string; result: string } }`
- * so it’s a drop-in replacement for the client’s pollTaskStatus3.
+ * so it's a drop-in replacement for the client's pollTaskStatus3.
  */
 export async function pollTaskStatus(
   taskId: string,

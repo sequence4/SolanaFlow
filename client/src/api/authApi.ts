@@ -2,8 +2,7 @@
 
 import axios from 'axios';
 import Cookies from 'js-cookie';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+import { API_URL } from '@/config/api';
 
 const authApi = axios.create({
   baseURL: API_URL,

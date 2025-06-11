@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Oxygen_Mono } from 'next/font/google';
 import "@/styles/globals.css";
+import "@/utils/polyfills";
 
 import Providers from "@/components/Providers";
 

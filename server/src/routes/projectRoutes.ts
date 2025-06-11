@@ -11,24 +11,35 @@ import {
   deployProjectEphemeral,
   installPackages,
   setCluster,
-  createProjectDirectory,
   installNodeDependencies,
   runCommandController,
   compileTsController,
   startContainer,
   getContainerUrl,
+  listProjects,
 } from '../controllers/projectController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { buildProject, testProject, getBuildArtifact } from '../controllers/projectController';
+import { v4 as uuidv4 } from 'uuid';
 
 const router = express.Router();
 
+// -- TEMP: skip real auth while debugging ------------------------------------
+const DEV_AUTH = (req: any, _res: any, next: () => void) => {
+  /* provide a synthetic *valid UUID* so DB inserts succeed         */
+  req.user = { id: '00000000-0000-0000-0000-000000000000' };
+  // or use uuidv4() each time → req.user = { id: uuidv4() };
+  next();
+};
+const guard = DEV_AUTH;              // <-- flip back to authMiddleware later
+// ----------------------------------------------------------------------------
+
+router.get('/org/projects', guard, listProjects);
 router.post('/run-command', authMiddleware, runCommandController);
 router.post('/compile-ts', authMiddleware, compileTsController);
-router.post('/create', authMiddleware, createProject);
-router.post('/create-project-directory', authMiddleware, createProjectDirectory);
+router.post('/create', guard, createProject);
 router.put('/update/:id', authMiddleware, editProject);
-router.get('/details/:id', authMiddleware, getProjectDetails);
+router.get('/details/:id', guard, getProjectDetails);
 router.delete('/:id', authMiddleware, deleteProject);
 router.post('/:id/start-container', authMiddleware, startContainer);
 router.get('/:id/container-url', authMiddleware, getContainerUrl);

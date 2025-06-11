@@ -1,3 +1,4 @@
+/*
 import React from 'react';
 import { toaster } from '@/components/ui/toaster'; 
 import { ProjectContextType } from '@/context/project/ProjectContextTypes';
@@ -19,21 +20,25 @@ import {
 } from '@solana/web3.js';
 import { 
   BPF_UPGRADE_LOADER_ID,
+  BPF_LOADER_CHUNK_SIZE
+} from "@/utils/constants";
+import {
   createInitializeBufferData, 
   createDeployInstructionData, 
   createWriteBufferInstructionData,
   createSetAuthorityInstructionData,
 } from './instructionData';
 import { checkBufferAuthority } from './checkBufferAuth';
+import { connection } from "@/utils/connection";
 
-export async function deployUpgradeableProgram(
+export async function deployUpgradeableProgramServer(
   connection: Connection,
   phantomPublicKey: PublicKey,
   signAndSendTransaction: (tx: Transaction, signers?: Keypair[]) => Promise<string>,
   programData: Buffer,
   deployControlOption: 'fullWallet' | 'delegated' = 'delegated'
 ): Promise<PublicKey> {
-  console.log('calling deployUpgradeableProgram');
+  console.log('calling deployUpgradeableProgramServer');
 
   const bufferAccount = Keypair.generate();
   const bufferSpace = 37 + programData.length;
@@ -87,7 +92,7 @@ export async function deployUpgradeableProgram(
         ephemeralKeypair.publicKey,
         0.1 * LAMPORTS_PER_SOL
       );
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash({ commitment: 'confirmed' });
       await connection.confirmTransaction(
         {
           signature: airdropSig,
@@ -128,7 +133,7 @@ export async function deployUpgradeableProgram(
     currentBufferAuthority = ephemeralKeypair.publicKey;
   }
 
-  const CHUNK_SIZE = 700;
+  const CHUNK_SIZE = BPF_LOADER_CHUNK_SIZE;
   let offset = 0;
 
   while (offset < programData.length) {
@@ -150,13 +155,14 @@ export async function deployUpgradeableProgram(
       if (deployControlOption === 'delegated' && ephemeralKeypair) {
         writeTx.feePayer = ephemeralKeypair.publicKey;
 
-        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash({ commitment: 'confirmed' });
         writeTx.recentBlockhash = blockhash;
 
         writeTx.sign(ephemeralKeypair);
 
         const txSig = await connection.sendRawTransaction(writeTx.serialize(), {
           skipPreflight: false,
+          preflightCommitment: 'confirmed',
         });
 
         await connection.confirmTransaction(
@@ -257,8 +263,9 @@ export async function deployUpgradeableProgram(
   console.log('Upgradeable program deployed to:', deployedPubkey.toBase58());
   return deployedPubkey;
 }
+*/
 
-
+/*
 export const handleDeployProgram = async (
   projectContext: ProjectContextType,
   setProjectContext: React.Dispatch<React.SetStateAction<ProjectContextType>>,
@@ -281,11 +288,11 @@ export const handleDeployProgram = async (
   
   // Verify explicitly that we're connected to devnet with a fresh connection
   try {
-    const connection = new Connection('https://api.devnet.solana.com', 'confirmed');
-    console.log('Verifying devnet connection with fresh connection object...');
+    // const connection = new Connection('https://api.devnet.solana.com', 'confirmed');
+    console.log('Verifying devnet connection with shared connection...');
     
     // Get recent blockhash to verify connection
-    const { blockhash } = await connection.getLatestBlockhash();
+    const { blockhash } = await connection.getLatestBlockhash({ commitment: 'confirmed' });
     console.log('Successfully connected to devnet. Recent blockhash:', blockhash.substring(0, 10) + '...');
     
     // Verify wallet account exists on this network
@@ -312,8 +319,7 @@ export const handleDeployProgram = async (
 
     
 
-    const connection = new Connection('https://tiniest-smart-putty.solana-devnet.quiknode.pro/31fdf5493679b4c1c854289d95c822094900efc2/', 'confirmed');
-    console.log('connection', connection);
+    console.log('Using shared connection');
 
     // Double-check wallet is still connected before proceeding with lengthy build
     if (!walletPublicKey) {
@@ -328,7 +334,7 @@ export const handleDeployProgram = async (
     // Verify wallet is on correct network by checking an account that only exists on devnet
     try {
       // Try looking up a devnet-only account or getting recent blockhash
-      const { blockhash } = await connection.getLatestBlockhash();
+      const { blockhash } = await connection.getLatestBlockhash({ commitment: 'confirmed' });
       console.log(`Connected to correct network. Latest blockhash: ${blockhash}`);
     } catch (networkError: any) {
       console.error('Network connection error - possibly not on devnet:', networkError);
@@ -339,8 +345,8 @@ export const handleDeployProgram = async (
       return;
     }
 
-    let taskData = await pollTaskStatus3(buildResponse.taskId);
-    taskData = taskData.task;
+    const buildStatus = await pollTaskStatus3(buildResponse.taskId); // { task: Task }
+    let taskData = buildStatus.task;                                // Task
     if (
       taskData.status === 'finished' || 
       taskData.status === 'succeed' ||
@@ -368,7 +374,7 @@ export const handleDeployProgram = async (
             console.log('Fetched ephemeral pubkey:', ephemeralPubkey.toBase58());
 
             // Reference the same chunk size used in deployUpgradeableProgram
-            const CHUNK_SIZE = 700; // Must match the chunk size used during deployment
+            const CHUNK_SIZE = BPF_LOADER_CHUNK_SIZE; // Must match the chunk size used during deployment
             
             // Calculate buffer rent (for the buffer account holding the program)
             const bufferSpace = 37 + programData.length;
@@ -422,7 +428,7 @@ export const handleDeployProgram = async (
                 const fundTx = new Transaction().add(fundIx);
 
                 // Add recent blockhash to transaction before signing
-                const { blockhash } = await connection.getLatestBlockhash();
+                const { blockhash } = await connection.getLatestBlockhash({ commitment: 'confirmed' });
                 fundTx.recentBlockhash = blockhash;
                 fundTx.feePayer = walletPublicKey;
                 
@@ -503,7 +509,7 @@ export const handleDeployProgram = async (
                 console.log(`Ephemeral funding transaction sent for ${additionalFundsNeeded / LAMPORTS_PER_SOL} SOL. Sig:`, signature);
 
                 // Get fresh blockhash for confirmation
-                const latestBlockhash = await connection.getLatestBlockhash();
+                const latestBlockhash = await connection.getLatestBlockhash({ commitment: 'confirmed' });
                 
                 // Confirm the transaction with timeout and retry
                 console.log('Confirming transaction...');
@@ -635,13 +641,11 @@ export const handleDeployProgram = async (
                       console.log('Program deployed successfully with ID:', deployedProgramId.toBase58());
                       
                       // Show success message with program ID to the user
-                      /*
                       toaster.create({
                         title: 'Deployment successful',
                         description: `Program ID: ${deployedProgramId.toBase58()}`,
                         type: 'success',
                       });
-                      */
                       
                       // Store the program ID in project context
                       setProjectContext(prev => ({
@@ -811,7 +815,7 @@ export const handleDeployProgram = async (
                 });
                 return;
               }
-                */
+             
               
               try {
                 const deployedProgramId = new PublicKey(cleanedProgramId);
@@ -903,7 +907,7 @@ export const handleDeployProgram = async (
             return;
           }
         } else {
-          const programKey = await deployUpgradeableProgram(
+          const programKey = await deployUpgradeableProgramServer(
             connection,
             walletPublicKey,
             signAndSendTransaction,
@@ -948,4 +952,9 @@ export const handleDeployProgram = async (
       type: 'error',
     });
   }
+};
+  */
+
+export const handleDeployProgram = async () => {
+  return null;
 };

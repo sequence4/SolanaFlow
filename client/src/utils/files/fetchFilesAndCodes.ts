@@ -28,17 +28,28 @@ export const fetchFilesAndCodes = async (
     allFileContentTaskIds.push(response2.taskId);
 
     // poll for task completion
-    const updatedTree = await pollTaskStatus(response2.taskId);
+    const updatedTree = await pollTaskStatus<FileTreeItemType | FileTreeItemType[]>(
+      response2.taskId
+    );
     console.log('[DEBUG_FETCH_FILES] File tree task completed, tree retrieved');
 
     // populate each file's content
     let fileContentTaskIds: string[] = [];
     if (Array.isArray(updatedTree)) {
       console.log('[DEBUG_FETCH_FILES] Populating content for array tree');
-      fileContentTaskIds = await populateFileContent(updatedTree, projectId);
-    } else if (updatedTree && updatedTree.children) {
+      fileContentTaskIds = await populateFileContent(updatedTree as FileTreeItemType[], projectId);
+    } else if (
+      updatedTree &&
+      typeof updatedTree === 'object' &&
+      'children' in updatedTree &&
+      Array.isArray((updatedTree as FileTreeItemType).children) &&
+      (updatedTree as FileTreeItemType).children !== undefined
+    ) {
       console.log('[DEBUG_FETCH_FILES] Populating content for tree with children');
-      fileContentTaskIds = await populateFileContent(updatedTree.children, projectId);
+      const children = (updatedTree as FileTreeItemType).children;
+      if (children) {
+        fileContentTaskIds = await populateFileContent(children, projectId);
+      }
     }
     
     // add all file content task IDs to our collection
@@ -72,7 +83,19 @@ export const fetchFilesAndCodes = async (
     }
 
     // build a single root node
-    const singleRoot = buildSingleRootNode(updatedTree, projectContext.name || "Project");
+    /* Ensure we always pass an array to buildSingleRootNode */
+    const treeArray: FileTreeItemType[] = Array.isArray(updatedTree)
+      ? updatedTree                                  // already an array
+      : 'children' in updatedTree && 
+        Array.isArray((updatedTree as FileTreeItemType).children) && 
+        (updatedTree as FileTreeItemType).children !== undefined
+          ? (updatedTree as FileTreeItemType).children || []  // take the children array or empty array if null
+          : [updatedTree as FileTreeItemType];           // fallback – wrap single node
+
+    const singleRoot = buildSingleRootNode(
+      treeArray,
+      projectContext.name || "Project"
+    );
     console.log("[DEBUG_FETCH_FILES] Built single root node");
 
     // if we have a single root, set it in fileContext
@@ -108,7 +131,8 @@ export const fetchFilesAndCodes = async (
               programId: prevContext.details?.projectState?.programId,
               instructions: prevContext.details?.projectState?.instructions,
               projectFiles: prevContext.details?.projectState?.projectFiles,
-              deployed: prevContext.details?.projectState?.deployed
+              deployed: prevContext.details?.projectState?.deployed ?? false,
+              built: prevContext.details?.projectState?.built ?? false
             }
           }
         };

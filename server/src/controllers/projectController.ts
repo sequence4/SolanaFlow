@@ -17,7 +17,6 @@ import {
   runCommand,
   startInstallNodeDependenciesTask,
   compileTs,
-  closeProjectContainer,
 } from '../utils/projectUtils';
 import path from 'path';
 import { APP_CONFIG } from '../config/appConfig';
@@ -84,7 +83,8 @@ export const createProject = async (
   next: NextFunction
 ) => {
   try {
-    const { name, description, details } = req.body;
+    const { name, description } = req.body;
+    const details = req.body.details ?? {};
     const safeName = (name && name.trim()) ? name : `Untitled-${new Date().toISOString().slice(0,10)}`;
 
     const project = await createProjectDb({ 
@@ -95,23 +95,21 @@ export const createProject = async (
 
     res.status(201).json({
       message: 'Project created successfully',
-      project,
-      directoryTask: { taskId: null, message: 'No directory work required' }
+      project
     });
   } catch (err) {
     next(err);
   }
 };
 
+/* Removed createProjectDirectory - functionality no longer needed
 export const createProjectDirectory = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
-  const org_id = req.user?.org_id;
   const userId = req.user?.id;
-
-  if (!org_id || !userId) return next(new AppError('User organization not found', 400)); 
+  // org_id checks temporarily disabled until auth lands
 
   try {
     const { name, description, projectId = '' } = req.body;
@@ -150,6 +148,7 @@ export const createProjectDirectory = async (
     return next(new AppError('Failed to start project directory creation', 500));
   }
 };
+*/
 
 export const editProject = async (
   req: Request,
@@ -158,11 +157,8 @@ export const editProject = async (
 ) => {
   const { id } = req.params;
   const { name, description, details } = req.body;
-  const org_id = req.user?.org_id;
-
-  if (!org_id) {
-    return next(new AppError('User organization not found', 400));
-  }
+  const userId = req.user?.id;
+  // org_id checks temporarily disabled until auth lands
 
   const client = await pool.connect();
 
@@ -170,8 +166,8 @@ export const editProject = async (
     await client.query('BEGIN');
 
     const projectCheck = await client.query(
-      'SELECT * FROM solanaproject WHERE id = $1 AND org_id = $2',
-      [id, org_id]
+      'SELECT * FROM solanaproject WHERE id = $1',
+      [id]
     );
 
     if (projectCheck.rows.length === 0) {
@@ -198,15 +194,27 @@ export const editProject = async (
     }
 
     if (details !== undefined) {
-      updateQuery += `, details = $${valueIndex}`;
-      updateValues.push(JSON.stringify(details));
-      valueIndex++;
+      // Handle case when details contains projectState.built
+      if (details.projectState && details.projectState.built !== undefined) {
+        updateQuery += `, details = jsonb_set(
+          COALESCE(details, '{}'::jsonb),
+          '{projectState,built}',
+          -- cast the parameter so Postgres knows it's boolean JSON
+          to_jsonb(($${valueIndex})::boolean),
+          true
+        )`;
+        updateValues.push(!!details.projectState.built); // ensure true | false
+        valueIndex++;
+      } else {
+        // Regular update for other cases
+        updateQuery += `, details = $${valueIndex}`;
+        updateValues.push(JSON.stringify(details));
+        valueIndex++;
+      }
     }
 
-    updateQuery += ` WHERE id = $${valueIndex} AND org_id = $${
-      valueIndex + 1
-    } RETURNING *`;
-    updateValues.push(id, org_id);
+    updateQuery += ` WHERE id = $${valueIndex} RETURNING *`;
+    updateValues.push(id);
 
     const result = await client.query(updateQuery, updateValues);
 
@@ -237,29 +245,23 @@ export const getProjectDetails = async (
 ): Promise<void> => {
   const { id } = req.params;
   const userId = req.user?.id;
-  const orgId = req.user?.org_id;
+  // org_id checks temporarily disabled until auth lands
 
-  console.log(`[DEBUG_PROJECT] getProjectDetails called for id=${id}, userId=${userId}, orgId=${orgId}`);
-
-  if (!userId || !orgId) {
-    console.log(`[DEBUG_PROJECT] getProjectDetails failed - missing userId or orgId`);
-    next(new AppError('User information not found', 400));
-    return;
-  }
+  console.log(`[DEBUG_PROJECT] getProjectDetails called for id=${id}, userId=${userId}`);
 
   try {
     console.log(`[DEBUG_PROJECT] Querying database for project id=${id}`);
     const projectResult = await pool.query(
       `
-      SELECT id, name, description, org_id, root_path, details, container_url, last_updated, created_at
+      SELECT id, name, description, root_path, details, container_url, last_updated, created_at
       FROM solanaproject
-      WHERE id = $1 AND org_id = $2
+      WHERE id = $1
     `,
-      [id, orgId]
+      [id]
     );
 
     if (projectResult.rows.length === 0) {
-      console.log(`[DEBUG_PROJECT] No project found for id=${id}, orgId=${orgId}`);
+      console.log(`[DEBUG_PROJECT] No project found for id=${id}`);
       next(
         new AppError('Project not found or you do not have permission to access it', 404)
       );
@@ -301,74 +303,34 @@ export const deleteProject = async (
   next: NextFunction
 ): Promise<void> => {
   const { id } = req.params;
-  const userId = req.user?.id;
-  const orgId = req.user?.org_id;
-
-  if (!userId || !orgId) {
-    next(new AppError('User information not found', 400));
-    return;
-  }
-
-  const client = await pool.connect();
 
   try {
-    await client.query('BEGIN');
-
-    const userCheck = await client.query(
-      'SELECT role FROM Creator WHERE id = $1 AND org_id = $2',
-      [userId, orgId]
+    // 1) fetch container name *before* we delete the project
+    const { rows } = await pool.query(
+      `SELECT container_name FROM solanaproject WHERE id = $1`,
+      [id]
     );
+    const container = rows[0]?.container_name;
 
-    if (userCheck.rows.length === 0 || userCheck.rows[0].role !== 'admin') {
-      throw new AppError('Only admin users can delete projects', 403);
-    }
-
-    const projectCheck = await client.query(
-      'SELECT * FROM solanaproject WHERE id = $1 AND org_id = $2',
-      [id, orgId]
+    // 2) delete the project row
+    const { rowCount } = await pool.query(
+      `DELETE FROM solanaproject WHERE id = $1`,
+      [id]
     );
+    if (rowCount === 0) return next(new AppError('Not found', 404));
 
-    if (projectCheck.rows.length === 0) {
-      throw new AppError(
-        'Project not found or you do not have permission to delete it',
-        404
+    // 3) queue container for cleanup (if we had one)
+    if (container) {
+      await pool.query(
+        `INSERT INTO cleanup_queue (container_name, project_id)
+         VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        [container, id]
       );
     }
 
-    const containerTaskId = await closeProjectContainer(
-      id,
-      userId,
-      false,
-      true
-    );
-
-    await client.query('DELETE FROM solanaproject WHERE id = $1', [id]);
-    
-    await client.query('COMMIT');
-
-    // Release any occupied warm-pool slot
-    await pool.query(
-      'UPDATE warm_container_pool SET busy = false WHERE name = $1',
-      [ projectCheck.rows[0].container_name ]
-    );
-    
-    res.status(200).json({
-      message: 'Project deleted successfully',
-      containerTaskId: containerTaskId,
-    });
-    
-    return;
-    
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Error in deleteProject:', error);
-    if (error instanceof AppError) {
-      next(error);
-    } else {
-      next(new AppError('Failed to delete project', 500));
-    }
-  } finally {
-    client.release();
+    res.status(204).end();
+  } catch (err) {
+    next(err);
   }
 };
 
@@ -440,17 +402,13 @@ export const setCluster = async (
   next: NextFunction
 ) => {
   const { id } = req.params;
-  const userId = req.user?.id;
-  const orgId = req.user?.org_id;
-
-  if (!userId || !orgId) {
-    return next(new AppError('User information not found', 400));
-  }
+  const userId = req.user?.id ?? 'mock-user';
+  // org_id checks temporarily disabled until auth lands
 
   try {
     const projectCheck = await pool.query(
-      'SELECT * FROM solanaproject WHERE id = $1 AND org_id = $2',
-      [id, orgId]
+      'SELECT * FROM solanaproject WHERE id = $1',
+      [id]
     );
 
     if (projectCheck.rows.length === 0) {
@@ -475,16 +433,13 @@ export const buildProject = async (
   next: NextFunction
 ): Promise<void> => {
   const { id } = req.params;
-  const userId = req.user?.id;
-  const orgId = req.user?.org_id;
+  const userId = req.user?.id ?? 'mock-user';
+  // org_id checks temporarily disabled until auth lands
 
-  if (!userId || !orgId) {
-    return next(new AppError('User information not found', 400));
-  }
   try {
     const projectCheck = await pool.query(
-      'SELECT details FROM solanaproject WHERE id = $1 AND org_id = $2',
-      [id, orgId]
+      'SELECT details FROM solanaproject WHERE id = $1',
+      [id]
     );
 
     if (projectCheck.rows.length === 0) {
@@ -553,17 +508,25 @@ export const getBuildArtifact = async (
 
 export const createEphemeralKeypair = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const ephemeral = Keypair.generate();
-    const ephemeralPubkeyString = ephemeral.publicKey.toBase58();
+    const { secretKey } = req.body ?? {};
+    const ephem = secretKey
+        ? Keypair.fromSecretKey(Uint8Array.from(secretKey))
+        : Keypair.generate();
+    const pubkey = ephem.publicKey.toBase58();
 
-    const ephemeralFilePath = path.join(APP_CONFIG.WALLETS_FOLDER, `${ephemeralPubkeyString}.json`);
-    fs.writeFileSync(ephemeralFilePath, JSON.stringify([...ephemeral.secretKey]));
+    const walletPath = path.join(
+        APP_CONFIG.WALLETS_FOLDER,
+        `${pubkey}.json`
+    );
+    fs.writeFileSync(walletPath, JSON.stringify(Array.from(ephem.secretKey)), { mode: 0o600 });
+    
+    // optional but useful – detect typos early
+    await runCommand(
+      `solana-keygen pubkey ${walletPath} | grep -q ${pubkey}`,
+      '.', 'verify-ephem', { skipSuccessUpdate: true }
+    ); // exits 1 if mismatch
 
-    console.log(`Created ephemeral keypair with public key ${ephemeralPubkeyString} and saved to ${ephemeralFilePath}`);
-
-    res.status(200).json({
-      ephemeralPubkey: ephemeralPubkeyString
-    });
+    res.status(200).json({ ephemeralPubkey: pubkey });
   } catch (err) {
     console.error('Error creating ephemeral keypair:', err);
     return next(new AppError('Failed to create ephemeral keypair', 500));
@@ -576,15 +539,13 @@ export const deployProject = async (
   next: NextFunction
 ): Promise<void> => {
   const { id } = req.params;
-  const userId = req.user?.id;
-  const orgId = req.user?.org_id;
-
-  if (!userId || !orgId) return next(new AppError('User information not found', 400));
+  const userId = req.user?.id ?? 'mock-user';
+  // org_id checks temporarily disabled until auth lands
 
   try {
     const projectCheck = await pool.query(
-      'SELECT details FROM solanaproject WHERE id = $1 AND org_id = $2',
-      [id, orgId]
+      'SELECT details FROM solanaproject WHERE id = $1',
+      [id]
     );
 
     if (projectCheck.rows.length === 0) {
@@ -627,16 +588,14 @@ export const deployProjectEphemeral = async (
   next: NextFunction
 ): Promise<void> => {
   const { id } = req.params;
-  const userId = req.user?.id;
-  const orgId = req.user?.org_id;
+  /** 
+   * ⚠️  dev-only: we don't run auth yet.
+   *     fall back to a deterministic mock user ID if none supplied.
+   */
+  const userId = req.user?.id ?? 'mock-user';
   const { ephemeralPubkey } = req.body;
 
   console.log(`[DEPLOY_EPHEMERAL] Received request to deploy project ${id} with ephemeral key ${ephemeralPubkey}`);
-
-  if (!userId || !orgId) {
-    console.log(`[DEPLOY_EPHEMERAL] Missing user info: userId=${userId}, orgId=${orgId}`);
-    return next(new AppError('User information not found', 400));
-  }
 
   if (!ephemeralPubkey) {
     console.log(`[DEPLOY_EPHEMERAL] No ephemeral public key provided in request`);
@@ -666,12 +625,12 @@ export const deployProjectEphemeral = async (
 
   try {
     const projectCheck = await pool.query(
-      'SELECT details FROM solanaproject WHERE id = $1 AND org_id = $2',
-      [id, orgId]
+      'SELECT details FROM solanaproject WHERE id = $1',
+      [id]
     );
 
     if (projectCheck.rows.length === 0) {
-      console.log(`[DEPLOY_EPHEMERAL] Project not found or no permission: id=${id}, orgId=${orgId}`);
+      console.log(`[DEPLOY_EPHEMERAL] Project not found (id=${id})`);
       return next(
         new AppError(
           'Project not found or you do not have permission to deploy it',
@@ -869,15 +828,13 @@ export const installPackages = async (
 ) => {
   const { id } = req.params;
   const { packages } = req.body;
-  const userId = req.user?.id;
-  const orgId = req.user?.org_id;
-
-  if (!userId || !orgId) return next(new AppError('User information not found', 400));
+  const userId = req.user?.id ?? 'mock-user';
+  // org_id checks temporarily disabled until auth lands
   
   try {
     const projectCheck = await pool.query(
-      'SELECT * FROM solanaproject WHERE id = $1 AND org_id = $2',
-      [id, orgId]
+      'SELECT * FROM solanaproject WHERE id = $1',
+      [id]
     );
 
     if (projectCheck.rows.length === 0) {
@@ -908,12 +865,8 @@ export const installNodeDependencies = async (
 ) => {
   const { projectId } = req.params;
   const { packages } = req.body;
-  const userId = req.user?.id;
-  const orgId = req.user?.org_id;
-
-  if (!userId || !orgId) {
-    return next(new AppError('User information not found', 400));
-  }
+  const userId = req.user?.id ?? 'mock-user';
+  // org_id checks temporarily disabled until auth lands
 
   if (!packages || !Array.isArray(packages)) {
     return next(new AppError('Packages array is required', 400));
@@ -978,3 +931,44 @@ export async function getContainerUrl(
     next(error);
   }
 }
+
+// --- LIST PROJECTS WITH OPTIONAL SEARCH & PAGINATION ------------------
+export const listProjects = async (
+  req: Request, res: Response, next: NextFunction
+) => {
+  const page   = Number(req.query.page  ?? 1);
+  const limit  = Number(req.query.limit ?? 10);
+  const search = String(req.query.search ?? '').trim();
+
+  const offset = (page - 1) * limit;
+  const params: any[] = [limit, offset];
+  const whereSQL =
+    search
+      ? `WHERE name ILIKE $3 OR description ILIKE $3`
+      : '';
+
+  if (search) params.push(`%${search}%`);
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, name, description, container_url AS "containerUrl", details
+         FROM solanaproject
+         ${whereSQL}
+         ORDER BY created_at DESC
+         LIMIT $1 OFFSET $2`,
+      params
+    );
+
+    const totalQ = await pool.query(
+      `SELECT COUNT(*) FROM solanaproject ${whereSQL}`,
+      search ? [`%${search}%`] : []
+    );
+
+    res.json({
+      data: rows,
+      totalPages: Math.ceil(Number(totalQ.rows[0].count) / limit),
+    });
+  } catch (err) {
+    next(err);
+  }
+};

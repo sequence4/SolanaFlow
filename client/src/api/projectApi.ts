@@ -8,6 +8,8 @@ import {
 import { TaskResponse } from './interfaces/Task';
 import axios from 'axios';
 
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL!;   // we *expect* it
+
 export const projectApi = {
 
   runCommand: async (
@@ -26,6 +28,35 @@ export const projectApi = {
     } catch (error) {
       console.error('Error running command:', error);
       throw error;
+    }
+  },
+
+  /* ──────────────────────────────────────────────────────────────────────
+     NOTE: every project route is mounted at `/projects` on the server.
+     The "/org/projects" suffix lives *inside* that router.        */
+  listProjects: async (page = 1, limit = 10, search?: string)
+  : Promise<{ data: any[]; totalPages: number }> => {
+    try {
+      const resp = await axios.get(`${API_BASE}/projects/org/projects`, {
+        params: { page, limit, search },
+      });
+
+      // ── normalise every possible server reply shape ───────────────
+      const payload = resp.data ?? {};                   // axios .data
+
+      // If server returned an *array* directly, wrap it
+      if (Array.isArray(payload)) {
+        return { data: payload, totalPages: 1 };
+      }
+
+      // Otherwise expect { data: … , totalPages: … }
+      return {
+        data:      payload.data      ?? [],
+        totalPages: payload.totalPages ?? 1,
+      };
+    } catch (error) {
+      console.error('Error listing projects:', error);
+      return { data: [], totalPages: 1 }; // Fail gracefully
     }
   },
 
@@ -64,22 +95,11 @@ export const projectApi = {
       const response = await api.post('/projects/create', projectInfo);
       console.log(`[DEBUG_API] createProject - Response:`, {
         message: response.data.message,
-        projectId: response.data.project?.id,
-        taskId: response.data.directoryTask?.taskId
+        projectId: response.data.project?.id
       });
       return response.data;
     } catch (error) {
       console.error('[DEBUG_API] Error creating project:', error);
-      throw error;
-    }
-  },
-
-  createProjectDirectory: async (name: string, description: string): Promise<{ message: string; rootPath: string; taskId: string }> => {
-    try {
-      const response = await api.post(`/projects/create-project-directory`, { name, description });
-      return response.data;
-    } catch (error) {
-      console.error('Error creating project directory:', error);
       throw error;
     }
   },
@@ -93,22 +113,6 @@ export const projectApi = {
       return response.data;
     } catch (error) {
       console.error('Error updating project:', error);
-      throw error;
-    }
-  },
-
-  listProjects: async (
-    page: number = 1,
-    limit: number = 10,
-    search?: string
-  ): Promise<ListProjectsResponse> => {
-    try {
-      const response = await api.get('/org/projects', {
-        params: { page, limit, search },
-      });
-      return response.data.projects;
-    } catch (error) {
-      console.error('Error listing projects:', error);
       throw error;
     }
   },
@@ -221,9 +225,18 @@ export const projectApi = {
     }
   },
 
-  createEphemeral: async (projectId: string): Promise<{ ephemeralPubkey: string }> => {
+  /**
+   * POST the 64-byte secret array so the backend can write <pubkey>.json.
+   */
+  createEphemeral: async (
+    projectId: string,
+    secretKey: number[]
+  ): Promise<{ ephemeralPubkey: string }> => {
     try {
-      const response = await api.post(`/projects/${projectId}/ephemeral`);
+      const response = await api.post(
+        `/projects/${projectId}/ephemeral`,
+        { secretKey }
+      );
       return response.data;
     } catch (err) {
       console.error('Error creating ephemeral:', err);

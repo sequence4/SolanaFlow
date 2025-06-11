@@ -12,6 +12,7 @@ export function runDeployPipelineWithLogs(
   },
   setProjectContext: React.Dispatch<React.SetStateAction<ProjectContextType>>,
   setArtifactUrl?: (url: string) => void,
+  onComplete?: (status?: 'error') => void,
 ) {
   
   taskLogs.resetLogs();
@@ -47,16 +48,24 @@ export function runDeployPipelineWithLogs(
       }
     }
 
-    if (msg.stage === 'deploy-done' || msg.stage === 'done') {
+    if (msg.stage === 'deploy-done' || msg.stage === 'done' || msg.stage === 'completed') {
       taskLogs.addSystemLog("✅ Deployment complete!");
       if (es) {
         es.close();
       }
+      if (onComplete) {
+        onComplete();
+      }
       setTimeout(() => taskLogs.setIsVisible(false), 3000);
+    } else if (msg.stage === 'deploy-skipped') {
+      taskLogs.addSystemLog("✅ Wallet-signed deploy detected – backend deploy step skipped");
     } else if (msg.stage === 'error') {
       taskLogs.addSystemLog(`❌ Error: ${msg.message || 'Unknown error'}`);
       if (es) {
         es.close();
+      }
+      if (onComplete) {
+        onComplete('error');
       }
     }
   };
@@ -64,7 +73,7 @@ export function runDeployPipelineWithLogs(
   let es: ReturnType<typeof sseDeploy> | null = null;
   
   try {
-    es = sseDeploy(projectContext.id!, graph, update);
+    es = sseDeploy(projectContext.id!, graph, update, /* walletSigned = */ true);
     
     es.addEventListener('close', () => {
       console.log(`[deployPipeline] SSE connection closed`);
