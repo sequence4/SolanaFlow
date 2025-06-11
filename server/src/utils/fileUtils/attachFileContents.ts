@@ -3,11 +3,14 @@ import path from "path";
 
 /** Predicate: which files should be sent with content eagerly? */
 export function isImportant(pathInProj: string): boolean {
+  // Strip leading ./ prefix if present
+  const p = pathInProj.replace(/^\.?\//, "");   // strip ./ ➡ absolute-in-repo
+  
   // adjust if you later want tests, README, etc.
   return (
-    /^(Anchor\.toml|Cargo\.toml)$/.test(pathInProj) ||      // configs
-    /^programs\/[^/]+\/Cargo\.toml$/.test(pathInProj) ||    // per-program manifest
-    /^programs\/[^/]+\/src\/.*\.rs$/.test(pathInProj)       // all Rust sources
+    /^(Anchor\.toml|Cargo\.toml)$/.test(p) ||      // configs
+    /^programs\/[^/]+\/Cargo\.toml$/.test(p) ||    // per-program manifest
+    /^programs\/[^/]+\/src\/.*\.rs$/.test(p)       // all Rust sources
   );
 }
 
@@ -15,7 +18,7 @@ export function isImportant(pathInProj: string): boolean {
 export async function attachFileContents(
   tree: any[],
   absRoot: string             // absolute host path to project root
-): Promise<any[]> {
+): Promise<void> {
   const tasks: Promise<void>[] = [];
 
   const walk = (node: any) => {
@@ -27,7 +30,13 @@ export async function attachFileContents(
             node.code = txt;
             node.status = "generated";
           })
-          .catch(() => { /* leave empty, but don't fail pipeline */ })
+          .catch((err: NodeJS.ErrnoException) => {
+            if (err.code === "ENOENT") {
+              console.warn(`[attachFileContents] Missing file: ${full}`);
+            } else {
+              console.error(`[attachFileContents] fs error:`, err);
+            }
+          })
       );
     }
     if (Array.isArray(node.children)) node.children.forEach(walk);
@@ -35,5 +44,4 @@ export async function attachFileContents(
 
   tree.forEach(walk);
   await Promise.all(tasks);
-  return tree;
 } 
