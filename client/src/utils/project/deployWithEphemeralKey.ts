@@ -1,4 +1,4 @@
-import { Connection, PublicKey } from '@solana/web3.js';
+import { Connection, PublicKey, Keypair } from '@solana/web3.js';
 import type { WalletContextState } from '@solana/wallet-adapter-react';
 import { deployWithEphemeralKey } from '../../lib/ephemeralDeployment';
 import { projectApi } from '../../api/projectApi';
@@ -22,12 +22,16 @@ export async function handleEphemeralDeploy(
 
     onProgress(0, 'Starting ephemeral key deployment...');
 
-    // 1. Use the ephemeral key approach to handle the deployment
+    // 1. Generate an ephemeral key that will sign the chunk uploads
+    const ephem = Keypair.generate();
+
+    // 2. Use the ephemeral key approach to handle the deployment
     // This returns quickly because all transactions are signed by the ephemeral key
     const deployResult = await deployWithEphemeralKey({
       soBytes: programSoData,
       connection,
       wallet,
+      ephemeralKeypair: ephem,
       onProgress
     });
 
