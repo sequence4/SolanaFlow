@@ -133,7 +133,7 @@ export async function runDeployPipeline({
       throw new Error("ROOT_FOLDER env var not set");
     }
     const absRoot = path.join(rootBase, rootPath);
-    await attachFileContents(rawTree, absRoot);
+    await attachFileContents(rawTree, absRoot, workspace.containerName);
     const fileTree = rawTree;  // now populated
 
     /* finally emit build-done with artefact + file tree */

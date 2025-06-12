@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { FileNode } from "../fileUtils";
+import { runCommand } from "../projectUtils";
 
 /** RegExp that rejects typical non-text assets. */
 const BIN_PATTERN = /\.(png|jpe?g|gif|ico|wasm|so|ttf|woff2?)$/i;
@@ -13,11 +14,12 @@ const BIN_PATTERN = /\.(png|jpe?g|gif|ico|wasm|so|ttf|woff2?)$/i;
  */
 export async function attachFileContents(
   nodes: FileNode[],
-  absRoot: string
+  absRoot: string,
+  containerName?: string
 ): Promise<void> {
   for (const node of nodes) {
     if (node.type === "directory" && node.children) {
-      await attachFileContents(node.children, absRoot);
+      await attachFileContents(node.children, absRoot, containerName);
       continue;
     }
 
@@ -25,9 +27,20 @@ export async function attachFileContents(
     if (BIN_PATTERN.test(node.name)) continue;
 
     const abs = path.join(absRoot, node.path);
-    const stat = await fs.promises.stat(abs);
-    if (stat.size > 1_048_576) continue; // >1 MiB ➜ skip
+    try {
+      const stat = await fs.promises.stat(abs);
+      if (stat.size > 1_048_576) continue;          // >1 MiB ➜ skip
+      node.content = await fs.promises.readFile(abs, "utf8");
+    } catch (err: any) {
+      /* Host path missing – try inside the running container */
+      if (err.code !== "ENOENT" || !containerName) throw err;
 
-    node.content = await fs.promises.readFile(abs, "utf8");
+      // Work out the repo root inside /usr/src/
+      const relRoot = path.basename(absRoot);       // e.g. "untitled-project-123"
+      const dockerPath = `/usr/src/${relRoot}/${node.path}`;
+      const catCmd = `docker exec ${containerName} cat ${dockerPath}`;
+
+      node.content = await runCommand(catCmd, ".", "");
+    }
   }
 } 
