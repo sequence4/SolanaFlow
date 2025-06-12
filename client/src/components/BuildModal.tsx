@@ -61,7 +61,7 @@ export function BuildModal({
           </DialogDescription>
         </DialogHeader>
 
-        {isBuilding && percent !== null && (
+        {percent !== null && (
           <div className="space-y-2 my-4">
             <div className="flex items-center justify-between">
               <span className="text-sm text-[#6e6e76]">{stage}</span>

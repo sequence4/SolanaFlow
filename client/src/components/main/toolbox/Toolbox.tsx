@@ -160,19 +160,35 @@ export const Toolbox = () => {
             
             try {
                 /* -------------------------------------------------- *
+                 *  Tell the UI we are building (must be BEFORE the   *
+                 *  first render of <BuildModal>, otherwise the bar   *
+                 *  never appears)                                    *
+                 * -------------------------------------------------- */
+                setIsBuilding(true);
+
+                /* -------------------------------------------------- *
                  *  OPEN SERVER-SENT EVENTS STREAM
                  * -------------------------------------------------- */
                 esRef.current = deployPipeline(
                   projectContext.id ?? id,
                   graph,
                   (msg: any) => {
-                    // Map backend stage → percentage
-                    const idx = STAGES.findIndex(s => s.stage === msg.stage);
-                    if (idx >= 0) {
-                      setBuildPercent(
-                        Math.min(((idx + 1) / STAGES.length) * 100, 100)
+                    /* 1. Prefer explicit numeric progress from server */
+                    if (typeof msg.progress === "number") {
+                      setBuildPercent(Math.max(0, Math.min(msg.progress, 100)));
+                    } else {
+                      /* 2. Otherwise fall back to coarse stage map */
+                      const idx = STAGES.findIndex(
+                        (s) => s.stage === msg.stage
                       );
+                      if (idx >= 0) {
+                        setBuildPercent(
+                          Math.round(((idx + 1) / STAGES.length) * 100)
+                        );
+                      }
                     }
+
+                    /* 3. Human-readable status line                 */
                     setBuildStage(msg.message ?? msg.stage);
 
                     // Close modal & reset when build completes
@@ -185,8 +201,6 @@ export const Toolbox = () => {
                   true         // walletSigned (kept true)
                 );
 
-                setIsBuilding(true);        // keep after stream open
-                
                 // 1.  **Always** update the local context immediately so the UI reacts
                 setProjectContext(prev => ({
                   ...prev,
