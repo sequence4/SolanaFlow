@@ -22,6 +22,44 @@ function sizeOptSupported(): boolean {
 }
 
 /**
+ * Returns free bytes left on the partition that backs /var/lib/docker.
+ * Falls back to Number.MAX_SAFE_INTEGER on any failure so we never block.
+ */
+function getDockerFreeBytes(): number {
+  try {
+    const out = execSync(
+      "df -B1 /var/lib/docker | tail -1 | awk '{print $4}'",
+      { encoding: "utf8" }
+    ).trim();
+    return Number(out || 0);
+  } catch {
+    return Number.MAX_SAFE_INTEGER;
+  }
+}
+
+/**
+ * Ensures at least `minBytes` are available under /var/lib/docker.
+ * If not, runs `docker system prune -af --volumes` once and re-checks.
+ * Throws 'LOW_DOCKER_SPACE' if the space is still insufficient.
+ */
+function ensureDockerSpace(minBytes = 3 * 1024 * 1024 * 1024): void {
+  if (getDockerFreeBytes() >= minBytes) return;
+
+  console.warn(
+    `[startProjectContainer] Low Docker disk (<${minBytes} bytes). ` +
+    "Running docker system prune -af --volumes …"
+  );
+  try {
+    execSync("docker system prune -af --volumes", { stdio: "inherit" });
+  } catch (e) {
+    console.error("[startProjectContainer] docker system prune failed:", e);
+  }
+  if (getDockerFreeBytes() < minBytes) {
+    throw new Error("LOW_DOCKER_SPACE");
+  }
+}
+
+/**
  * Starts a new Docker container for a project
  * 
  * @param projId - The project ID
@@ -41,6 +79,9 @@ export async function startProjectContainer(projId: string): Promise<string> {
 
     /* 2 ─ run container with explicit platform, project label & random host-port */
     const quota = sizeOptSupported() ? '--storage-opt size=20G \\' : '';
+
+    // NEW: make sure the host has enough free space (≥ 3 GiB)
+    ensureDockerSpace();
 
     execSync(
       `docker run -d --platform linux/arm64 \
