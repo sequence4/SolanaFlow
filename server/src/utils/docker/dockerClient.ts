@@ -2,6 +2,7 @@
    It **neutralises DOCKER_HOST** so dockerode is forced to use the
    local UNIX socket, then re-exports the singleton.                  */
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 import Docker from 'dockerode';
 
 // 1️⃣  Remove misleading env vars _before_ constructing the client
