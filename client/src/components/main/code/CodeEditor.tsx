@@ -67,7 +67,7 @@ import { materialLight, materialLightInit } from "@uiw/codemirror-theme-material
 import { useColorMode, useColorModeValue } from '../../ui/color-mode';
 import FileContext from '../../../context/file/FileContext';
 
-const CodeEditor = ({ language = "typescript" }) => {
+const CodeEditor = ({ language: lang = "typescript" }) => {
   const { selectedFile } = useContext(FileContext);
 
   const [code, setCode] = useState('');
@@ -79,10 +79,12 @@ const CodeEditor = ({ language = "typescript" }) => {
   }, [colorMode]);
 
   useEffect(() => {
-    if (selectedFile && selectedFile.code) {
-      setCode(selectedFile.code);
-      console.log(selectedFile);
-    }
+    if (!selectedFile) return;
+
+    // Prefer the new `content` key but keep `code` as legacy fallback
+    const next = (selectedFile as any).content ?? (selectedFile as any).code ?? '';
+    setCode(next);
+    console.log('[CodeEditor] loaded', selectedFile.name, '— bytes:', next.length);
   }, [selectedFile]);
 
   const onChange = (value: string) => {
@@ -90,7 +92,7 @@ const CodeEditor = ({ language = "typescript" }) => {
   };
 
   const getLanguage = () => {
-    switch (language) {
+    switch (lang) {
       case "rust":
         return rust();
       case "typescript":

@@ -5,4 +5,6 @@ export interface FileContextType {
   setSelectedFile: (file: FileTreeItemType | null) => void;
   fileTree: FileTreeItemType | FileTreeItemType[] | null;
   setFileTree: (tree: FileTreeItemType | FileTreeItemType[] | null) => void;
+  /** Raw UTF-8 contents of the currently selected file */
+  content?: string;
 }
