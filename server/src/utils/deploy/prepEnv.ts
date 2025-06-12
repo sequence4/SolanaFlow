@@ -114,10 +114,19 @@ export async function prepEnv(
 
       let copied = false;
       try {
-        /* Fast path: copy a prebaked template if present */
+        /**
+         * We copy the baked Anchor template so users don't wait for `anchor init`,
+         * but we exclude the giant `target/` build cache and `node_modules/`.
+         * Those directories regenerate on the first build/npm install, keeping
+         * workspace containers < 500 MB and avoiding "No space left on device".
+         */
         execSync(
           `docker exec ${containerName} bash -c ` +
-          `"cp -r /usr/src/anchor-template/* '${projectDir}' && ` +
+          `"rsync -a --delete ` +
+          `--exclude 'target' ` +
+          `--exclude 'node_modules' ` +
+          `--exclude '.git' ` +
+          `/usr/src/anchor-template/ '${projectDir}/' && ` +
           `chown -R 1000:1000 '${projectDir}'"`,
           { stdio: 'inherit' }
         );
@@ -130,7 +139,7 @@ export async function prepEnv(
         /* Universal path: generate a fresh Anchor workspace */
         execSync(
           `docker exec ${containerName} bash -c ` +
-          `"anchor init '${projectDir}' --no-git --skip-tests --typescript && ` +
+          `"anchor init '${projectDir}' --no-git --typescript --force && ` +
           `chown -R 1000:1000 '${projectDir}'"`,
           { stdio: 'inherit' }
         );
