@@ -15,7 +15,6 @@ import { Button } from "@/components/ui/button";
 import { Hammer, AlertTriangle } from "lucide-react";
 import { runDeployPipelineWithLogs } from "@/utils/deploy/deployPipeline";
 import { useTaskLogs } from "@/context/logs/useTaskLogs";
-import { connection } from "@/utils/connection";
 import { useWalletSigner } from "@/utils/wallet";
 
 /* ------------------------------------------------------------------ *
@@ -98,11 +97,11 @@ export function BuildModal({
    *  Live-update progress from taskLogs
    * ---------------------------------------------------------------- */
   useEffect(() => {
-    const unsub = taskLogs.onProgress(({ progress, message }) => {
+    const unsubscribe = taskLogs.onProgress(({ progress, message }) => {
       setProgress(progress);
       setStage(message ?? "");
     });
-    return () => unsub();
+    return unsubscribe;
   }, [taskLogs]);
 
   /* ---------------------------------------------------------------- *
