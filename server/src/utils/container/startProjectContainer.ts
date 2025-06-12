@@ -2,6 +2,26 @@ import { execSync } from 'child_process';
 import pool from 'src/config/database';
 
 /**
+ * Returns true when the Docker daemon is overlay2 on an XFS filesystem
+ * mounted with the `pquota` option (the only case where `--storage-opt size=`
+ * is accepted). Falls back to false on any error.
+ */
+function sizeOptSupported(): boolean {
+  try {
+    // 1) storage driver must be overlay2
+    if (execSync('docker info --format "{{.Driver}}"', { encoding: "utf8" }).trim() !== "overlay2") {
+      return false;
+    }
+
+    // 2) driver status must mention both "Backing Filesystem: xfs" and "pquota"
+    const status = execSync('docker info --format "{{json .DriverStatus}}"', { encoding: "utf8" });
+    return /Backing Filesystem.*xfs/i.test(status) && /pquota/i.test(status);
+  } catch {
+    return false;   // safest default
+  }
+}
+
+/**
  * Starts a new Docker container for a project
  * 
  * @param projId - The project ID
@@ -20,11 +40,13 @@ export async function startProjectContainer(projId: string): Promise<string> {
     execSync(`docker pull --platform linux/arm64 ${image}`, { stdio: 'inherit' });
 
     /* 2 ─ run container with explicit platform, project label & random host-port */
+    const quota = sizeOptSupported() ? '--storage-opt size=20G \\' : '';
+
     execSync(
       `docker run -d --platform linux/arm64 \
        --name  ${name} \
        --label solanaflow.project=${projId} \
-       --storage-opt size=20G \
+       ${quota} \
        -v ${vCargo}:/root/.cargo \
        -v ${vSccache}:/opt/sccache \
        -v ${vTargetBuild}:/usr/src/target \

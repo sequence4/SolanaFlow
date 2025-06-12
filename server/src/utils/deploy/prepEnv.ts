@@ -132,6 +132,7 @@ export async function prepEnv(
         hasRoom = getWorkspaceFreeBytes(containerName) >= FREE_BYTES_NEEDED;
       } catch (e) {
         console.warn("[prepEnv] free-space probe failed:", e);
+        hasRoom = false;           // default to safe path
       }
 
       let copied = false;
