@@ -35,12 +35,13 @@ export async function attachFileContents(
       /* Host path missing – try inside the running container */
       if (err.code !== "ENOENT" || !containerName) throw err;
 
-      // Work out the repo root inside /usr/src/
-      const relRoot = path.basename(absRoot);       // e.g. "untitled-project-123"
+      // Work out the repo root path exactly as it exists in the container
+      const rootFolder = process.env.ROOT_FOLDER!;
+      const relRoot = path.relative(rootFolder, absRoot);   // keeps nested parts
       const dockerPath = `/usr/src/${relRoot}/${node.path}`;
       const catCmd = `docker exec ${containerName} cat ${dockerPath}`;
 
-      node.content = await runCommand(catCmd, ".", "");
+      node.content = await runCommand(catCmd, ".", undefined as any);
     }
   }
 } 
