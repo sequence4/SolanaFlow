@@ -145,10 +145,15 @@ export const Toolbox = () => {
             taskLogs.setIsVisible(true);
             taskLogs.addSystemLog("🔨 Building program...");
             
-            const graph = {
-                ...(projectContext.details?.projectState ?? {}),
-                nodes: projectContext.details?.projectState?.nodes ?? [],
-            };
+            const graphNodes = projectContext.details?.projectState?.nodes ?? [];
+
+            /* Guard: fail fast if the user hasn't placed any workflow nodes */
+            if (graphNodes.length === 0) {
+              toast.error("Add at least one node to the workflow before building");
+              return;
+            }
+
+            const graph = { nodes: graphNodes };   // shape backend expects
             
             try {
                 // Run the build pipeline
@@ -193,14 +198,9 @@ export const Toolbox = () => {
                   });
                 }
                 
-                toast.success("Build completed");
-                
             } catch (error) {
                 console.error('[build] Build error:', error);
                 taskLogs.addSystemLog(`❌ Error: ${error instanceof Error ? error.message : String(error)}`);
-                toast.error("Build failed", {
-                    description: String(error)
-                });
             } finally {
                 setIsBuilding(false);
                 taskLogs.setIsBuilding(false);
