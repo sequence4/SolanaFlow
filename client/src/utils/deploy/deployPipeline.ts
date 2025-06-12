@@ -30,6 +30,10 @@ export function runDeployPipelineWithLogs(
       taskLogs.updateStage(msg.stage);
     }
 
+    if (msg.stage === "file-tree-start") {
+      taskLogs.addSystemLog("📂 Building project file tree…");
+    }
+
     if (msg.containerUrl) {
       console.log(`[deployPipeline] Received containerUrl: ${msg.containerUrl}`);
       taskLogs.addSystemLog(`🌐 Container URL: ${msg.containerUrl}`);
@@ -52,9 +56,10 @@ export function runDeployPipelineWithLogs(
     }
 
     if (msg.fileTree && setFileTree) {
-      console.log(`[deployPipeline] Received fileTree with ${msg.fileTree.length} items`);
-      taskLogs.addSystemLog(`📂 Received project file tree with ${msg.fileTree.length} items`);
-      setFileTree(msg.fileTree);
+      const count = Array.isArray(msg.fileTree) ? msg.fileTree.length : 1;
+      console.log(`[deployPipeline] Received fileTree with ${count} items`);
+      taskLogs.addSystemLog(`📂 Received project file tree with ${count} items`);
+      setFileTree(structuredClone(msg.fileTree as import("@/interfaces/FileTreeItemType").FileTreeItemType[]));
     }
 
     if (msg.stage === 'deploy-done' || msg.stage === 'done' || msg.stage === 'completed') {

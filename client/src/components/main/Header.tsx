@@ -3,6 +3,8 @@
 import React, { useContext } from "react";
 import UxContext from "@/context/ux/UxContext";
 import FileContext from "@/context/file/FileContext";
+import { useTaskLogs } from "@/context/logs/useTaskLogs";
+import type { FileTreeItemType } from "@/interfaces/FileTreeItemType";
 
 // shadcn UI components
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,9 +12,21 @@ import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 export default function Header() {
   const { activeTab } = useContext(UxContext);
   const { fileTree } = useContext(FileContext);
+  const { isBuilding } = useTaskLogs();
 
-  // Check if there are any files in the fileTree
-  const hasFiles = !!(fileTree && fileTree.children && fileTree.children.length > 0);
+  /**
+   * Returns true if *any* node in the supplied tree is a file.
+   * A node is considered a file when it has **no `children` array**
+   * (covers generators that omit a `type` flag entirely).
+   */
+  const nodeHasFile = (n: FileTreeItemType | FileTreeItemType[]): boolean =>
+    Array.isArray(n)
+      ? n.some(nodeHasFile)                    // iterate over array roots
+      : n.children && n.children.length > 0    // directory ➜ drill down
+        ? n.children.some(nodeHasFile)
+        : true;                                // leaf  ➜ treat as file
+
+  const hasFiles = fileTree ? nodeHasFile(fileTree) : false;
 
   return (
     <TabsList className="bg-[var(--foreground-dark)] p-2 pb-4 flex gap-2">
@@ -24,15 +38,15 @@ export default function Header() {
       </TabsTrigger>
       <TabsTrigger
         value="interface"
-        className={`${hasFiles ? "cursor-pointer" : "cursor-not-allowed"} ${activeTab === "interface" ? "tab-active" : "tab-inactive"}`}
-        disabled={!hasFiles}
+        className={`${(!hasFiles || isBuilding) ? "cursor-not-allowed" : "cursor-pointer"} ${activeTab === "interface" ? "tab-active" : "tab-inactive"}`}
+        disabled={!hasFiles || isBuilding}
       >
         interface
       </TabsTrigger>
       <TabsTrigger
         value="code"
-        className={`${hasFiles ? "cursor-pointer" : "cursor-not-allowed"} ${activeTab === "code" ? "tab-active" : "tab-inactive"}`}
-        disabled={!hasFiles}
+        className={`${(!hasFiles || isBuilding) ? "cursor-not-allowed" : "cursor-pointer"} ${activeTab === "code" ? "tab-active" : "tab-inactive"}`}
+        disabled={!hasFiles || isBuilding}
       >
         code
       </TabsTrigger>

@@ -3,6 +3,7 @@
 import React, { useContext, useState, useRef, useEffect, useCallback } from 'react';
 import '@/styles/toolbox/toolboxStyle.css';
 import { NodeItems } from '@/components/main/toolbox/workflowToolbox/NodeItems';
+import FileExplorer from '@/components/code/FileExplorer';
 import ProjectContext from '@/context/project/ProjectContext';
 import FileContext from '@/context/file/FileContext';
 import UxContext from '@/context/ux/UxContext';
@@ -132,6 +133,7 @@ export const Toolbox = () => {
             const id = await ensureId(projectContext, setProjectContext);
             
             setIsBuilding(true);
+            taskLogs.setIsBuilding(true);
             
             // -----------------------------------------------------------------
             //  Run the heavy build pipeline *after* the fast metadata insert
@@ -198,6 +200,7 @@ export const Toolbox = () => {
                 });
             } finally {
                 setIsBuilding(false);
+                taskLogs.setIsBuilding(false);
             }
         } catch (err) {
             console.error('[build] Error:', err);
@@ -538,12 +541,20 @@ export const Toolbox = () => {
             </div>
 
             <div className="flex-1 overflow-hidden">
+                {/* WORKFLOW node library */}
                 {isExpanded && activeTab === 'workflow' && (
-                    <NodeItems 
+                    <NodeItems
                         ref={nodeItemsRef}
                         activeChainTab={activeChainTab === "on-chain" ? "onChain" : "offChain"}
                     />
                 )}
+
+                {/* CODE tab — file explorer lives here */}
+                {activeTab === 'code' && (
+                    <FileExplorer />
+                )}
+
+                {/* INTERFACE placeholder (unchanged) */}
                 {activeTab === 'interface' && (
                     <div className="p-4 text-[#6e6e76]">
                         <p>Interface Tab Toolbox Placeholder</p>

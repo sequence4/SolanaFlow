@@ -76,16 +76,15 @@ const Code = () => {
     const terminalBorder = useColorModeValue('var(--border-2-light)', 'var(--border-2-dark)');
     
     return (
-        <div className="flex flex-col w-full h-full overflow-x-hidden" style={{ background: codeBg }}>
-            <div className="flex-[3] h-[68%]">
-                <CodeEditor language={getLanguage(selectedFile?.ext)} />
-            </div>
-            {/* Solana Terminal */}
-            <div className="flex-1 z-10" style={{ backgroundColor: '#101521' }}>
-                <SolanaTerminal />
-            </div>
+      <div className="flex flex-col w-full h-full" style={{ background: codeBg }}>
+        <div className="flex-1 min-h-0">
+          <CodeEditor language={getLanguage(selectedFile?.ext)} />
         </div>
-    )
+        <div style={{ height: "32%" }} className="border-t border-[#2a2a2d]">
+          <SolanaTerminal />
+        </div>
+      </div>
+    );
 }
 
 export default Code;

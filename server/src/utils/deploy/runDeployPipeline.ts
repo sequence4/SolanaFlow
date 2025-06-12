@@ -15,6 +15,7 @@ import {
 import { waitForTaskCompletion, getTaskById } from "../taskUtils";
 import { deriveProgramId } from "../../utils/deriveProgramId";
 import path from "path";
+import { attachFileContents } from "../fileUtils/attachFileContents";
 
 interface PipelineArgs {
   projectId: string;
@@ -112,7 +113,7 @@ export async function runDeployPipeline({
     /* ---------------------------------------------------------------- *
      * 3c ─ build finished → gather file-tree with eager code
      * ---------------------------------------------------------------- */
-    sendProgress({ stage: "file-tree", message: "Collecting project files…" });
+    sendProgress({ stage: "file-tree-start", message: "Collecting project files…" });
 
     // (1) build the raw tree via the existing utility
     const rootPath = workspace.rootPath ?? (
@@ -122,14 +123,18 @@ export async function runDeployPipeline({
       .then(m => m.startGenerateFileTreeTask(projectId, rootPath, userId));
     await import("../taskUtils").then(m => m.pollTaskStatus(rawTreeTask));
 
-    const treeTaskResult = await import("../taskUtils")
+    const { result: treeJson } = await import("../taskUtils")
       .then(m => m.getTaskById(rawTreeTask));
-    const rawTree = treeTaskResult.result ? JSON.parse(treeTaskResult.result) : [];
+    const rawTree: any[] = treeJson ? JSON.parse(treeJson) : [];
 
     // (2) attach code for the important files
-    const absRoot = path.join(process.env.ROOT_FOLDER!, rootPath);   // ROOT_FOLDER = host mount
-    const fileTree = await import("../fileUtils/attachFileContents")
-      .then(m => m.attachFileContents(rawTree, absRoot));
+    const rootBase = process.env.ROOT_FOLDER;
+    if (!rootBase) {
+      throw new Error("ROOT_FOLDER env var not set");
+    }
+    const absRoot = path.join(rootBase, rootPath);
+    await attachFileContents(rawTree, absRoot);
+    const fileTree = rawTree;  // now populated
 
     /* finally emit build-done with artefact + file tree */
     sendProgress({
