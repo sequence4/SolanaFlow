@@ -133,6 +133,7 @@ export const Toolbox = () => {
             const id = await ensureId(projectContext, setProjectContext);
             
             setIsBuilding(true);
+            taskLogs.setIsBuilding(true);
             
             // -----------------------------------------------------------------
             //  Run the heavy build pipeline *after* the fast metadata insert
@@ -199,6 +200,7 @@ export const Toolbox = () => {
                 });
             } finally {
                 setIsBuilding(false);
+                taskLogs.setIsBuilding(false);
             }
         } catch (err) {
             console.error('[build] Error:', err);

@@ -13,9 +13,11 @@ export default function Header() {
   const { fileTree } = useContext(FileContext);
   const { isBuilding } = useTaskLogs();
 
-  // Check if there are any files in the fileTree
+  /* fileTree may be array *or* single root obj */
   const hasFiles =
-    Array.isArray(fileTree) ? fileTree.length > 0 : !!fileTree;
+    Array.isArray(fileTree)
+      ? fileTree.length > 0
+      : !!fileTree?.children?.length;
 
   return (
     <TabsList className="bg-[var(--foreground-dark)] p-2 pb-4 flex gap-2">
