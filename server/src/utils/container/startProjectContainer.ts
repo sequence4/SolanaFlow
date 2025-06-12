@@ -24,6 +24,7 @@ export async function startProjectContainer(projId: string): Promise<string> {
       `docker run -d --platform linux/arm64 \
        --name  ${name} \
        --label solanaflow.project=${projId} \
+       --storage-opt size=20G \
        -v ${vCargo}:/root/.cargo \
        -v ${vSccache}:/opt/sccache \
        -v ${vTargetBuild}:/usr/src/target \

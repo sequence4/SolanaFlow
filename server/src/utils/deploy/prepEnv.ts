@@ -20,6 +20,18 @@ export type { WorkspaceHandle } from '../container/interfaces';
 
 const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
 
+/**
+ * Return free bytes available on the container's /usr/src mount.
+ * Works because Docker exposes the writable layer as a normal fs entry.
+ */
+function getWorkspaceFreeBytes(container: string): number {
+  const out = execSync(
+    `docker exec ${container} bash -c "df -B1 /usr/src | tail -1 | awk '{print \\$4}'"`,
+    { encoding: "utf8" }
+  ).trim();
+  return Number(out || 0);
+}
+
 export async function prepEnv(
   projectId: string,
   userId: string,
@@ -112,27 +124,34 @@ export async function prepEnv(
     if (!hasCargo) {
       console.log(`[prepEnv] Bootstrapping workspace in ${projectDir}`);
 
-      let copied = false;
+      // ─── thin-copy constants ────────────────────────────────────────────────
+      const FREE_BYTES_NEEDED = 500 * 1024 * 1024;      // 500 MB safety margin
+      // -----------------------------------------------------------------------
+      let hasRoom = true;
       try {
-        /**
-         * We copy the baked Anchor template so users don't wait for `anchor init`,
-         * but we exclude the giant `target/` build cache and `node_modules/`.
-         * Those directories regenerate on the first build/npm install, keeping
-         * workspace containers < 500 MB and avoiding "No space left on device".
-         */
-        execSync(
-          // tar is available in every Debian/Ubuntu-based image; we can still
-          // exclude the big dirs just like rsync did.
-          `docker exec ${containerName} bash -c "` +
-          `cd /usr/src/anchor-template && ` +
-          `tar -cf - --exclude='target' --exclude='node_modules' --exclude='.git' . | ` +
-          `tar -xf - -C '${projectDir}' && ` +
-          `chown -R 1000:1000 '${projectDir}'"`,
-          { stdio: 'inherit' }
-        );
-        copied = true;
-      } catch {
-        console.warn('[prepEnv] No prebaked template found – falling back to anchor init');
+        hasRoom = getWorkspaceFreeBytes(containerName) >= FREE_BYTES_NEEDED;
+      } catch (e) {
+        console.warn("[prepEnv] free-space probe failed:", e);
+      }
+
+      let copied = false;
+      if (hasRoom) {
+        try {
+          execSync(
+            `docker exec ${containerName} bash -c "` +
+              `cd /usr/src/anchor-template && ` +
+              // thin copy – skip heavy dirs that would blow the 10 GiB overlay
+              `tar -cf - --exclude='target' --exclude='node_modules' --exclude='.git' . | ` +
+              `tar -xf - -C '${projectDir}' && ` +
+              `chown -R 1000:1000 '${projectDir}'"`,
+            { stdio: "inherit" }
+          );
+          copied = true;
+        } catch (copyErr) {
+          console.warn("[prepEnv] Template copy failed, will fall back to anchor init:", copyErr);
+        }
+      } else {
+        console.warn("[prepEnv] Workspace almost full – skipping template copy");
       }
 
       if (!copied) {
