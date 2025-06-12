@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { FileNode } from "../fileUtils";
-import { runCommand } from "../projectUtils";
+import { readFileFromContainer } from "../docker/readFileFromContainer";
 
 /** RegExp that rejects typical non-text assets. */
 const BIN_PATTERN = /\.(png|jpe?g|gif|ico|wasm|so|ttf|woff2?)$/i;
@@ -32,16 +32,14 @@ export async function attachFileContents(
       if (stat.size > 1_048_576) continue;          // >1 MiB ➜ skip
       node.content = await fs.promises.readFile(abs, "utf8");
     } catch (err: any) {
-      /* Host path missing – try inside the running container */
+      // Host path not present ➜ pull it straight from the workspace container
       if (err.code !== "ENOENT" || !containerName) throw err;
 
-      // Work out the repo root path exactly as it exists in the container
-      const rootFolder = process.env.ROOT_FOLDER!;
-      const relRoot = path.relative(rootFolder, absRoot);   // keeps nested parts
-      const dockerPath = `/usr/src/${relRoot}/${node.path}`;
-      const catCmd = `docker exec ${containerName} cat ${dockerPath}`;
+      const rootFolder  = process.env.ROOT_FOLDER!;
+      const relRoot     = path.relative(rootFolder, absRoot);   // keeps nested dirs
+      const dockerPath  = `/usr/src/${relRoot}/${node.path}`;
 
-      node.content = await runCommand(catCmd, ".", undefined as any);
+      node.content = await readFileFromContainer(containerName, dockerPath);
     }
   }
 } 
