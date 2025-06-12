@@ -88,7 +88,7 @@ export interface EphemeralDeployOptions {
   /** progress ∈ [0-100], plus human log line */
   onProgress?: (progress: number, message: string) => void;
   programId?: PublicKey;
-  /** Timeout in ms for authority transfer verification; default 60s */
+  /** Max milliseconds to wait for on-chain authority transfer (default 60 000) */
   verifyTimeoutMs?: number;
 }
 
@@ -615,7 +615,8 @@ export async function deployWithEphemeralKey(
     // Try 'confirmed' for ≤60 s (120×0.5 s); fall back to 'finalized' once
     const COMMIT_PRIMARY   = 'confirmed';
     const COMMIT_FALLBACK  = 'finalized';
-    let retries = 120;
+    const retriesMax = Math.ceil(verifyTimeoutMs / 500);
+    let retries = retriesMax;
     let newAuth: PublicKey | null = null;
 
     while (retries-- > 0) {
@@ -650,12 +651,12 @@ export async function deployWithEphemeralKey(
       ) {
         newAuth = walletPublicKey; // ✅ success, just slower RPC
       } else {
-        const msg = `Authority transfer not visible after ${(120 - retries) * 0.5}s – treating as lag, continuing`;
+        const msg = `Authority transfer not visible after ${(retriesMax - retries) * 0.5}s – treating as lag, continuing`;
         console.warn(msg);
         return {
           success: true,
           programId,
-          signatures: signatures,
+          signatures,
           warning: msg,
         };
       }
