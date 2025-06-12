@@ -102,10 +102,14 @@ const sortFiles = (files: FileTreeItemType[]) => {
 };
 
 const FileTree = () => {
-  const { projectContext } = useContext(ProjectContext);
-  const { details } = projectContext;
-  const { fileTree } = useContext(FileContext);
-  const { selectedFile, setSelectedFile } = useContext(FileContext);
+  const { projectContext }   = useContext(ProjectContext);
+  const { fileTree, selectedFile, setSelectedFile } = useContext(FileContext);
+
+  /** Normalise to an array so TS always sees .path */
+  const roots: FileTreeItemType[] = useMemo(() => {
+    if (!fileTree) return [];
+    return Array.isArray(fileTree) ? fileTree : [fileTree];
+  }, [fileTree]);
 
   const onSelectFile = (item: FileTreeItemType) => {
     setSelectedFile(item);
@@ -113,17 +117,17 @@ const FileTree = () => {
 
   return (
     <div className="flex flex-col h-full max-w-full overflow-auto">
-        <div className="flex flex-col px-0 py-[30px]" style={{ flex: 3 }}>
-          {fileTree && 
-            <FileTreeItem
-              key={fileTree.path}
-              item={fileTree}
-              onSelectFile={onSelectFile}
-              selectedItem={selectedFile || undefined}
-              level={0}
-            />
-          }
-        </div>
+      <div className="flex flex-col px-0 py-[30px]">
+        {roots.map(root => (
+          <FileTreeItem
+            key={root.path ?? root.name /* fallback for safety */}
+            item={root}
+            onSelectFile={onSelectFile}
+            selectedItem={selectedFile || undefined}
+            level={0}
+          />
+        ))}
+      </div>
     </div>
   );
 };

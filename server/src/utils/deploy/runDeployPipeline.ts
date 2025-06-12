@@ -14,6 +14,8 @@ import {
 } from "../projectUtils";
 import { waitForTaskCompletion, getTaskById } from "../taskUtils";
 import { deriveProgramId } from "../../utils/deriveProgramId";
+import path from "path";
+import { attachFileContents } from "../fileUtils/attachFileContents";
 
 interface PipelineArgs {
   projectId: string;
@@ -107,10 +109,39 @@ export async function runDeployPipeline({
     console.log("[PIPELINE] 📦 fetching artefact (.so) from container");
     const { base64So } = await getBuildArtifactTask(projectId);
     console.log("[PIPELINE] 📦 artefact length:", base64So.length);
+    
+    /* ---------------------------------------------------------------- *
+     * 3c ─ build finished → gather file-tree with eager code
+     * ---------------------------------------------------------------- */
+    sendProgress({ stage: "file-tree-start", message: "Collecting project files…" });
+
+    // (1) build the raw tree via the existing utility
+    const rootPath = workspace.rootPath ?? (
+      await import("../fileUtils").then(m => m.getProjectRootPath(projectId))
+    );
+    const rawTreeTask = await import("../fileUtils")
+      .then(m => m.startGenerateFileTreeTask(projectId, rootPath, userId));
+    await import("../taskUtils").then(m => m.pollTaskStatus(rawTreeTask));
+
+    const { result: treeJson } = await import("../taskUtils")
+      .then(m => m.getTaskById(rawTreeTask));
+    const rawTree: any[] = treeJson ? JSON.parse(treeJson) : [];
+
+    // (2) attach code for the important files
+    const rootBase = process.env.ROOT_FOLDER;
+    if (!rootBase) {
+      throw new Error("ROOT_FOLDER env var not set");
+    }
+    const absRoot = path.join(rootBase, rootPath);
+    await attachFileContents(rawTree, absRoot, workspace.containerName);
+    const fileTree = rawTree;  // now populated
+
+    /* finally emit build-done with artefact + file tree */
     sendProgress({
       stage   : "build-done",
       message : "Build finished",
-      artifact: base64So,                // front-end can create a download link
+      artifact: base64So,
+      fileTree                       // <= NEW
     });
 
     /* 4 ─ deploy --------------------------------------------------------- */

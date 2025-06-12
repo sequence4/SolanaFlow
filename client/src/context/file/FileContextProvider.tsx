@@ -6,7 +6,7 @@ import { FileContextType } from "./FileContextTypes";
 import { FileTreeItemType } from "../../interfaces/FileTreeItemType";
 
 // Helper function to parse the stored file tree
-function getInitialFileTree(): FileTreeItemType | null {
+function getInitialFileTree(): FileTreeItemType | FileTreeItemType[] | null {
   try {
     const stored = localStorage.getItem("fileTree");
     if (!stored) return null;
@@ -70,7 +70,7 @@ function getInitialSelectedFile(): FileTreeItemType | null {
 const FileContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Initialize with null - no localStorage calls at initialization
   const [selectedFile, setSelectedFile] = useState<FileTreeItemType | null>(null);
-  const [fileTree, setFileTree] = useState<FileTreeItemType | null>(null);
+  const [fileTree, setFileTree] = useState<FileTreeItemType | FileTreeItemType[] | null>(null);
 
   // Load from localStorage after component mounts
   useEffect(() => {
@@ -126,7 +126,9 @@ const FileContextProvider: React.FC<{ children: React.ReactNode }> = ({ children
     selectedFile,
     setSelectedFile,
     fileTree,
-    setFileTree,
+    setFileTree: (tree) => {
+      setFileTree(tree);
+    },
   };
 
   return (

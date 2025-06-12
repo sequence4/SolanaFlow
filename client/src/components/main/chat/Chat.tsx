@@ -248,7 +248,7 @@ const Chat: React.FC = () => {
         return allFiles;
     };
 
-    const allFiles = fileTree ? getAllFiles([fileTree]) : [];
+    const allFiles = fileTree ? getAllFiles([fileTree as FileTreeItemType]) : [];
 
     const handleCustomFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];

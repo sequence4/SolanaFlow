@@ -17,12 +17,13 @@ const SKIP_FILES = [
   '.prettierignore',
 ];
 
-interface FileNode {
+export interface FileNode {
   name: string;
   type: 'file' | 'directory';
   ext?: string;
   path: string;
   children?: FileNode[];
+  content?: string;
 }
 
 export async function findFileRecursive(dir: string, fileName: string): Promise<string | null> {

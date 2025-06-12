@@ -20,6 +20,18 @@ export type { WorkspaceHandle } from '../container/interfaces';
 
 const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
 
+/**
+ * Return free bytes available on the container's /usr/src mount.
+ * Works because Docker exposes the writable layer as a normal fs entry.
+ */
+function getWorkspaceFreeBytes(container: string): number {
+  const out = execSync(
+    `docker exec ${container} bash -c "df -B1 /usr/src | tail -1 | awk '{print \\$4}'"`,
+    { encoding: "utf8" }
+  ).trim();
+  return Number(out || 0);
+}
+
 export async function prepEnv(
   projectId: string,
   userId: string,
@@ -112,25 +124,42 @@ export async function prepEnv(
     if (!hasCargo) {
       console.log(`[prepEnv] Bootstrapping workspace in ${projectDir}`);
 
-      let copied = false;
+      // ─── thin-copy constants ────────────────────────────────────────────────
+      const FREE_BYTES_NEEDED = 500 * 1024 * 1024;      // 500 MB safety margin
+      // -----------------------------------------------------------------------
+      let hasRoom = true;
       try {
-        /* Fast path: copy a prebaked template if present */
-        execSync(
-          `docker exec ${containerName} bash -c ` +
-          `"cp -r /usr/src/anchor-template/* '${projectDir}' && ` +
-          `chown -R 1000:1000 '${projectDir}'"`,
-          { stdio: 'inherit' }
-        );
-        copied = true;
-      } catch {
-        console.warn('[prepEnv] No prebaked template found – falling back to anchor init');
+        hasRoom = getWorkspaceFreeBytes(containerName) >= FREE_BYTES_NEEDED;
+      } catch (e) {
+        console.warn("[prepEnv] free-space probe failed:", e);
+        hasRoom = false;           // default to safe path
+      }
+
+      let copied = false;
+      if (hasRoom) {
+        try {
+          execSync(
+            `docker exec ${containerName} bash -c "` +
+              `cd /usr/src/anchor-template && ` +
+              // thin copy – skip heavy dirs that would blow the 10 GiB overlay
+              `tar -cf - --exclude='target' --exclude='node_modules' --exclude='.git' . | ` +
+              `tar -xf - -C '${projectDir}' && ` +
+              `chown -R 1000:1000 '${projectDir}'"`,
+            { stdio: "inherit" }
+          );
+          copied = true;
+        } catch (copyErr) {
+          console.warn("[prepEnv] Template copy failed, will fall back to anchor init:", copyErr);
+        }
+      } else {
+        console.warn("[prepEnv] Workspace almost full – skipping template copy");
       }
 
       if (!copied) {
         /* Universal path: generate a fresh Anchor workspace */
         execSync(
-          `docker exec ${containerName} bash -c ` +
-          `"anchor init '${projectDir}' --no-git --skip-tests --typescript && ` +
+          `docker exec ${containerName} bash -c "` +
+          `anchor init '${projectDir}' --no-git --force && ` +  // TS flag removed in Anchor 0.31
           `chown -R 1000:1000 '${projectDir}'"`,
           { stdio: 'inherit' }
         );

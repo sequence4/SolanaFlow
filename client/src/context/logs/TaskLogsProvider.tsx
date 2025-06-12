@@ -24,6 +24,7 @@ export default function TaskLogsProvider({
   const [steps, setSteps] = useState<Step[]>([]);
   const [showDetails, setShowDetails] = useState(false);
   const [systemLogs, setSystemLogs] = useState<string[]>([]);
+  const [isBuilding, setIsBuilding] = useState(false);
   
   // Reset when progress reaches 100%
   useEffect(() => {
@@ -105,6 +106,7 @@ export default function TaskLogsProvider({
         memoryStats: "128MB / 512MB",
         networkStats: "4.2 MB/s",
         nodeVersion: "v18.12.1",
+        isBuilding,
         
         addLog,
         setProgress,
@@ -115,6 +117,7 @@ export default function TaskLogsProvider({
         resetLogs,
         setSteps: handleSetSteps,
         updateStage,
+        setIsBuilding,
       }}
     >
       {children}

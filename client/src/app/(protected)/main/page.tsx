@@ -9,12 +9,25 @@ import Code from "@/components/main/code/Code";
 import UxContext from "@/context/ux/UxContext";
 import FileContext from "@/context/file/FileContext";
 import { ActiveTab } from "@/context/ux/UxContextTypes";
+import { FileTreeItemType } from "@/interfaces/FileTreeItemType";
 
 export default function MainPage() {
   const { activeTab, setActiveTab } = useContext(UxContext);
   const { fileTree } = useContext(FileContext);
 
-  const hasFiles = !!(fileTree && fileTree.children && fileTree.children.length > 0);
+  /**
+   * Returns true if any node in the tree is a file.
+   * A node is considered a file when it has **no children array**
+   * (covers arrays, single-root objects, and generators that omit `type: "file"`).
+   */
+  const treeHasFile = (n: FileTreeItemType | FileTreeItemType[]): boolean =>
+    Array.isArray(n)
+      ? n.some(treeHasFile)                     // iterate over array roots
+      : n.children && n.children.length > 0     // directory ➜ drill down
+        ? n.children.some(treeHasFile)
+        : true;                                 // leaf ➜ treat as file
+
+  const hasFiles = fileTree ? treeHasFile(fileTree) : false;
 
   useEffect(() => {
     if (!hasFiles && (activeTab === 'interface' || activeTab === 'code')) {

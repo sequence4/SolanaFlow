@@ -7,5 +7,7 @@ export interface FileTreeItemType {
     path?: string;
     status?: 'pending' | 'generating' | 'generated'; 
     code?: string;
+    /** Raw UTF-8 contents for files, omitted for directories */
+    content?: string;
 }
   
