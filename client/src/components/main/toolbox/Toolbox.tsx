@@ -70,6 +70,7 @@ export const Toolbox = () => {
     const [isBuilding, setIsBuilding] = useState(false);
     const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
     const [isBuildModalOpen, setIsBuildModalOpen] = useState(false);
+    const [buildProjectId, setBuildProjectId] = useState<string | null>(null);
     
     const taskLogs = useTaskLogs();
     const [modalOpen, setModalOpen] = useState(false);
@@ -213,10 +214,15 @@ export const Toolbox = () => {
         }
     }, [isBuilding, setIsBuilding, taskLogs, projectContext, setProjectContext, setArtifactUrl, setFileTree]);
     
-    const handleBuildClick = () => {
-        /* Gate checks remain exactly the same */
-        if (!fileTree) return;
-        setIsBuildModalOpen(true);                    // open modal first
+    const handleBuildClick = async () => {
+      if (!fileTree) return;                        // still gate on code presence
+    
+      /* Guarantee we have a project id */
+      const id = await ensureId(projectContext, setProjectContext);
+      setBuildProjectId(id);
+    
+      /* Now open the confirmation modal */
+      setIsBuildModalOpen(true);
     };
     
     const projectDeployed = !!projectContext?.details?.projectState?.deployed;
@@ -607,10 +613,10 @@ export const Toolbox = () => {
                 />
             )}
 
-            {/* Build confirmation modal */}
-            {isBuildModalOpen && projectContext.id && (
+            {/* Build confirmation modal (uses guaranteed id) */}
+            {isBuildModalOpen && buildProjectId && (
                 <BuildModal
-                    projectId={projectContext.id}
+                    projectId={buildProjectId}
                     isOpen={isBuildModalOpen}
                     onClose={() => setIsBuildModalOpen(false)}
                     onSuccess={handleConfirmBuild}
