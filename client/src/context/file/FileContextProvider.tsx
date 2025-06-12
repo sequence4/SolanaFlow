@@ -126,7 +126,13 @@ const FileContextProvider: React.FC<{ children: React.ReactNode }> = ({ children
     selectedFile,
     setSelectedFile,
     fileTree,
-    setFileTree,
+    setFileTree: (tree) => {
+      if (Array.isArray(tree)) {
+        setFileTree(tree[0] || null);
+      } else {
+        setFileTree(tree);
+      }
+    },
   };
 
   return (
