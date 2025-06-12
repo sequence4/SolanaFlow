@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import {
   Dialog,
   DialogContent,
@@ -12,44 +12,32 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Hammer } from "lucide-react";
-import { useTaskLogs } from "@/context/logs/useTaskLogs";
 
 /* ------------------------------------------------------------------ *
  *  Props
  * ------------------------------------------------------------------ */
 interface BuildModalProps {
-  projectId: string;
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  isBuilding: boolean;          // NEW
+  isBuilding: boolean;
+  percent: number | null;       // NEW
+  stage: string;                // NEW
 }
 
 /* ------------------------------------------------------------------ *
  *  Component
  * ------------------------------------------------------------------ */
 export function BuildModal({
-  projectId,
   isOpen,
   onClose,
   onSuccess,
   isBuilding,
+  percent,
+  stage,
 }: BuildModalProps) {
-  const [percent, setPercent] = useState<number | null>(null);
-  const [stage,   setStage]   = useState<string>("Waiting…");
-
-  /* Stream updates from TaskLogsProvider */
-  const taskLogs = useTaskLogs();
-  useEffect(() => {
-    const off = taskLogs.onProgress(({ progress, message }) => {
-      setPercent(progress);
-      setStage(message);
-    });
-    return off;
-  }, [taskLogs]);
-
   /* Start Build */
-  const handleStart = () => onSuccess();   // parent sets isBuilding=true
+  const handleStart = () => onSuccess();   // parent starts SSE
 
   /* ---------------------------------------------------------------- *
    *  UI
