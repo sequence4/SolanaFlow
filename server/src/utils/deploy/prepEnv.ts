@@ -121,12 +121,12 @@ export async function prepEnv(
          * workspace containers < 500 MB and avoiding "No space left on device".
          */
         execSync(
-          `docker exec ${containerName} bash -c ` +
-          `"rsync -a --delete ` +
-          `--exclude 'target' ` +
-          `--exclude 'node_modules' ` +
-          `--exclude '.git' ` +
-          `/usr/src/anchor-template/ '${projectDir}/' && ` +
+          // tar is available in every Debian/Ubuntu-based image; we can still
+          // exclude the big dirs just like rsync did.
+          `docker exec ${containerName} bash -c "` +
+          `cd /usr/src/anchor-template && ` +
+          `tar -cf - --exclude='target' --exclude='node_modules' --exclude='.git' . | ` +
+          `tar -xf - -C '${projectDir}' && ` +
           `chown -R 1000:1000 '${projectDir}'"`,
           { stdio: 'inherit' }
         );
@@ -138,8 +138,8 @@ export async function prepEnv(
       if (!copied) {
         /* Universal path: generate a fresh Anchor workspace */
         execSync(
-          `docker exec ${containerName} bash -c ` +
-          `"anchor init '${projectDir}' --no-git --typescript --force && ` +
+          `docker exec ${containerName} bash -c "` +
+          `anchor init '${projectDir}' --no-git --force && ` +  // TS flag removed in Anchor 0.31
           `chown -R 1000:1000 '${projectDir}'"`,
           { stdio: 'inherit' }
         );
