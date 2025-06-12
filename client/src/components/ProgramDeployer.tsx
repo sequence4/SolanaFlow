@@ -91,7 +91,7 @@ export function ProgramDeployer({
 
       if (isLoading) return;                  
       setIsLoading(true);
-      setProgress(1);                   // bar visible while wallet prompt is open
+      setProgress(0);                   // show bar, starts at 0 %
       console.log('🚀 Starting deployment…');
 
       // 🖌️  let React flush this paint BEFORE the wallet popup blocks the thread
@@ -109,10 +109,18 @@ export function ProgramDeployer({
           wallet,
           /** explicit generic helps TS infer correct overload */
           ephemeralKeypair: ephem,
-          onProgress: (progress, message) => {
-            setProgress(progress);
-            setDeployStage(message);   // NEW – let UI text update
-            console.log(message);
+          onProgress: (raw, message) => {
+            /**
+             * The library emits either:
+             *   • a fraction 0-1  ➜ multiply by 100
+             *   • or an integer   ➜ already a %
+             */
+            const pct = raw <= 1 ? Math.round(raw * 100) : Math.round(raw);
+
+            // keep at least 1 % so the bar is visible during very small uploads
+            setProgress(Math.max(1, Math.min(pct, 100)));
+            setDeployStage(message ?? '');
+            console.log('[DEPLOY]', pct + '%', message);
           }
         });
 
