@@ -37,6 +37,7 @@ import { runDeployPipelineWithLogs } from '@/utils/deploy/deployPipeline';
 import { useWalletSigner } from '@/utils/wallet';
 import { ensureId } from '@/utils/project/ensureId';
 import { ProgramDeployer } from '@/components/ProgramDeployer';
+import { BuildModal } from '@/components/BuildModal';
 import { projectApi } from '@/api/projectApi';
 
 // Add this constant after the imports section
@@ -68,6 +69,7 @@ export const Toolbox = () => {
     const [isDeploying, setIsDeploying] = useState(false);
     const [isBuilding, setIsBuilding] = useState(false);
     const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
+    const [isBuildModalOpen, setIsBuildModalOpen] = useState(false);
     
     const taskLogs = useTaskLogs();
     const [modalOpen, setModalOpen] = useState(false);
@@ -126,7 +128,7 @@ export const Toolbox = () => {
         );
     };
     
-    const handleBuildClick = useCallback(async () => {
+    const handleConfirmBuild = useCallback(async () => {
         if (isBuilding) return;
         
         try {
@@ -210,6 +212,12 @@ export const Toolbox = () => {
             setIsBuilding(false);
         }
     }, [isBuilding, setIsBuilding, taskLogs, projectContext, setProjectContext, setArtifactUrl, setFileTree]);
+    
+    const handleBuildClick = () => {
+        /* Gate checks remain exactly the same */
+        if (!fileTree) return;
+        setIsBuildModalOpen(true);                    // open modal first
+    };
     
     const projectDeployed = !!projectContext?.details?.projectState?.deployed;
     const built = !!projectContext.details?.projectState?.built;
@@ -389,7 +397,7 @@ export const Toolbox = () => {
                     <div className="grid grid-cols-1 gap-2 mb-4">
                         <button
                             onClick={handleBuildClick}
-                            disabled={!fileTree || isBuilding}
+                            disabled={!fileTree}
                             className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center"
                         >
                             {isBuilding ? (
@@ -596,6 +604,16 @@ export const Toolbox = () => {
                     isOpen={isDeployModalOpen}
                     onClose={() => setIsDeployModalOpen(false)}
                     onSuccess={handleDeploySuccess}
+                />
+            )}
+
+            {/* Build confirmation modal */}
+            {isBuildModalOpen && projectContext.id && (
+                <BuildModal
+                    projectId={projectContext.id}
+                    isOpen={isBuildModalOpen}
+                    onClose={() => setIsBuildModalOpen(false)}
+                    onSuccess={handleConfirmBuild}
                 />
             )}
 
