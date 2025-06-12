@@ -1,6 +1,7 @@
+import { execSync } from "child_process";
+import concat from "concat-stream";      // already in package.json
 import docker from './dockerClient';
 import * as tar from 'tar-stream';
-import { finished } from 'stream/promises';
 
 /**
  * Reads a UTF-8 text file from a running container *without* spawning a shell.
@@ -9,26 +10,53 @@ import { finished } from 'stream/promises';
  */
 export async function readFileFromContainer(
   containerName: string,
-  containerPath: string
+  filePath: string
 ): Promise<string> {
   const container = docker.getContainer(containerName);
-  const tStream   = await container.getArchive({ path: containerPath }); // tar stream
 
-  const extract = tar.extract();
-  let fileContent = '';
-  extract.on('entry', (header: any, stream: any, next: any) => {
-    if (header.type !== 'file') {         // skip dirs, pax headers
-      stream.resume(); return next();
-    }
-    const chunks: Buffer[] = [];
-    stream.on('data', (c: Buffer) => chunks.push(c));
-    stream.on('end', () => {
-      fileContent = Buffer.concat(chunks).toString('utf8');
-      next();                             // continue (usually no more entries)
+  /* ------------------------------------------------------------------
+   * 1) fast path – Docker API /getArchive (tar stream)
+   * ------------------------------------------------------------------ */
+  try {
+    const stream = await container.getArchive({ path: filePath });
+    const extract = tar.extract();
+
+    return await new Promise<string>((resolve, reject) => {
+      let contents = Buffer.alloc(0);
+
+      extract.on("entry", (_hdr: any, entry: any, next: any) => {
+        entry.pipe(
+          concat((buf: Buffer) => {
+            contents = Buffer.concat([contents, buf]);
+            next();
+          })
+        );
+      });
+
+      extract.on("finish", () => resolve(contents.toString("utf8")));
+      extract.on("error", reject);
+
+      stream.pipe(extract);
     });
-  });
+  } catch (err: any) {
+    console.warn(
+      `[readFileFromContainer] getArchive failed for ${filePath}:`,
+      err?.message || err
+    );
+  }
 
-  tStream.pipe(extract);
-  await finished(extract);
-  return fileContent;
+  /* ------------------------------------------------------------------
+   * 2) fallback – docker exec cat (never triggers docker-modem bug)
+   * ------------------------------------------------------------------ */
+  try {
+    const safePath = filePath.replace(/'/g, "'\\''"); // bash-quote '
+    return execSync(
+      `docker exec ${containerName} bash -c "cat '${safePath}'"`,
+      { encoding: "utf8" }
+    );
+  } catch (execErr) {
+    throw new Error(
+      `readFileFromContainer: both getArchive and exec fallback failed – ${execErr}`
+    );
+  }
 } 
