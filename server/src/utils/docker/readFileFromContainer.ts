@@ -11,7 +11,9 @@ export async function readFileFromContainer(
   containerName: string,
   containerPath: string
 ): Promise<string> {
-  const docker = new Docker();                         // talks to local /var/run/docker.sock
+  const docker = new Docker({
+    socketPath: process.env.DOCKER_SOCKET_PATH || '/var/run/docker.sock',
+  });                       // talks to local /var/run/docker.sock
   const container = docker.getContainer(containerName);
   const tStream = await container.getArchive({ path: containerPath }); // tar stream
 
