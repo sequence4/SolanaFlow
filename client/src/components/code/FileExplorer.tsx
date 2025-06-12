@@ -6,7 +6,7 @@ import { ChevronDown, ChevronRight, FileText, Folder } from "lucide-react";
 /* ---------- recursive leaf ---------- */
 const TreeItem = memo(({ node, level = 0 }: { node: FileTreeItemType; level?: number }) => {
   const { setSelectedFile } = useContext(FileContext);
-  const [open, setOpen] = useState(level < 1);               // root folders open
+  const [open, setOpen] = useState(level < 1 || node.name === "anchor-template");               // root folders open + anchor template
 
   const indent = { paddingLeft: `${level * 1.0}rem` };
 

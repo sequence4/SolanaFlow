@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 
 import CodeEditor from './CodeEditor';
 import SolanaTerminal from './SolanaTerminal';
-import FileExplorer from '../../../components/code/FileExplorer';
 
 import '../../../styles/code/codeTabStyle';
     
@@ -77,22 +76,15 @@ const Code = () => {
     const terminalBorder = useColorModeValue('var(--border-2-light)', 'var(--border-2-dark)');
     
     return (
-        <div className="flex flex-col w-full h-full" style={{ background: codeBg }}>
-            {/* -------- top section: explorer + editor -------- */}
-            <div className="flex flex-1 min-h-0">        {/* min-h-0 keeps flex children from overflow */}
-                <div style={{ width: 250, minWidth: 220 }}>
-                    <FileExplorer />
-                </div>
-                <div className="flex-1 border-l border-[#2a2a2d]">
-                    <CodeEditor language={getLanguage(selectedFile?.ext)} />
-                </div>
-            </div>
-            {/* -------- terminal -------- */}
-            <div style={{ height: "32%" }} className="border-t border-[#2a2a2d]">
-                <SolanaTerminal />
-            </div>
+      <div className="flex flex-col w-full h-full" style={{ background: codeBg }}>
+        <div className="flex-1 min-h-0">
+          <CodeEditor language={getLanguage(selectedFile?.ext)} />
         </div>
-    )
+        <div style={{ height: "32%" }} className="border-t border-[#2a2a2d]">
+          <SolanaTerminal />
+        </div>
+      </div>
+    );
 }
 
 export default Code;
