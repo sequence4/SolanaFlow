@@ -1,6 +1,5 @@
 import Docker from 'dockerode';
-// @ts-ignore - missing type definitions
-import tar from 'tar-stream';
+import * as tar from 'tar-stream';
 import { finished } from 'stream/promises';
 
 /**
@@ -19,13 +18,15 @@ export async function readFileFromContainer(
   const extract = tar.extract();
   let fileContent = '';
   extract.on('entry', (header: any, stream: any, next: any) => {
+    if (header.type !== 'file') {         // skip dirs, pax headers
+      stream.resume(); return next();
+    }
     const chunks: Buffer[] = [];
-    stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+    stream.on('data', (c: Buffer) => chunks.push(c));
     stream.on('end', () => {
-      fileContent = Buffer.concat(chunks).toString('utf8'); // keep trailing newline
-      next();
+      fileContent = Buffer.concat(chunks).toString('utf8');
+      next();                             // continue (usually no more entries)
     });
-    stream.resume();
   });
 
   tStream.pipe(extract);
