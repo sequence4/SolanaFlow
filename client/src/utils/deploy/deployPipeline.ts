@@ -59,7 +59,7 @@ export function runDeployPipelineWithLogs(
       const count = Array.isArray(msg.fileTree) ? msg.fileTree.length : 1;
       console.log(`[deployPipeline] Received fileTree with ${count} items`);
       taskLogs.addSystemLog(`📂 Received project file tree with ${count} items`);
-      setFileTree(msg.fileTree as import("@/interfaces/FileTreeItemType").FileTreeItemType[]);
+      setFileTree(structuredClone(msg.fileTree as import("@/interfaces/FileTreeItemType").FileTreeItemType[]));
     }
 
     if (msg.stage === 'deploy-done' || msg.stage === 'done' || msg.stage === 'completed') {

@@ -4,6 +4,7 @@ import React, { useContext } from "react";
 import UxContext from "@/context/ux/UxContext";
 import FileContext from "@/context/file/FileContext";
 import { useTaskLogs } from "@/context/logs/useTaskLogs";
+import type { FileTreeItemType } from "@/interfaces/FileTreeItemType";
 
 // shadcn UI components
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,11 +14,15 @@ export default function Header() {
   const { fileTree } = useContext(FileContext);
   const { isBuilding } = useTaskLogs();
 
-  /* fileTree may be array *or* single root obj */
-  const hasFiles =
-    Array.isArray(fileTree)
-      ? fileTree.length > 0
-      : !!fileTree?.children?.length;
+  /* Recursively check if there are any files in the tree */
+  const treeHasAFile = (node: FileTreeItemType | FileTreeItemType[]): boolean =>
+    Array.isArray(node)
+      ? node.some(treeHasAFile)
+      : node.type === 'file'
+        ? true
+        : node.children?.some(treeHasAFile) ?? false;
+
+  const hasFiles = fileTree ? treeHasAFile(fileTree) : false;
 
   return (
     <TabsList className="bg-[var(--foreground-dark)] p-2 pb-4 flex gap-2">
