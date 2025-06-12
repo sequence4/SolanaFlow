@@ -22,6 +22,7 @@ export interface TaskLogsContextType {
   memoryStats: string;
   networkStats: string;
   nodeVersion: string;
+  isBuilding: boolean;
   
   addLog: (message: string) => void;
   setProgress: (progress: number) => void;
@@ -32,6 +33,7 @@ export interface TaskLogsContextType {
   resetLogs: () => void;
   setSteps: (steps: Step[]) => void;
   updateStage: (stage: string) => void;
+  setIsBuilding: (b: boolean) => void;
 }
 
 const TaskLogsContext = createContext<TaskLogsContextType>({
@@ -45,6 +47,7 @@ const TaskLogsContext = createContext<TaskLogsContextType>({
   memoryStats: "128MB / 512MB",
   networkStats: "4.2 MB/s",
   nodeVersion: "v18.12.1",
+  isBuilding: false,
   
   addLog: () => {},
   setProgress: () => {},
@@ -55,6 +58,7 @@ const TaskLogsContext = createContext<TaskLogsContextType>({
   resetLogs: () => {},
   setSteps: () => {},
   updateStage: () => {},
+  setIsBuilding: () => {},
 });
 
 export default TaskLogsContext; 
