@@ -91,7 +91,7 @@ export function ProgramDeployer({
 
       if (isLoading) return;                  
       setIsLoading(true);
-      setProgress(0);                   // show bar, starts at 0 %
+      setProgress(1);                   // 1 % so the bar is visible while Phantom is open
       console.log('🚀 Starting deployment…');
 
       // 🖌️  let React flush this paint BEFORE the wallet popup blocks the thread
@@ -107,17 +107,10 @@ export function ProgramDeployer({
           soBytes: programBytes!,
           connection,
           wallet,
-          /** explicit generic helps TS infer correct overload */
           ephemeralKeypair: ephem,
+          verifyTimeoutMs: 120_000,          // give Devnet 2 min to propagate
           onProgress: (raw, message) => {
-            /**
-             * The library emits either:
-             *   • a fraction 0-1  ➜ multiply by 100
-             *   • or an integer   ➜ already a %
-             */
             const pct = raw <= 1 ? Math.round(raw * 100) : Math.round(raw);
-
-            // keep at least 1 % so the bar is visible during very small uploads
             setProgress(Math.max(1, Math.min(pct, 100)));
             setDeployStage(message ?? '');
             console.log('[DEPLOY]', pct + '%', message);
@@ -125,9 +118,13 @@ export function ProgramDeployer({
         });
 
         if (deployResult.success) {
+          // if we only got a "lag" warning, surface it once then treat as success
+          if (deployResult.warning) {
+            toast.warning(deployResult.warning);
+          }
           onSuccess(deployResult.programId.toBase58());
         }
-        
+
         /* 5 – success UX */
         toast.success('Program deployed with ephemeral key', {
           description: `Program ID: ${deployResult.programId.toBase58()}`,
@@ -147,8 +144,8 @@ export function ProgramDeployer({
         console.error(err);
         toast.error('Deployment failed', { description: err.message });
       } finally {
-        setIsLoading(false);           // re-enable UI
-        setProgress(null);             // hide bar fully
+        setIsLoading(false);           // re-enable UI / close modal
+        setProgress(null);             // hide bar
 
         backendRunningRef.current = false;
         backendStartedRef.current = false;  // dialog can deploy again if reopened
@@ -195,7 +192,7 @@ export function ProgramDeployer({
                 </div>
               )}
               
-              {isLoading && progress !== null && (
+              {progress !== null && (
                 <div className="space-y-2 mt-4">
                   <>
                     <div className="flex items-center justify-between">
