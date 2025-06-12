@@ -1,16 +1,6 @@
-import Docker, { DockerOptions } from 'dockerode';
+import docker from './dockerClient';
 import * as tar from 'tar-stream';
 import { finished } from 'stream/promises';
-
-/**
- * One global Docker client that **always** talks to the local daemon.
- *  – `socketPath` ignores any `DOCKER_HOST` env that might be set
- *    (which is what triggered the EAI_AGAIN 'solanaflow-demo' DNS failure). 
- *  – Keep it singleton-style so we don't open a new socket per file.
- */
-const docker = new Docker({
-  socketPath: process.env.DOCKER_SOCKET ?? '/var/run/docker.sock',
-} as DockerOptions);
 
 /**
  * Reads a UTF-8 text file from a running container *without* spawning a shell.
