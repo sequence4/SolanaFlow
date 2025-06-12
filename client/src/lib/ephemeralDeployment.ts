@@ -651,7 +651,7 @@ export async function deployWithEphemeralKey(
       ) {
         newAuth = walletPublicKey; // ✅ success, just slower RPC
       } else {
-        const msg = `Authority transfer not visible after ${(retriesMax - retries) * 0.5}s – treating as lag, continuing`;
+        const msg = `Authority transfer not visible after ${((retriesMax - retries) * 0.5).toFixed(1)}s – treating as lag, continuing`;
         console.warn(msg);
         return {
           success: true,

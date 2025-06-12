@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Keypair } from '@solana/web3.js';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { toast } from 'sonner';
 import { downloadArtifact } from '@/api/projectArtifact';
@@ -156,7 +155,7 @@ export function ProgramDeployer({
         backendRunningRef.current = false;
         backendStartedRef.current = false;  // dialog can deploy again if reopened
       }
-    }, [isLoading, projectId, programBytes, connection, wallet, onSuccess, onClose]);
+    }, [isLoading, projectId, programBytes, wallet, onSuccess, onClose]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !isLoading && !open && onClose()}>
