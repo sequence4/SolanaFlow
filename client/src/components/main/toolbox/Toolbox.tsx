@@ -406,14 +406,14 @@ export const Toolbox = () => {
                             disabled={!fileTree}
                             className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center"
                         >
-                            {isBuilding ? (
+                            <>
+                              {isBuilding ? (
                                 <PulseLoader color="#9de19f" size={3} cssOverride={{ display: 'inline-block', margin: 0 }} />
-                            ) : (
-                                <>
-                                    <Hammer className="h-4 w-4 mr-2 text-[#22c55e]" />
-                                    <span>Build</span>
-                                </>
-                            )}
+                              ) : (
+                                <Hammer className="h-4 w-4 mr-2 text-[#22c55e]" />
+                              )}
+                              <span>Build</span>
+                            </>
                         </button>
                         <div className="relative">
                             <button
@@ -618,6 +618,7 @@ export const Toolbox = () => {
                 <BuildModal
                     projectId={buildProjectId}
                     isOpen={isBuildModalOpen}
+                    isBuilding={isBuilding}
                     onClose={() => setIsBuildModalOpen(false)}
                     onSuccess={handleConfirmBuild}
                 />
