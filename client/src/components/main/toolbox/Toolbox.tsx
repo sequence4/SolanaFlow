@@ -47,13 +47,20 @@ const WALLET_TOAST_ID = 'wallet-not-connected';
 /** Memo-friendly helpers */
 const NEED_BUILD_TOAST_ID = 'need-build';   // prevents duplicates
 
-// Add this constant after the imports section
+/**
+ * Full sequence of stages streamed by the deploy-pipeline SSE.
+ * Keep this list in the exact order the server emits them so that
+ * (idx+1)/length → percentage works.
+ */
 const STAGES = [
-    { stage: "init" },
-    { stage: "build" },
-    { stage: "build-done" },
-    { stage: "done" }
-];
+  { stage: "file-tree" },
+  { stage: "file-tree-done" },
+  { stage: "src-gen" },
+  { stage: "src-write" },
+  { stage: "build" },
+  { stage: "build-done" },
+  { stage: "done" },
+] as const;
 
 export const Toolbox = () => {
     const [isExpanded] = useState(true);
