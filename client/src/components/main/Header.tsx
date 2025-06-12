@@ -14,15 +14,19 @@ export default function Header() {
   const { fileTree } = useContext(FileContext);
   const { isBuilding } = useTaskLogs();
 
-  /* Recursively check if there are any files in the tree */
-  const treeHasAFile = (node: FileTreeItemType | FileTreeItemType[]): boolean =>
-    Array.isArray(node)
-      ? node.some(treeHasAFile)
-      : node.type === 'file'
-        ? true
-        : node.children?.some(treeHasAFile) ?? false;
+  /**
+   * Returns true if *any* node in the supplied tree is a file.
+   * A node is considered a file when it has **no `children` array**
+   * (covers generators that omit a `type` flag entirely).
+   */
+  const nodeHasFile = (n: FileTreeItemType | FileTreeItemType[]): boolean =>
+    Array.isArray(n)
+      ? n.some(nodeHasFile)                    // iterate over array roots
+      : n.children && n.children.length > 0    // directory ➜ drill down
+        ? n.children.some(nodeHasFile)
+        : true;                                // leaf  ➜ treat as file
 
-  const hasFiles = fileTree ? treeHasAFile(fileTree) : false;
+  const hasFiles = fileTree ? nodeHasFile(fileTree) : false;
 
   return (
     <TabsList className="bg-[var(--foreground-dark)] p-2 pb-4 flex gap-2">
