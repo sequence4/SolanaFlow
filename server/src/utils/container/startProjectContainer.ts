@@ -75,14 +75,14 @@ export async function startProjectContainer(projId: string): Promise<string> {
 
   try {
     /* 1 ─ ensure image is present & host-arch-compatible */
-    execSync(`docker pull --platform linux/arm64 ${image}`, { stdio: 'inherit' });
+    execSync(`docker pull --quiet --platform linux/arm64 --pull-always ${image}`);
 
     /* 2 ─ run container with explicit platform, project label & random host-port */
     // NEW: make sure the host has enough free space (≥ 3 GiB)
     ensureDockerSpace();
 
     const runArgs: string[] = [
-      'docker', 'run', '-d',
+      'docker', 'run', '--pull=always', '-d',
       '--platform', 'linux/arm64',
       '--name', name,
       '--label', `solanaflow.project=${projId}`,
