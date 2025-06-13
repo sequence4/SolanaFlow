@@ -126,7 +126,9 @@ RUN apt-get update -qq \
  && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 3000
-CMD ["node", ".next/standalone/server.js"]
+# Next 15+ puts the entry-point at  .next/standalone/index.js
+# https://vercel.com/guides/nextjs-advanced-features#standalone-build-output
+CMD ["node", ".next/standalone/index.js"]
 
 # create a separate stage for seeding the target volume
 FROM solana-toolchain AS seed-target
