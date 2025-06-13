@@ -92,10 +92,13 @@ export async function startProjectContainer(projId: string): Promise<string> {
       '-v', `${vSccache}:/opt/sccache`,
       '-v', `${vTargetBuild}:/usr/src/target`,
       '-e', 'CARGO_TARGET_DIR=/usr/src/target',
-      // publish container port 3000 to random host port
+      // publish container port 3000 → random host port
       '-p', '0:3000',
       image,
-      'node', '/usr/share/solanaflow/web/.next/standalone/server.js'
+      // keep container up even if Next.js fails (easier debugging)
+      'bash', '-lc',
+      "trap : TERM INT; sleep infinity & wait & " +
+      "node /usr/share/solanaflow/web/.next/standalone/server.js"
     ];
 
     execSync(runArgs.join(' '), { stdio: 'inherit' });
