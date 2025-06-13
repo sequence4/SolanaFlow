@@ -124,7 +124,7 @@ COPY --from=builder /usr/share/solanaflow /usr/share/solanaflow
 RUN solana --version && anchor --version
 RUN apt-get update -qq \
  && DEBIAN_FRONTEND=noninteractive \
-    apt-get install -y --no-install-recommends binutils \
+    apt-get install -y --no-install-recommends binutils nodejs \
  && strip /usr/local/bin/solana* || true \
  && apt-get clean && rm -rf /var/lib/apt/lists/*
 
