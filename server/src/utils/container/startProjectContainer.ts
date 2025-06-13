@@ -92,11 +92,10 @@ export async function startProjectContainer(projId: string): Promise<string> {
       '-v', `${vSccache}:/opt/sccache`,
       '-v', `${vTargetBuild}:/usr/src/target`,
       '-e', 'CARGO_TARGET_DIR=/usr/src/target',
-      // publish ALL exposed ports (incl. 3000) on random host ports
-      '-P',
-      '--expose', '3000',          // make 100 % sure port 3000 exists even if image forgot EXPOSE
+      // publish container port 3000 to random host port
+      '-p', '0:3000',
       image,
-      'bash', '-c', 'cd /usr/src && tail -f /dev/null' // keep container alive for interactive build
+      'node', '/usr/share/solanaflow/web/.next/standalone/server.js'
     ];
 
     execSync(runArgs.join(' '), { stdio: 'inherit' });

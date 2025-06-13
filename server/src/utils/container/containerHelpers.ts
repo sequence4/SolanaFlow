@@ -13,13 +13,13 @@ export async function resolveContainerUrl(name: string): Promise<string> {
   try { execSync(`docker start ${name}`, { stdio: 'ignore' }); } catch {/* nop */}
 
   /* -------------------------------------------------------------
-   * ② Retry `docker port … 3000/tcp` for up to 10 s (20 × 500 ms)
+   * ② Retry `docker port … 3000/tcp` for up to 15 s (30 × 500 ms)
    *    Docker sometimes needs a short moment to register the random
    *    host-port after `docker run -P`.  A tight loop eliminates the
    *    "No public port '3000/tcp' published" race we observed.
    * ------------------------------------------------------------ */
   let mapping = '';
-  for (let i = 0; i < 20 && !mapping.trim(); i++) {
+  for (let i = 0; i < 30 && !mapping.trim(); i++) {
     try {
       mapping = execSync(`docker port ${name} 3000/tcp`, {
         encoding: 'utf8',
@@ -29,7 +29,7 @@ export async function resolveContainerUrl(name: string): Promise<string> {
     if (!mapping.trim()) await new Promise(r => setTimeout(r, 500));
   }
   if (!mapping.trim()) {
-    throw new Error(`port 3000/tcp not published for ${name} after 10 s`);
+    throw new Error(`port 3000/tcp not published for ${name} after 15 s`);
   }
 
   console.log(`[resolveContainerUrl] ${name} → ${mapping.trim()}`);
