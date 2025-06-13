@@ -92,9 +92,11 @@ export async function startProjectContainer(projId: string): Promise<string> {
       '-v', `${vSccache}:/opt/sccache`,
       '-v', `${vTargetBuild}:/usr/src/target`,
       '-e', 'CARGO_TARGET_DIR=/usr/src/target',
-      // publish container port 3000, host port chosen automatically
-      '-p', '0:3000',
-      image
+      // publish ALL exposed ports (incl. 3000) on random host ports
+      '-P',
+      '--expose', '3000',          // make 100 % sure port 3000 exists even if image forgot EXPOSE
+      image,
+      'bash', '-c', 'cd /usr/src && tail -f /dev/null' // keep container alive for interactive build
     ];
 
     execSync(runArgs.join(' '), { stdio: 'inherit' });
