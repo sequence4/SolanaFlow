@@ -92,8 +92,8 @@ export async function startProjectContainer(projId: string): Promise<string> {
       '-v', `${vSccache}:/opt/sccache`,
       '-v', `${vTargetBuild}:/usr/src/target`,
       '-e', 'CARGO_TARGET_DIR=/usr/src/target',
-      // always publish container port 3000 → random host port
-      '-p', '3000/tcp',
+      // publish container port 3000, host port chosen automatically
+      '-p', '0:3000',
       image
     ];
 
