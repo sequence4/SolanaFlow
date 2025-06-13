@@ -98,7 +98,7 @@ export async function startProjectContainer(projId: string): Promise<string> {
       // keep container up even if Next.js fails (easier debugging)
       'bash', '-lc',
       "trap : TERM INT; sleep infinity & wait & " +
-      "node /usr/share/solanaflow/web/.next/standalone/index.js"
+      "node /usr/share/solanaflow/web/.next/standalone/server.js"
     ];
 
     execSync(runArgs.join(' '), { stdio: 'inherit' });
