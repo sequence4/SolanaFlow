@@ -120,11 +120,13 @@ WORKDIR /usr/share/solanaflow/web
 COPY --from=solana-toolchain /usr/local/bin /usr/local/bin
 COPY --from=solana-toolchain /root/.cargo/bin /root/.cargo/bin
 COPY --from=builder /usr/share/solanaflow /usr/share/solanaflow
+# bring in the exact Node we used to build the standalone bundle
+COPY --from=builder /root/.nvm/versions/node/v20.18.0/bin/node /usr/local/bin/node
 
 RUN solana --version && anchor --version
 RUN apt-get update -qq \
  && DEBIAN_FRONTEND=noninteractive \
-    apt-get install -y --no-install-recommends binutils nodejs \
+    apt-get install -y --no-install-recommends binutils \
  && strip /usr/local/bin/solana* || true \
  && apt-get clean && rm -rf /var/lib/apt/lists/*
 
