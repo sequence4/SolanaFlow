@@ -6,11 +6,13 @@ import { useTaskLogs } from '@/context/logs/useTaskLogs';
 import ProjectContext from '@/context/project/ProjectContext';
 import { projectApi } from '@/api/projectApi';
 import { runDeployPipelineWithLogs } from '@/utils/deploy/deployPipeline';
+import FileContext from '@/context/file/FileContext';
 
 export function useBuildAndDeploy() {
   const [isBuilding, setIsBuilding] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
   const { projectContext, setProjectContext } = useContext(ProjectContext);
+  const { setFileTree } = useContext(FileContext);
   const taskLogs = useTaskLogs();
   
   // Function to handle building the project
@@ -67,7 +69,8 @@ export function useBuildAndDeploy() {
               toast.error("Failed to save build state");
               resolve({ success: true, error: error as Error });
             }
-          }
+          },
+          setFileTree
         );
         
         return eventSource;
@@ -81,7 +84,7 @@ export function useBuildAndDeploy() {
     } finally {
       setIsBuilding(false);
     }
-  }, [isBuilding, projectContext, setProjectContext, taskLogs]);
+  }, [isBuilding, projectContext, setProjectContext, taskLogs, setFileTree]);
   
   // Function to handle deployment success
   const handleDeploySuccess = useCallback(async (projectId: string, programId: string) => {
