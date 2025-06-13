@@ -21,8 +21,28 @@ export async function resolveContainerUrl(name: string): Promise<string> {
 
   const port   = m[1];
 
-  /* ① Explicit FQDN → respect it. ② Otherwise use loop-back */
-  const host   = process.env.PUBLIC_FQDN ?? "127.0.0.1";
+  /* ---------- choose public hostname ---------- */
+  let host = process.env.PUBLIC_FQDN?.trim();
+
+  /* Fallback: derive from EC2 instance metadata */
+  if (!host) {
+    try {
+      host = execSync(
+        "curl -s --max-time 2 http://169.254.169.254/latest/meta-data/public-hostname"
+      ).toString().trim();
+    } catch { /* ignore */ }
+  }
+
+  /* Last-chance fallback (same subnet but still routable from browser) */
+  if (!host) {
+    host = execSync("curl -s ifconfig.me").toString().trim();   // public IPv4
+  }
+
+  if (!host) throw new Error(
+    "Cannot resolve PUBLIC_FQDN and could not auto-detect EC2 hostname. " +
+    "Set PUBLIC_FQDN in the environment."
+  );
+  /* -------------------------------------------- */
   const scheme = process.env.CONTAINER_URL_SCHEME ?? "http";
 
   return `${scheme}://${host}:${port}`;
