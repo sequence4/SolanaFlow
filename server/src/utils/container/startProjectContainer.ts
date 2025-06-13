@@ -86,6 +86,7 @@ function ensureDockerSpace(minBytes = 3 * 1024 * 1024 * 1024): void {
  */
 export async function startProjectContainer(projId: string): Promise<string> {
   const name  = `userproj-${projId}-${Date.now()}`.slice(0, 63);        // 64-char limit
+  // Use the tag only, let --pull=always refresh it
   const image = process.env.SOLANAFLOW_BUILD_IMAGE ?? 
               'ghcr.io/sequence4/solana-toolchain:runtime-latest';
   
