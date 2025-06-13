@@ -214,6 +214,60 @@ export async function runDeployPipeline({
       }
     }
 
+    // Copy the Anchor-generated IDL to the frontend idl directory
+    if (programId) {
+      sendProgress({
+        stage: "copy-idl",
+        message: "Saving Anchor IDL for frontend..."
+      });
+
+      try {
+        // Find the program name from the file tree
+        const rootPath = workspace.rootPath ?? (
+          await import("../fileUtils").then(m => m.getProjectRootPath(projectId))
+        );
+
+        // Default program name (same as in handleGenerateCode)
+        const programName = 'my_program'; // Using the same default as in handleGenerateCode
+
+        // Generate a task ID for running commands
+        const idlTaskId = `idl-${projectId}-${Date.now()}`;
+
+        // Copy the IDL from target/idl to our frontend idl directory
+        const copyIdlCmd = [
+          `cd /usr/src/${rootPath}`,
+          // Make sure target/idl exists and the program IDL exists
+          `if [ -f target/idl/${programName}.json ]; then`,
+          // Read the IDL file content
+          `  IDL_CONTENT=$(cat target/idl/${programName}.json)`,
+          // Parse and update the IDL with the correct programId using jq
+          `  UPDATED_IDL=$(echo "$IDL_CONTENT" | jq '.metadata.address = "${programId}"')`,
+          // Make sure the idl directory exists
+          `  mkdir -p idl`,
+          // Write the updated IDL to the frontend location
+          `  echo '$UPDATED_IDL' > idl/solanaflow_token.json`,
+          `  echo "IDL copied to idl/solanaflow_token.json"`,
+          `else`,
+          `  echo "IDL file not found at target/idl/${programName}.json"`,
+          `  echo "{}" > idl/solanaflow_token.json`,
+          `fi`
+        ].join(" && ");
+
+        // Execute the command in the container
+        await runCommand(
+          `docker exec ${workspace.containerName} bash -c '${copyIdlCmd}'`,
+          ".",
+          idlTaskId,
+          { skipSuccessUpdate: true }
+        );
+
+        console.log(`[DEPLOY] IDL copied to idl/solanaflow_token.json for program ${programId}`);
+      } catch (error) {
+        console.error("[DEPLOY] Error copying IDL:", error);
+        // Non-fatal error, continue with deployment
+      }
+    }
+
     // Only include programId in the completion event if we have one
     const completionEvent: Record<string, unknown> = {
       stage: "done",
