@@ -119,7 +119,11 @@ COPY --from=solana-toolchain /root/.cargo/bin /root/.cargo/bin
 COPY --from=builder /usr/share/solanaflow /usr/share/solanaflow
 
 RUN solana --version && anchor --version
-RUN apt-get clean && rm -rf /var/lib/apt/lists/* && strip /usr/local/bin/solana*
+RUN apt-get update -qq \
+ && DEBIAN_FRONTEND=noninteractive \
+    apt-get install -y --no-install-recommends binutils \
+ && strip /usr/local/bin/solana* || true \
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 3000
 CMD ["node", ".next/standalone/server.js"]
