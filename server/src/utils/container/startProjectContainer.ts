@@ -2,6 +2,25 @@ import { execSync } from 'child_process';
 import pool from 'src/config/database';
 
 /**
+ * Checks if the Docker server version supports the --pull=always flag (added in 23.0.0)
+ */
+function dockerSupportsPullAlways(): boolean {
+  try {
+    const versionStr = execSync('docker version --format "{{.Server.Version}}"', 
+                      { encoding: 'utf8' }).trim();
+    const versionParts = versionStr.split('.').map(Number);
+    
+    // Simple semver comparison for major version
+    if (versionParts[0] >= 23) {
+      return true;
+    }
+    return false;
+  } catch {
+    return false; // On any error, assume the flag isn't supported
+  }
+}
+
+/**
  * Returns true when the Docker daemon is overlay2 on an XFS filesystem
  * mounted with the `pquota` option (the only case where `--storage-opt size=`
  * is accepted). Falls back to false on any error.
@@ -67,7 +86,12 @@ function ensureDockerSpace(minBytes = 3 * 1024 * 1024 * 1024): void {
  */
 export async function startProjectContainer(projId: string): Promise<string> {
   const name  = `userproj-${projId}-${Date.now()}`.slice(0, 63);        // 64-char limit
-  const image = process.env.SOLANAFLOW_BUILD_IMAGE ?? 'ghcr.io/sequence4/solana-toolchain:runtime-latest';
+  // Pin to a specific digest to ensure we always get the correct image version
+  const pinned = process.env.SF_RUNTIME_DIGEST ?? 
+                 'sha256:87acc435d4f84e2acbeaebff3049d7d81eaf482924b8d70c4dd1025d199dbe4c'; // last successful build
+  const baseImage = process.env.SOLANAFLOW_BUILD_IMAGE ?? 'ghcr.io/sequence4/solana-toolchain:runtime-latest';
+  const image = `${baseImage}@${pinned}`;
+  
   // 📦 three isolated caches
   const vCargo       = 'solanaflow-cargo-registry';
   const vTargetBuild = 'solanaflow-cargo-target';
@@ -82,7 +106,10 @@ export async function startProjectContainer(projId: string): Promise<string> {
     ensureDockerSpace();
 
     const runArgs: string[] = [
-      'docker', 'run', '--pull=always', '-d',
+      'docker', 'run',
+      // Only add --pull=always for Docker 23.0+
+      ...(dockerSupportsPullAlways() ? ['--pull=always'] : []),
+      '-d',
       '--platform', 'linux/arm64',
       '--name', name,
       '--label', `solanaflow.project=${projId}`,
