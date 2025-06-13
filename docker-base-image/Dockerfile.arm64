@@ -43,6 +43,7 @@ RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
     anchor init anchor-template --no-git --no-install \
  && (cd anchor-template && anchor build) \
  && rm -rf anchor-template/node_modules \
+ && rm -rf /usr/src/anchor-template \
  && mv anchor-template /usr/src/anchor-template \
  && rm -rf /tmp/* \
  && mkdir -p /cache-seed \

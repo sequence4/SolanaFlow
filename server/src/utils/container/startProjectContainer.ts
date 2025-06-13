@@ -67,7 +67,7 @@ function ensureDockerSpace(minBytes = 3 * 1024 * 1024 * 1024): void {
  */
 export async function startProjectContainer(projId: string): Promise<string> {
   const name  = `userproj-${projId}-${Date.now()}`.slice(0, 63);        // 64-char limit
-  const image = process.env.SOLANAFLOW_BUILD_IMAGE ?? 'ghcr.io/sequence4/solana-toolchain:latest';
+  const image = process.env.SOLANAFLOW_BUILD_IMAGE ?? 'ghcr.io/sequence4/solana-toolchain:runtime-latest';
   // 📦 three isolated caches
   const vCargo       = 'solanaflow-cargo-registry';
   const vTargetBuild = 'solanaflow-cargo-target';
