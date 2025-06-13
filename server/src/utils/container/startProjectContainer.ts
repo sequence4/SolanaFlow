@@ -93,7 +93,7 @@ export async function startProjectContainer(projId: string): Promise<string> {
       '-v', `${vTargetBuild}:/usr/src/target`,
       '-e', 'CARGO_TARGET_DIR=/usr/src/target',
       // always publish container port 3000 → random host port
-      '-p', '0.0.0.0:3000/tcp',
+      '-p', '0.0.0.0::3000/tcp',
       image
     ];
 
