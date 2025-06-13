@@ -236,7 +236,6 @@ export const Toolbox = () => {
                 toast.error("Build error", {
                     description: String(error)
                 });
-            } finally {
                 setIsBuilding(false);
             }
         } catch (err) {
