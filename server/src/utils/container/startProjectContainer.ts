@@ -75,7 +75,7 @@ export async function startProjectContainer(projId: string): Promise<string> {
 
   try {
     /* 1 ─ ensure image is present & host-arch-compatible */
-    execSync(`docker pull --quiet --platform linux/arm64 --pull-always ${image}`);
+    execSync(`docker pull --platform linux/arm64 ${image}`, { stdio: 'inherit' });
 
     /* 2 ─ run container with explicit platform, project label & random host-port */
     // NEW: make sure the host has enough free space (≥ 3 GiB)
