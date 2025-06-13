@@ -78,24 +78,26 @@ export async function startProjectContainer(projId: string): Promise<string> {
     execSync(`docker pull --platform linux/arm64 ${image}`, { stdio: 'inherit' });
 
     /* 2 ─ run container with explicit platform, project label & random host-port */
-    const quota = sizeOptSupported() ? '--storage-opt size=20G \\' : '';
-
     // NEW: make sure the host has enough free space (≥ 3 GiB)
     ensureDockerSpace();
 
-    execSync(
-      `docker run -d --platform linux/arm64 \
-       --name  ${name} \
-       --label solanaflow.project=${projId} \
-       ${quota} \
-       -v ${vCargo}:/root/.cargo \
-       -v ${vSccache}:/opt/sccache \
-       -v ${vTargetBuild}:/usr/src/target \
-       -e CARGO_TARGET_DIR=/usr/src/target \
-       -p 0.0.0.0::3000 \
-       ${image}`,
-      { stdio: 'inherit' }
-    );
+    const runArgs: string[] = [
+      'docker', 'run', '-d',
+      '--platform', 'linux/arm64',
+      '--name', name,
+      '--label', `solanaflow.project=${projId}`,
+      // attach 20 GiB quota only when overlay2 + xfs +pquota
+      ...(sizeOptSupported() ? ['--storage-opt', 'size=20G'] : []),
+      '-v', `${vCargo}:/root/.cargo`,
+      '-v', `${vSccache}:/opt/sccache`,
+      '-v', `${vTargetBuild}:/usr/src/target`,
+      '-e', 'CARGO_TARGET_DIR=/usr/src/target',
+      // always publish container port 3000 → random host port
+      '-p', '0.0.0.0:3000/tcp',
+      image
+    ];
+
+    execSync(runArgs.join(' '), { stdio: 'inherit' });
 
     return name;
   } catch (err: any) {
