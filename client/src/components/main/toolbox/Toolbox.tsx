@@ -164,6 +164,8 @@ export const Toolbox = () => {
                  *  never appears)                                    *
                  * -------------------------------------------------- */
                 setIsBuilding(true);
+                setBuildPercent(0);                     // show the bar right away
+                setBuildStage("Starting build…");       // human-readable label
 
                 /* -------------------------------------------------- *
                  *  OPEN SERVER-SENT EVENTS STREAM
