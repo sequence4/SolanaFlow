@@ -144,26 +144,18 @@ export const Toolbox = () => {
     };
     
     const handleConfirmBuild = useCallback(async () => {
-        if (isBuilding) return;
+        if (!fileTree) return;                        // still gate on code presence
         
         try {
+            /* Guarantee we have a project id */
             const id = await ensureId(projectContext, setProjectContext);
             
-            setBuildPercent(0);
-            setBuildStage("Starting…");
-            
-            // -----------------------------------------------------------------
-            //  Run the heavy build pipeline *after* the fast metadata insert
-            // -----------------------------------------------------------------
-            const graphNodes = projectContext.details?.projectState?.nodes ?? [];
-
-            /* Guard: fail fast if the user hasn't placed any workflow nodes */
-            if (graphNodes.length === 0) {
-              toast.error("Add at least one node to the workflow before building");
-              return;
-            }
-
-            const graph = { nodes: graphNodes };   // shape backend expects
+            /* shape backend expects */
+            const graph = {
+                nodes: projectContext.details?.projectState?.nodes || [],
+                edges: projectContext.details?.projectState?.edges || [],
+                config: projectContext.details?.projectState?.config || {},
+            };
             
             try {
                 /* -------------------------------------------------- *
@@ -172,6 +164,8 @@ export const Toolbox = () => {
                  *  never appears)                                    *
                  * -------------------------------------------------- */
                 setIsBuilding(true);
+                setBuildPercent(0);                     // show the bar right away
+                setBuildStage("Starting build…");       // human-readable label
 
                 /* -------------------------------------------------- *
                  *  OPEN SERVER-SENT EVENTS STREAM
@@ -195,8 +189,14 @@ export const Toolbox = () => {
                       }
                     }
 
-                    /* 3. Human-readable status line                 */
+                    /* 3. Human-readable status line */
                     setBuildStage(msg.message ?? msg.stage);
+
+                    /* 4. Handle file tree updates */
+                    if (msg.fileTree) {
+                      console.log(`[BUILD] Received fileTree update`);
+                      setFileTree(structuredClone(msg.fileTree));
+                    }
 
                     // Close modal & reset when build completes
                     if (msg.stage === "done" || msg.stage === "build-done") {
@@ -236,7 +236,6 @@ export const Toolbox = () => {
                 toast.error("Build error", {
                     description: String(error)
                 });
-            } finally {
                 setIsBuilding(false);
             }
         } catch (err) {
@@ -246,7 +245,7 @@ export const Toolbox = () => {
             });
             setIsBuilding(false);
         }
-    }, [isBuilding, setIsBuilding, projectContext, setProjectContext]);
+    }, [isBuilding, setIsBuilding, projectContext, setProjectContext, setFileTree, fileTree]);
     
     const handleBuildClick = async () => {
       if (!fileTree) return;                        // still gate on code presence
