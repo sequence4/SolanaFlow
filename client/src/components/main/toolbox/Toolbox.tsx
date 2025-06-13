@@ -16,7 +16,6 @@ import { toast } from "sonner";
 import clsx from "clsx";
 import PulseLoader from "react-spinners/PulseLoader";
 import { handleConfirmNewProject, handleOpenProject, handleSaveClick, handleNewProjectClick } from '@/utils/project/projectUtils';
-import { useTaskLogs } from '@/context/logs/useTaskLogs';
 import {
   Search,
   X,
@@ -33,11 +32,13 @@ import {
   Hammer,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import { runDeployPipelineWithLogs } from '@/utils/deploy/deployPipeline';
+import { deployPipeline } from '@/api/deployPipeline';
 import { useWalletSigner } from '@/utils/wallet';
 import { ensureId } from '@/utils/project/ensureId';
 import { ProgramDeployer } from '@/components/ProgramDeployer';
+import { BuildModal } from '@/components/BuildModal';
 import { projectApi } from '@/api/projectApi';
+import { useTaskLogs } from '@/context/logs/useTaskLogs';
 
 // Add this constant after the imports section
 // Prevent duplicate "wallet not connected" toasts
@@ -45,6 +46,21 @@ const WALLET_TOAST_ID = 'wallet-not-connected';
 
 /** Memo-friendly helpers */
 const NEED_BUILD_TOAST_ID = 'need-build';   // prevents duplicates
+
+/**
+ * Full sequence of stages streamed by the deploy-pipeline SSE.
+ * Keep this list in the exact order the server emits them so that
+ * (idx+1)/length → percentage works.
+ */
+const STAGES = [
+  { stage: "file-tree" },
+  { stage: "file-tree-done" },
+  { stage: "src-gen" },
+  { stage: "src-write" },
+  { stage: "build" },
+  { stage: "build-done" },
+  { stage: "done" },
+] as const;
 
 export const Toolbox = () => {
     const [isExpanded] = useState(true);
@@ -58,8 +74,9 @@ export const Toolbox = () => {
     const [isFocused, setIsFocused] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const nodeItemsRef = useRef<any>(null);
-    const esRef = useRef<ReturnType<typeof runDeployPipelineWithLogs> | null>(null);
+    const esRef = useRef<ReturnType<typeof deployPipeline> | null>(null);
     const [artifactUrl, setArtifactUrl] = useState<string | null>(null);
+    const taskLogs = useTaskLogs();
     
     const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
     const [isProjectListModalOpen, setIsProjectListModalOpen] = useState(false);
@@ -68,9 +85,11 @@ export const Toolbox = () => {
     const [isDeploying, setIsDeploying] = useState(false);
     const [isBuilding, setIsBuilding] = useState(false);
     const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
+    const [isBuildModalOpen, setIsBuildModalOpen] = useState(false);
+    const [buildProjectId, setBuildProjectId] = useState<string | null>(null);
+    const [buildPercent, setBuildPercent] = useState<number | null>(null);
+    const [buildStage, setBuildStage] = useState<string>("Waiting…");
     
-    const taskLogs = useTaskLogs();
-    const [modalOpen, setModalOpen] = useState(false);
     const walletSigner = useWalletSigner();
 
     useEffect(() => {
@@ -96,15 +115,13 @@ export const Toolbox = () => {
     };
 
     const handleCreateProject = (data: { name: string; description: string; repoUrl?: string }) => {
-        taskLogs.resetLogs();
-        
         handleConfirmNewProject(
-            projectContext, 
-            setProjectContext, 
-            data.name, 
-            data.description, 
-            projectsRefreshCounter, 
-            setProjectsRefreshCounter, 
+            projectContext,
+            setProjectContext,
+            data.name,
+            data.description,
+            projectsRefreshCounter,
+            setProjectsRefreshCounter,
             setUxOpenPanel as (p: string) => void,
             setFileTree,
             setSelectedFile,
@@ -126,47 +143,71 @@ export const Toolbox = () => {
         );
     };
     
-    const handleBuildClick = useCallback(async () => {
+    const handleConfirmBuild = useCallback(async () => {
         if (isBuilding) return;
         
         try {
             const id = await ensureId(projectContext, setProjectContext);
             
-            setIsBuilding(true);
-            taskLogs.setIsBuilding(true);
+            setBuildPercent(0);
+            setBuildStage("Starting…");
             
             // -----------------------------------------------------------------
             //  Run the heavy build pipeline *after* the fast metadata insert
             // -----------------------------------------------------------------
-            taskLogs.resetLogs();
-            taskLogs.setIsVisible(true);
-            taskLogs.addSystemLog("🔨 Building program...");
-            
-            const graph = {
-                ...(projectContext.details?.projectState ?? {}),
-                nodes: projectContext.details?.projectState?.nodes ?? [],
-            };
+            const graphNodes = projectContext.details?.projectState?.nodes ?? [];
+
+            /* Guard: fail fast if the user hasn't placed any workflow nodes */
+            if (graphNodes.length === 0) {
+              toast.error("Add at least one node to the workflow before building");
+              return;
+            }
+
+            const graph = { nodes: graphNodes };   // shape backend expects
             
             try {
-                // Run the build pipeline
-                await new Promise<void>((resolve, reject) => {
-                    try {
-                        esRef.current = runDeployPipelineWithLogs(
-                            { ...projectContext, id },
-                            graph,
-                            taskLogs,
-                            setProjectContext,
-                            setArtifactUrl,
-                            (status?: 'error') => status === 'error' ? reject(new Error('Build failed')) : resolve(),
-                            setFileTree
+                /* -------------------------------------------------- *
+                 *  Tell the UI we are building (must be BEFORE the   *
+                 *  first render of <BuildModal>, otherwise the bar   *
+                 *  never appears)                                    *
+                 * -------------------------------------------------- */
+                setIsBuilding(true);
+
+                /* -------------------------------------------------- *
+                 *  OPEN SERVER-SENT EVENTS STREAM
+                 * -------------------------------------------------- */
+                esRef.current = deployPipeline(
+                  projectContext.id ?? id,
+                  graph,
+                  (msg: any) => {
+                    /* 1. Prefer explicit numeric progress from server */
+                    if (typeof msg.progress === "number") {
+                      setBuildPercent(Math.max(0, Math.min(msg.progress, 100)));
+                    } else {
+                      /* 2. Otherwise fall back to coarse stage map */
+                      const idx = STAGES.findIndex(
+                        (s) => s.stage === msg.stage
+                      );
+                      if (idx >= 0) {
+                        setBuildPercent(
+                          Math.round(((idx + 1) / STAGES.length) * 100)
                         );
-                    } catch (error) {
-                        reject(error);
+                      }
                     }
-                });
-                
-                taskLogs.addSystemLog("✅ Build completed successfully!");
-                
+
+                    /* 3. Human-readable status line                 */
+                    setBuildStage(msg.message ?? msg.stage);
+
+                    // Close modal & reset when build completes
+                    if (msg.stage === "done" || msg.stage === "build-done") {
+                      setIsBuilding(false);
+                      setIsBuildModalOpen(false);
+                      esRef.current?.close();
+                    }
+                  },
+                  true         // walletSigned (kept true)
+                );
+
                 // 1.  **Always** update the local context immediately so the UI reacts
                 setProjectContext(prev => ({
                   ...prev,
@@ -190,17 +231,13 @@ export const Toolbox = () => {
                   });
                 }
                 
-                toast.success("Build completed");
-                
             } catch (error) {
                 console.error('[build] Build error:', error);
-                taskLogs.addSystemLog(`❌ Error: ${error instanceof Error ? error.message : String(error)}`);
-                toast.error("Build failed", {
+                toast.error("Build error", {
                     description: String(error)
                 });
             } finally {
                 setIsBuilding(false);
-                taskLogs.setIsBuilding(false);
             }
         } catch (err) {
             console.error('[build] Error:', err);
@@ -209,7 +246,18 @@ export const Toolbox = () => {
             });
             setIsBuilding(false);
         }
-    }, [isBuilding, setIsBuilding, taskLogs, projectContext, setProjectContext, setArtifactUrl, setFileTree]);
+    }, [isBuilding, setIsBuilding, projectContext, setProjectContext]);
+    
+    const handleBuildClick = async () => {
+      if (!fileTree) return;                        // still gate on code presence
+    
+      /* Guarantee we have a project id */
+      const id = await ensureId(projectContext, setProjectContext);
+      setBuildProjectId(id);
+    
+      /* Now open the confirmation modal */
+      setIsBuildModalOpen(true);
+    };
     
     const projectDeployed = !!projectContext?.details?.projectState?.deployed;
     const built = !!projectContext.details?.projectState?.built;
@@ -292,12 +340,7 @@ export const Toolbox = () => {
     }, []);
 
     useEffect(() => {
-        return () => {
-            if (esRef.current) {
-                console.log('[deploy] Closing EventSource on unmount');
-                esRef.current.close();
-            }
-        };
+        return () => esRef.current?.close();
     }, []);
 
     return (
@@ -389,17 +432,17 @@ export const Toolbox = () => {
                     <div className="grid grid-cols-1 gap-2 mb-4">
                         <button
                             onClick={handleBuildClick}
-                            disabled={!fileTree || isBuilding}
+                            disabled={!fileTree}
                             className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center"
                         >
-                            {isBuilding ? (
+                            <>
+                              {isBuilding ? (
                                 <PulseLoader color="#9de19f" size={3} cssOverride={{ display: 'inline-block', margin: 0 }} />
-                            ) : (
-                                <>
-                                    <Hammer className="h-4 w-4 mr-2 text-[#22c55e]" />
-                                    <span>Build</span>
-                                </>
-                            )}
+                              ) : (
+                                <Hammer className="h-4 w-4 mr-2 text-[#22c55e]" />
+                              )}
+                              <span>Build</span>
+                            </>
                         </button>
                         <div className="relative">
                             <button
@@ -568,27 +611,6 @@ export const Toolbox = () => {
                 onSubmit={handleCreateProject}
             />
 
-            {/* Project creation modal */}
-            <NewProjectModal
-                open={modalOpen}
-                onOpenChange={setModalOpen}
-                onSubmit={async (data) => {
-                    const response = await projectApi.createProject({
-                        name: data.name,
-                        description: data.description,
-                    });
-                    
-                    setProjectContext(prev => ({
-                        ...prev,
-                        id: response.project.id,
-                        name: data.name,
-                        description: data.description,
-                    }));
-                    
-                    setModalOpen(false);
-                }}
-            />
-            
             {/* Program deployer modal */}
             {isDeployModalOpen && projectContext.id && (
                 <ProgramDeployer
@@ -596,6 +618,18 @@ export const Toolbox = () => {
                     isOpen={isDeployModalOpen}
                     onClose={() => setIsDeployModalOpen(false)}
                     onSuccess={handleDeploySuccess}
+                />
+            )}
+
+            {/* Build confirmation modal (uses guaranteed id) */}
+            {isBuildModalOpen && buildProjectId && (
+                <BuildModal
+                    isOpen={isBuildModalOpen}
+                    isBuilding={isBuilding}
+                    percent={buildPercent}
+                    stage={buildStage}
+                    onClose={() => setIsBuildModalOpen(false)}
+                    onSuccess={handleConfirmBuild}
                 />
             )}
 

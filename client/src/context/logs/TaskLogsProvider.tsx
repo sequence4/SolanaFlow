@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import TaskLogsContext, { TaskLog, Step } from "./TaskLogsContext";
 
 // Define the canonical stages list to be used across the app
@@ -25,6 +25,26 @@ export default function TaskLogsProvider({
   const [showDetails, setShowDetails] = useState(false);
   const [systemLogs, setSystemLogs] = useState<string[]>([]);
   const [isBuilding, setIsBuilding] = useState(false);
+  const [lastMessage, setLastMessage] = useState<string>("");
+
+  /* ---------- very lightweight observer list ---------- */
+  type ProgressCB = (e: { progress: number; message: string }) => void;
+  const subs = useRef<Set<ProgressCB>>(new Set()).current;
+
+  const onProgress = useCallback(
+    (cb: ProgressCB) => {
+      subs.add(cb);
+      return () => subs.delete(cb);            // unsubscribe
+    },
+    [subs],
+  );
+
+  /* Notify on every progress mutation */
+  const notify = useCallback(
+    (p: number, msg: string) =>
+      subs.forEach((fn) => fn({ progress: p, message: msg })),
+    [subs],
+  );
   
   // Reset when progress reaches 100%
   useEffect(() => {
@@ -60,6 +80,7 @@ export default function TaskLogsProvider({
 
   const addSystemLog = useCallback((log: string) => {
     setSystemLogs((prev) => [...prev, log]);
+    setLastMessage(log);
     
     // Also make the toast visible when system logs are added
     if (!isVisible) {
@@ -81,6 +102,7 @@ export default function TaskLogsProvider({
     setProgress(0);
     setCurrentStep(-1); // Reset to "waiting" state
     setSystemLogs([]);
+    setLastMessage("");
     // Keep steps until a new task explicitly sets them
     // setSteps([]); 
     setShowDetails(false); // Reset details view as well
@@ -92,6 +114,12 @@ export default function TaskLogsProvider({
     setCurrentStep(index);
     setIsVisible(true);
   }, []);
+
+  // Wrap setProgress to also notify subscribers
+  const setWrappedProgress = useCallback((p: number) => {
+    setProgress(p);
+    notify(p, lastMessage);
+  }, [notify, lastMessage]);
 
   return (
     <TaskLogsContext.Provider
@@ -108,8 +136,10 @@ export default function TaskLogsProvider({
         nodeVersion: "v18.12.1",
         isBuilding,
         
+        onProgress,
+        
         addLog,
-        setProgress,
+        setProgress: setWrappedProgress,
         setCurrentStep,
         setIsVisible,
         setShowDetails,

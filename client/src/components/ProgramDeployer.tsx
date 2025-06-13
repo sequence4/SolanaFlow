@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Keypair, PublicKey } from '@solana/web3.js';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { toast } from 'sonner';
 import { downloadArtifact } from '@/api/projectArtifact';
@@ -38,8 +37,6 @@ export function ProgramDeployer({
   const [byteLength, setByteLength] = useState(0);
   const [progress, setProgress] = useState<number | null>(null);
   const [deployStage, setDeployStage] = useState<string>('');
-  const [currentChunk, setCurrentChunk] = useState(0);
-  const [totalChunks, setTotalChunks] = useState(0);
 
   // ────────────────────────────────────────────────────────────────
   //  Guards that survive React 18 Strict-Mode double-mounts
@@ -91,35 +88,46 @@ export function ProgramDeployer({
 
       if (isLoading) return;                  
       setIsLoading(true);
-      setProgress(1);                   // bar visible while wallet prompt is open
-      console.log('🚀 Starting deployment…');
+
+      // Show progress bar before wallet popup
+      setProgress(1);                   // 1 % so progress bar is shown during wallet prompt
 
       // 🖌️  let React flush this paint BEFORE the wallet popup blocks the thread
       await new Promise(r => setTimeout(r, 0));
 
       try {
+        if (!programBytes) {
+          toast.error('Program bytes missing');
+          return;
+        }
+
         // 1. create key & tell backend
         const ephem = await createAndRegisterEphemeral(projectId);
         console.log(`🔑 Ephemeral key: ${ephem.publicKey.toBase58()}`);
 
         // 2. run the local-wallet deploy signer that **pays fees**
         const deployResult = await deployWithEphemeralKey({
-          soBytes: programBytes!,
+          soBytes: programBytes,
           connection,
           wallet,
-          /** explicit generic helps TS infer correct overload */
           ephemeralKeypair: ephem,
-          onProgress: (progress, message) => {
-            setProgress(progress);
-            setDeployStage(message);   // NEW – let UI text update
-            console.log(message);
+          verifyTimeoutMs: 120_000,      // allow 2 min for the authority–swap RPC to settle
+          onProgress: (raw, message) => {
+            const pct = raw <= 1 ? Math.round(raw * 100) : Math.round(raw);
+            setProgress(Math.max(1, Math.min(pct, 100)));
+            setDeployStage(message ?? '');
+            console.log('[DEPLOY]', pct + '%', message);
           }
         });
 
         if (deployResult.success) {
+          // if we only got a "lag" warning, surface it once then treat as success
+          if (deployResult.warning) {
+            toast.warning(deployResult.warning);
+          }
           onSuccess(deployResult.programId.toBase58());
         }
-        
+
         /* 5 – success UX */
         toast.success('Program deployed with ephemeral key', {
           description: `Program ID: ${deployResult.programId.toBase58()}`,
@@ -133,19 +141,21 @@ export function ProgramDeployer({
           },
         });
 
-        onSuccess(deployResult.programId.toBase58());
         onClose();
       } catch (err: any) {
         console.error(err);
         toast.error('Deployment failed', { description: err.message });
       } finally {
-        setIsLoading(false);           // re-enable UI
-        setProgress(null);             // hide bar fully
+        setIsLoading(false);           // re-enable UI; keep bar until verify step finishes
+        setTimeout(() => {
+          setProgress(null);           // fade bar after UX settles
+          setDeployStage('');         // clear stage text
+        }, 750);
 
         backendRunningRef.current = false;
         backendStartedRef.current = false;  // dialog can deploy again if reopened
       }
-    }, [isLoading, projectId, programBytes, connection, wallet, onSuccess, onClose]);
+    }, [isLoading, projectId, programBytes, wallet, onSuccess, onClose]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !isLoading && !open && onClose()}>
@@ -187,7 +197,7 @@ export function ProgramDeployer({
                 </div>
               )}
               
-              {isLoading && progress !== null && (
+              {progress !== null && (
                 <div className="space-y-2 mt-4">
                   <>
                     <div className="flex items-center justify-between">

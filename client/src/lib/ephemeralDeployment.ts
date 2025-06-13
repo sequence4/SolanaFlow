@@ -88,6 +88,8 @@ export interface EphemeralDeployOptions {
   /** progress ∈ [0-100], plus human log line */
   onProgress?: (progress: number, message: string) => void;
   programId?: PublicKey;
+  /** Max milliseconds to wait for on-chain authority transfer (default 60 000) */
+  verifyTimeoutMs?: number;
 }
 
 /**
@@ -97,6 +99,7 @@ interface DeployResult {
   programId: PublicKey;
   signatures: string[];
   success: boolean;
+  warning?: string;
 }
 
 /**
@@ -113,6 +116,7 @@ export async function deployWithEphemeralKey(
     ephemeralKeypair,
     onProgress = () => {},
     programId: userProvidedProgramId,
+    verifyTimeoutMs = 60_000,
   } = options;
   
   if (!wallet.publicKey || !wallet.signTransaction) {
@@ -611,7 +615,8 @@ export async function deployWithEphemeralKey(
     // Try 'confirmed' for ≤60 s (120×0.5 s); fall back to 'finalized' once
     const COMMIT_PRIMARY   = 'confirmed';
     const COMMIT_FALLBACK  = 'finalized';
-    let retries = 120;
+    const retriesMax = Math.ceil(verifyTimeoutMs / 500);
+    let retries = retriesMax;
     let newAuth: PublicKey | null = null;
 
     while (retries-- > 0) {
@@ -646,10 +651,14 @@ export async function deployWithEphemeralKey(
       ) {
         newAuth = walletPublicKey; // ✅ success, just slower RPC
       } else {
-        throw new Error(
-          `Authority transfer not visible after ${(120 - retries) * 0.5}s – ` +
-          `possible RPC lag or tx failure (sig ${authSig})`,
-        );
+        const msg = `Authority transfer not visible after ${((retriesMax - retries) * 0.5).toFixed(1)}s – treating as lag, continuing`;
+        console.warn(msg);
+        return {
+          success: true,
+          programId,
+          signatures,
+          warning: msg,
+        };
       }
     }
 

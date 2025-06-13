@@ -24,6 +24,14 @@ export interface TaskLogsContextType {
   nodeVersion: string;
   isBuilding: boolean;
   
+  /**
+   * Subscribe to fine-grained progress updates without forcing a
+   * whole-tree re-render. Returns an unsubscribe function.
+   */
+  onProgress: (
+    cb: (ev: { progress: number; message: string }) => void
+  ) => () => void;
+  
   addLog: (message: string) => void;
   setProgress: (progress: number) => void;
   setCurrentStep: (step: number) => void;
@@ -48,6 +56,8 @@ const TaskLogsContext = createContext<TaskLogsContextType>({
   networkStats: "4.2 MB/s",
   nodeVersion: "v18.12.1",
   isBuilding: false,
+  
+  onProgress: () => () => {},
   
   addLog: () => {},
   setProgress: () => {},
