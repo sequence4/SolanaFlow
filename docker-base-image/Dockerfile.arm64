@@ -58,7 +58,7 @@ RUN solana --version && cargo build-sbf --version && anchor --version
 ###############################################################################
 FROM solana-toolchain AS chef
 WORKDIR /app
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml Cargo.lock src/ ./
 RUN cargo chef prepare --recipe-path recipe.json
 
 FROM solana-toolchain AS cooker
