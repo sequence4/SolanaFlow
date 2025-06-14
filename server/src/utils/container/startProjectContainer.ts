@@ -115,12 +115,11 @@ export async function startProjectContainer(projId: string): Promise<string> {
       '-v', `${vSccache}:/opt/sccache`,
       '-v', `${vTargetBuild}:/usr/src/target`,
       '-e', 'CARGO_TARGET_DIR=/usr/src/target',
+      '-e', 'HOSTNAME=0.0.0.0',
       // publish container port 3000 → random host port
       '-p', '0:3000',
       image,
-      // keep container alive and forward TERM/INT to Next.js
-      'bash', '-lc',
-      'node /usr/share/solanaflow/web/.next/standalone/server.js & pid=$!; trap "kill $pid" TERM INT; wait $pid'
+      'bash', '-lc', 'node /usr/share/solanaflow/web/.next/standalone/server.js & pid=$!; trap "kill $pid" TERM INT; wait $pid'
     ];
 
     execSync(runArgs.join(' '), { stdio: 'inherit' });
