@@ -36,7 +36,7 @@ RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
  && apt-get clean && rm -rf /var/lib/apt/lists/* \
  && strip /usr/local/bin/solana*
 
-RUN rustup default stable --profile minimal
+RUN rustup set profile minimal && rustup default stable
 
 
 # warm the BPF / SBF cache once so first user build is instant
