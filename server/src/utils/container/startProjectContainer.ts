@@ -122,6 +122,7 @@ export async function startProjectContainer(projId: string): Promise<string> {
       'bash', '-lc', 'node /usr/share/solanaflow/web/.next/standalone/server.js & pid=$!; trap "kill $pid" TERM INT; wait $pid'
     ];
 
+    console.log('[startProjectContainer] RUN CMD:\n', runArgs.join(' '));
     execSync(runArgs.join(' '), { stdio: 'inherit' });
 
     return name;
