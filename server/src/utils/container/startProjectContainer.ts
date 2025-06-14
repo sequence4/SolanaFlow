@@ -104,9 +104,7 @@ export async function startProjectContainer(projId: string): Promise<string> {
     ensureDockerSpace();
 
     const runArgs: string[] = [
-      'docker', 'run',
-      // Only add --pull=always for Docker 23.0+
-      ...(dockerSupportsPullAlways() ? ['--pull=always'] : []),
+      'docker', 'run', '--pull=always',
       '-d',
       '--platform', 'linux/arm64',
       '--name', name,
