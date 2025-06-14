@@ -138,12 +138,13 @@ COPY --from=builder /usr/share/solanaflow/web/.next/standalone \
 ## ② static assets **duplicated** where the standalone server expects them
 COPY --from=builder /usr/share/solanaflow/web/.next/static \
     /usr/share/solanaflow/web/.next/static
-#            (kept for completeness)
+#
+# -------------- NEW: correct location for standalone build -------------------
 COPY --from=builder /usr/share/solanaflow/web/.next/static \
-    /usr/share/solanaflow/web/.next/standalone/static
-#            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# Next 15's server resolves  "/_next/static/*"  from this dir,
-# so we provide a second copy right next to server.js.
+    /usr/share/solanaflow/web/.next/standalone/_next/static
+#                               ↑↑ note the "_next/static" sub-folder
+# Next.js standalone server expects      /_next/static/*     to be relative to
+#      dirname(server.js) + '/_next/static'   — this copy satisfies that.
 
 ## ③ public/  (images, favicon …)
 COPY --from=builder /usr/share/solanaflow/web/public           /usr/share/solanaflow/web/public
@@ -152,6 +153,9 @@ COPY --from=builder /usr/share/solanaflow/web                  /usr/share/solana
 COPY --from=solana-toolchain /usr/src/anchor-template /usr/src/anchor-template
 # bring in the exact Node we used to build the standalone bundle
 COPY --from=builder /root/.nvm/versions/node/v20.18.0/bin/node /usr/local/bin/node
+#
+# --------------------------------------------------------------------------------
+# everything below this line is unchanged
 
 RUN solana --version && anchor --version
 RUN cargo --version  && rustc --version
