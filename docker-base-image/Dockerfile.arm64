@@ -95,6 +95,8 @@ RUN . "$NVM_DIR/nvm.sh" \
  && npm i -g yarn
 
 ENV NEXT_TELEMETRY_DISABLED=1 NEXT_SKIP_ESLINT=1
+# --- Force Next 14 + to emit the standalone bundle ---------------------------
+ENV NEXT_PRIVATE_STANDALONE=true
 RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing=locked \
     mkdir -p /usr/share/solanaflow \
  && CI=1 yarn create next-app /usr/share/solanaflow/web \
@@ -133,7 +135,7 @@ RUN apt-get update -qq \
 EXPOSE 3000
 # Next 15+ puts the entry-point at  .next/standalone/server.js
 # https://vercel.com/guides/nextjs-advanced-features#standalone-build-output
-CMD ["node", ".next/standalone/server.js"]
+CMD ["node", "/usr/share/solanaflow/web/.next/standalone/server.js"]
 
 # create a separate stage for seeding the target volume
 FROM solana-toolchain AS seed-target
