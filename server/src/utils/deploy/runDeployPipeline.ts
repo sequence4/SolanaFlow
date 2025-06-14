@@ -241,7 +241,7 @@ export async function runDeployPipeline({
           "mkdir -p idl; " +
           `if [ -f target/idl/${programName}.json ]; then ` +
           // update .metadata.address in-place with jq (no temp file needed)
-          `jq --arg addr '${programId}' '.metadata.address = $addr' ` +
+          `jq --arg addr '${programId}' '.metadata.address = \\$addr' ` +
           `target/idl/${programName}.json > idl/solanaflow_token.json; ` +
           `echo 'IDL copied to idl/solanaflow_token.json'; ` +
           "else " +
