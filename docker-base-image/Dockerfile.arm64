@@ -133,11 +133,11 @@ COPY --from=builder /root/.nvm/versions/node/v20.18.0/bin/node /usr/local/bin/no
 RUN solana --version && anchor --version
 RUN cargo --version  && rustc --version
 RUN apt-get update -qq \
- # ---------- core build tool-chain ---------- #
  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      build-essential        \  # gcc, g++, make, /usr/bin/cc
-      clang lld llvm         \  # Solana/Anchor SBF linker
-      pkg-config libssl-dev  \  # common Rust crate build deps
+      # --- core build tool-chain --- \
+      build-essential \            # gcc, g++, make, /usr/bin/cc
+      clang lld llvm \             # Solana / Anchor SBF linker
+      pkg-config libssl-dev \      # common Rust crate build deps
       binutils ca-certificates \
  && update-ca-certificates \
  # defensive: be sure /usr/bin/cc exists even if clang is preferred
