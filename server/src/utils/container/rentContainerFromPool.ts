@@ -68,6 +68,11 @@ export async function rentContainerFromPool(): Promise<RentedContainer | null> {
     
     // Persist the random host-port (needed so the same donor is not re-selected)
     const hostPort = Number(url.split(':').pop());
+    if (hostPort === 0) {
+      throw new Error(
+        `[rent] container ${name} started without a published 3000/tcp port`
+      );
+    }
     if (!Number.isNaN(hostPort)) {
       await pool.query(
         'UPDATE warm_container_pool SET port = $2 WHERE name = $1',

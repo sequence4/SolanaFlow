@@ -8,7 +8,8 @@
         "lint": "eslint . --ext .ts",
         "test": "jest --runInBand --passWithNoTests src/__tests__/placeholder.test.ts",
         "test:watch": "jest --watchAll   --config jest.config.js",
-        "test:cov": "jest --coverage   --config jest.config.js"
+        "test:cov": "jest --coverage   --config jest.config.js",
+        "seed:warm": "ts-node -r tsconfig-paths/register scripts/seedWarmDonor.ts"
     },
     "_moduleAliases": {
         "@": "dist"
