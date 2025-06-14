@@ -1,6 +1,9 @@
+import * as dotenv from 'dotenv-flow';
+dotenv.config();            // loads .env, .env.local, .env.$NODE_ENV …
+
 import { execSync } from "child_process";
 import { v4 as uuidv4 } from "uuid";
-import pool from "../src/config/database";
+import pool from "../src/config/database";   // module-alias takes care of "@/…"
 
 /**
  * Seeds ONE "warm" donor container:
@@ -16,6 +19,12 @@ async function main() {
   const image =
     process.env.SOLANAFLOW_BUILD_IMAGE ??
     "ghcr.io/sequence4/solana-toolchain:runtime-latest";
+
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    console.error("[seed] DATABASE_URL is undefined – aborting.");
+    process.exit(1);
+  }
 
   const name = `warm-${uuidv4()}`.slice(0, 63); // Docker name ≤ 63 chars
   console.log(`[seed] creating donor ${name} from ${image}`);
