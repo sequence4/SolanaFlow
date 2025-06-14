@@ -318,13 +318,19 @@ export const handleGenerateCode = async ({
             await runCommand(
               `docker exec ${workspace.containerName} bash -c "` +
               `set -e; cd /usr/share/solanaflow/web && ` +
-              `yarn install --frozen-lockfile && ` +
+              // 0) add UI deps (idempotent if already present)
+              `yarn add --exact --silent lucide-react tailwind-variants class-variance-authority ` +
+              `@radix-ui/react-popover @radix-ui/react-slot && ` +
+              // 1) install everything declared in package.json
+              `yarn install --frozen-lockfile --silent && ` +
+              // 2) build the standalone bundle
               `yarn build && ` +
+              // 3) copy assets next to server.js so the minimal server can serve them
               `cp -R .next/static .next/standalone/.next/static && ` +
               `cp -R public .next/standalone/public"`,
               ".",
               nextBuildTaskId,
-              { skipSuccessUpdate: true }   // we emit progress above; no auto status spam
+              { skipSuccessUpdate: true }
             );
             sendProgress({ stage: 'next-build-done', message: 'Next bundle rebuilt' });
             // ───────────────────────────────────────────────────────────────────────────────────
