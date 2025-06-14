@@ -16,6 +16,7 @@ import { waitForTaskCompletion, getTaskById } from "../taskUtils";
 import { deriveProgramId } from "../../utils/deriveProgramId";
 import path from "path";
 import { attachFileContents } from "../fileUtils/attachFileContents";
+import { v4 as uuidv4 } from "uuid";
 
 interface PipelineArgs {
   projectId: string;
@@ -231,31 +232,23 @@ export async function runDeployPipeline({
         const programName = 'my_program'; // Using the same default as in handleGenerateCode
 
         // Generate a task ID for running commands
-        const idlTaskId = `idl-${projectId}-${Date.now()}`;
+        const idlTaskId = uuidv4();           // always a valid UUID
+        const copyIdlCmd = `
+set -e
+cd /usr/src/${rootPath}
+mkdir -p idl
+if [ -f target/idl/${programName}.json ]; then
+  jq --arg addr "${programId}" '.metadata.address = $addr' \
+     target/idl/${programName}.json \
+     > idl/solanaflow_token.json
+  echo "IDL copied to idl/solanaflow_token.json"
+else
+  echo '{}' > idl/solanaflow_token.json
+  echo "IDL placeholder generated"
+fi`;
 
-        // Copy the IDL from target/idl to our frontend idl directory
-        const copyIdlCmd = [
-          `cd /usr/src/${rootPath}`,
-          // Make sure target/idl exists and the program IDL exists
-          `if [ -f target/idl/${programName}.json ]; then`,
-          // Read the IDL file content
-          `  IDL_CONTENT=$(cat target/idl/${programName}.json)`,
-          // Parse and update the IDL with the correct programId using jq
-          `  UPDATED_IDL=$(echo "$IDL_CONTENT" | jq '.metadata.address = "${programId}"')`,
-          // Make sure the idl directory exists
-          `  mkdir -p idl`,
-          // Write the updated IDL to the frontend location
-          `  echo '$UPDATED_IDL' > idl/solanaflow_token.json`,
-          `  echo "IDL copied to idl/solanaflow_token.json"`,
-          `else`,
-          `  echo "IDL file not found at target/idl/${programName}.json"`,
-          `  echo "{}" > idl/solanaflow_token.json`,
-          `fi`
-        ].join(" && ");
-
-        // Execute the command in the container
         await runCommand(
-          `docker exec ${workspace.containerName} bash -c '${copyIdlCmd}'`,
+          `docker exec ${workspace.containerName} bash -c "${copyIdlCmd.replace(/\n/g, ' && ')}"`,
           ".",
           idlTaskId,
           { skipSuccessUpdate: true }
