@@ -130,8 +130,22 @@ COPY --from=solana-toolchain /root/.rustup /root/.rustup
 #   web/.next/standalone/…   (server code)
 #   web/.next/static/…       (css/js chunks, fonts, images…)
 #   web/public/…             (static public assets)
-COPY --from=builder /usr/share/solanaflow/web/.next/standalone /usr/share/solanaflow/web/.next/standalone
-COPY --from=builder /usr/share/solanaflow/web/.next/static     /usr/share/solanaflow/web/.next/static
+
+## ① server code — unchanged
+COPY --from=builder /usr/share/solanaflow/web/.next/standalone \
+    /usr/share/solanaflow/web/.next/standalone
+
+## ② static assets **duplicated** where the standalone server expects them
+COPY --from=builder /usr/share/solanaflow/web/.next/static \
+    /usr/share/solanaflow/web/.next/static
+#            (kept for completeness)
+COPY --from=builder /usr/share/solanaflow/web/.next/static \
+    /usr/share/solanaflow/web/.next/standalone/static
+#            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# Next 15's server resolves  "/_next/static/*"  from this dir,
+# so we provide a second copy right next to server.js.
+
+## ③ public/  (images, favicon …)
 COPY --from=builder /usr/share/solanaflow/web/public           /usr/share/solanaflow/web/public
 # also copy the project itself (src/, app/, idl/, …)
 COPY --from=builder /usr/share/solanaflow/web                  /usr/share/solanaflow/web
