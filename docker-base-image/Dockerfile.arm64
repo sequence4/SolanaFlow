@@ -132,19 +132,23 @@ COPY --from=builder /root/.nvm/versions/node/v20.18.0/bin/node /usr/local/bin/no
 
 RUN solana --version && anchor --version
 RUN cargo --version  && rustc --version
-RUN apt-get update -qq \
- && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      # --- core build tool-chain --- \
-      build-essential \            # gcc, g++, make, /usr/bin/cc
-      clang lld llvm \             # Solana / Anchor SBF linker
-      pkg-config libssl-dev \      # common Rust crate build deps
-      binutils ca-certificates \
- && update-ca-certificates \
- # defensive: be sure /usr/bin/cc exists even if clang is preferred
- && ln -sf $(command -v gcc || command -v clang) /usr/bin/cc \
- # strip unused Solana binaries to keep image small
- && strip /usr/local/bin/solana* || true \
- && apt-get clean && rm -rf /var/lib/apt/lists/*
+# --- base tool-chain and libraries needed for Anchor / Rust programs ---------
+RUN apt-get update -qq && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        build-essential \        # gcc, g++, make, /usr/bin/cc                         \
+        clang \                  # C/CPP frontend used by Solana SBF linker            \
+        lld \                    # LLVM linker                                         \
+        llvm \                   # LLVM tool-chain                                     \
+        pkg-config \             # helper for native-deps crates                       \
+        libssl-dev \             # openssl headers - common Rust build dep             \
+        binutils \               # strip, ar, objdump …                                \
+        ca-certificates && \
+    update-ca-certificates && \
+    # Make sure a /usr/bin/cc exists (clang or gcc)                                    \
+    ln -sf $(command -v gcc || command -v clang) /usr/bin/cc && \
+    # Slim down image                                                                   \
+    strip /usr/local/bin/solana* || true && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 3000
 # Next 15+ puts the entry-point at  .next/standalone/server.js
