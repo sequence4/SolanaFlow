@@ -135,18 +135,18 @@ RUN cargo --version  && rustc --version
 # --- base tool-chain and libraries needed for Anchor / Rust programs ---------
 RUN apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        build-essential \        # gcc, g++, make, /usr/bin/cc                         \
-        clang \                  # C/CPP frontend used by Solana SBF linker            \
-        lld \                    # LLVM linker                                         \
-        llvm \                   # LLVM tool-chain                                     \
-        pkg-config \             # helper for native-deps crates                       \
-        libssl-dev \             # openssl headers - common Rust build dep             \
-        binutils \               # strip, ar, objdump …                                \
+        build-essential \
+        clang \
+        lld \
+        llvm \
+        pkg-config \
+        libssl-dev \
+        binutils \
         ca-certificates && \
     update-ca-certificates && \
-    # Make sure a /usr/bin/cc exists (clang or gcc)                                    \
-    ln -sf $(command -v gcc || command -v clang) /usr/bin/cc && \
-    # Slim down image                                                                   \
+    # Ensure /usr/bin/cc exists (prefers clang, falls back to gcc)             \
+    ln -sf "$(command -v clang || command -v gcc)" /usr/bin/cc && \
+    # Trim Solana CLIs to keep image slim                                       \
     strip /usr/local/bin/solana* || true && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
