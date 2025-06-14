@@ -234,20 +234,20 @@ export async function runDeployPipeline({
         // Generate a task ID for running commands
         const idlTaskId = uuidv4();
 
-        const copyIdlCmd = [
-          "set -e",
-          `cd /usr/src/${rootPath}`,
-          "mkdir -p idl",
-          `if [ -f target/idl/${programName}.json ]; then`,
-          // safely patch IDL with jq
-          `  jq --arg addr "${programId}" '.metadata.address = $addr' \\`,
-          `     target/idl/${programName}.json > idl/solanaflow_token.json`,
-          `  echo 'IDL copied to idl/solanaflow_token.json'`,
-          "else",
-          `  echo '{}' > idl/solanaflow_token.json`,
-          `  echo 'IDL placeholder generated'`,
-          "fi"
-        ].join(" && ");
+        // NOTE: no leading \n, use ';' instead of '&&' after `then`
+        const copyIdlCmd =
+          "set -e; " +
+          `cd /usr/src/${rootPath}; ` +
+          "mkdir -p idl; " +
+          `if [ -f target/idl/${programName}.json ]; then ` +
+          // update .metadata.address in-place with jq (no temp file needed)
+          `jq --arg addr '${programId}' '.metadata.address = $addr' ` +
+          `target/idl/${programName}.json > idl/solanaflow_token.json; ` +
+          `echo 'IDL copied to idl/solanaflow_token.json'; ` +
+          "else " +
+          `echo '{}' > idl/solanaflow_token.json; ` +
+          `echo 'IDL placeholder generated'; ` +
+          "fi";
 
         await runCommand(
           `docker exec ${workspace.containerName} bash -c "${copyIdlCmd}"`,
