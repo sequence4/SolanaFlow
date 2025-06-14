@@ -117,7 +117,7 @@ RUN test -f /usr/share/solanaflow/web/.next/standalone/server.js
 ###############################################################################
 FROM ubuntu:22.04 AS runtime
 ENV PATH=/usr/local/bin:/root/.cargo/bin:$PATH \
-    HOST=0.0.0.0 \
+    HOSTNAME=0.0.0.0 \
     NEXT_DISABLE_SWC=1
 WORKDIR /usr/share/solanaflow/web
 
@@ -135,19 +135,14 @@ COPY --from=solana-toolchain /root/.rustup /root/.rustup
 COPY --from=builder /usr/share/solanaflow/web/.next/standalone \
     /usr/share/solanaflow/web/.next/standalone
 
-## ② static assets **duplicated** where the standalone server expects them
+## ② static assets — copy into standalone/.next/static
 COPY --from=builder /usr/share/solanaflow/web/.next/static \
-    /usr/share/solanaflow/web/.next/static
-#
-# -------------- NEW: correct location for standalone build -------------------
-COPY --from=builder /usr/share/solanaflow/web/.next/static \
-    /usr/share/solanaflow/web/.next/standalone/_next/static
-#                               ↑↑ note the "_next/static" sub-folder
-# Next.js standalone server expects      /_next/static/*     to be relative to
-#      dirname(server.js) + '/_next/static'   — this copy satisfies that.
+    /usr/share/solanaflow/web/.next/standalone/.next/static
 
-## ③ public/  (images, favicon …)
-COPY --from=builder /usr/share/solanaflow/web/public           /usr/share/solanaflow/web/public
+## ③ public/ — copy beside server.js
+COPY --from=builder /usr/share/solanaflow/web/public \
+    /usr/share/solanaflow/web/.next/standalone/public
+
 # also copy the project itself (src/, app/, idl/, …)
 COPY --from=builder /usr/share/solanaflow/web                  /usr/share/solanaflow/web
 COPY --from=solana-toolchain /usr/src/anchor-template /usr/src/anchor-template
