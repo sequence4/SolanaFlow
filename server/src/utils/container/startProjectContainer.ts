@@ -118,10 +118,10 @@ export async function startProjectContainer(projId: string): Promise<string> {
       // publish container port 3000 → random host port
       '-p', '0:3000',
       image,
-      // keep container up even if Next.js fails (easier debugging)
+      // keep container alive and forward TERM/INT to Next.js
       'bash', '-lc',
-      "trap : TERM INT; sleep infinity & wait & " +
-      "node /usr/share/solanaflow/web/.next/standalone/server.js"
+      'node /usr/share/solanaflow/web/.next/standalone/server.js & ' +
+      'pid=$!; trap "kill $pid" TERM INT; wait $pid'
     ];
 
     execSync(runArgs.join(' '), { stdio: 'inherit' });
