@@ -125,7 +125,16 @@ WORKDIR /usr/share/solanaflow/web
 COPY --from=solana-toolchain /usr/local/bin /usr/local/bin
 COPY --from=solana-toolchain /root/.cargo/bin /root/.cargo/bin
 COPY --from=solana-toolchain /root/.rustup /root/.rustup
-COPY --from=builder /usr/share/solanaflow /usr/share/solanaflow
+# ── web bundle ────────────────────────────────────────────────────────────────
+# Next 'standalone' output lives in:
+#   web/.next/standalone/…   (server code)
+#   web/.next/static/…       (css/js chunks, fonts, images…)
+#   web/public/…             (static public assets)
+COPY --from=builder /usr/share/solanaflow/web/.next/standalone /usr/share/solanaflow/web/.next/standalone
+COPY --from=builder /usr/share/solanaflow/web/.next/static     /usr/share/solanaflow/web/.next/static
+COPY --from=builder /usr/share/solanaflow/web/public           /usr/share/solanaflow/web/public
+# also copy the project itself (src/, app/, idl/, …)
+COPY --from=builder /usr/share/solanaflow/web                  /usr/share/solanaflow/web
 COPY --from=solana-toolchain /usr/src/anchor-template /usr/src/anchor-template
 # bring in the exact Node we used to build the standalone bundle
 COPY --from=builder /root/.nvm/versions/node/v20.18.0/bin/node /usr/local/bin/node
@@ -151,9 +160,9 @@ RUN apt-get update -qq && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 3000
-# Next 15+ puts the entry-point at  .next/standalone/server.js
-# https://vercel.com/guides/nextjs-advanced-features#standalone-build-output
-CMD ["node", "/usr/share/solanaflow/web/.next/standalone/server.js"]
+# Entrypoint - run from the web root so that "_next/static" & "public" resolve
+WORKDIR /usr/share/solanaflow/web
+CMD ["node", ".next/standalone/server.js"]
 
 # create a separate stage for seeding the target volume
 FROM solana-toolchain AS seed-target
