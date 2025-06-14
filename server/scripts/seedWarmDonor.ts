@@ -3,7 +3,7 @@ dotenv.config();            // loads .env, .env.local, .env.$NODE_ENV …
 
 import { execSync } from "child_process";
 import { v4 as uuidv4 } from "uuid";
-import pool from "../src/config/database";   // module-alias takes care of "@/…"
+import pool from '../src/config/database';   // module-alias takes care of "@/…"
 
 /**
  * Seeds ONE "warm" donor container:

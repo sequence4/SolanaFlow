@@ -122,6 +122,7 @@ WORKDIR /usr/share/solanaflow/web
 COPY --from=solana-toolchain /usr/local/bin /usr/local/bin
 COPY --from=solana-toolchain /root/.cargo/bin /root/.cargo/bin
 COPY --from=builder /usr/share/solanaflow /usr/share/solanaflow
+COPY --from=solana-toolchain /usr/src/anchor-template /usr/src/anchor-template
 # bring in the exact Node we used to build the standalone bundle
 COPY --from=builder /root/.nvm/versions/node/v20.18.0/bin/node /usr/local/bin/node
 
