@@ -232,23 +232,25 @@ export async function runDeployPipeline({
         const programName = 'my_program'; // Using the same default as in handleGenerateCode
 
         // Generate a task ID for running commands
-        const idlTaskId = uuidv4();           // always a valid UUID
-        const copyIdlCmd = `
-set -e
-cd /usr/src/${rootPath}
-mkdir -p idl
-if [ -f target/idl/${programName}.json ]; then
-  jq --arg addr "${programId}" '.metadata.address = $addr' \
-     target/idl/${programName}.json \
-     > idl/solanaflow_token.json
-  echo "IDL copied to idl/solanaflow_token.json"
-else
-  echo '{}' > idl/solanaflow_token.json
-  echo "IDL placeholder generated"
-fi`;
+        const idlTaskId = uuidv4();
+
+        const copyIdlCmd = [
+          "set -e",
+          `cd /usr/src/${rootPath}`,
+          "mkdir -p idl",
+          `if [ -f target/idl/${programName}.json ]; then`,
+          // safely patch IDL with jq
+          `  jq --arg addr "${programId}" '.metadata.address = $addr' \\`,
+          `     target/idl/${programName}.json > idl/solanaflow_token.json`,
+          `  echo 'IDL copied to idl/solanaflow_token.json'`,
+          "else",
+          `  echo '{}' > idl/solanaflow_token.json`,
+          `  echo 'IDL placeholder generated'`,
+          "fi"
+        ].join(" && ");
 
         await runCommand(
-          `docker exec ${workspace.containerName} bash -c "${copyIdlCmd.replace(/\n/g, ' && ')}"`,
+          `docker exec ${workspace.containerName} bash -c "${copyIdlCmd}"`,
           ".",
           idlTaskId,
           { skipSuccessUpdate: true }
@@ -256,7 +258,7 @@ fi`;
 
         console.log(`[DEPLOY] IDL copied to idl/solanaflow_token.json for program ${programId}`);
       } catch (error) {
-        console.error("[DEPLOY] Error copying IDL:", error);
+        console.error("[DEPLOY] IDL copy failed for program", programId, error);
         // Non-fatal error, continue with deployment
       }
     }
