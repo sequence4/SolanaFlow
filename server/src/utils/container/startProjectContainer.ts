@@ -119,7 +119,8 @@ export async function startProjectContainer(projId: string): Promise<string> {
       // publish container port 3000 → random host port
       '-p', '0:3000',
       image,
-      'bash', '-lc', 'node /usr/share/solanaflow/web/.next/standalone/server.js & pid=$!; trap "kill $pid" TERM INT; wait $pid'
+      'bash', '-lc',
+      '"node /usr/share/solanaflow/web/.next/standalone/server.js -H 0.0.0.0 & pid=$!; trap \\"kill $pid\\" TERM INT; wait $pid"'
     ];
 
     console.log('[startProjectContainer] RUN CMD:\n', runArgs.join(' '));
