@@ -11,6 +11,7 @@ import { ensureAnchorTomlProgram, ensureRootWorkspaceMembers } from './ensureCon
 import { parseNodeDetails } from './parseNodeDetails';
 import { lintWorkspaceManifests } from './cargoManifestLint';
 import { FileTreeItem } from '../../types/FileTreeItem';
+import { runCommand } from "../projectUtils";
 import {
   HOME_PAGE_TSX,
   ROOT_LAYOUT_TSX,
@@ -305,6 +306,28 @@ export const handleGenerateCode = async ({
             console.warn(`[GEN] Some UI files failed to write: ${uiFilesResult.failed.join(', ')}`);
           } else {
             sendProgress({ stage: 'ui-gen-done', message: 'Token-minting UI ready' });
+            
+            // ─────────────────────── rebuild Next.js after UI injection ───────────────────────
+            sendProgress({ stage: 'next-build', message: 'Re-building Next.js bundle…' });
+
+            const nextBuildTaskId = `next-build-${Date.now()}`;
+
+            // 1) reinstall deps (in case tailwind etc. were added) 
+            // 2) run the build (emits .next/standalone/*)
+            // 3) duplicate static + public into the standalone folder so server.js can serve them
+            await runCommand(
+              `docker exec ${workspace.containerName} bash -c "` +
+              `set -e; cd /usr/share/solanaflow/web && ` +
+              `yarn install --frozen-lockfile && ` +
+              `yarn build && ` +
+              `cp -R .next/static .next/standalone/.next/static && ` +
+              `cp -R public .next/standalone/public"`,
+              ".",
+              nextBuildTaskId,
+              { skipSuccessUpdate: true }   // we emit progress above; no auto status spam
+            );
+            sendProgress({ stage: 'next-build-done', message: 'Next bundle rebuilt' });
+            // ───────────────────────────────────────────────────────────────────────────────────
           }
         } else {
           console.log('[GEN] insertSrcFiles for UI produced no work');
