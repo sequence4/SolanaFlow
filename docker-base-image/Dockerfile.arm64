@@ -36,6 +36,9 @@ RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
  && apt-get clean && rm -rf /var/lib/apt/lists/* \
  && strip /usr/local/bin/solana*
 
+RUN rustup default stable --profile minimal
+
+
 # warm the BPF / SBF cache once so first user build is instant
 WORKDIR /tmp
 RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
@@ -51,7 +54,7 @@ RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
  && cp -a /usr/src/target /cache-seed/target
 
 # quick smoke-test
-RUN solana --version && cargo build-sbf --version && anchor --version
+RUN solana --version && cargo --version && rustc --version && anchor --version
 
 ###############################################################################
 # 2.  Dependency cooker (cargo-chef)
