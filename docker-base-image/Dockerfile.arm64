@@ -95,7 +95,7 @@ RUN curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh |
 RUN . "$NVM_DIR/nvm.sh" \
  && nvm install ${NODE_VERSION} \
  && nvm alias default ${NODE_VERSION} \
- && npm i -g yarn
+ && if ! command -v yarn >/dev/null 2>&1 ; then npm i -g yarn@1 ; fi
 
 ENV NEXT_TELEMETRY_DISABLED=1 NEXT_SKIP_ESLINT=1
 # --- Force Next 14 + to emit the standalone bundle ---------------------------
@@ -146,11 +146,14 @@ COPY --from=builder /usr/share/solanaflow/web/public \
 # also copy the project itself (src/, app/, idl/, …)
 COPY --from=builder /usr/share/solanaflow/web                  /usr/share/solanaflow/web
 COPY --from=solana-toolchain /usr/src/anchor-template /usr/src/anchor-template
-# bring in the exact Node and Yarn used to build the standalone bundle
-COPY --from=builder /root/.nvm/versions/node/v20.18.0/bin/node /usr/local/bin/node
-# copy Yarn 1.x built in the builder stage
-COPY --from=builder /root/.nvm/versions/node/v20.18.0/bin/yarn /usr/local/bin/yarn
-#
+
+# copy the entire Node version dir (≈ 28 MB) – includes node, npm, corepack, etc.
+COPY --from=builder /root/.nvm/versions/node/v20.18.0 /root/.nvm/versions/node/v20.18.0
+RUN ln -sf /root/.nvm/versions/node/v20.18.0/bin/* /usr/local/bin/
+
+# ➜ NEW – copy its backing JS files so the shim can resolve ../lib/cli
+COPY --from=builder /usr/local/lib/node_modules/yarn /usr/local/lib/node_modules/yarn
+
 # --------------------------------------------------------------------------------
 # everything below this line is unchanged
 
@@ -182,3 +185,10 @@ CMD ["node", ".next/standalone/server.js"]
 # create a separate stage for seeding the target volume
 FROM solana-toolchain AS seed-target
 COPY --from=solana-toolchain /cache-seed/target /target-seed
+
+# ────────────────────────────────────────────────────────────────
+# runtime stage  ➜  copy the *full* Yarn 1.x install from builder
+#   · yarn in /usr/local/bin is just a shim that calls ../lib/cli
+#   · therefore we MUST also copy /usr/local/lib/node_modules/yarn
+# ────────────────────────────────────────────────────────────────
+FROM ubuntu:22.04 AS runtime
