@@ -18,6 +18,8 @@ import path from "path";
 import { attachFileContents } from "../fileUtils/attachFileContents";
 import { v4 as uuidv4 } from "uuid";
 
+// TODO: chunk really large fileTree payloads (> ~16 MB) – Chrome drops giant SSE frames.
+
 const MAX_BUILD_MINUTES = Number(process.env.MAX_BUILD_MINUTES) || 15;
 const MAX_DEPLOY_MINUTES = Number(process.env.MAX_DEPLOY_MINUTES) || 6;
 
