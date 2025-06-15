@@ -318,7 +318,7 @@ export const handleGenerateCode = async ({
             await runCommand(
               `docker exec ${workspace.containerName} bash -c "` +
               `set -e; cd /usr/share/solanaflow/web && ` +
-              `cp -R ${workspace.rootPath}/web/. . && ` +
+              `cp -R "${workspace.rootPath}/web/." . && ` +
               // 0) add UI deps (idempotent if already present)
               `yarn add --exact --silent lucide-react tailwind-variants class-variance-authority ` +
               `@radix-ui/react-popover @radix-ui/react-slot && ` +
