@@ -311,7 +311,15 @@ export const handleGenerateCode = async ({
             // ─────────────────────── rebuild Next.js after UI injection ───────────────────────
             sendProgress({ stage: 'next-build', message: 'Re-building Next.js bundle…' });
 
-            const nextBuildTaskId = `next-build-${randomUUID()}`;
+            const nextBuildTaskId = randomUUID();        // DB column is uuid → no prefix
+
+            // --- build absolute path to the generated web/ directory -------------
+            const absRoot = workspace.rootPath.startsWith("/")
+              ? workspace.rootPath                                           // already absolute
+              : `/usr/src/${workspace.rootPath}`;                            // make it absolute
+
+            const sourceWebDir = `${absRoot}/web/.`;                         // trailing /. → copy hidden files
+            // ---------------------------------------------------------------------
 
             // 1) reinstall deps (in case tailwind etc. were added) 
             // 2) run the build (emits .next/standalone/*)
@@ -319,7 +327,7 @@ export const handleGenerateCode = async ({
             await runCommand(
               `docker exec ${workspace.containerName} bash -c "` +
               `set -e; cd /usr/share/solanaflow/web && ` +
-              `cp -R \\\"${workspace.rootPath}/web/.\\\" . && ` +
+              `cp -R \\\"${sourceWebDir}\\\" . && ` +
               // 0) add UI deps (idempotent if already present)
               `yarn add --exact --silent lucide-react tailwind-variants class-variance-authority ` +
               `@radix-ui/react-popover @radix-ui/react-slot && ` +
