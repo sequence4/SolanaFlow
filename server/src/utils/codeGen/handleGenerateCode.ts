@@ -5,7 +5,7 @@ import type { WorkspaceHandle } from '../deploy/prepEnv';
 import { amendConfigFiles } from './amendConfigFiles';
 import { pollTaskStatus, createTask, updateTaskStatus, markWriteDone, waitForTaskCompletion } from '../taskUtils';
 import { genSrcFiles } from './genSrcFiles';
-import { insertSrcFiles } from './insertSrcFiles';
+import { insertSrcFiles, InsertSrcProgressFn } from './insertSrcFiles';
 import { debugDumpContainerTree, debugPrintFiles } from '../containerUtils';
 import { ensureAnchorTomlProgram, ensureRootWorkspaceMembers } from './ensureConfigHelpers';
 import { parseNodeDetails } from './parseNodeDetails';
@@ -66,6 +66,15 @@ async function waitForAll(taskIds: string[]): Promise<{
   return { succeeded, failed };
 }
 
+/** Helper to emit progress event when each file is written */
+const emitFileWritten = (sendProgress: (data: unknown) => void): InsertSrcProgressFn => (item) => {
+  sendProgress({
+    stage: 'file-written',
+    path: item.path,
+    item,                 // full FileTreeItem so FE can append to tree
+  });
+};
+
 /** Write the token-minting UI tree, wait for all tasks, attach contents, and
  *  send a progress event.  MUST be called *before* Rust generation so the
  *  user sees the preview immediately.
@@ -78,7 +87,7 @@ async function writeUiFirst(
   sendProgress: (d: unknown) => void,
 ) {
   // 1) schedule writes
-  const uiTaskIds = await insertSrcFiles(uiRoot, projectId, existing, null);
+  const uiTaskIds = await insertSrcFiles(uiRoot, projectId, existing, null, emitFileWritten(sendProgress));
 
   // 2) let the caller know we're starting UI writes
   sendProgress({ stage: 'ui-write', message: 'Writing UI files…' });
@@ -354,7 +363,7 @@ export const handleGenerateCode = async ({
           sendProgress: (d: unknown) => void,
         ): Promise<void> {
           return (async () => {
-            const writeTaskIds = await insertSrcFiles(rootNode, projectId, existing, creatorId);
+            const writeTaskIds = await insertSrcFiles(rootNode, projectId, existing, creatorId, emitFileWritten(sendProgress));
             
             // 🟢 NEW – wait until every write-file task finishes
             for (const tId of writeTaskIds) {

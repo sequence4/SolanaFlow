@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import FileContext from "./FileContext";
 import { FileContextType } from "./FileContextTypes";
 import { FileTreeItemType } from "../../interfaces/FileTreeItemType";
+import eventBus from "../../lib/eventBus";
 
 // Helper function to parse the stored file tree
 function getInitialFileTree(): FileTreeItemType | FileTreeItemType[] | null {
@@ -67,6 +68,75 @@ function getInitialSelectedFile(): FileTreeItemType | null {
   }
 }
 
+// Helper function to merge a newly written file into the existing tree
+const mergeIntoTree = (tree: FileTreeItemType | FileTreeItemType[] | null, item: FileTreeItemType): FileTreeItemType | FileTreeItemType[] => {
+  if (!tree) return item; // First arrival
+  
+  // Convert to array for consistent handling
+  const treeArray = Array.isArray(tree) ? tree : [tree];
+  
+  // Helper to recursively merge
+  const merge = (nodes: FileTreeItemType[], newItem: FileTreeItemType): boolean => {
+    // Extract path components for navigation
+    const itemPath = newItem.path || '';
+    const pathParts = itemPath.split('/').filter(Boolean);
+    
+    if (pathParts.length === 0) {
+      // This is a root item, check if it already exists
+      const existingIndex = nodes.findIndex(n => n.path === newItem.path);
+      if (existingIndex >= 0) {
+        nodes[existingIndex] = { ...nodes[existingIndex], ...newItem };
+        return true;
+      }
+      nodes.push(newItem);
+      return true;
+    }
+    
+    // Find the parent directory
+    const dirPath = pathParts.slice(0, -1).join('/');
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i];
+      if (node.type === 'directory' && node.path?.endsWith(dirPath)) {
+        // Found the parent directory
+        if (!node.children) node.children = [];
+        
+        // Check if the file already exists in this directory
+        const fileName = pathParts[pathParts.length - 1];
+        const existingIndex = node.children.findIndex(child => 
+          child.name === fileName || child.path === newItem.path
+        );
+        
+        if (existingIndex >= 0) {
+          // Update existing file
+          node.children[existingIndex] = { 
+            ...node.children[existingIndex], 
+            ...newItem 
+          };
+        } else {
+          // Add new file
+          node.children.push(newItem);
+        }
+        return true;
+      }
+      
+      // Try to descend into children
+      if (node.type === 'directory' && node.children) {
+        if (merge(node.children, newItem)) return true;
+      }
+    }
+    
+    return false;
+  };
+  
+  // Try to merge with existing tree
+  if (!merge(treeArray, item)) {
+    // If we couldn't find a place to merge, add as a new root item
+    treeArray.push(item);
+  }
+  
+  return treeArray;
+};
+
 const FileContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Initialize with null - no localStorage calls at initialization
   const [selectedFile, setSelectedFile] = useState<FileTreeItemType | null>(null);
@@ -121,6 +191,21 @@ const FileContextProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn("Error saving selectedFile to localStorage:", error);
     }
   }, [selectedFile]);
+
+  // Listen for file-written events from SSE
+  useEffect(() => {
+    const handleFileWritten = (payload: any) => {
+      if (payload.stage === 'file-written' && payload.item) {
+        console.log('[FileContext] Received file-written event:', payload.path);
+        setFileTree((prevTree) => mergeIntoTree(prevTree, payload.item));
+      }
+    };
+
+    eventBus.on('progress', handleFileWritten);
+    return () => {
+      eventBus.off('progress', handleFileWritten);
+    };
+  }, []);
 
   const contextValue: FileContextType = {
     selectedFile,

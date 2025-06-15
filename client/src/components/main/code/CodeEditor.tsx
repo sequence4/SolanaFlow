@@ -80,11 +80,21 @@ const CodeEditor = ({ language: lang = "typescript" }) => {
 
   useEffect(() => {
     if (!selectedFile) return;
-
-    // Prefer the new `content` key but keep `code` as legacy fallback
-    const next = (selectedFile as any).content ?? (selectedFile as any).code ?? '';
-    setCode(next);
-    console.log('[CodeEditor] loaded', selectedFile.name, '— bytes:', next.length);
+    
+    // Get the full content
+    const fullContent = (selectedFile as any).content ?? (selectedFile as any).code ?? '';
+    
+    // Implement typewriter effect
+    let pos = 0;
+    const id = setInterval(() => {
+      setCode(fullContent.slice(0, ++pos));
+      if (pos >= fullContent.length) clearInterval(id);
+    }, 8); // 8ms gives ~125 chars per second
+    
+    console.log('[CodeEditor] loaded', selectedFile.name, '— bytes:', fullContent.length);
+    
+    // Clean up interval on unmount or when selectedFile changes
+    return () => clearInterval(id);
   }, [selectedFile]);
 
   const onChange = (value: string) => {
