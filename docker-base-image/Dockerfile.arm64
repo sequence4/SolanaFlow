@@ -156,9 +156,6 @@ COPY --from=solana-toolchain /usr/src/anchor-template /usr/src/anchor-template
 COPY --from=builder /root/.nvm/versions/node/v20.18.0 /root/.nvm/versions/node/v20.18.0
 RUN ln -sf /root/.nvm/versions/node/v20.18.0/bin/* /usr/local/bin/
 
-# ➜ NEW – copy its backing JS files so the shim can resolve ../lib/cli
-COPY --from=builder /usr/local/lib/node_modules/yarn /usr/local/lib/node_modules/yarn
-
 # sanity-check Yarn & Node
 RUN node -v && yarn -v      # should print 20.18.0 / 1.22.x
 
