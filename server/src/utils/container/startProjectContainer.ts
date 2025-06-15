@@ -20,6 +20,12 @@ function dockerSupportsPullAlways(): boolean {
   }
 }
 
+/** Returns true if we should append --pull=always to `docker run`.
+ *  The flag is safe only on tag references: Docker forbids it on digests. */
+function pullAlwaysAllowed(imageRef: string): boolean {
+  return dockerSupportsPullAlways() && !imageRef.includes('@');
+}
+
 /**
  * Returns true when the Docker daemon is overlay2 on an XFS filesystem
  * mounted with the `pquota` option (the only case where `--storage-opt size=`
@@ -90,6 +96,8 @@ export async function startProjectContainer(projId: string): Promise<string> {
   const image = process.env.SOLANAFLOW_BUILD_IMAGE ?? 
               'ghcr.io/sequence4/solana-toolchain:runtime-latest';
   
+  const withPullAlways = pullAlwaysAllowed(image);
+              
   // 📦 three isolated caches
   const vCargo       = 'solanaflow-cargo-registry';
   const vTargetBuild = 'solanaflow-cargo-target';
@@ -104,7 +112,8 @@ export async function startProjectContainer(projId: string): Promise<string> {
     ensureDockerSpace();
 
     const runArgs: string[] = [
-      'docker', 'run', '--pull=always',
+      'docker', 'run', 
+      ...(withPullAlways ? ['--pull=always'] : []),
       '-d',
       '--platform', 'linux/arm64',
       '--name', name,
