@@ -11,10 +11,10 @@ import pool from '../src/config/database';
 /* -----------------------------------------------------------
  * 1. provide a typed mock for pool.query
  * --------------------------------------------------------- */
-jest.mock('../../src/config/database', () => ({
-  __esModule: true,
-  default: { query: jest.fn() },      // satisfies Pool-like shape
-}));
+jest.mock('../src/config/database', () => {
+  const query = jest.fn();
+  return { __esModule: true, default: { query } };
+});
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const mockedQuery = (pool as unknown as { query: jest.Mock }).query;

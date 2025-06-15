@@ -111,7 +111,7 @@ export async function runSpawn(
     
     /* ----- debounce helper ----- */
     let lastFlush = 0;
-    const FLUSH_MS = 750;          // tune via env later if you wish
+    const FLUSH_MS = Number(process.env.SPAWN_FLUSH_MS) || 750;
     const flushIfDue = async () => {
       const now = Date.now();
       if (now - lastFlush > FLUSH_MS) {
