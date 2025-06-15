@@ -37,7 +37,6 @@ async function waitForAll(taskIds: string[]): Promise<{
   succeeded: string[];
   failed: string[];
 }> {
-  const finals = ['succeed', 'finished', 'failed', 'warning'];
   const succeeded: string[] = [];
   const failed: string[] = [];
 
@@ -98,7 +97,6 @@ export const handleGenerateCode = async ({
 
         // Find instructions for debugPrintFiles - this is a simplified assumption
         // A more robust approach would be to get this from parsed node details like in genSrcFiles.ts
-        const instructions = graph.nodes.map(n => ({ name: ((n as any).data)?.label?.replace(/\s+/g, '').toLowerCase() || 'unknown' })).filter(i => i.name !== 'unknown');
 
         console.log('[GEN] raw snippet count =', functionParts.length);
         if (functionParts.length) {
@@ -180,6 +178,33 @@ export const handleGenerateCode = async ({
 
         // Gather existing paths so insertSrcFiles can decide create vs update
         const existing = new Set(flattenPaths(initialTree));
+        
+        function writeFilesAndEmitTree(
+          rootNode: FileTreeItem,
+          projectId: string,
+          existing: Set<string>,
+          creatorId: string | null,
+          workspace: WorkspaceHandle,
+          sendProgress: (d: unknown) => void,
+        ): Promise<void> {
+          return (async () => {
+            await insertSrcFiles(rootNode, projectId, existing, creatorId);
+
+            const rootBase = process.env.ROOT_FOLDER!;
+            const absRoot  = path.join(rootBase, workspace.rootPath);
+            const tinyTree = [rootNode];
+            await attachFileContents(tinyTree, absRoot, workspace.containerName);
+
+            sendProgress({
+              stage   : "ui-ready",
+              message : "UI code written – preview available",
+              fileTree: tinyTree,
+            });
+
+            await markWriteDone(projectId);
+          })();
+        }
+        
         await writeFilesAndEmitTree(
           srcTree,
           projectId,
@@ -407,38 +432,4 @@ function flattenPaths(tree: any[]): string[] {
     if (Array.isArray(n?.children)) out.push(...flattenPaths(n.children));
   }
   return out;
-}
-
-/**
- * Write every generated src file, build a small in-memory tree
- * with code attached, stream it to the client (`ui-ready`), then
- * mark a synthetic task so later pipeline stages can wait for it.
- */
-async function writeFilesAndEmitTree(
-  rootNode: FileTreeItem,
-  projectId: string,
-  existing: Set<string>,
-  creatorId: string | null,
-  workspace: WorkspaceHandle,
-  sendProgress: (d: unknown) => void,
-): Promise<void> {
-  // 1 — persist to disk
-  await insertSrcFiles(rootNode, projectId, existing, creatorId);
-
-  // 2 — build a lightweight tree (the node we already have) and
-  //     attach code so the IDE panel can open files immediately
-  const rootBase = process.env.ROOT_FOLDER!;
-  const absRoot  = path.join(rootBase, workspace.rootPath);
-  const tinyTree = [rootNode];
-  await attachFileContents(tinyTree, absRoot, workspace.containerName);
-
-  // 3 — push the preview to the browser
-  sendProgress({
-    stage   : "ui-ready",
-    message : "UI code written – preview available",
-    fileTree: tinyTree,
-  });
-
-  // 4 — flag for downstream pollers / deploy pipeline
-  await markWriteDone(projectId);
 }
