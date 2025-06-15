@@ -146,8 +146,10 @@ COPY --from=builder /usr/share/solanaflow/web/public \
 # also copy the project itself (src/, app/, idl/, …)
 COPY --from=builder /usr/share/solanaflow/web                  /usr/share/solanaflow/web
 COPY --from=solana-toolchain /usr/src/anchor-template /usr/src/anchor-template
-# bring in the exact Node we used to build the standalone bundle
+# bring in the exact Node and Yarn used to build the standalone bundle
 COPY --from=builder /root/.nvm/versions/node/v20.18.0/bin/node /usr/local/bin/node
+# copy Yarn 1.x built in the builder stage
+COPY --from=builder /root/.nvm/versions/node/v20.18.0/bin/yarn /usr/local/bin/yarn
 #
 # --------------------------------------------------------------------------------
 # everything below this line is unchanged
