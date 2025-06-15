@@ -1,7 +1,7 @@
 export const UI_BUTTON_TSX = `"use client";
 
 import * as React from "react";
-import { cn } from "../lib/utils";
+import { cn } from "../../lib/utils";
 
 const buttonVariants = {
   default: "bg-primary text-primary-foreground hover:bg-primary/90",
