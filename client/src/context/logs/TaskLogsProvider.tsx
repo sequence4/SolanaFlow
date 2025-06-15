@@ -3,6 +3,22 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import TaskLogsContext, { TaskLog, Step } from "./TaskLogsContext";
 
+// Create a global reference for access from non-React contexts
+declare global {
+  interface Window {
+    __taskLogsRef: {
+      current: {
+        updateStage: (stage: string, data?: any) => void;
+      } | null;
+    };
+  }
+}
+
+// Initialize the global reference
+if (typeof window !== 'undefined') {
+  window.__taskLogsRef = { current: null };
+}
+
 // Define the canonical stages list to be used across the app
 export const STAGES = [
   { stage: "environment", label: "Build env",   icon: "Server"   },
@@ -26,6 +42,9 @@ export default function TaskLogsProvider({
   const [systemLogs, setSystemLogs] = useState<string[]>([]);
   const [isBuilding, setIsBuilding] = useState(false);
   const [lastMessage, setLastMessage] = useState<string>("");
+  const [uiReady, setUiReady] = useState(false);
+  const [fileTree, setFileTree] = useState<any>(null);
+  const [buildPhase, setBuildPhase] = useState<'waiting' | 'started' | 'done'>('waiting');
 
   /* ---------- very lightweight observer list ---------- */
   type ProgressCB = (e: { progress: number; message: string }) => void;
@@ -108,7 +127,23 @@ export default function TaskLogsProvider({
     setShowDetails(false); // Reset details view as well
   }, []);
 
-  const updateStage = useCallback((stage: string) => {
+  const updateStage = useCallback((stage: string, data?: any) => {
+    // Special handling for ui-ready
+    if (stage === 'ui-ready') {
+      setUiReady(true);
+      if (data?.fileTree) {
+        setFileTree(data.fileTree);
+      }
+      return;
+    }
+
+    // Special handling for build phases
+    if (stage === 'build-started') {
+      setBuildPhase('started');
+    } else if (stage === 'build-done') {
+      setBuildPhase('done');
+    }
+
     const index = STAGES.findIndex(s => s.stage === stage);
     // Set to found index or -1 if stage is unrecognized
     setCurrentStep(index);
@@ -120,6 +155,20 @@ export default function TaskLogsProvider({
     setProgress(p);
     notify(p, lastMessage);
   }, [notify, lastMessage]);
+
+  // Set up global reference for non-React contexts
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.__taskLogsRef.current = {
+        updateStage
+      };
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.__taskLogsRef.current = null;
+      }
+    };
+  }, [updateStage]);
 
   return (
     <TaskLogsContext.Provider
@@ -135,6 +184,9 @@ export default function TaskLogsProvider({
         networkStats: "4.2 MB/s",
         nodeVersion: "v18.12.1",
         isBuilding,
+        uiReady,
+        fileTree,
+        buildPhase,
         
         onProgress,
         

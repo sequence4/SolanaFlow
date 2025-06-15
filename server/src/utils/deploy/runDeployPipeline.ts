@@ -57,7 +57,11 @@ export async function runDeployPipeline({
 
     /* 3 ─ build program --------------------------------------------------- */
     console.log("[PIPELINE] ⏳ anchor build started…");
-    sendProgress({ stage: "build", message: "Building program…" });
+    
+    // wait until all src + UI files are on disk
+    await waitForTaskCompletion(`WRITE_SRCS_${projectId}`, 15, 2_000);
+    
+    sendProgress({ stage: "build-started", message: "Building program…" });
     const buildTask = await startAnchorBuildTask(projectId, userId);
     
     // Convert env-driven minutes → retry count (2-second interval)

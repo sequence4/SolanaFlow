@@ -1,5 +1,6 @@
 import { fetchEventSource, EventSourceMessage } from '@microsoft/fetch-event-source';
 import { API_URL } from '@/config/api';
+import { useTaskLogs } from '@/context/logs/useTaskLogs';
 
 export function deployPipeline(
   projectId: string,
@@ -24,6 +25,9 @@ export function deployPipeline(
   
   const controller = new AbortController();
   
+  // Get taskLogs from the context
+  const taskLogs = window.__taskLogsRef?.current;
+  
   fetchEventSource(url, {
     method: 'POST',
     headers,
@@ -41,6 +45,17 @@ export function deployPipeline(
       try {
         const msg = JSON.parse(event.data);
         console.log(`[SSE] Received message:`, msg);
+
+        // 🚀 new: UI is ready – hide spinner, mount iframe, show explorer
+        if (msg.stage === "ui-ready" && taskLogs) {
+          taskLogs.updateStage("ui-ready", msg);
+        }
+
+        // 📦 new: build has actually begun (good place to start a progress bar)
+        if (msg.stage === "build-started" && taskLogs) {
+          taskLogs.updateStage("build-started");
+        }
+
         onProgress(msg);
       } catch (error) {
         console.error(`[SSE] Error parsing message:`, error);
