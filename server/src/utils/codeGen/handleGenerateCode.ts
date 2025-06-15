@@ -331,7 +331,7 @@ export const handleGenerateCode = async ({
               // 0) add UI deps (idempotent if already present)
               `yarn add --exact --silent ` +
               `lucide-react tailwind-variants class-variance-authority ` +
-              `@radix-ui/react-slot @radix-ui/react-popover ` +
+              `@radix-ui/react-slot @radix-ui/react-popover @radix-ui/react-label ` +
               `@solana/wallet-adapter-react @solana/wallet-adapter-react-ui ` +
               `@solana/wallet-adapter-wallets @solana/web3.js ` +
               `clsx tailwind-merge && ` +
