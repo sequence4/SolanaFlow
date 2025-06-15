@@ -3,7 +3,7 @@ import { refreshWorkspaceTree } from './refreshWorkspaceTree';
 import { Graph } from '../../types/graph';
 import type { WorkspaceHandle } from '../deploy/prepEnv';
 import { amendConfigFiles } from './amendConfigFiles';
-import { pollTaskStatus, createTask, updateTaskStatus, markWriteDone } from '../taskUtils';
+import { pollTaskStatus, createTask, updateTaskStatus, markWriteDone, waitForTaskCompletion } from '../taskUtils';
 import { genSrcFiles } from './genSrcFiles';
 import { insertSrcFiles } from './insertSrcFiles';
 import { debugDumpContainerTree, debugPrintFiles } from '../containerUtils';
@@ -188,7 +188,12 @@ export const handleGenerateCode = async ({
           sendProgress: (d: unknown) => void,
         ): Promise<void> {
           return (async () => {
-            await insertSrcFiles(rootNode, projectId, existing, creatorId);
+            const writeTaskIds = await insertSrcFiles(rootNode, projectId, existing, creatorId);
+            
+            // 🟢 NEW – wait until every write-file task finishes
+            for (const tId of writeTaskIds) {
+              await waitForTaskCompletion(tId, 90, 2_000);
+            }
 
             const rootBase = process.env.ROOT_FOLDER!;
             const absRoot  = path.join(rootBase, workspace.rootPath);
@@ -201,6 +206,7 @@ export const handleGenerateCode = async ({
               fileTree: tinyTree,
             });
 
+            // now it is safe to raise the sentinel
             await markWriteDone(projectId);
           })();
         }
