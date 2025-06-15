@@ -115,6 +115,11 @@ RUN test -f /usr/share/solanaflow/web/.next/standalone/server.js
 ###############################################################################
 # 4.  Runtime – slim image with CLI + built app
 ###############################################################################
+# ────────────────────────────────────────────────────────────────
+# runtime stage  ➜  copy the *full* Yarn 1.x install from builder
+#   · yarn in /usr/local/bin is just a shim that calls ../lib/cli
+#   · therefore we MUST also copy /usr/local/lib/node_modules/yarn
+# ────────────────────────────────────────────────────────────────
 FROM ubuntu:22.04 AS runtime
 ENV PATH=/usr/local/bin:/root/.cargo/bin:$PATH \
     HOSTNAME=0.0.0.0 \
@@ -154,6 +159,9 @@ RUN ln -sf /root/.nvm/versions/node/v20.18.0/bin/* /usr/local/bin/
 # ➜ NEW – copy its backing JS files so the shim can resolve ../lib/cli
 COPY --from=builder /usr/local/lib/node_modules/yarn /usr/local/lib/node_modules/yarn
 
+# sanity-check Yarn & Node
+RUN node -v && yarn -v      # should print 20.18.0 / 1.22.x
+
 # --------------------------------------------------------------------------------
 # everything below this line is unchanged
 
@@ -185,10 +193,3 @@ CMD ["node", ".next/standalone/server.js"]
 # create a separate stage for seeding the target volume
 FROM solana-toolchain AS seed-target
 COPY --from=solana-toolchain /cache-seed/target /target-seed
-
-# ────────────────────────────────────────────────────────────────
-# runtime stage  ➜  copy the *full* Yarn 1.x install from builder
-#   · yarn in /usr/local/bin is just a shim that calls ../lib/cli
-#   · therefore we MUST also copy /usr/local/lib/node_modules/yarn
-# ────────────────────────────────────────────────────────────────
-FROM ubuntu:22.04 AS runtime
