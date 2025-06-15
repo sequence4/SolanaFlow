@@ -128,8 +128,8 @@ export default function TaskLogsProvider({
   }, []);
 
   const updateStage = useCallback((stage: string, data?: any) => {
-    // Special handling for ui-ready
-    if (stage === 'ui-ready') {
+    /* ---------- 1. dedicated handling for the streamed UI preview ---------- */
+    if (stage === "ui-ready") {
       setUiReady(true);
       if (data?.fileTree) {
         setFileTree(data.fileTree);
@@ -137,16 +137,15 @@ export default function TaskLogsProvider({
       return;
     }
 
-    // Special handling for build phases
-    if (stage === 'build-started') {
-      setBuildPhase('started');
-    } else if (stage === 'build-done') {
-      setBuildPhase('done');
-    }
+    /* ---------- 2. normalise build-sub-stages into the single "build" step */
+    const normalisedStage =
+      stage.startsWith("build-") ? "build" : stage;
 
-    const index = STAGES.findIndex(s => s.stage === stage);
-    // Set to found index or -1 if stage is unrecognized
-    setCurrentStep(index);
+    if (stage === "build-started") setBuildPhase("started");
+    if (stage === "build-done")    setBuildPhase("done");
+
+    const index = STAGES.findIndex(s => s.stage === normalisedStage);
+    setCurrentStep(index);         // -1 if unknown → toast still shows
     setIsVisible(true);
   }, []);
 

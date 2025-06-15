@@ -3,19 +3,25 @@ import { v4 as uuidv4 } from 'uuid';
 import { exec } from 'child_process';
 import fs from 'fs';
 
+/**
+ * Create a row in the `task` table.
+ * If **customId** is given we use it verbatim (handy for sentinel tasks
+ * like WRITE_SRCS_42).  Otherwise we generate a uuid.
+ */
 export async function createTask(
   name: string,
   creatorId: string | null,
-  projectId: string
+  projectId: string,
+  customId?: string,
 ): Promise<string> {
   const client = await pool.connect();
   try {
-    const id = uuidv4();
+    const id = customId ?? uuidv4();
     await client.query(
-      `INSERT INTO task
-       (id,name,creator_id,project_id,status,created_at)
-       VALUES ($1,$2,$3,$4,'queued',NOW())`,
-      [id, name, creatorId, projectId]
+      `INSERT INTO task (id,name,creator_id,project_id,status,created_at)
+       VALUES ($1,$2,$3,$4,'queued',NOW())
+       ON CONFLICT (id) DO NOTHING`,
+      [id, name, creatorId, projectId],
     );
     return id;
   } finally {
@@ -193,6 +199,8 @@ export async function pollTaskStatus(
 }
 
 export async function markWriteDone(projectId: string) {
-  const id = await createTask(`WRITE_SRCS_${projectId}`, null, projectId);
-  await updateTaskStatus(id, "succeed", "UI+SRC files written");
+  const sentinel = `WRITE_SRCS_${projectId}`;
+  // deterministic id → build-pipeline can poll it
+  await createTask(sentinel, null, projectId, sentinel);
+  await updateTaskStatus(sentinel, "succeed", "UI + SRC files written");
 }

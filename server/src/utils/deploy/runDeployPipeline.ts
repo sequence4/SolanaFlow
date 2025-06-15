@@ -59,7 +59,8 @@ export async function runDeployPipeline({
     console.log("[PIPELINE] ⏳ anchor build started…");
     
     // wait until all src + UI files are on disk
-    await waitForTaskCompletion(`WRITE_SRCS_${projectId}`, 15, 2_000);
+    // allow up to 3 min for large repos (90 × 2 s)
+    await waitForTaskCompletion(`WRITE_SRCS_${projectId}`, 90, 2_000);
     
     sendProgress({ stage: "build-started", message: "Building program…" });
     const buildTask = await startAnchorBuildTask(projectId, userId);
