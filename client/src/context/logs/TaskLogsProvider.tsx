@@ -2,22 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import TaskLogsContext, { TaskLog, Step } from "./TaskLogsContext";
-
-// Create a global reference for access from non-React contexts
-declare global {
-  interface Window {
-    __taskLogsRef: {
-      current: {
-        updateStage: (stage: string, data?: any) => void;
-      } | null;
-    };
-  }
-}
-
-// Initialize the global reference
-if (typeof window !== 'undefined') {
-  window.__taskLogsRef = { current: null };
-}
+import eventBus from "@/lib/eventBus";
 
 // Define the canonical stages list to be used across the app
 export const STAGES = [
@@ -149,25 +134,52 @@ export default function TaskLogsProvider({
     setIsVisible(true);
   }, []);
 
+  // Subscribe to global progress events (from SSE)
+  useEffect(() => {
+    const handler = (payload: any) => {
+      if (payload && typeof payload === 'object') {
+        if (payload.stage) {
+          updateStage(payload.stage, payload);
+        }
+        if (payload.containerUrl) {
+          addSystemLog(`🌐 Container URL: ${payload.containerUrl}`);
+        }
+        if (payload.artifact) {
+          addSystemLog("🗄️  Build artefact ready – click to download");
+        }
+        if (payload.fileTree) {
+          const count = Array.isArray(payload.fileTree) ? payload.fileTree.length : 1;
+          addSystemLog(`📂 Received project file tree with ${count} items`);
+        }
+        if (payload.programId) {
+          addSystemLog(`🔑 Program ID: ${payload.programId}`);
+        }
+        if (['deploy-done', 'done', 'completed'].includes(payload.stage)) {
+          addSystemLog("✅ Deployment complete!");
+          setTimeout(() => setIsVisible(false), 3000);
+        } else if (payload.stage === 'deploy-skipped') {
+          addSystemLog("✅ Wallet-signed deploy detected – backend deploy step skipped");
+        } else if (payload.stage === 'error') {
+          addSystemLog(`❌ Error: ${payload.message || 'Unknown error'}`);
+        } else if (payload.message && !payload.stage) {
+          addSystemLog(payload.message);
+        }
+      } else if (payload) {
+        // If payload is a simple value (string/number), log it directly
+        addSystemLog(String(payload));
+      }
+    };
+    eventBus.on('progress', handler);
+    return () => {
+      eventBus.off('progress', handler);
+    };
+  }, [updateStage, addSystemLog, setIsVisible]);
+
   // Wrap setProgress to also notify subscribers
   const setWrappedProgress = useCallback((p: number) => {
     setProgress(p);
     notify(p, lastMessage);
   }, [notify, lastMessage]);
-
-  // Set up global reference for non-React contexts
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.__taskLogsRef.current = {
-        updateStage
-      };
-    }
-    return () => {
-      if (typeof window !== 'undefined') {
-        window.__taskLogsRef.current = null;
-      }
-    };
-  }, [updateStage]);
 
   return (
     <TaskLogsContext.Provider

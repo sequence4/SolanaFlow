@@ -10,6 +10,7 @@ import pool from 'src/config/database';
 import { pruneContainerResources } from './container/pruneContainer';
 import { startProjectContainer } from './container/startProjectContainer';
 import { Connection, sendAndConfirmRawTransaction } from '@solana/web3.js';
+import { spawn } from 'child_process';
 
 //const USER_WORKSPACE_IMAGE = "ghcr.io/sequence4/solanaflow:latest";
 
@@ -96,6 +97,56 @@ export async function runCommand(
     );
   });
 };
+
+export async function runSpawn(
+  command: string,
+  cwd: string,
+  taskId: string,
+  options: { skipSuccessUpdate?: boolean; sendProgress?: (data: unknown) => void } = {}
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, { cwd, shell: true });
+    let stdoutData = '';
+    let stderrData = '';
+    child.stdout.on('data', chunk => {
+      const text = chunk.toString();
+      stdoutData += text;
+      updateTaskStatus(taskId, 'doing', stdoutData + stderrData).catch(console.error);
+      if (options.sendProgress) {
+        options.sendProgress({ message: text });
+      }
+    });
+    child.stderr.on('data', chunk => {
+      const text = chunk.toString();
+      stderrData += text;
+      updateTaskStatus(taskId, 'doing', stdoutData + stderrData).catch(console.error);
+      if (options.sendProgress) {
+        options.sendProgress({ message: text });
+      }
+    });
+    child.on('error', error => {
+      const result = `Error starting process: ${error.message}`;
+      updateTaskStatus(taskId, 'failed', result).catch(console.error);
+      reject(new Error(result));
+    });
+    child.on('close', async code => {
+      if (code !== 0) {
+        const result = `Error: process exited with code ${code}\n\nStdout: ${stdoutData}\n\nStderr: ${stderrData}`;
+        await updateTaskStatus(taskId, 'failed', result);
+        return reject(new Error(result));
+      }
+      if (!options.skipSuccessUpdate) {
+        if (hasWarning(stdoutData) || hasWarning(stderrData)) {
+          const result = `Warning detected:\n\nStdout: ${stdoutData.trim()}\n\nStderr: ${stderrData.trim()}`;
+          await updateTaskStatus(taskId, 'warning', result);
+        } else {
+          await updateTaskStatus(taskId, 'succeed', 'Success');
+        }
+      }
+      resolve(stdoutData.trim());
+    });
+  });
+}
 
 export async function compileTs(
   tsFileName: string,

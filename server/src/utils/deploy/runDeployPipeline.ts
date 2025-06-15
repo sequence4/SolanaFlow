@@ -18,6 +18,9 @@ import path from "path";
 import { attachFileContents } from "../fileUtils/attachFileContents";
 import { v4 as uuidv4 } from "uuid";
 
+const MAX_BUILD_MINUTES = Number(process.env.MAX_BUILD_MINUTES) || 15;
+const MAX_DEPLOY_MINUTES = Number(process.env.MAX_DEPLOY_MINUTES) || 6;
+
 interface PipelineArgs {
   projectId: string;
   userId: string;
@@ -65,8 +68,8 @@ export async function runDeployPipeline({
     sendProgress({ stage: "build-started", message: "Building program…" });
     const buildTask = await startAnchorBuildTask(projectId, userId);
     
-    // Convert env-driven minutes → retry count (2-second interval)
-    const buildMinutes = Number(process.env.MAX_BUILD_MINUTES) || 15;
+    // Compute retry count based on configured build timeout
+    const buildMinutes = MAX_BUILD_MINUTES;
     const buildRetries = Math.ceil(buildMinutes * 60_000 / 2_000);
     
     // Check build status and bail early if not successful
@@ -156,11 +159,8 @@ export async function runDeployPipeline({
     if (!walletSigned) {
       sendProgress({ stage: "deploy", message: "Deploying / upgrading…" });
 
-      // Parse deployment timeout from env with better handling
-      const deployMinutesRaw = Number(process.env.MAX_DEPLOY_MINUTES);
-      const deployMinutes = Number.isFinite(deployMinutesRaw) && deployMinutesRaw >= 1
-        ? Math.ceil(deployMinutesRaw)
-        : 6;
+      // Calculate deployment timeout from env (default 6 minutes)
+      const deployMinutes = MAX_DEPLOY_MINUTES;
       const deployTimeoutMs = deployMinutes * 60_000;
       
       // Convert timeout ms to retry count (2-second interval)

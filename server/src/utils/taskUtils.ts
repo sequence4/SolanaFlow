@@ -3,6 +3,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { exec } from 'child_process';
 import fs from 'fs';
 
+const MAX_WRITE_RETRIES = Number(process.env.MAX_WRITE_RETRIES) || 90;
+const POLL_INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS) || 2000;
+
 /**
  * Create a row in the `task` table.
  * If **customId** is given we use it verbatim (handy for sentinel tasks
@@ -112,53 +115,32 @@ export async function ensureDirectoryExists(
 
 export async function waitForTaskCompletion(
   taskId: string,
-  maxRetries: number = 60,
-  intervalMs: number = 2000
+  maxRetries: number = MAX_WRITE_RETRIES,
+  intervalMs: number = POLL_INTERVAL_MS
 ): Promise<string> {
-  const finalStates = ['succeed', 'finished', 'failed', 'warning'];
   let retries = 0;
-  
-  console.log(`[DEBUG_TASK_BACKEND] waitForTaskCompletion started for taskId=${taskId}, maxRetries=${maxRetries}, intervalMs=${intervalMs}`);
-  
+  let status = '';
+
   while (retries < maxRetries) {
-    try {
-      const client = await pool.connect();
-      try {
-        const result = await client.query(
-          'SELECT status, result FROM task WHERE id = $1',
-          [taskId]
-        );
-        
-        if (result.rows.length === 0) {
-          console.log(`[DEBUG_TASK_BACKEND] Task ${taskId} not found during waitForTaskCompletion`);
-          return 'failed';
-        }
-        
-        const status = result.rows[0].status;
-        const hasResult = result.rows[0].result !== null;
-        
-        console.log(`[DEBUG_TASK_BACKEND] Task ${taskId} status: ${status}, has result: ${hasResult} (attempt ${retries + 1}/${maxRetries})`);
-        
-        if (finalStates.includes(status)) {
-          console.log(`[DEBUG_TASK_BACKEND] Task ${taskId} reached final state: ${status} with result`);
-          return status;
-        }
-      } finally {
-        client.release();
-      }
-      
-      console.log(`[DEBUG_TASK_BACKEND] Waiting ${intervalMs}ms before next poll for taskId=${taskId}`);
-      await new Promise(resolve => setTimeout(resolve, intervalMs));
-      retries++;
-    } catch (error) {
-      console.error(`[DEBUG_TASK_BACKEND] Error checking task status for ${taskId}:`, error);
-      await new Promise(resolve => setTimeout(resolve, intervalMs * 2));
-      retries++;
+    const result = await getTaskById(taskId);
+    status = result.status;
+
+    if (status === 'succeed' || status === 'finished' || status === 'warning') {
+      console.log(`[DEBUG_TASK_BACKEND] Task ${taskId} completed with status: ${status}`);
+      return status;
     }
+
+    if (status === 'failed') {
+      console.error(`[DEBUG_TASK_BACKEND] Task ${taskId} failed with status: ${status}`);
+      return status;
+    }
+
+    await new Promise(resolve => setTimeout(resolve, intervalMs));
+    retries++;
+    console.log(`[DEBUG_TASK_BACKEND] Waiting for task ${taskId} (attempt ${retries}/${maxRetries})`);
   }
-  
-  console.log(`[DEBUG_TASK_BACKEND] Task ${taskId} did not complete within the maximum retries (${maxRetries})`);
-  return 'timeout';
+
+  return status;
 }
 
 /**
@@ -170,32 +152,38 @@ export async function waitForTaskCompletion(
  */
 export async function pollTaskStatus(
   taskId: string,
-  maxRetries = 60,         // 2 min @ 2 s interval
-  intervalMs = 2_000,
-): Promise<{ task: { status: string; result: string } }> {
-  const finals = ['succeed', 'failed', 'finished', 'warning'];
-
-  for (let n = 0; n < maxRetries; n++) {
-    const { rows } = await pool.query<{ status: string; result: string }>(
-      'SELECT status, result FROM task WHERE id = $1',
-      [taskId],
-    );
-
-    if (rows.length === 0) {
-      throw new Error(`pollTaskStatus: task ${taskId} not found`);
+  maxRetries = MAX_WRITE_RETRIES,         // e.g. 3 min @ 2 s interval by default
+  intervalMs = POLL_INTERVAL_MS,
+): Promise<{ task: { status: string; result: string | null } }> {
+  let retries = 0;
+  
+  console.log(`[DEBUG_TASK_BACKEND] Starting poll for task ${taskId}`);
+  
+  while (retries < maxRetries) {
+    try {
+      const result = await getTaskById(taskId);
+      console.log(`[DEBUG_TASK_BACKEND] Polled task ${taskId}, status: ${result.status}`);
+      
+      // For successfully completed (or failed) tasks, return immediately
+      if (['succeed', 'finished', 'failed', 'warning'].includes(result.status)) {
+        console.log(`[DEBUG_TASK_BACKEND] Task ${taskId} completed with status: ${result.status}`);
+        return { task: result };
+      }
+      
+      // For all other statuses (queued, doing), wait and retry
+      await new Promise(resolve => setTimeout(resolve, intervalMs));
+    } catch (error) {
+      console.error(`[DEBUG_TASK_BACKEND] Error polling task ${taskId}:`, error);
+      // For errors like "task not found", wait and retry
+      await new Promise(resolve => setTimeout(resolve, intervalMs));
     }
-
-    const task = rows[0];
-
-    if (finals.includes(task.status)) return { task };
-
-    await new Promise(r => setTimeout(r, intervalMs));
+    
+    retries++;
+    console.log(`[DEBUG_TASK_BACKEND] Attempt ${retries} of ${maxRetries} for task ${taskId}`);
   }
-
-  throw new Error(
-    `pollTaskStatus: task ${taskId} did not finish within ${maxRetries * intervalMs /
-      1000}s`,
-  );
+  
+  // If maxRetries reached, throw the appropriate error
+  throw new Error(`Polling timed out after ${maxRetries} attempts for task ${taskId}`);
 }
 
 export async function markWriteDone(projectId: string) {
