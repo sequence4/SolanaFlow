@@ -212,71 +212,71 @@ export const handleGenerateCode = async ({
         // Build the UI file tree
         const uiFiles = {
           name: ".",
-          path: ".",
+          path: "./web",
           type: "directory" as const,
           children: [
             {
               name: "app",
-              path: "./app",
+              path: "./web/app",
               type: "directory" as const,
               children: [
-                { name: "page.tsx", path: "./app/page.tsx", type: "file" as const, code: HOME_PAGE_TSX },
-                { name: "layout.tsx", path: "./app/layout.tsx", type: "file" as const, code: ROOT_LAYOUT_TSX }
+                { name: "page.tsx", path: "./web/app/page.tsx", type: "file" as const, code: HOME_PAGE_TSX },
+                { name: "layout.tsx", path: "./web/app/layout.tsx", type: "file" as const, code: ROOT_LAYOUT_TSX }
               ]
             },
             {
               name: "src",
-              path: "./src",
+              path: "./web/src",
               type: "directory" as const,
               children: [
                 {
                   name: "components",
-                  path: "./src/components",
+                  path: "./web/src/components",
                   type: "directory" as const,
                   children: [
-                    { name: "mint-form.tsx", path: "./src/components/mint-form.tsx", type: "file" as const, code: MINT_FORM_TSX },
-                    { name: "token-created-success.tsx", path: "./src/components/token-created-success.tsx", type: "file" as const, code: TOKEN_CREATED_SUCCESS_TSX },
-                    { name: "theme-toggle.tsx", path: "./src/components/theme-toggle.tsx", type: "file" as const, code: THEME_TOGGLE_TSX },
-                    { name: "wallet.tsx", path: "./src/components/wallet.tsx", type: "file" as const, code: WALLET_TSX },
+                    { name: "mint-form.tsx", path: "./web/src/components/mint-form.tsx", type: "file" as const, code: MINT_FORM_TSX },
+                    { name: "token-created-success.tsx", path: "./web/src/components/token-created-success.tsx", type: "file" as const, code: TOKEN_CREATED_SUCCESS_TSX },
+                    { name: "theme-toggle.tsx", path: "./web/src/components/theme-toggle.tsx", type: "file" as const, code: THEME_TOGGLE_TSX },
+                    { name: "wallet.tsx", path: "./web/src/components/wallet.tsx", type: "file" as const, code: WALLET_TSX },
                     {
                       name: "ui",
-                      path: "./src/components/ui",
+                      path: "./web/src/components/ui",
                       type: "directory" as const,
                       children: [
-                        { name: "button.tsx", path: "./src/components/ui/button.tsx", type: "file" as const, code: UI_BUTTON_TSX },
-                        { name: "input.tsx", path: "./src/components/ui/input.tsx", type: "file" as const, code: UI_INPUT_TSX },
-                        { name: "label.tsx", path: "./src/components/ui/label.tsx", type: "file" as const, code: UI_LABEL_TSX }
+                        { name: "button.tsx", path: "./web/src/components/ui/button.tsx", type: "file" as const, code: UI_BUTTON_TSX },
+                        { name: "input.tsx", path: "./web/src/components/ui/input.tsx", type: "file" as const, code: UI_INPUT_TSX },
+                        { name: "label.tsx", path: "./web/src/components/ui/label.tsx", type: "file" as const, code: UI_LABEL_TSX }
                       ]
                     }
                   ]
                 },
                 {
                   name: "context",
-                  path: "./src/context",
+                  path: "./web/src/context",
                   type: "directory" as const,
                   children: [
-                    { name: "WalletConnectionProvider.tsx", path: "./src/context/WalletConnectionProvider.tsx", type: "file" as const, code: WALLET_CONNECTION_PROVIDER_TSX }
+                    { name: "WalletConnectionProvider.tsx", path: "./web/src/context/WalletConnectionProvider.tsx", type: "file" as const, code: WALLET_CONNECTION_PROVIDER_TSX }
                   ]
                 },
                 {
                   name: "lib",
-                  path: "./src/lib",
+                  path: "./web/src/lib",
                   type: "directory" as const,
                   children: [
-                    { name: "utils.ts", path: "./src/lib/utils.ts", type: "file" as const, code: UTILS_TS }
+                    { name: "utils.ts", path: "./web/src/lib/utils.ts", type: "file" as const, code: UTILS_TS }
                   ]
                 },
-                { name: "globals.css", path: "./src/globals.css", type: "file" as const, code: GLOBALS_CSS }
+                { name: "globals.css", path: "./web/src/globals.css", type: "file" as const, code: GLOBALS_CSS }
               ]
             },
-            { name: "tailwind.config.js", path: "./tailwind.config.js", type: "file" as const, code: TAILWIND_CONFIG },
-            { name: "postcss.config.js", path: "./postcss.config.js", type: "file" as const, code: POSTCSS_CONFIG },
+            { name: "tailwind.config.js", path: "./web/tailwind.config.js", type: "file" as const, code: TAILWIND_CONFIG },
+            { name: "postcss.config.js", path: "./web/postcss.config.js", type: "file" as const, code: POSTCSS_CONFIG },
             {
               name: "idl",
-              path: "./idl",
+              path: "./web/idl",
               type: "directory" as const,
               children: [
-                { name: "solanaflow_token.json", path: "./idl/solanaflow_token.json", type: "file" as const, code: "{}" }
+                { name: "solanaflow_token.json", path: "./web/idl/solanaflow_token.json", type: "file" as const, code: "{}" }
               ]
             }
           ]
