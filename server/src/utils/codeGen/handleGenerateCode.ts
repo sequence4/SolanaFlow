@@ -12,6 +12,7 @@ import { parseNodeDetails } from './parseNodeDetails';
 import { lintWorkspaceManifests } from './cargoManifestLint';
 import { FileTreeItem } from '../../types/FileTreeItem';
 import { runCommand } from "../projectUtils";
+import { randomUUID } from 'crypto';
 import {
   HOME_PAGE_TSX,
   ROOT_LAYOUT_TSX,
@@ -310,7 +311,7 @@ export const handleGenerateCode = async ({
             // ─────────────────────── rebuild Next.js after UI injection ───────────────────────
             sendProgress({ stage: 'next-build', message: 'Re-building Next.js bundle…' });
 
-            const nextBuildTaskId = `next-build-${Date.now()}`;
+            const nextBuildTaskId = `next-build-${randomUUID()}`;
 
             // 1) reinstall deps (in case tailwind etc. were added) 
             // 2) run the build (emits .next/standalone/*)
@@ -318,7 +319,7 @@ export const handleGenerateCode = async ({
             await runCommand(
               `docker exec ${workspace.containerName} bash -c "` +
               `set -e; cd /usr/share/solanaflow/web && ` +
-              `cp -R "${workspace.rootPath}/web/." . && ` +
+              `cp -R \\\"${workspace.rootPath}/web/.\\\" . && ` +
               // 0) add UI deps (idempotent if already present)
               `yarn add --exact --silent lucide-react tailwind-variants class-variance-authority ` +
               `@radix-ui/react-popover @radix-ui/react-slot && ` +
