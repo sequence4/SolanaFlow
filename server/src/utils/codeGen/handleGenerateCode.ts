@@ -3,7 +3,7 @@ import { refreshWorkspaceTree } from './refreshWorkspaceTree';
 import { Graph } from '../../types/graph';
 import type { WorkspaceHandle } from '../deploy/prepEnv';
 import { amendConfigFiles } from './amendConfigFiles';
-import { pollTaskStatus, createTask, updateTaskStatus } from '../taskUtils';
+import { pollTaskStatus, createTask, updateTaskStatus, markWriteDone } from '../taskUtils';
 import { genSrcFiles } from './genSrcFiles';
 import { insertSrcFiles } from './insertSrcFiles';
 import { debugDumpContainerTree, debugPrintFiles } from '../containerUtils';
@@ -13,6 +13,8 @@ import { lintWorkspaceManifests } from './cargoManifestLint';
 import { FileTreeItem } from '../../types/FileTreeItem';
 import { runCommand } from "../projectUtils";
 import { randomUUID } from 'crypto';
+import path from "path";
+import { attachFileContents } from "../fileUtils/attachFileContents";
 import {
   HOME_PAGE_TSX,
   ROOT_LAYOUT_TSX,
@@ -178,32 +180,16 @@ export const handleGenerateCode = async ({
 
         // Gather existing paths so insertSrcFiles can decide create vs update
         const existing = new Set(flattenPaths(initialTree));
-        const writeTaskIds = await insertSrcFiles(
+        await writeFilesAndEmitTree(
           srcTree,
           projectId,
           existing,
-          /* creatorId */ null
+          /* creatorId */ null,
+          workspace,
+          sendProgress,
         );
-
-        console.log('[GEN] insertSrcFiles returned taskIds =', writeTaskIds);
-
-        if (writeTaskIds.length) {
-          sendProgress({ stage: 'src-write', message: 'Writing Rust files…' });
-          const { succeeded, failed } = await waitForAll(writeTaskIds);
-          console.log('[GEN] src-write tasks done → ok:', succeeded, 'fail:', failed);
-
-          if (failed.length) {
-            sendProgress({
-              stage: 'src-write-failed',
-              message: `Rust write: ${failed.length} task(s) failed`,
-            });
-            throw new Error(`insertSrcFiles failed for ${failed.join(', ')}`);
-          }
-        } else {
-          console.log('[GEN] insertSrcFiles produced no work (tree empty?)');
-        }
-
-        sendProgress({ stage: 'src-gen-done', message: 'Rust sources ready' });
+        // no extra progress needed here – ui-ready already fired
+        sendProgress({ stage: "src-gen-done", message: "Rust sources ready" });
 
         /* --------------------------------------------------------------- *
          * 5 ─ inject token-minting UI into Next.js app
@@ -355,16 +341,22 @@ export const handleGenerateCode = async ({
 
         // ─────────── Run static lint on Cargo manifests before amending ───────────
         console.log('[GEN] Running static Cargo.toml linter...');
-        try {
-          await lintWorkspaceManifests({ projectId, userId, workspace });
-          console.log('[GEN] Cargo.toml lint passed');
-          sendProgress({ stage: 'lint-done', message: 'Cargo manifests validated' });
-        } catch (error: unknown) {
-          const lintError = error instanceof Error ? error : new Error(String(error));
-          console.error('[GEN] Cargo.toml lint failed:', lintError);
-          sendProgress({ stage: 'lint-failed', message: `Manifest validation failed: ${lintError.message}` });
-          // Continue with amendConfigFiles even if lint fails, as it will fix the issues
-        }
+        lintWorkspaceManifests({ projectId, userId, workspace })
+          .then(() =>
+            sendProgress({ stage: "lint-done", message: "Cargo manifests validated" }),
+          )
+          .catch(err =>
+            sendProgress({ stage: "lint-failed", message: `Manifest validation failed: ${String(err)}` }),
+          );
+
+        // same pattern for amendConfigFiles — *do not await*
+        amendConfigFiles(projectId, userId)
+          .then(({ anchorTaskId }) =>
+            sendProgress({ stage: "amend-done", anchorTaskId, message: "[handleGenerateCode] Amend done" }),
+          )
+          .catch(err =>
+            sendProgress({ stage: "amend-failed", message: String(err) }),
+          );
 
         // ─────────── Debug: dump container tree ───────────
         const dumpTaskId = await createTask(
@@ -402,12 +394,6 @@ export const handleGenerateCode = async ({
           }
           await updateTaskStatus(dumpTaskId, 'succeed', 'Tree dumped and files printed');
         }
-
-        // ────────────────────────── PATCH MANIFESTS ───────────────────────── */
-        console.log('[GEN] calling amendConfigFiles (post-generation)…');
-        const { anchorTaskId } = await amendConfigFiles(projectId, userId);
-        console.log('[GEN] amendConfigFiles result:', { anchorTaskId });
-        sendProgress({ stage: 'debug', message: '[handleGenerateCode] Amend done' });
     } catch (err) {
         console.error('Error in handleGenerateCode:', err);
         throw err;
@@ -421,4 +407,38 @@ function flattenPaths(tree: any[]): string[] {
     if (Array.isArray(n?.children)) out.push(...flattenPaths(n.children));
   }
   return out;
+}
+
+/**
+ * Write every generated src file, build a small in-memory tree
+ * with code attached, stream it to the client (`ui-ready`), then
+ * mark a synthetic task so later pipeline stages can wait for it.
+ */
+async function writeFilesAndEmitTree(
+  rootNode: FileTreeItem,
+  projectId: string,
+  existing: Set<string>,
+  creatorId: string | null,
+  workspace: WorkspaceHandle,
+  sendProgress: (d: unknown) => void,
+): Promise<void> {
+  // 1 — persist to disk
+  await insertSrcFiles(rootNode, projectId, existing, creatorId);
+
+  // 2 — build a lightweight tree (the node we already have) and
+  //     attach code so the IDE panel can open files immediately
+  const rootBase = process.env.ROOT_FOLDER!;
+  const absRoot  = path.join(rootBase, workspace.rootPath);
+  const tinyTree = [rootNode];
+  await attachFileContents(tinyTree, absRoot, workspace.containerName);
+
+  // 3 — push the preview to the browser
+  sendProgress({
+    stage   : "ui-ready",
+    message : "UI code written – preview available",
+    fileTree: tinyTree,
+  });
+
+  // 4 — flag for downstream pollers / deploy pipeline
+  await markWriteDone(projectId);
 }
