@@ -329,8 +329,12 @@ export const handleGenerateCode = async ({
               `set -e; cd /usr/share/solanaflow/web && ` +
               `cp -R \\\"${sourceWebDir}\\\" . && ` +
               // 0) add UI deps (idempotent if already present)
-              `yarn add --exact --silent lucide-react tailwind-variants class-variance-authority ` +
-              `@radix-ui/react-popover @radix-ui/react-slot && ` +
+              `yarn add --exact --silent ` +
+              `lucide-react tailwind-variants class-variance-authority ` +
+              `@radix-ui/react-slot @radix-ui/react-popover ` +
+              `@solana/wallet-adapter-react @solana/wallet-adapter-react-ui ` +
+              `@solana/wallet-adapter-wallets @solana/web3.js ` +
+              `clsx tailwind-merge && ` +
               // 1) install everything declared in package.json
               `yarn install --frozen-lockfile --silent && ` +
               // 2) build the standalone bundle
