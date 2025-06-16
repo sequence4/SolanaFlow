@@ -19,16 +19,16 @@ export default function FileArrivalTicker() {
   /* after showing an item, remove it -------------------------------------- */
   useEffect(() => {
     if (!queue.length) return;
-    const timer = setTimeout(() => setQueue(q => q.slice(1)), 300);
+    const timer = setTimeout(() => setQueue(q => q.slice(1)), 600);
     return () => clearTimeout(timer);
   }, [queue]);
 
   return (
     <div className="pointer-events-none fixed bottom-4 left-1/2 -translate-x-1/2 z-50 font-mono text-xs text-sky-400">
       <AnimatePresence initial={false}>
-        {queue.slice(0, 1).map(name => (
+        {queue.slice(0, 1).map((name, i) => (
           <motion.div
-            key={name + Math.random()}
+            key={name + i}
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}

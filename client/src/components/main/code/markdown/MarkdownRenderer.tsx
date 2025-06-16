@@ -4,13 +4,14 @@ import CodeSnippet from '@/components/main/code/markdown/CodeSnippet';
 
 const markdownOptions = {
     overrides: {
-      p: {
-        component: (props: { children: React.ReactNode }) => (
-          <p style={{ margin: '0.5em 0' }}>
-            {props.children}
-          </p>
-        ),
-      },
+        p: {
+    // replace <p> with <div> so we can safely nest block elements
+    component: (props: { children: React.ReactNode }) => (
+      <div style={{ margin: '0.5em 0' }}>
+        {props.children}
+      </div>
+    ),
+  },
       pre: {
         component: (props: { children: React.ReactNode }) => (
           <pre

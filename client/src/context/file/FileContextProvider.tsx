@@ -105,10 +105,10 @@ const FileContextProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [selectedFile, setSelectedFile] = useState<FileTreeItemType | null>(null);
   const [fileTree, setFileTree] = useState<FileTreeItemType | FileTreeItemType[] | null>(null);
   const { setActiveTab } = useContext(UxContext);
-  // prevents repeated tab-switching once we've shown the Code tab
-  const codeTabShown = useRef(false);
+  // only run the "switch-to-code-tab + first-file-selection" block once
+  const firstFileHandled = useRef(false);
   
-  // queue used purely for "ticker" effect
+  // queue used purely for the bottom-ticker ("typing") effect
   const pushFileArrival = (filePath: string) => {
     eventBus.emit("file-arrival", filePath);
   };
@@ -163,17 +163,26 @@ const FileContextProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handler = (payload: any) => {
       /* ---- full snapshot -------------------------------- */
       if (payload.fileTree) {
-        setFileTree(structuredClone(payload.fileTree));
+        const tree = structuredClone(payload.fileTree);
+        setFileTree(tree);
 
-        // emit the very first file once (for nice "opening line")
-        const first = Array.isArray(payload.fileTree)
-          ? payload.fileTree[0]?.name
-          : payload.fileTree?.name;
-        if (first) pushFileArrival(first);
-
-        if (!codeTabShown.current) {
-          setActiveTab('code');
-          codeTabShown.current = true;
+        if (!firstFileHandled.current) {
+          // choose the very first *file* (DFS)
+          const pickFirst = (n:any):any =>
+            Array.isArray(n)
+              ? pickFirst(n[0])
+              : n?.type === 'file'
+                  ? n
+                  : n?.children && n.children.length
+                      ? pickFirst(n.children)
+                      : null;
+          const first = pickFirst(tree);
+          if (first) {
+            setSelectedFile(first);
+            pushFileArrival(first.name);
+          }
+          setActiveTab('code');            // jump to Code tab
+          firstFileHandled.current = true; // never again
         }
         return;
       }
@@ -187,13 +196,12 @@ const FileContextProvider: React.FC<{ children: React.ReactNode }> = ({ children
           content: payload.content,
         };
         setFileTree(prev => mergeIntoTree(prev, item));
+        pushFileArrival(item.name);        // ticker
 
-        // every streamed file gets piped to ticker
-        pushFileArrival(item.name);
-
-        if (!codeTabShown.current) {
+        if (!firstFileHandled.current) {
+          setSelectedFile(item);
           setActiveTab('code');
-          codeTabShown.current = true;
+          firstFileHandled.current = true;
         }
       }
     };
