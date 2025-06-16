@@ -2,6 +2,32 @@ import { deployPipeline as sseDeploy } from '@/api/deployPipeline';
 import { ProjectContextType } from '@/context/project/ProjectContextTypes';
 import { useContext } from 'react';
 import FileContext from '@/context/file/FileContext';
+import { FileTreeItemType } from '@/interfaces/FileTreeItemType';
+
+// Track file tree state internally to handle streaming
+let currentFileTree: FileTreeItemType[] = [];
+
+// Helper function to add a file to the tree
+function addFileToTree(path: string, content: string, setFileTree?: (tree: any) => void) {
+  if (!setFileTree) return;
+  
+  // Extract filename from path
+  const pathParts = path.split('/');
+  const fileName = pathParts[pathParts.length - 1];
+  
+  // Create a file node
+  const fileItem: FileTreeItemType = {
+    name: fileName,
+    path,
+    type: 'file',
+    ext: fileName.split('.').pop(),
+    content
+  };
+  
+  // Add to tree - simple version just adds at root level
+  currentFileTree.push(fileItem);
+  setFileTree([...currentFileTree]);
+}
 
 export function runDeployPipelineWithLogs(
   projectContext: ProjectContextType,
@@ -16,7 +42,10 @@ export function runDeployPipelineWithLogs(
   setArtifactUrl?: (url: string) => void,
   onComplete?: (status?: 'error') => void,
   setFileTree?: (tree: any) => void,
+  setActiveTab?: (tab: string) => void,
 ) {
+  // Reset the file tree collection for streaming
+  currentFileTree = [];
   
   taskLogs.resetLogs();
   taskLogs.setIsVisible(true);
@@ -28,6 +57,22 @@ export function runDeployPipelineWithLogs(
 
     if (msg.stage) {
       taskLogs.updateStage(msg.stage);
+    }
+
+    if (msg.stage === 'ui-stream') {
+      currentFileTree = [];
+      if (setFileTree) setFileTree([]);
+      taskLogs.addSystemLog("📝  streaming UI…");
+    }
+
+    if (msg.event === 'file-written') {
+      if (setFileTree) addFileToTree(msg.path, msg.content, setFileTree);
+      taskLogs.addSystemLog(`📄 ${msg.path}`);
+    }
+
+    if (msg.event === 'ui-complete') {
+      taskLogs.addSystemLog("✨ UI ready, opening preview");
+      if (setActiveTab) setActiveTab('interface');
     }
 
     if (msg.stage === "file-tree-start") {

@@ -67,11 +67,11 @@ async function waitForAll(taskIds: string[]): Promise<{
 }
 
 /** Helper to emit progress event when each file is written */
-const emitFileWritten = (sendProgress: (data: unknown) => void): InsertSrcProgressFn => (item) => {
+const emitFileWritten = (sendProgress: (data: unknown) => void): ((path: string, content: string) => void) => (path, content) => {
   sendProgress({
-    stage: 'file-written',
-    path: item.path,
-    item,                 // full FileTreeItem so FE can append to tree
+    event: 'file-written',
+    path,
+    content,
   });
 };
 
@@ -186,13 +186,16 @@ export const handleGenerateCode = async ({
         const initialTree = JSON.parse(treeResult.task.result ?? '[]');
         
         // Gather existing paths so insertSrcFiles can decide create vs update
-        const existing = new Set<string>(flattenPaths(initialTree));
+        const existingFilePaths = new Set<string>(flattenPaths(initialTree));
 
         /* ─────────────────────  A)  generate and write the UI FIRST  ───────────────────── */
         sendProgress({ stage: 'ui-gen', message: 'Generating token-minting UI…' });
         
+        // For streaming, use the userId as creatorId
+        const creatorId = userId;
+        
         // Build the UI file tree
-        const uiFiles = {
+        const uiTree = {
           name: ".",
           path: "./web",
           type: "directory" as const,
@@ -264,13 +267,19 @@ export const handleGenerateCode = async ({
           ]
         } as FileTreeItem;
 
-        await writeUiFirst(
-          uiFiles,
+        // Tell FE we're starting incremental UI push
+        sendProgress({ stage: 'ui-stream', message: 'Streaming UI files…' });
+
+        await insertSrcFiles(
+          uiTree,
           projectId,
-          existing,
-          workspace,
-          sendProgress,
+          existingFilePaths,
+          creatorId,
+          (path, code) => sendProgress({ event: 'file-written', path, content: code }),
         );
+
+        // All UI files done
+        sendProgress({ event: 'ui-complete', message: 'UI streaming finished' });
 
         // ─────────────────────── rebuild Next.js after UI injection ───────────────────────
         sendProgress({ stage: 'next-build', message: 'Re-building Next.js bundle…' });
@@ -363,7 +372,7 @@ export const handleGenerateCode = async ({
           sendProgress: (d: unknown) => void,
         ): Promise<void> {
           return (async () => {
-            const writeTaskIds = await insertSrcFiles(rootNode, projectId, existing, creatorId, emitFileWritten(sendProgress));
+            const writeTaskIds = await insertSrcFiles(rootNode, projectId, existingFilePaths, creatorId, emitFileWritten(sendProgress));
             
             // 🟢 NEW – wait until every write-file task finishes
             for (const tId of writeTaskIds) {
@@ -383,7 +392,7 @@ export const handleGenerateCode = async ({
         await writeFilesAndEmitTree(
           srcTree,
           projectId,
-          existing,
+          existingFilePaths,
           /* creatorId */ null,
           workspace,
           sendProgress,

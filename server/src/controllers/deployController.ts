@@ -45,7 +45,15 @@ export async function deployPipeline(
   // Generic helper keeps TypeScript happy for every event payload
   const send = <T = unknown>(data: T): void => {
     console.log('[API] Sending SSE event:', data);
-    res.write(`data: ${JSON.stringify(data)}\n\n`);
+    // Allow custom SSE event names (MDN pattern)
+    // https://developer.mozilla.org/... → custom events
+    if (typeof data === 'object' && data && 'event' in data) {
+      const { event, ...payload } = data as any;
+      res.write(`event: ${event}\n`);
+      res.write(`data: ${JSON.stringify(payload)}\n\n`);
+    } else {
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    }
   };
 
   /* ------------------------------------------------------------------ *

@@ -187,8 +187,8 @@ export async function pollTaskStatus(
 }
 
 export async function markWriteDone(projectId: string) {
-  const sentinel = `WRITE_SRCS_${projectId}`;
-  // deterministic id → build-pipeline can poll it
-  await createTask(sentinel, null, projectId, sentinel);
-  await updateTaskStatus(sentinel, "succeed", "UI + SRC files written");
+  // Generate a real UUID and keep the human-readable tag in "title"
+  const id = uuidv4();                         // ✅ valid uuid
+  await createTask(`WRITE_SRCS_${projectId}`, null, projectId, id);
+  await updateTaskStatus(id, "succeed", "UI + SRC files written");
 }
