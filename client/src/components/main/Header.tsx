@@ -45,8 +45,8 @@ export default function Header() {
       </TabsTrigger>
       <TabsTrigger
         value="code"
-        className={`${(!hasFiles || isBuilding) ? "cursor-not-allowed" : "cursor-pointer"} ${activeTab === "code" ? "tab-active" : "tab-inactive"}`}
-        disabled={!hasFiles || isBuilding}
+        /* visually muted while building, but NOT disabled */
+        className={`${(!hasFiles || isBuilding) ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${activeTab === "code" ? "tab-active" : "tab-inactive"}`}
       >
         code
       </TabsTrigger>

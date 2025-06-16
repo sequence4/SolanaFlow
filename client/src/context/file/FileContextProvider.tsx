@@ -111,6 +111,7 @@ const FileContextProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // --- NEW refs --------------------------------------------------------------
   const arrivalQueue = useRef<FileTreeItemType[]>([]);
   const typingInProgress = useRef(false);
+  const initialRevealDone = useRef(false);
 
   // Pops the next queued file once CodeEditor signals typing-done
   const showNextQueuedFile = () => {
@@ -176,6 +177,11 @@ const FileContextProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const typingDoneHandler = () => {
       typingInProgress.current = false;
       showNextQueuedFile();
+
+      // if queue now empty → the first-time reveal is finished
+      if (!arrivalQueue.current.length && !initialRevealDone.current) {
+        initialRevealDone.current = true;
+      }
     };
     
     eventBus.on('typing-start', typingStartHandler);
@@ -210,6 +216,18 @@ const FileContextProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       /* ---- single streamed file ------------------------- */
       if (payload.path && payload.content) {
+
+        // After the first pass, just merge into tree; no auto-display
+        if (initialRevealDone.current) {
+          setFileTree(prev => mergeIntoTree(prev, {
+            name: payload.path.split('/').pop() ?? 'file',
+            path: payload.path,
+            type: 'file',
+            content: payload.content,
+          }));
+          return;
+        }
+
         const item: FileTreeItemType = {
           name: payload.path.split('/').pop() ?? 'file',
           path: payload.path,
@@ -230,6 +248,7 @@ const FileContextProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           // still the very first file
           setSelectedFile(item);
+          setActiveTab('code');            // jump to Code tab
           firstFileHandled.current = true;
           typingInProgress.current = true;
         }

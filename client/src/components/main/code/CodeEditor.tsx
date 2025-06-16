@@ -85,8 +85,8 @@ const CodeEditor = ({ language: lang = "typescript" }) => {
     const fullContent =
       (selectedFile as any).content ?? (selectedFile as any).code ?? '';
 
-    const STEP = 5;   // chars per tick  (tweak for even faster)
-    const SPEED = 3;  // ms per tick     (lower = faster)
+    const STEP  = 8;  // chars per tick
+    const SPEED = 2;  // ms per tick
 
     let pos = 0;
     setCode('');                   // clear first
