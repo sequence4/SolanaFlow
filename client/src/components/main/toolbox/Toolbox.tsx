@@ -127,7 +127,7 @@ export const Toolbox = () => {
     };
     
     const handleConfirmBuild = useCallback(async () => {
-      if (!fileTree || isBuilding) return;        // guard re-entry & empty project
+      if (isBuilding) return;                     // guard re-entry
 
       /* ------------------------------------------- *
        * 1️⃣  Ensure we have a projectId BEFORE opening SSE
@@ -193,7 +193,7 @@ export const Toolbox = () => {
         toast.error("Build error", { description: String(err) });
         setIsBuilding(false);
       }
-    }, [fileTree, isBuilding, projectContext, setProjectContext, setFileTree, setActiveTab]);
+    }, [isBuilding, projectContext, setProjectContext, setFileTree, setActiveTab]);
     
     const handleBuildClick = async () => {
       if (isBuilding) return;        // already running
@@ -386,7 +386,8 @@ export const Toolbox = () => {
                     <div className="grid grid-cols-1 gap-2 mb-4">
                         <button
                             onClick={handleBuildClick}
-                            disabled={!fileTree}
+                            // always enabled – the guard inside handleConfirmBuild
+                            // will stop accidental double-clicks
                             className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center"
                         >
                             <>
