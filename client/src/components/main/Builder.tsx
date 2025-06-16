@@ -32,7 +32,7 @@ import { Button } from "@/components/ui/button";
 import { FaCircle } from "react-icons/fa";
 import { IoChatboxEllipsesOutline } from "react-icons/io5";
 import { LuWallet } from "react-icons/lu";
-import { MessageSquareMore } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 
 // Utils
 import { ProjectInfo } from "./Toolbar";

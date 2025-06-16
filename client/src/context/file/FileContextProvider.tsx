@@ -105,7 +105,8 @@ const FileContextProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [selectedFile, setSelectedFile] = useState<FileTreeItemType | null>(null);
   const [fileTree, setFileTree] = useState<FileTreeItemType | FileTreeItemType[] | null>(null);
   const { setActiveTab } = useContext(UxContext);
-  const firstTreeLoaded = useRef(false);           // prevents repeated tab-switches
+  // prevents repeated tab-switching once we've shown the Code tab
+  const codeTabShown = useRef(false);
 
   // Load from localStorage after component mounts
   useEffect(() => {
@@ -158,9 +159,10 @@ const FileContextProvider: React.FC<{ children: React.ReactNode }> = ({ children
       /* 1️⃣  Full file-tree snapshot */
       if (payload.fileTree) {
         setFileTree(structuredClone(payload.fileTree));
-        if (!firstTreeLoaded.current) {
-          firstTreeLoaded.current = true;
-          setActiveTab('code');                    // show Code tab once
+
+        if (!codeTabShown.current) {
+          setActiveTab('code');
+          codeTabShown.current = true;
         }
         return;
       }
@@ -174,6 +176,11 @@ const FileContextProvider: React.FC<{ children: React.ReactNode }> = ({ children
           content: payload.content,
         };
         setFileTree(prev => mergeIntoTree(prev, item));
+
+        if (!codeTabShown.current) {
+          setActiveTab('code');
+          codeTabShown.current = true;
+        }
       }
     };
 
