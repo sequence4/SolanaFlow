@@ -9,6 +9,9 @@
     "lint": "next lint",
     "test": "echo \"(Client) No tests implemented yet.\" && exit 0"
   },
+  "resolutions": {
+    "@types/react": "19.1.8"
+  },
   "dependencies": {
     "@codemirror/lang-javascript": "^6.2.3",
     "@codemirror/lang-rust": "^6.0.1",

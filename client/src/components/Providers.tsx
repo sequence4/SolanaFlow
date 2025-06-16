@@ -1,5 +1,4 @@
 "use client";
-// @ts-nocheck
 
 
 import WalletConnectionProvider from "@/context/WalletConnectionProvider";
