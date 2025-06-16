@@ -107,6 +107,11 @@ const FileContextProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { setActiveTab } = useContext(UxContext);
   // prevents repeated tab-switching once we've shown the Code tab
   const codeTabShown = useRef(false);
+  
+  // queue used purely for "ticker" effect
+  const pushFileArrival = (filePath: string) => {
+    eventBus.emit("file-arrival", filePath);
+  };
 
   // Load from localStorage after component mounts
   useEffect(() => {
@@ -156,9 +161,15 @@ const FileContextProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Listen for file-tree and individual file events from SSE
   useEffect(() => {
     const handler = (payload: any) => {
-      /* 1️⃣  Full file-tree snapshot */
+      /* ---- full snapshot -------------------------------- */
       if (payload.fileTree) {
         setFileTree(structuredClone(payload.fileTree));
+
+        // emit the very first file once (for nice "opening line")
+        const first = Array.isArray(payload.fileTree)
+          ? payload.fileTree[0]?.name
+          : payload.fileTree?.name;
+        if (first) pushFileArrival(first);
 
         if (!codeTabShown.current) {
           setActiveTab('code');
@@ -167,7 +178,7 @@ const FileContextProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      /* 2️⃣  Individual streamed files */
+      /* ---- single streamed file ------------------------- */
       if (payload.path && payload.content) {
         const item: FileTreeItemType = {
           name: payload.path.split('/').pop() ?? 'file',
@@ -176,6 +187,9 @@ const FileContextProvider: React.FC<{ children: React.ReactNode }> = ({ children
           content: payload.content,
         };
         setFileTree(prev => mergeIntoTree(prev, item));
+
+        // every streamed file gets piped to ticker
+        pushFileArrival(item.name);
 
         if (!codeTabShown.current) {
           setActiveTab('code');

@@ -6,6 +6,7 @@ export type ProgressPayload = Record<string, unknown>;
 type BusEvents = {
   progress: ProgressPayload;
   'chat-build-command': void;  // Event emitted when user types "build" in the chat
+  'file-arrival': string;      // Event emitted when a file arrives (for ticker)
 };
 
 const eventBus = mitt<BusEvents>();
