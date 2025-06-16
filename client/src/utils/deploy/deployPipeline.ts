@@ -75,8 +75,10 @@ export function runDeployPipelineWithLogs(
 
     /* ------------ AUTO TAB SWITCH on ui-complete ------------- */
     if (msg.stage === "ui-complete" || msg.event === "ui-complete") {
-      // only switch if user has NOT manually left workflow
-      if (activeTab === "workflow") uxSetActiveTab("interface");
+      // Skip if we're already there or the user manually picked a tab **after** the build started
+      if (activeTab !== "interface") {
+        uxSetActiveTab("interface");
+      }
     }
     /* ---------------------------------------------------------- */
 

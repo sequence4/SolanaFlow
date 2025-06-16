@@ -301,7 +301,6 @@ export const handleGenerateCode = async ({
           `docker exec ${workspace.containerName} bash -c "` +
           `set -e; cd /usr/share/solanaflow/web && ` +
           `cp -R "${sourceWebDir}" . && ` +
-          `npm config set optional false && ` +
           // 0) add UI deps (idempotent if already present)
           `yarn add --exact --silent ` +
           `lucide-react tailwind-variants class-variance-authority ` +
@@ -310,7 +309,7 @@ export const handleGenerateCode = async ({
           `@solana/wallet-adapter-wallets @solana/web3.js ` +
           `clsx tailwind-merge && ` +
           // 1) install everything declared in package.json
-          `yarn install --frozen-lockfile --silent && ` +
+          `yarn install --frozen-lockfile --silent --omit=optional && ` +
           // 2) build the standalone bundle
           `yarn build && ` +
           // 3) copy assets next to server.js so the minimal server can serve them
