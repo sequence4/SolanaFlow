@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import eventBus from '@/lib/eventBus';
 
 import { Button } from "@/components/ui/button";
@@ -74,6 +74,10 @@ const CodeEditor = ({ language: lang = "typescript" }) => {
   const [code, setCode] = useState('');
   const [theme, setTheme] = useState(vscodeDark);
   const { colorMode } = useColorMode();
+  
+  // --- auto-scroll control ----------------------------------------------
+  const viewRef    = useRef<any>(null);   // CodeMirror EditorView
+  const autoScroll = useRef(true);        // true until user scrolls up
 
   useEffect(() => {
     setTheme(colorMode === "dark" ? tokyoNight : githubLight);
@@ -81,6 +85,9 @@ const CodeEditor = ({ language: lang = "typescript" }) => {
 
   useEffect(() => {
     if (!selectedFile) return;
+
+    // every new file begins with auto-scroll ON
+    autoScroll.current = true;
 
     const fullContent =
       (selectedFile as any).content ?? (selectedFile as any).code ?? '';
@@ -128,6 +135,22 @@ const CodeEditor = ({ language: lang = "typescript" }) => {
     background: menuBg,
     border: `1px solid ${menuBorder}`,
     color: menuColor,
+  };
+
+  /* -------------------------------------------------- */
+  /* CodeMirror mount: capture view + watch scroll      */
+  const handleMount = (view: any /* EditorView */) => {
+    viewRef.current = view;
+    const dom = view.scrollDOM;
+    const onScroll = () => {
+      if (!autoScroll.current) return;                       // already off
+      const { scrollTop, clientHeight, scrollHeight } = dom;
+      // user scrolled up ⇒ disable future auto-scroll
+      if (scrollTop + clientHeight < scrollHeight - 20) {
+        autoScroll.current = false;
+      }
+    };
+    dom.addEventListener("scroll", onScroll);
   };
 
   return (
@@ -272,6 +295,19 @@ const CodeEditor = ({ language: lang = "typescript" }) => {
           theme={theme}
           extensions={[getLanguage()]}
           onChange={onChange}
+          /** capture EditorView on first mount */
+          onCreateEditor={handleMount}
+
+          /** scroll to bottom on every doc update IF autoScroll still true */
+          onUpdate={() => {
+            if (autoScroll.current && viewRef.current) {
+              // use rAF to ensure DOM updated before scroll
+              requestAnimationFrame(() => {
+                const dom = viewRef.current!.scrollDOM;
+                dom.scrollTop = dom.scrollHeight;
+              });
+            }
+          }}
         />
       </div>
     </div>
