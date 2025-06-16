@@ -119,7 +119,7 @@ export default function TaskLogsProvider({
   }, []);
 
   const updateStage = useCallback((stage: string, data?: any) => {
-    /* ---------- 1. dedicated handling for the streamed UI preview ---------- */
+    /* ---------- 1️⃣  dedicated handling for the streamed UI preview ---------- */
     if (stage === "ui-ready") {
       setUiReady(true);
       if (data?.fileTree) {
@@ -128,7 +128,7 @@ export default function TaskLogsProvider({
       return;
     }
 
-    /* ---------- 2. normalise build-sub-stages into the single "build" step */
+    /* ---------- 2️⃣  normalise build-sub-stages into the single "build" step */
     const normalisedStage =
       stage.startsWith("build-") ? "build" : stage;
 
@@ -138,11 +138,21 @@ export default function TaskLogsProvider({
     const index = STAGES.findIndex(s => s.stage === normalisedStage);
     setCurrentStep(index);         // -1 if unknown → toast still shows
     showToastIfAllowed();
+
+    /* ---------- 3️⃣  surface the stage's text to Chat ASAP ---------- */
+    if (data?.message) {
+      // Use backend-supplied sentence when present
+      addSystemLog(data.message);
+    } else if (index >= 0) {
+      // Fallback: synthesise a friendly line from the STAGES list
+      const label = STAGES[index].label;
+      addSystemLog(`${label}…`);
+    }
     
     if (stage === 'done' || stage === 'error') {
       setSuppressToast(false);              // allow UI toast for future builds
     }
-  }, [suppressToast, isVisible]);
+  }, [suppressToast, isVisible, addSystemLog]);
 
   // Subscribe to global progress events (from SSE)
   useEffect(() => {
