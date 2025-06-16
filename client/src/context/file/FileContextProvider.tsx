@@ -108,6 +108,18 @@ const FileContextProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // only run the "switch-to-code-tab + first-file-selection" block once
   const firstFileHandled = useRef(false);
   
+  // --- NEW refs --------------------------------------------------------------
+  const arrivalQueue = useRef<FileTreeItemType[]>([]);
+  const typingInProgress = useRef(false);
+
+  // Pops the next queued file once CodeEditor signals typing-done
+  const showNextQueuedFile = () => {
+    if (typingInProgress.current) return;         // still typing current
+    if (!arrivalQueue.current.length) return;     // nothing queued
+    const next = arrivalQueue.current.shift()!;
+    setSelectedFile(next);
+  };
+  
   // queue used purely for the bottom-ticker ("typing") effect
   const pushFileArrival = (filePath: string) => {
     eventBus.emit("file-arrival", filePath);
@@ -160,6 +172,15 @@ const FileContextProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Listen for file-tree and individual file events from SSE
   useEffect(() => {
+    const typingStartHandler = () => { typingInProgress.current = true; };
+    const typingDoneHandler = () => {
+      typingInProgress.current = false;
+      showNextQueuedFile();
+    };
+    
+    eventBus.on('typing-start', typingStartHandler);
+    eventBus.on('typing-done', typingDoneHandler);
+    
     const handler = (payload: any) => {
       /* ---- full snapshot -------------------------------- */
       if (payload.fileTree) {
@@ -196,18 +217,31 @@ const FileContextProvider: React.FC<{ children: React.ReactNode }> = ({ children
           content: payload.content,
         };
         setFileTree(prev => mergeIntoTree(prev, item));
-        pushFileArrival(item.name);        // ticker
+        pushFileArrival(item.name);          // 👈 ticker, unchanged
 
-        if (!firstFileHandled.current) {
+        // --- NEW:  decide whether to queue or show immediately ------------------
+        if (firstFileHandled.current) {
+          if (typingInProgress.current) {
+            arrivalQueue.current.push(item); // wait your turn
+          } else {
+            setSelectedFile(item);           // no typing – show now
+            typingInProgress.current = true; // CodeEditor will clear it later
+          }
+        } else {
+          // still the very first file
           setSelectedFile(item);
-          setActiveTab('code');
           firstFileHandled.current = true;
+          typingInProgress.current = true;
         }
       }
     };
 
     eventBus.on('progress', handler);
-    return () => eventBus.off('progress', handler);
+    return () => {
+      eventBus.off('progress', handler);
+      eventBus.off('typing-start', typingStartHandler);
+      eventBus.off('typing-done', typingDoneHandler);
+    };
   }, [setActiveTab]);
 
   const contextValue: FileContextType = {

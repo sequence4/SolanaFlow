@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext } from "react";
+import eventBus from '@/lib/eventBus';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -80,21 +81,27 @@ const CodeEditor = ({ language: lang = "typescript" }) => {
 
   useEffect(() => {
     if (!selectedFile) return;
-    
-    // Get the full content
-    const fullContent = (selectedFile as any).content ?? (selectedFile as any).code ?? '';
-    
-    // Implement typewriter effect
+
+    const fullContent =
+      (selectedFile as any).content ?? (selectedFile as any).code ?? '';
+
+    const STEP = 5;   // chars per tick  (tweak for even faster)
+    const SPEED = 3;  // ms per tick     (lower = faster)
+
     let pos = 0;
+    setCode('');                   // clear first
+    eventBus.emit('typing-start'); // notify provider
+
     const id = setInterval(() => {
-      setCode(fullContent.slice(0, ++pos));
-      if (pos >= fullContent.length) clearInterval(id);
-    }, 8); // 8ms gives ~125 chars per second
-    
-    console.log('[CodeEditor] loaded', selectedFile.name, '— bytes:', fullContent.length);
-    
-    // Clean up interval on unmount or when selectedFile changes
-    return () => clearInterval(id);
+      pos += STEP;
+      setCode(fullContent.slice(0, pos));
+      if (pos >= fullContent.length) {
+        clearInterval(id);
+        eventBus.emit('typing-done');   // 👈 important
+      }
+    }, SPEED);
+
+    return () => clearInterval(id);     // cleanup if file changes
   }, [selectedFile]);
 
   const onChange = (value: string) => {

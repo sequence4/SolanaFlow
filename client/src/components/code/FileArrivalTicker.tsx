@@ -19,7 +19,7 @@ export default function FileArrivalTicker() {
   /* after showing an item, remove it -------------------------------------- */
   useEffect(() => {
     if (!queue.length) return;
-    const timer = setTimeout(() => setQueue(q => q.slice(1)), 600);
+    const timer = setTimeout(() => setQueue(q => q.slice(1)), 350);
     return () => clearTimeout(timer);
   }, [queue]);
 
