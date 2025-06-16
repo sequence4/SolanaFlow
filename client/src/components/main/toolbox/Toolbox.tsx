@@ -37,7 +37,6 @@ import { deployPipeline } from '@/api/deployPipeline';
 import { useWalletSigner } from '@/utils/wallet';
 import { ensureId } from '@/utils/project/ensureId';
 import { ProgramDeployer } from '@/components/ProgramDeployer';
-import { BuildModal } from '@/components/BuildModal';
 import { projectApi } from '@/api/projectApi';
 import { useTaskLogs } from '@/context/logs/useTaskLogs';
 
@@ -249,14 +248,13 @@ export const Toolbox = () => {
     }, [isBuilding, setIsBuilding, projectContext, setProjectContext, setFileTree, fileTree]);
     
     const handleBuildClick = async () => {
-      if (!fileTree) return;                        // still gate on code presence
-    
-      /* Guarantee we have a project id */
-      const id = await ensureId(projectContext, setProjectContext);
-      setBuildProjectId(id);
-    
-      /* Now open the confirmation modal */
-      setIsBuildModalOpen(true);
+      if (!fileTree || isBuilding) return;          // guard re-entry & empty project
+
+      // 1) Hide TaskLogs toast for this run
+      taskLogs.setSuppressToast(true);
+
+      // 2) Kick off the real build immediately 
+      await handleConfirmBuild();                   // same routine you already use
     };
     
     const projectDeployed = !!projectContext?.details?.projectState?.deployed;
@@ -634,17 +632,7 @@ export const Toolbox = () => {
                 />
             )}
 
-            {/* Build confirmation modal (uses guaranteed id) */}
-            {isBuildModalOpen && buildProjectId && (
-                <BuildModal
-                    isOpen={isBuildModalOpen}
-                    isBuilding={isBuilding}
-                    percent={buildPercent}
-                    stage={buildStage}
-                    onClose={() => setIsBuildModalOpen(false)}
-                    onSuccess={handleConfirmBuild}
-                />
-            )}
+
 
             <Dialog open={isProjectListModalOpen} onOpenChange={(open) => setIsProjectListModalOpen(open)}>
                 <DialogContent 
