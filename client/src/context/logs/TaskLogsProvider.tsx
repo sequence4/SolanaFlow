@@ -19,7 +19,7 @@ export default function TaskLogsProvider({
   children: React.ReactNode;
 }) {
   const [logs, setLogs] = useState<TaskLog[]>([]);
-  const [isVisible, setIsVisible] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);   // stays off; Chat will display logs
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(-1); // Start at -1 to indicate "waiting for pipeline"
   const [steps, setSteps] = useState<Step[]>([]);
