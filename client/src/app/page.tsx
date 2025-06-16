@@ -12,10 +12,17 @@ import Head from "next/head"
 import TypewriterCode from "@/components/landing/TypeWriterCode"
 import LandingStyles from "@/components/landing/style"
 import ScrollReveal from "@/components/landing/ScrollReveal"
-
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/hooks/useAuth"
 
 export default function LandingPage() {
   const [mounted, setMounted] = useState(false)
+  const router = useRouter()
+  const { user, loading } = useAuth()
+
+  useEffect(() => {
+    if (!loading && user) router.replace('/main');
+  }, [loading, user, router]);
 
   useEffect(() => {
     setMounted(true)

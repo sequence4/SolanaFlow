@@ -100,16 +100,16 @@ RUN . "$NVM_DIR/nvm.sh" \
 ENV NEXT_TELEMETRY_DISABLED=1 NEXT_SKIP_ESLINT=1
 # --- Force Next 14 + to emit the standalone bundle ---------------------------
 ENV NEXT_PRIVATE_STANDALONE=true
+# copy the web/ directory that already exists in the repo
+COPY web/ /usr/share/solanaflow/web
+
+# install deps and build once
 RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing=locked \
-    mkdir -p /usr/share/solanaflow \
- && CI=1 yarn create next-app /usr/share/solanaflow/web \
-        --typescript --eslint --tailwind --app --no-src-dir --no-interactive \
- && printf '\nmodule.exports = { output: "standalone" };\n' >> /usr/share/solanaflow/web/next.config.js \
- && yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile \
+    yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile \
  && yarn --cwd /usr/share/solanaflow/web build \
  && yarn cache clean --all || true
 
-# fail the build early if the expected file is missing
+# sanity-check: make sure the stand-alone entry exists
 RUN test -f /usr/share/solanaflow/web/.next/standalone/server.js
 
 ###############################################################################
@@ -139,14 +139,6 @@ COPY --from=solana-toolchain /root/.rustup /root/.rustup
 ## ① server code — unchanged
 COPY --from=builder /usr/share/solanaflow/web/.next/standalone \
     /usr/share/solanaflow/web/.next/standalone
-
-## ② static assets — copy into standalone/.next/static
-COPY --from=builder /usr/share/solanaflow/web/.next/static \
-    /usr/share/solanaflow/web/.next/standalone/.next/static
-
-## ③ public/ — copy beside server.js
-COPY --from=builder /usr/share/solanaflow/web/public \
-    /usr/share/solanaflow/web/.next/standalone/public
 
 # also copy the project itself (src/, app/, idl/, …)
 COPY --from=builder /usr/share/solanaflow/web                  /usr/share/solanaflow/web
