@@ -1,7 +1,6 @@
 import { updateOrCreateFile } from '../fileUtils';
 import type { FileTreeItem } from '../../types/FileTreeItem';
 import path from 'path';
-import { waitForTaskCompletion } from '../taskUtils';
 
 // Define the callback type for file write progress
 export type InsertSrcProgressFn = (item: FileTreeItem) => void;
@@ -62,10 +61,7 @@ export async function insertSrcFiles(
       if (taskId) {
         console.log(`[DEBUG_INSERT_SRC] Added taskId ${taskId} for file: ${projectRelativePath}`);
         
-        // Wait for the task to complete
-        await waitForTaskCompletion(taskId, 90, 2_000);
-        
-        // stream this individual file immediately
+        // stream the file *now* – don't block the queue
         if (onFile) onFile(projectRelativePath, node.code || '');
         
         fileTaskIds.push(taskId);

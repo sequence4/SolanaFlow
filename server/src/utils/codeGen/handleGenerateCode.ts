@@ -301,6 +301,7 @@ export const handleGenerateCode = async ({
           `docker exec ${workspace.containerName} bash -c "` +
           `set -e; cd /usr/share/solanaflow/web && ` +
           `cp -R "${sourceWebDir}" . && ` +
+          `npm config set optional false && ` +
           // 0) add UI deps (idempotent if already present)
           `yarn add --exact --silent ` +
           `lucide-react tailwind-variants class-variance-authority ` +
