@@ -89,14 +89,15 @@ export default function TaskLogsProvider({
   }, [isVisible, suppressToast]);
 
   const addSystemLog = useCallback((log: string) => {
-    if (suppressToast) return;
-    
-    setSystemLogs((prev) => [...prev, log]);
+    /*  Always push the line into Chat  */
+    setSystemLogs(prev => [...prev, log]);
     setLastMessage(log);
-    
-    // Also make the toast visible when system logs are added
-    showToastIfAllowed();
-  }, [isVisible, suppressToast]);
+
+    /*  Only raise the visual toast when NOT suppressed  */
+    if (!suppressToast) {
+      showToastIfAllowed();
+    }
+  }, [suppressToast]);
 
   const handleSetSteps = useCallback((newSteps: Step[]) => {
     setSteps(newSteps);
