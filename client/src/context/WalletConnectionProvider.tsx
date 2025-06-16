@@ -1,3 +1,5 @@
+"use client";
+
 import React, { FC, ReactNode, useMemo } from 'react';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { 
@@ -15,7 +17,7 @@ interface WalletConnectionProviderProps {
   children: ReactNode;
 }
 
-export const WalletConnectionProvider: FC<WalletConnectionProviderProps> = ({ children }) => {
+const WalletConnectionProvider: FC<WalletConnectionProviderProps> = ({ children }) => {
   const network = WalletAdapterNetwork.Devnet;
 
   const endpoint =
@@ -38,3 +40,5 @@ export const WalletConnectionProvider: FC<WalletConnectionProviderProps> = ({ ch
     </ConnectionProvider>
   );
 };
+
+export default WalletConnectionProvider;

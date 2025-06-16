@@ -1,7 +1,8 @@
 "use client";
+// @ts-nocheck
 
-// @ts-nocheck - Disable TypeScript checking for this file due to provider component typing issues
-import { WalletConnectionProvider } from "@/context/WalletConnectionProvider";
+
+import WalletConnectionProvider from "@/context/WalletConnectionProvider";
 import AuthProvider from "@/context/auth/AuthProvider";
 import ProjectProvider from "@/context/project/ProjectContextProvider";
 import FileContextProvider from "@/context/file/FileContextProvider";
@@ -19,18 +20,18 @@ export default function Providers({
     <>
       <Provider>
         <UxContextProvider>
-          <FileContextProvider>
-            <WalletConnectionProvider>
-              <AuthProvider>
-                <ProjectProvider>
-                  <TaskLogsProvider>
+          <WalletConnectionProvider>
+            <AuthProvider>
+              <ProjectProvider>
+                <TaskLogsProvider>
+                  <FileContextProvider>
                     {children}
                     <Toaster />
-                  </TaskLogsProvider>
-                </ProjectProvider>
-              </AuthProvider>
-            </WalletConnectionProvider>
-          </FileContextProvider>
+                  </FileContextProvider>
+                </TaskLogsProvider>
+              </ProjectProvider>
+            </AuthProvider>
+          </WalletConnectionProvider>
         </UxContextProvider>
       </Provider>
     </>
