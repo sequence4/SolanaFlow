@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import FileContext from "./FileContext";
 import { FileContextType } from "./FileContextTypes";
 import { FileTreeItemType } from "../../interfaces/FileTreeItemType";
 import eventBus from "../../lib/eventBus";
+import UxContext from "../ux/UxContext";
 
 // Helper function to parse the stored file tree
 function getInitialFileTree(): FileTreeItemType | FileTreeItemType[] | null {
@@ -18,45 +19,7 @@ function getInitialFileTree(): FileTreeItemType | FileTreeItemType[] | null {
   }
 }
 
-// Sample default file tree to use when no data is available
-const defaultFileTree: FileTreeItemType = {
-  name: "Project Files",
-  type: "directory",
-  path: "root",
-  children: [
-    {
-      name: "src",
-      type: "directory",
-      path: "root/src",
-      children: [
-        {
-          name: "components",
-          type: "directory",
-          path: "root/src/components",
-          children: [
-            {
-              name: "App.tsx",
-              type: "file",
-              path: "root/src/components/App.tsx",
-            }
-          ]
-        },
-        {
-          name: "index.ts",
-          type: "file",
-          path: "root/src/index.ts",
-        }
-      ]
-    },
-    {
-      name: "README.md",
-      type: "file",
-      path: "root/README.md",
-    }
-  ]
-};
-
-// NEW: Helper to parse the stored selected file
+// Helper to parse the stored selected file
 function getInitialSelectedFile(): FileTreeItemType | null {
   try {
     const stored = localStorage.getItem("selectedFile");
@@ -141,6 +104,8 @@ const FileContextProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Initialize with null - no localStorage calls at initialization
   const [selectedFile, setSelectedFile] = useState<FileTreeItemType | null>(null);
   const [fileTree, setFileTree] = useState<FileTreeItemType | FileTreeItemType[] | null>(null);
+  const { setActiveTab } = useContext(UxContext);
+  const firstTreeLoaded = useRef(false);           // prevents repeated tab-switches
 
   // Load from localStorage after component mounts
   useEffect(() => {
@@ -149,9 +114,6 @@ const FileContextProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const storedFileTree = localStorage.getItem("fileTree");
       if (storedFileTree) {
         setFileTree(JSON.parse(storedFileTree));
-      } else {
-        // Set default file tree if nothing is in localStorage
-        setFileTree(defaultFileTree);
       }
 
       // Load selectedFile
@@ -161,8 +123,6 @@ const FileContextProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       console.warn("Could not parse data from localStorage:", error);
-      // Set default file tree if there was an error
-      setFileTree(defaultFileTree);
     }
   }, []);
 
@@ -192,20 +152,34 @@ const FileContextProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [selectedFile]);
 
-  // Listen for file-written events from SSE
+  // Listen for file-tree and individual file events from SSE
   useEffect(() => {
-    const handleFileWritten = (payload: any) => {
-      if (payload.stage === 'file-written' && payload.item) {
-        console.log('[FileContext] Received file-written event:', payload.path);
-        setFileTree((prevTree) => mergeIntoTree(prevTree, payload.item));
+    const handler = (payload: any) => {
+      /* 1️⃣  Full file-tree snapshot */
+      if (payload.fileTree) {
+        setFileTree(structuredClone(payload.fileTree));
+        if (!firstTreeLoaded.current) {
+          firstTreeLoaded.current = true;
+          setActiveTab('code');                    // show Code tab once
+        }
+        return;
+      }
+
+      /* 2️⃣  Individual streamed files */
+      if (payload.path && payload.content) {
+        const item: FileTreeItemType = {
+          name: payload.path.split('/').pop() ?? 'file',
+          path: payload.path,
+          type: 'file',
+          content: payload.content,
+        };
+        setFileTree(prev => mergeIntoTree(prev, item));
       }
     };
 
-    eventBus.on('progress', handleFileWritten);
-    return () => {
-      eventBus.off('progress', handleFileWritten);
-    };
-  }, []);
+    eventBus.on('progress', handler);
+    return () => eventBus.off('progress', handler);
+  }, [setActiveTab]);
 
   const contextValue: FileContextType = {
     selectedFile,

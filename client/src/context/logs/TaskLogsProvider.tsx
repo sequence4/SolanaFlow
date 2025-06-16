@@ -32,6 +32,11 @@ export default function TaskLogsProvider({
   const [fileTree, setFileTree] = useState<any>(null);
   const [buildPhase, setBuildPhase] = useState<'waiting' | 'started' | 'done'>('waiting');
 
+  /* helper – show toast only when allowed */
+  const showToastIfAllowed = () => {
+    if (!suppressToast && !isVisible) setIsVisible(true);
+  };
+
   /* ---------- very lightweight observer list ---------- */
   type ProgressCB = (e: { progress: number; message: string }) => void;
   const subs = useRef<Set<ProgressCB>>(new Set()).current;
@@ -72,35 +77,35 @@ export default function TaskLogsProvider({
   }, [currentStep]);
 
   const addLog = useCallback((message: string) => {
+    if (suppressToast) return;
+    
     setLogs((prevLogs) => [
       ...prevLogs,
       { message, timestamp: Date.now() },
     ]);
     
     // Make the toast visible when logs are added
-    if (!suppressToast && !isVisible) {
-      setIsVisible(true);
-    }
+    showToastIfAllowed();
   }, [isVisible, suppressToast]);
 
   const addSystemLog = useCallback((log: string) => {
+    if (suppressToast) return;
+    
     setSystemLogs((prev) => [...prev, log]);
     setLastMessage(log);
     
     // Also make the toast visible when system logs are added
-    if (!suppressToast && !isVisible) {
-      setIsVisible(true);
-    }
+    showToastIfAllowed();
   }, [isVisible, suppressToast]);
 
   const handleSetSteps = useCallback((newSteps: Step[]) => {
     setSteps(newSteps);
     
     // Make the toast visible when steps are set
-    if (newSteps.length > 0 && !isVisible) {
-      setIsVisible(true);
+    if (newSteps.length > 0) {
+      showToastIfAllowed();
     }
-  }, [isVisible]);
+  }, [isVisible, suppressToast]);
 
   const resetLogs = useCallback(() => {
     setLogs([]);
@@ -132,12 +137,12 @@ export default function TaskLogsProvider({
 
     const index = STAGES.findIndex(s => s.stage === normalisedStage);
     setCurrentStep(index);         // -1 if unknown → toast still shows
-    setIsVisible(true);
+    showToastIfAllowed();
     
     if (stage === 'done' || stage === 'error') {
       setSuppressToast(false);              // allow UI toast for future builds
     }
-  }, []);
+  }, [suppressToast, isVisible]);
 
   // Subscribe to global progress events (from SSE)
   useEffect(() => {

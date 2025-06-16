@@ -53,7 +53,7 @@ export const Toolbox = () => {
     const [isExpanded] = useState(true);
     const { projectContext, setProjectContext } = useContext(ProjectContext);
     const { fileTree, setFileTree, setSelectedFile } = useContext(FileContext);
-    const { activeTab, setUxOpenPanel } = useContext(UxContext);
+    const { activeTab, setUxOpenPanel, setActiveTab } = useContext(UxContext);
     const [activeChainTab, setActiveChainTab] = useState<"on-chain" | "off-chain">("on-chain");
     const [projectName, setProjectName] = useState(projectContext.name || "My Token Project");
     const [isEditing, setIsEditing] = useState(false);
@@ -165,6 +165,7 @@ export const Toolbox = () => {
             if (msg.fileTree) {
               console.log(`[BUILD] Received fileTree update`);
               setFileTree(structuredClone(msg.fileTree));
+              setActiveTab('code');
             }
             
             if (msg.stage === "done" || msg.stage === "build-done") {
@@ -192,7 +193,7 @@ export const Toolbox = () => {
         toast.error("Build error", { description: String(err) });
         setIsBuilding(false);
       }
-    }, [fileTree, isBuilding, projectContext, setProjectContext, setFileTree]);
+    }, [fileTree, isBuilding, projectContext, setProjectContext, setFileTree, setActiveTab]);
     
     const handleBuildClick = async () => {
       if (isBuilding) return;        // already running
