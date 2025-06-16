@@ -1,7 +1,9 @@
-import type { Metadata } from 'next'
-import '../src/globals.css'
-import WalletConnectionProvider from '../src/context/WalletConnectionProvider';
+"use client";
+
+import "../src/globals.css";
+import WalletConnectionProvider from "../src/context/WalletConnectionProvider";
 import React from 'react';
+import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'SolanaFlow Token Minter',
@@ -14,11 +16,9 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body>
-        <WalletConnectionProvider>
-          {children}
-        </WalletConnectionProvider>
+    <html lang="en" className="light" suppressHydrationWarning>
+      <body className="min-h-screen bg-background font-sans antialiased">
+        <WalletConnectionProvider>{children}</WalletConnectionProvider>
       </body>
     </html>
   )
