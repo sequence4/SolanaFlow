@@ -1,4 +1,4 @@
-import { FileTreeItem } from "../types";
+import type { FileTreeItem } from "../../types/FileTreeItem";
 
 /** Generate the minimal Next.js UI for a token-mint dApp */
 export function genUi(projectName: string): FileTreeItem[] {
