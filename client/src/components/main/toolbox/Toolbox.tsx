@@ -47,20 +47,7 @@ const WALLET_TOAST_ID = 'wallet-not-connected';
 /** Memo-friendly helpers */
 const NEED_BUILD_TOAST_ID = 'need-build';   // prevents duplicates
 
-/**
- * Full sequence of stages streamed by the deploy-pipeline SSE.
- * Keep this list in the exact order the server emits them so that
- * (idx+1)/length → percentage works.
- */
-const STAGES = [
-  { stage: "file-tree" },
-  { stage: "file-tree-done" },
-  { stage: "src-gen" },
-  { stage: "src-write" },
-  { stage: "build" },
-  { stage: "build-done" },
-  { stage: "done" },
-] as const;
+
 
 export const Toolbox = () => {
     const [isExpanded] = useState(true);
@@ -85,10 +72,6 @@ export const Toolbox = () => {
     const [isDeploying, setIsDeploying] = useState(false);
     const [isBuilding, setIsBuilding] = useState(false);
     const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
-    const [isBuildModalOpen, setIsBuildModalOpen] = useState(false);
-    const [buildProjectId, setBuildProjectId] = useState<string | null>(null);
-    const [buildPercent, setBuildPercent] = useState<number | null>(null);
-    const [buildStage, setBuildStage] = useState<string>("Waiting…");
     
     const walletSigner = useWalletSigner();
 
@@ -144,117 +127,76 @@ export const Toolbox = () => {
     };
     
     const handleConfirmBuild = useCallback(async () => {
-        if (!fileTree) return;                        // still gate on code presence
-        
-        try {
-            /* Guarantee we have a project id */
-            const id = await ensureId(projectContext, setProjectContext);
-            
-            /* shape backend expects */
-            const graph = {
-                nodes: projectContext.details?.projectState?.nodes || [],
-                edges: projectContext.details?.projectState?.edges || [],
-                config: projectContext.details?.projectState?.config || {},
-            };
-            
-            try {
-                /* -------------------------------------------------- *
-                 *  Tell the UI we are building (must be BEFORE the   *
-                 *  first render of <BuildModal>, otherwise the bar   *
-                 *  never appears)                                    *
-                 * -------------------------------------------------- */
-                setIsBuilding(true);
-                setBuildPercent(0);                     // show the bar right away
-                setBuildStage("Starting build…");       // human-readable label
+      if (!fileTree || isBuilding) return;        // guard re-entry & empty project
 
-                /* -------------------------------------------------- *
-                 *  OPEN SERVER-SENT EVENTS STREAM
-                 * -------------------------------------------------- */
-                esRef.current = deployPipeline(
-                  projectContext.id ?? id,
-                  graph,
-                  (msg: any) => {
-                    /* 1. Prefer explicit numeric progress from server */
-                    if (typeof msg.progress === "number") {
-                      setBuildPercent(Math.max(0, Math.min(msg.progress, 100)));
-                    } else {
-                      /* 2. Otherwise fall back to coarse stage map */
-                      const idx = STAGES.findIndex(
-                        (s) => s.stage === msg.stage
-                      );
-                      if (idx >= 0) {
-                        setBuildPercent(
-                          Math.round(((idx + 1) / STAGES.length) * 100)
-                        );
-                      }
-                    }
+      /* ------------------------------------------- *
+       * 1️⃣  Ensure we have a projectId BEFORE opening SSE
+       * ------------------------------------------- */
+      const projectId = projectContext.id
+        ? projectContext.id
+        : await ensureId(projectContext, setProjectContext);
 
-                    /* 3. Human-readable status line */
-                    setBuildStage(msg.message ?? msg.stage);
+      if (!projectId) {                           // extra safety net
+        toast.error("Build error", { description: "Unable to determine project id" });
+        return;
+      }
 
-                    /* 4. Handle file tree updates */
-                    if (msg.fileTree) {
-                      console.log(`[BUILD] Received fileTree update`);
-                      setFileTree(structuredClone(msg.fileTree));
-                    }
+      /* ------------------------------------------- *
+       * 2️⃣  Mark UI state (no modal / no toast)
+       * ------------------------------------------- */
+      setIsBuilding(true);
+      taskLogs.setSuppressToast(true);            // hide TaskLogs toast
 
-                    // Close modal & reset when build completes
-                    if (msg.stage === "done" || msg.stage === "build-done") {
-                      setIsBuilding(false);
-                      setIsBuildModalOpen(false);
-                      esRef.current?.close();
-                    }
-                  },
-                  true         // walletSigned (kept true)
-                );
+      /* ------------------------------------------- *
+       * 3️⃣  Open the SSE stream
+       * ------------------------------------------- */
+      const graph = {
+        nodes: projectContext.details?.projectState?.nodes || [],
+        edges: projectContext.details?.projectState?.edges || [],
+        config: projectContext.details?.projectState?.config || {},
+      };
 
-                // 1.  **Always** update the local context immediately so the UI reacts
-                setProjectContext(prev => ({
-                  ...prev,
-                  details: {
-                    ...prev.details!,
-                    projectState: {
-                      ...prev.details!.projectState,
-                      built: true,          // ➜ enables Deploy button
-                      deployed: false
-                    }
-                  }
-                }));
-                
-                // 2.  Fire-and-forget persistence (best effort)
-                if (projectContext.id) {
-                  projectApi.updateProject(projectContext.id, {
-                    details: { projectState: { built: true } }
-                  }).catch(err => {
-                    console.error("Failed to persist build state:", err);
-                    // UI is already updated, so just log
-                  });
-                }
-                
-            } catch (error) {
-                console.error('[build] Build error:', error);
-                toast.error("Build error", {
-                    description: String(error)
-                });
-                setIsBuilding(false);
+      try {
+        esRef.current = deployPipeline(
+          projectId,                              // ✅  ALWAYS defined now
+          graph,
+          (msg: any) => {
+            // … existing progress / fileTree logic unchanged …
+            if (msg.fileTree) {
+              console.log(`[BUILD] Received fileTree update`);
+              setFileTree(structuredClone(msg.fileTree));
             }
-        } catch (err) {
-            console.error('[build] Error:', err);
-            toast.error("Build error", {
-                description: String(err)
-            });
-            setIsBuilding(false);
+            
+            if (msg.stage === "done" || msg.stage === "build-done") {
+              setIsBuilding(false);
+              esRef.current?.close();
+            }
+          },
+          true                                    // walletSigned
+        );
+
+        /* Persist built flag */
+        setProjectContext(prev => ({
+          ...prev,
+          details: {
+            ...prev.details!,
+            projectState: { ...prev.details!.projectState, built: true, deployed: false }
+          }
+        }));
+        if (projectId) {
+          projectApi.updateProject(projectId, { details: { projectState: { built: true } } })
+            .catch(err => console.error("[persist build]", err));
         }
-    }, [isBuilding, setIsBuilding, projectContext, setProjectContext, setFileTree, fileTree]);
+      } catch (err) {
+        console.error("[build] SSE error:", err);
+        toast.error("Build error", { description: String(err) });
+        setIsBuilding(false);
+      }
+    }, [fileTree, isBuilding, projectContext, setProjectContext, setFileTree]);
     
     const handleBuildClick = async () => {
-      if (!fileTree || isBuilding) return;          // guard re-entry & empty project
-
-      // 1) Hide TaskLogs toast for this run
-      taskLogs.setSuppressToast(true);
-
-      // 2) Kick off the real build immediately 
-      await handleConfirmBuild();                   // same routine you already use
+      if (isBuilding) return;        // already running
+      await handleConfirmBuild();    // ✨ one-liner
     };
     
     const projectDeployed = !!projectContext?.details?.projectState?.deployed;

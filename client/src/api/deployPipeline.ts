@@ -8,6 +8,7 @@ export function deployPipeline(
   onProgress: (msg: unknown) => void,
   walletSigned = true,
 ) {
+  if (!projectId) throw new Error("deployPipeline called without projectId");
   console.log(`[SSE] Starting deploy pipeline for project: ${projectId}`);
   console.log(`[SSE] API_URL: ${API_URL}`);
   
