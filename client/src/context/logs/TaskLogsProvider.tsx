@@ -20,6 +20,7 @@ export default function TaskLogsProvider({
 }) {
   const [logs, setLogs] = useState<TaskLog[]>([]);
   const [isVisible, setIsVisible] = useState(false);   // stays off; Chat will display logs
+  const [suppressToast, setSuppressToast] = useState(false);  // NEW
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(-1); // Start at -1 to indicate "waiting for pipeline"
   const [steps, setSteps] = useState<Step[]>([]);
@@ -77,20 +78,20 @@ export default function TaskLogsProvider({
     ]);
     
     // Make the toast visible when logs are added
-    if (!isVisible) {
+    if (!suppressToast && !isVisible) {
       setIsVisible(true);
     }
-  }, [isVisible]);
+  }, [isVisible, suppressToast]);
 
   const addSystemLog = useCallback((log: string) => {
     setSystemLogs((prev) => [...prev, log]);
     setLastMessage(log);
     
     // Also make the toast visible when system logs are added
-    if (!isVisible) {
+    if (!suppressToast && !isVisible) {
       setIsVisible(true);
     }
-  }, [isVisible]);
+  }, [isVisible, suppressToast]);
 
   const handleSetSteps = useCallback((newSteps: Step[]) => {
     setSteps(newSteps);
@@ -132,6 +133,10 @@ export default function TaskLogsProvider({
     const index = STAGES.findIndex(s => s.stage === normalisedStage);
     setCurrentStep(index);         // -1 if unknown → toast still shows
     setIsVisible(true);
+    
+    if (stage === 'done' || stage === 'error') {
+      setSuppressToast(false);              // allow UI toast for future builds
+    }
   }, []);
 
   // Subscribe to global progress events (from SSE)
@@ -198,6 +203,7 @@ export default function TaskLogsProvider({
         uiReady,
         fileTree,
         buildPhase,
+        suppressToast,
         
         onProgress,
         
@@ -211,6 +217,7 @@ export default function TaskLogsProvider({
         setSteps: handleSetSteps,
         updateStage,
         setIsBuilding,
+        setSuppressToast,
       }}
     >
       {children}

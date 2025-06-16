@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useTaskLogs } from "@/context/logs/useTaskLogs";
+import eventBus from '@/lib/eventBus';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -64,7 +65,8 @@ const Chat: React.FC = () => {
     const [selectedModel, setSelectedModel] = useState('gpt-4o');
     const [isExpanded, setIsExpanded] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
-    const { systemLogs } = useTaskLogs();       // 🟡 NEW
+    const taskLogs = useTaskLogs();  // Complete taskLogs object including systemLogs and setSuppressToast
+    const { systemLogs } = taskLogs;
     const [lastLogIndex, setLastLogIndex] = useState(0);  // 🟡 NEW
   
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -151,6 +153,23 @@ const Chat: React.FC = () => {
     }, [connected, publicKey]);
 
     const sendMessage = async () => {
+        const trimmed = input.trim().toLowerCase();
+        if (trimmed === 'build') {
+          // 1) prevent toast
+          taskLogs.setSuppressToast(true);
+
+          // 2) forward build command globally
+          eventBus.emit('chat-build-command');
+
+          // 3) still echo the user message in the thread
+          setMessages(prev => [
+            ...prev,
+            { text: input, sender: 'user', timestamp: new Date(), status: 'sent' }
+          ]);
+          setInput('');
+          return;                             // stop normal AI flow
+        }
+        
         if (input.trim()) {
             const selectedFiles = [selectedFile, ...additionalFiles].filter(
                 (file): file is FileTreeItemType => Boolean(file)

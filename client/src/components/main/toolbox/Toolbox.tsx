@@ -7,6 +7,7 @@ import FileExplorer from '@/components/code/FileExplorer';
 import ProjectContext from '@/context/project/ProjectContext';
 import FileContext from '@/context/file/FileContext';
 import UxContext from '@/context/ux/UxContext';
+import eventBus from '@/lib/eventBus';
 import 'simplebar-react/dist/simplebar.min.css';
 import { Dialog, DialogContent, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -341,6 +342,19 @@ export const Toolbox = () => {
     useEffect(() => {
         return () => esRef.current?.close();
     }, []);
+    
+    // Listen for build commands from the chat
+    useEffect(() => {
+        const run = () => {
+            if (isBuilding) return;              // guard re-entry
+            taskLogs.setSuppressToast(true);     // still hidden
+            
+            /* call the *real* build routine directly – bypasses modal */
+            handleConfirmBuild();                // same fn you already wrote
+        };
+        eventBus.on('chat-build-command', run);
+        return () => eventBus.off('chat-build-command', run);
+    }, [handleConfirmBuild, isBuilding, taskLogs]);
 
     return (
         <div
