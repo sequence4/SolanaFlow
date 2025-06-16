@@ -61,7 +61,7 @@ RUN solana --version && cargo --version && rustc --version && anchor --version
 ###############################################################################
 FROM solana-toolchain AS chef
 WORKDIR /app
-COPY Cargo.toml Cargo.lock src/ ./
+COPY docker-base-image/Cargo.toml docker-base-image/Cargo.lock docker-base-image/src/ ./
 RUN cargo chef prepare --recipe-path recipe.json
 
 FROM solana-toolchain AS cooker
@@ -88,7 +88,7 @@ COPY --from=cooker /app/target /app/target
 
 # project source
 WORKDIR /app
-COPY src/ ./src
+COPY docker-base-image/src/ ./src
 
 # Node + Yarn (cached)
 RUN curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
