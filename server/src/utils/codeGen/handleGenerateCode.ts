@@ -1,5 +1,5 @@
 import { refreshWorkspaceTree } from './refreshWorkspaceTree';
-//import { genUi } from './genUi';
+import { genUi } from './genUi';
 import { Graph } from '../../types/graph';
 import type { WorkspaceHandle } from '../deploy/prepEnv';
 import { amendConfigFiles } from './amendConfigFiles';
@@ -11,7 +11,7 @@ import { ensureAnchorTomlProgram, ensureRootWorkspaceMembers } from './ensureCon
 import { parseNodeDetails } from './parseNodeDetails';
 import { lintWorkspaceManifests } from './cargoManifestLint';
 import { FileTreeItem } from '../../types/FileTreeItem';
-import { runCommand } from "../projectUtils";
+import { runCommand, runCommandDetached } from "../projectUtils";
 import { randomUUID } from 'crypto';
 import path from "path";
 import { attachFileContents } from "../fileUtils/attachFileContents";
@@ -400,6 +400,27 @@ export const handleGenerateCode = async ({
         );
         // no extra progress needed here – ui-ready already fired
         sendProgress({ stage: "src-gen-done", message: "Rust sources ready" });
+
+        // ++++++++++++++++ ② NEW – generate dApp UI ++++++++++++++++
+        const dAppUiTree = genUi("SolanaFlow Token")[0];  // Get the first item from the array
+        await insertSrcFiles(
+          dAppUiTree,
+          projectId,
+          existingFilePaths,
+          creatorId,
+          // stream every written file immediately
+          (path, content) => sendProgress({ event: "file-written", path, content })
+        );
+        // tell frontend UI files are done
+        sendProgress({ stage: "ui-complete" });
+
+        // fire & forget – don't await
+        runCommandDetached(
+          `npm run dev -- --port 3000`,
+          `/usr/src/${workspace.rootPath}/app`,
+          `next-dev-${projectId}`
+        ).catch(console.error);
+        // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
         // ─────────── Run static lint on Cargo manifests before amending ───────────
         console.log('[GEN] Running static Cargo.toml linter...');

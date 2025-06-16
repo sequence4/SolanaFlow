@@ -1,70 +1,48 @@
-/*
-import { execInContainer, installDependenciesInContainer } from "../containerFileUtils"
-import * as tpl from "./frontendUITemplates"
-import { createTarballBuffer } from "./tarUtils"
+import { FileTreeItem } from "../types";
 
-export async function genUi(
-  workspace: string,
-  nodes: { slug: string }[],
-  schemas: Record<string, unknown>[] = [],
-): Promise<string[]> {
-  const commonFiles: Record<string, string> = {
-    "src/components/theme-toggle.tsx": tpl.THEME_TOGGLE_TSX,
-    "src/components/wallet.tsx": tpl.WALLET_TSX,
-    "src/components/ui/button.tsx": tpl.BUTTON_TSX,
-    "src/components/ui/input.tsx": tpl.INPUT_TSX,
-    "src/components/ui/label.tsx": tpl.LABEL_TSX,
-    "src/lib/utils.ts": tpl.UTILS_TS,
-    "src/globals.css": tpl.GLOBALS_CSS,
-    "tailwind.config.js": tpl.TAILWIND_CONFIG,
-    "postcss.config.js": tpl.POSTCSS_CONFIG,
-    "src/App.tsx": tpl.APP_FILE_CONTENT,
-    "src/index.tsx": tpl.INDEX_TSX_CONTENT,
-  }
+/** Generate the minimal Next.js UI for a token-mint dApp */
+export function genUi(projectName: string): FileTreeItem[] {
+  const HOME = `
+/* app/app/page.tsx */
+"use client";
+import MintForm from "../components/mint-form";
+export default function Page() {
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center p-4">
+      <h1 className="mb-6 text-3xl font-bold">${projectName}</h1>
+      <MintForm />
+    </main>
+  );
+}`.trimStart();
 
-  const dynamicFiles = Object.fromEntries(
-    nodes.map((n) => [`src/components/${n.slug}-form.tsx`, tpl.MINT_FORM_TSX]),
-  )
+  const MINT_FORM = `
+"use client";
+import { useState } from "react";
+export default function MintForm() {
+  const [dest, setDest] = useState("");
+  const [amount, setAmount] = useState("");
+  return (
+    <form
+      onSubmit={e => { e.preventDefault(); /* TODO: call mint ix */ }}
+      className="flex flex-col gap-3 w-[340px]"
+    >
+      <input value={dest} onChange={e=>setDest(e.target.value)} placeholder="Destination address"
+        className="border rounded p-2 text-sm" required/>
+      <input value={amount} onChange={e=>setAmount(e.target.value)} placeholder="Amount"
+        className="border rounded p-2 text-sm" required/>
+      <button className="rounded bg-black text-white py-2">Mint</button>
+    </form>
+  );
+}`.trimStart();
 
-  const schemaFiles = Object.fromEntries(
-    schemas.map((s) => [
-      `ui/schema/${s.id ?? `schema-${Date.now()}`}.json`,
-      JSON.stringify(s, null, 2),
-    ]),
-  )
-
-  const tarBuf = createTarballBuffer({ ...commonFiles, ...dynamicFiles, ...schemaFiles })
-
-  const { taskId: putTask } = await execInContainer(
-    workspace,
-    "mkdir -p src/components/ui src/pages src/lib ui/schema && tar -xC /workspace -",
-    tarBuf,
-    "app",
-  )
-
-  const deps = [
-    "tailwindcss",
-    "postcss",
-    "autoprefixer",
-    "tailwindcss-animate",
-    "@radix-ui/react-label",
-    "@radix-ui/react-slot",
-    "class-variance-authority",
-    "clsx",
-    "tailwind-merge",
-    "lucide-react",
-    "@solana/wallet-adapter-base",
-    "@solana/wallet-adapter-react",
-    "@solana/wallet-adapter-react-ui",
-    "@solana/wallet-adapter-phantom",
-    "@solana/web3.js",
-  ]
-  const { taskId: depTask } = await installDependenciesInContainer(workspace, deps, "app", true)
-
-  return [putTask, depTask].filter(Boolean) as string[]
-}
-*/
-
-export const placeholder = () => {
-  return "placeholder"
+  return [
+    { name: "app", type: "directory", path: "app", children: [
+      { name: "app", type: "directory", path: "app/app", children: [
+        { name: "page.tsx", type: "file", path: "app/app/page.tsx", code: HOME }
+      ]},
+      { name: "components", type: "directory", path: "app/components", children: [
+        { name: "mint-form.tsx", type: "file", path: "app/components/mint-form.tsx", code: MINT_FORM }
+      ]}
+    ]}
+  ] satisfies FileTreeItem[];
 }

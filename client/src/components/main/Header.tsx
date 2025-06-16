@@ -38,7 +38,7 @@ export default function Header() {
       </TabsTrigger>
       <TabsTrigger
         value="interface"
-        className={`${(!hasFiles || isBuilding) ? "cursor-not-allowed" : "cursor-pointer"} ${activeTab === "interface" ? "tab-active" : "tab-inactive"}`}
+        className={`${(!hasFiles || isBuilding) ? "cursor-not-allowed" : "cursor-pointer"} ${activeTab === "interface" ? "tab-active animate-pulse" : "tab-inactive"}`}
         disabled={!hasFiles || isBuilding}
       >
         interface

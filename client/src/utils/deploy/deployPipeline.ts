@@ -3,6 +3,7 @@ import { ProjectContextType } from '@/context/project/ProjectContextTypes';
 import { useContext } from 'react';
 import FileContext from '@/context/file/FileContext';
 import { FileTreeItemType } from '@/interfaces/FileTreeItemType';
+import UxContext from "@/context/ux/UxContext";
 
 // Track file tree state internally to handle streaming
 let currentFileTree: FileTreeItemType[] = [];
@@ -51,6 +52,8 @@ export function runDeployPipelineWithLogs(
   taskLogs.setIsVisible(true);
   taskLogs.addSystemLog("🚀 Starting deployment pipeline...");
 
+  const { activeTab, setActiveTab: uxSetActiveTab } = useContext(UxContext);
+
   const update = (msg: any) => {
     console.log(`[deployPipeline] Received update from SSE:`, msg);
     taskLogs.addSystemLog(JSON.stringify(msg));
@@ -70,10 +73,12 @@ export function runDeployPipelineWithLogs(
       taskLogs.addSystemLog(`📄 ${msg.path}`);
     }
 
-    if (msg.event === 'ui-complete') {
-      taskLogs.addSystemLog("✨ UI ready, opening preview");
-      if (setActiveTab) setActiveTab('interface');
+    /* ------------ AUTO TAB SWITCH on ui-complete ------------- */
+    if (msg.stage === "ui-complete" || msg.event === "ui-complete") {
+      // only switch if user has NOT manually left workflow
+      if (activeTab === "workflow") uxSetActiveTab("interface");
     }
+    /* ---------------------------------------------------------- */
 
     if (msg.stage === "file-tree-start") {
       taskLogs.addSystemLog("📂 Building project file tree…");

@@ -10,7 +10,7 @@ import pool from 'src/config/database';
 import { pruneContainerResources } from './container/pruneContainer';
 import { startProjectContainer } from './container/startProjectContainer';
 import { Connection, sendAndConfirmRawTransaction } from '@solana/web3.js';
-import { spawn } from 'child_process';
+import { spawn, SpawnOptions } from 'child_process';
 
 //const USER_WORKSPACE_IMAGE = "ghcr.io/sequence4/solanaflow:latest";
 
@@ -1189,4 +1189,47 @@ export async function broadcastSignedTx(projectId: string, encodedTx: string): P
   const raw  = Buffer.from(encodedTx, 'base64');
   const sig  = await sendAndConfirmRawTransaction(conn, raw);
   return sig;
+}
+
+/**
+ * Runs a command in a detached process, not waiting for completion.
+ * Useful for long-running processes like dev servers.
+ */
+export async function runCommandDetached(
+  command: string,
+  cwd: string,
+  taskId: string
+): Promise<void> {
+  console.log(`[DETACHED] Running command: ${command} in ${cwd}`);
+  
+  const options: SpawnOptions = {
+    cwd,
+    shell: true,
+    detached: true,
+    stdio: 'ignore'
+  };
+  
+  try {
+    const child = spawn(command, [], options);
+    
+    // Unref the child to allow the parent process to exit independently
+    child.unref();
+    
+    console.log(`[DETACHED] Process started with PID ${child.pid}`);
+    
+    // Log the start but don't wait for completion
+    await updateTaskStatus(
+      taskId, 
+      'doing', 
+      `Started detached process: ${command} (PID: ${child.pid})`
+    );
+  } catch (error: any) {
+    console.error(`[DETACHED] Failed to start command: ${error.message}`);
+    await updateTaskStatus(
+      taskId, 
+      'failed', 
+      `Failed to start detached process: ${error.message}`
+    );
+    throw error;
+  }
 }
