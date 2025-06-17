@@ -1204,9 +1204,9 @@ export async function runCommandDetached(
   
   const options: SpawnOptions = {
     cwd,
-    shell: true,
     detached: true,
-    stdio: 'ignore'
+    stdio: 'ignore',
+    shell: '/bin/bash'  // guarantees a shell is available inside the tool-chain image
   };
   
   try {

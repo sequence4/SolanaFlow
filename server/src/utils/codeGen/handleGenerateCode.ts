@@ -413,11 +413,11 @@ export const handleGenerateCode = async ({
         // tell frontend UI files are done
         sendProgress({ stage: "ui-complete" });
 
-        // fire & forget – don't await
+        // launch the already-built Next.js bundle in production mode
         runCommandDetached(
-          "npm run dev -- --port 3000",
-          "/usr/share/solanaflow/web",
-          `next-dev-${projectId}`
+          'node .next/standalone/server.js',
+          '/usr/share/solanaflow/web',
+          `next-serve-${projectId}`
         ).catch(console.error);
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
