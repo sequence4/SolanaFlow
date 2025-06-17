@@ -57,8 +57,10 @@ RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
  && rm -rf /usr/src/anchor-template \
  && mv anchor-template /usr/src/anchor-template \
  && rm -rf /tmp/* \
- && mkdir -p /cache-seed \
- && cp -a /usr/src/target /cache-seed/target
+# drop huge host-side artefacts — we only need the BPF release output
+&& rm -rf /usr/src/target/debug /usr/src/target/**/incremental \
+&& mkdir -p /cache-seed \
+&& cp -a /usr/src/target/deploy /cache-seed/target
 
 # quick smoke-test
 RUN solana --version && cargo --version && rustc --version && anchor --version
