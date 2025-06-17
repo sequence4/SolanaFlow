@@ -415,8 +415,8 @@ export const handleGenerateCode = async ({
 
         // fire & forget – don't await
         runCommandDetached(
-          `npm run dev -- --port 3000`,
-          `/usr/src/${workspace.rootPath}/app`,
+          "npm run dev -- --port 3000",
+          "/usr/share/solanaflow/web",
           `next-dev-${projectId}`
         ).catch(console.error);
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
