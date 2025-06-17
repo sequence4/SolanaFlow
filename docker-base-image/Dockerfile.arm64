@@ -140,7 +140,17 @@ COPY --from=solana-toolchain /root/.rustup /root/.rustup
 COPY --from=builder /usr/share/solanaflow/web/.next/standalone \
     /usr/share/solanaflow/web/.next/standalone
 
-# also copy the project itself (src/, app/, idl/, …)m
+# copy .next/static (always there)
+COPY --from=builder /usr/share/solanaflow/web/.next/static \
+                    /usr/share/solanaflow/web/.next/standalone/.next/static
+
+# copy public assets only when present
+RUN if [ -d /usr/share/solanaflow/web/public ]; then \
+       cp -R /usr/share/solanaflow/web/public \
+             /usr/share/solanaflow/web/.next/standalone/public ; \
+    fi
+
+# also copy the project itself (src/, app/, idl/, …)
 COPY --from=builder /usr/share/solanaflow/web                  /usr/share/solanaflow/web
 COPY --from=solana-toolchain /usr/src/anchor-template /usr/src/anchor-template
 

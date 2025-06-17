@@ -313,8 +313,8 @@ export const handleGenerateCode = async ({
           // 2) build the standalone bundle
           `yarn build && ` +
           // 3) copy assets next to server.js so the minimal server can serve them
-          `cp -R .next/static .next/standalone/.next/static && ` +
-          `cp -R public .next/standalone/public"`,
+          `[ -d ".next/static" ] && cp -R .next/static .next/standalone/.next/static || true && ` +
+          `[ -d "public" ] && cp -R public .next/standalone/public || true"`,
           ".",
           nextBuildTaskId,
           { skipSuccessUpdate: true }
