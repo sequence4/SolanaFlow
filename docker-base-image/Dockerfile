@@ -12,6 +12,13 @@ ENV PATH="${HOME}/.cargo/bin:${PATH}"
 ENV PATH="${HOME}/.local/share/solana/install/active_release/bin:${PATH}"
 ENV PATH="${HOME}/.nvm/versions/node/${NODE_VERSION}/bin:${PATH}"
 
+# ────────────────────────────────────────────────────────────────
+# Work-around for sporadic "Failed to unpack llvm/bin/lld" when the
+# Solana platform-tools cache gets corrupted. Purge it before we
+# pre-warm the BPF/SBF tool-chain so every fresh build starts clean.
+RUN rm -rf /root/.cache/solana/platform-tools || true
+# ────────────────────────────────────────────────────────────────
+
 # Install base utilities.
 RUN mkdir -p /workdir && mkdir -p /tmp && \
     apt-get update -qq && apt-get upgrade -qq && apt-get install -qq \

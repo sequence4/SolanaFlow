@@ -15,6 +15,13 @@ ENV AWS_REGION=${AWS_REGION} \
     SCCACHE_REGION=${AWS_REGION}
 LABEL stage=toolchain
 
+# ────────────────────────────────────────────────────────────────
+# Work-around for sporadic "Failed to unpack llvm/bin/lld" when the
+# Solana platform-tools cache gets corrupted. Purge it before we
+# pre-warm the BPF/SBF tool-chain so every fresh build starts clean.
+RUN rm -rf /root/.cache/solana/platform-tools || true
+# ────────────────────────────────────────────────────────────────
+
 # hot-fix so cargo-install-all.sh can find the CLI artefact
 RUN [ -d /solana-src ] && ln -sf /opt/target /solana-src/target || true
 
