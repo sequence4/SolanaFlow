@@ -169,6 +169,7 @@ RUN cargo --version  && rustc --version
 # --- base tool-chain and libraries needed for Anchor / Rust programs ----------
 RUN apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        bash \            # guarantee /bin/bash → Node spawn() never ENOENTs
         build-essential \
         clang \
         lld \
@@ -183,6 +184,9 @@ RUN apt-get update -qq && \
     ln -sf "$(command -v gcc || command -v clang)" /usr/bin/cc && \
     strip /usr/local/bin/solana* || true && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# optional one-liner: make generic shells resolve too
+RUN ln -sf /bin/bash /bin/sh
 
 EXPOSE 3000
 # Entrypoint - run from the web root so that "_next/static" & "public" resolve

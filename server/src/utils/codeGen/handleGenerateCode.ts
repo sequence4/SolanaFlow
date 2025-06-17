@@ -281,46 +281,10 @@ export const handleGenerateCode = async ({
         // All UI files done
         sendProgress({ event: 'ui-complete', message: 'UI streaming finished' });
 
-        // ─────────────────────── rebuild Next.js after UI injection ───────────────────────
-        sendProgress({ stage: 'next-build', message: 'Re-building Next.js bundle…' });
-
-        const nextBuildTaskId = randomUUID();        // DB column is uuid → no prefix
-
-        // --- build absolute path to the generated web/ directory -------------
-        const absRoot = workspace.rootPath.startsWith("/")
-          ? workspace.rootPath                                           // already absolute
-          : `/usr/src/${workspace.rootPath}`;                            // make it absolute
-
-        const sourceWebDir = `${absRoot}/web/.`;                         // trailing /. → copy hidden files
-        // ---------------------------------------------------------------------
-
-        // 1) reinstall deps (in case tailwind etc. were added) 
-        // 2) run the build (emits .next/standalone/*)
-        // 3) duplicate static + public into the standalone folder so server.js can serve them
-        await runCommand(
-          `docker exec ${workspace.containerName} bash -c "` +
-          `set -e; cd /usr/share/solanaflow/web && ` +
-          `cp -R "${sourceWebDir}" . && ` +
-          // 0) add UI deps (idempotent if already present)
-          `yarn add --exact --silent ` +
-          `lucide-react tailwind-variants class-variance-authority ` +
-          `@radix-ui/react-slot @radix-ui/react-popover @radix-ui/react-label ` +
-          `@solana/wallet-adapter-react @solana/wallet-adapter-react-ui ` +
-          `@solana/wallet-adapter-wallets @solana/web3.js ` +
-          `clsx tailwind-merge && ` +
-          // 1) install everything declared in package.json
-          `yarn install --frozen-lockfile --silent --omit=optional && ` +
-          // 2) build the standalone bundle
-          `yarn build && ` +
-          // 3) copy assets next to server.js so the minimal server can serve them
-          `[ -d ".next/static" ] && cp -R .next/static .next/standalone/.next/static || true && ` +
-          `[ -d "public" ] && cp -R public .next/standalone/public || true"`,
-          ".",
-          nextBuildTaskId,
-          { skipSuccessUpdate: true }
-        );
-        sendProgress({ stage: 'next-build-done', message: 'Next bundle rebuilt' });
-        /* ────────────────────────────────────────────────────────────────────────────────── */
+        sendProgress({
+          stage: 'next-build-skipped',
+          message: 'Skipped Next.js rebuild – bundle already baked during image build'
+        });
 
         // ───────────────────────── write graph-derived Rust sources ──────────────
         // For now, assume a basic program structure exists or will be created
@@ -417,7 +381,8 @@ export const handleGenerateCode = async ({
         runCommandDetached(
           'node .next/standalone/server.js',
           '/usr/share/solanaflow/web',
-          `next-serve-${projectId}`
+          `next-serve-${projectId}`,
+          { shell: '/bin/bash' }   // explicit, future-proof
         ).catch(console.error);
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

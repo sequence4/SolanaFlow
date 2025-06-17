@@ -1198,19 +1198,20 @@ export async function broadcastSignedTx(projectId: string, encodedTx: string): P
 export async function runCommandDetached(
   command: string,
   cwd: string,
-  taskId: string
+  taskId: string,
+  options: { shell?: string } = {}
 ): Promise<void> {
   console.log(`[DETACHED] Running command: ${command} in ${cwd}`);
   
-  const options: SpawnOptions = {
+  const spawnOptions: SpawnOptions = {
     cwd,
     detached: true,
     stdio: 'ignore',
-    shell: '/bin/bash'  // guarantees a shell is available inside the tool-chain image
+    shell: options.shell || '/bin/bash'  // guarantees a shell is available inside the tool-chain image
   };
   
   try {
-    const child = spawn(command, [], options);
+    const child = spawn(command, [], spawnOptions);
     
     // Unref the child to allow the parent process to exit independently
     child.unref();
