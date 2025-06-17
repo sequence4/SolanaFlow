@@ -110,7 +110,7 @@ RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing
  && yarn cache clean --all || true
 
 # sanity-check: make sure the stand-alone entry exists
-RUN test -f /usr/share/solanaflow/web/.next/standalone/server.js
+RUN test -f /usr/share/solanaflow/web/.next/standalone/web/server.js
 
 ###############################################################################
 # 4.  Runtime – slim image with CLI + built app
@@ -177,7 +177,7 @@ RUN apt-get update -qq && \
 EXPOSE 3000
 # Entrypoint - run from the web root so that "_next/static" & "public" resolve
 WORKDIR /usr/share/solanaflow/web
-CMD ["node", ".next/standalone/server.js"]
+CMD ["node", ".next/standalone/web/server.js"]
 
 # create a separate stage for seeding the target volume
 FROM solana-toolchain AS seed-target
