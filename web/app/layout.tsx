@@ -1,9 +1,12 @@
-"use client";
-
 import "../src/globals.css";
-import WalletConnectionProvider from "../src/context/WalletConnectionProvider";
 import React from 'react';
-import type { Metadata } from 'next'
+import type { Metadata } from 'next';
+import dynamic from 'next/dynamic';
+
+const WalletConnectionProvider = dynamic(
+  () => import("../src/context/WalletConnectionProvider").then(m => m.default),
+  { ssr: false }
+);
 
 export const metadata: Metadata = {
   title: 'SolanaFlow Token Minter',

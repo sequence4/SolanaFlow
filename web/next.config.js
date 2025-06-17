@@ -1,7 +1,15 @@
-/** @type {import("next").NextConfig} */
+/** @type {import('next').NextConfig} */
 const nextConfig = {
-  // tell Vercel/Next "stand-alone" mode – already set by env
-  output: "standalone",
+  /* --- mandatory for Docker test -f step --- */
+  output: 'standalone',                     
+
+  /* --- wallet adapter must be transpiled --- */
+  transpilePackages: [
+    '@solana/wallet-adapter-react',
+    '@solana/wallet-adapter-react-ui',
+    '@solana/wallet-adapter-base',
+    'next-themes',
+  ],
 
   // relax frame restrictions so the SolanaFlow UI can embed it
   async headers() {
@@ -20,5 +28,5 @@ const nextConfig = {
     ];
   },
 };
-
 module.exports = nextConfig;
+
