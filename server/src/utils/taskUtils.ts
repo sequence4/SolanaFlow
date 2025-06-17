@@ -186,10 +186,3 @@ export async function pollTaskStatus(
   // If maxRetries reached, throw the appropriate error
   throw new Error(`Polling timed out after ${maxRetries} attempts for task ${taskId}`);
 }
-
-export async function markWriteDone(projectId: string) {
-  // Generate a real UUID and keep the human-readable tag in "title"
-  const id = uuidv4();                         // ✅ valid uuid
-  await createTask(`WRITE_SRCS_${projectId}`, null, projectId, null, id);
-  await updateTaskStatus(id, "succeed", "UI + SRC files written");
-}

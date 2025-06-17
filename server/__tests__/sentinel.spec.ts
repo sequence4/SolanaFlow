@@ -5,7 +5,8 @@
  * `../config/database`, giving it a `query` jest-fn so TypeScript
  * sees the correct shape and we can control results.
  */
-import { markWriteDone, waitForTaskCompletion } from '../src/utils/taskUtils';
+import { waitForTaskCompletion } from '../src/utils/taskUtils';
+import { markWriteDone } from '../src/utils/taskUtils/index';
 import pool from '../src/config/database';
 
 /* -----------------------------------------------------------
