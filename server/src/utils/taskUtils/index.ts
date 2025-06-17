@@ -12,4 +12,5 @@ export async function markWriteDone(projectId: string) {
     id
   );
   await updateTaskStatus(id, "succeed", "UI+SRC files written");
+  return id;
 } 

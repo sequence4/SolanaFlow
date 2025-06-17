@@ -156,6 +156,9 @@ export async function pollTaskStatus(
   maxRetries = MAX_WRITE_RETRIES,         // e.g. 3 min @ 2 s interval by default
   intervalMs = POLL_INTERVAL_MS,
 ): Promise<{ task: { status: string; result: string | null } }> {
+  if (!taskId) {
+    throw new Error('pollTaskStatus called with empty taskId');
+  }
   let retries = 0;
   
   console.log(`[DEBUG_TASK_BACKEND] Starting poll for task ${taskId}`);

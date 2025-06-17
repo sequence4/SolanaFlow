@@ -350,7 +350,8 @@ export const handleGenerateCode = async ({
             await attachFileContents(tinyTree, absRoot, workspace.containerName);
 
             // now it is safe to raise the sentinel
-            await markWriteDone(projectId);
+            const sentinelId = await markWriteDone(projectId);
+            console.log('[GEN] write-done sentinel:', sentinelId);
           })();
         }
         

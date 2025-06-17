@@ -44,10 +44,10 @@ describe('WRITE_SRCS sentinel', () => {
     }, 100);
 
     // create the sentinel row (uses createTask)
-    await markWriteDone(projectId);
+    const taskId = await markWriteDone(projectId);
 
     // should resolve once our timeout flips the status
-    const status = await waitForTaskCompletion(`WRITE_SRCS_${projectId}`, 10, 50);
+    const status = await waitForTaskCompletion(taskId, 10, 50);
 
     expect(status).toBe('succeed');
     expect(mockedQuery).toHaveBeenCalled();   // sanity – poll happened
