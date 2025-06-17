@@ -1,12 +1,7 @@
 import "../src/globals.css";
 import React from 'react';
 import type { Metadata } from 'next';
-import dynamic from 'next/dynamic';
-
-const WalletConnectionProvider = dynamic(
-  () => import("../src/context/WalletConnectionProvider").then(m => m.default),
-  { ssr: false }
-);
+import ClientWalletProvider from "../src/components/WalletProvider";
 
 export const metadata: Metadata = {
   title: 'SolanaFlow Token Minter',
@@ -21,7 +16,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="light" suppressHydrationWarning>
       <body className="min-h-screen bg-background font-sans antialiased">
-        <WalletConnectionProvider>{children}</WalletConnectionProvider>
+        <ClientWalletProvider>{children}</ClientWalletProvider>
       </body>
     </html>
   )
