@@ -169,7 +169,8 @@ RUN cargo --version  && rustc --version
 # --- base tool-chain and libraries needed for Anchor / Rust programs ----------
 RUN apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        bash \            # guarantee /bin/bash → Node spawn() never ENOENTs
+        # guarantee /bin/bash so Node's child_process.spawn never ENOENTs
+        bash \
         build-essential \
         clang \
         lld \
@@ -187,6 +188,9 @@ RUN apt-get update -qq && \
 
 # optional one-liner: make generic shells resolve too
 RUN ln -sf /bin/bash /bin/sh
+
+# from this point every RUN uses Bash automatically
+SHELL ["/bin/bash","-c"]
 
 EXPOSE 3000
 # Entrypoint - run from the web root so that "_next/static" & "public" resolve
