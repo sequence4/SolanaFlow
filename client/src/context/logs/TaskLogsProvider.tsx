@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import TaskLogsContext, { TaskLog, Step } from "./TaskLogsContext";
+import eventBus from "@/lib/eventBus";
 
 // Define the canonical stages list to be used across the app
 export const STAGES = [
@@ -18,7 +19,8 @@ export default function TaskLogsProvider({
   children: React.ReactNode;
 }) {
   const [logs, setLogs] = useState<TaskLog[]>([]);
-  const [isVisible, setIsVisible] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);   // stays off; Chat will display logs
+  const [suppressToast, setSuppressToast] = useState(false);  // NEW
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(-1); // Start at -1 to indicate "waiting for pipeline"
   const [steps, setSteps] = useState<Step[]>([]);
@@ -26,6 +28,14 @@ export default function TaskLogsProvider({
   const [systemLogs, setSystemLogs] = useState<string[]>([]);
   const [isBuilding, setIsBuilding] = useState(false);
   const [lastMessage, setLastMessage] = useState<string>("");
+  const [uiReady, setUiReady] = useState(false);
+  const [fileTree, setFileTree] = useState<any>(null);
+  const [buildPhase, setBuildPhase] = useState<'waiting' | 'started' | 'done'>('waiting');
+
+  /* helper – show toast only when allowed */
+  const showToastIfAllowed = () => {
+    if (!suppressToast && !isVisible) setIsVisible(true);
+  };
 
   /* ---------- very lightweight observer list ---------- */
   type ProgressCB = (e: { progress: number; message: string }) => void;
@@ -67,35 +77,36 @@ export default function TaskLogsProvider({
   }, [currentStep]);
 
   const addLog = useCallback((message: string) => {
+    if (suppressToast) return;
+    
     setLogs((prevLogs) => [
       ...prevLogs,
       { message, timestamp: Date.now() },
     ]);
     
     // Make the toast visible when logs are added
-    if (!isVisible) {
-      setIsVisible(true);
-    }
-  }, [isVisible]);
+    showToastIfAllowed();
+  }, [isVisible, suppressToast]);
 
   const addSystemLog = useCallback((log: string) => {
-    setSystemLogs((prev) => [...prev, log]);
+    /*  Always push the line into Chat  */
+    setSystemLogs(prev => [...prev, log]);
     setLastMessage(log);
-    
-    // Also make the toast visible when system logs are added
-    if (!isVisible) {
-      setIsVisible(true);
+
+    /*  Only raise the visual toast when NOT suppressed  */
+    if (!suppressToast) {
+      showToastIfAllowed();
     }
-  }, [isVisible]);
+  }, [suppressToast]);
 
   const handleSetSteps = useCallback((newSteps: Step[]) => {
     setSteps(newSteps);
     
     // Make the toast visible when steps are set
-    if (newSteps.length > 0 && !isVisible) {
-      setIsVisible(true);
+    if (newSteps.length > 0) {
+      showToastIfAllowed();
     }
-  }, [isVisible]);
+  }, [isVisible, suppressToast]);
 
   const resetLogs = useCallback(() => {
     setLogs([]);
@@ -108,12 +119,82 @@ export default function TaskLogsProvider({
     setShowDetails(false); // Reset details view as well
   }, []);
 
-  const updateStage = useCallback((stage: string) => {
-    const index = STAGES.findIndex(s => s.stage === stage);
-    // Set to found index or -1 if stage is unrecognized
-    setCurrentStep(index);
-    setIsVisible(true);
-  }, []);
+  const updateStage = useCallback((stage: string, data?: any) => {
+    /* ---------- 1️⃣  dedicated handling for the streamed UI preview ---------- */
+    if (stage === "ui-ready") {
+      setUiReady(true);
+      if (data?.fileTree) {
+        setFileTree(data.fileTree);
+      }
+      return;
+    }
+
+    /* ---------- 2️⃣  normalise build-sub-stages into the single "build" step */
+    const normalisedStage =
+      stage.startsWith("build-") ? "build" : stage;
+
+    if (stage === "build-started") setBuildPhase("started");
+    if (stage === "build-done")    setBuildPhase("done");
+
+    const index = STAGES.findIndex(s => s.stage === normalisedStage);
+    setCurrentStep(index);         // -1 if unknown → toast still shows
+    showToastIfAllowed();
+
+    /* ---------- 3️⃣  surface the stage's text to Chat ASAP ---------- */
+    if (data?.message) {
+      // Use backend-supplied sentence when present
+      addSystemLog(data.message);
+    } else if (index >= 0) {
+      // Fallback: synthesise a friendly line from the STAGES list
+      const label = STAGES[index].label;
+      addSystemLog(`${label}…`);
+    }
+    
+    if (stage === 'done' || stage === 'error') {
+      setSuppressToast(false);              // allow UI toast for future builds
+    }
+  }, [suppressToast, isVisible, addSystemLog]);
+
+  // Subscribe to global progress events (from SSE)
+  useEffect(() => {
+    const handler = (payload: any) => {
+      if (payload && typeof payload === 'object') {
+        if (payload.stage) {
+          updateStage(payload.stage, payload);
+        }
+        if (payload.containerUrl) {
+          addSystemLog(`🌐 Container URL: ${payload.containerUrl}`);
+        }
+        if (payload.artifact) {
+          addSystemLog("🗄️  Build artefact ready – click to download");
+        }
+        if (payload.fileTree) {
+          const count = Array.isArray(payload.fileTree) ? payload.fileTree.length : 1;
+          addSystemLog(`📂 Received project file tree with ${count} items`);
+        }
+        if (payload.programId) {
+          addSystemLog(`🔑 Program ID: ${payload.programId}`);
+        }
+        if (['deploy-done', 'done', 'completed'].includes(payload.stage)) {
+          addSystemLog("✅ Deployment complete!");
+          setTimeout(() => setIsVisible(false), 3000);
+        } else if (payload.stage === 'deploy-skipped') {
+          addSystemLog("✅ Wallet-signed deploy detected – backend deploy step skipped");
+        } else if (payload.stage === 'error') {
+          addSystemLog(`❌ Error: ${payload.message || 'Unknown error'}`);
+        } else if (payload.message && !payload.stage) {
+          addSystemLog(payload.message);
+        }
+      } else if (payload) {
+        // If payload is a simple value (string/number), log it directly
+        addSystemLog(String(payload));
+      }
+    };
+    eventBus.on('progress', handler);
+    return () => {
+      eventBus.off('progress', handler);
+    };
+  }, [updateStage, addSystemLog, setIsVisible]);
 
   // Wrap setProgress to also notify subscribers
   const setWrappedProgress = useCallback((p: number) => {
@@ -135,6 +216,10 @@ export default function TaskLogsProvider({
         networkStats: "4.2 MB/s",
         nodeVersion: "v18.12.1",
         isBuilding,
+        uiReady,
+        fileTree,
+        buildPhase,
+        suppressToast,
         
         onProgress,
         
@@ -148,6 +233,7 @@ export default function TaskLogsProvider({
         setSteps: handleSetSteps,
         updateStage,
         setIsBuilding,
+        setSuppressToast,
       }}
     >
       {children}

@@ -16,6 +16,12 @@ import { waitForTaskCompletion, getTaskById } from "../taskUtils";
 import { deriveProgramId } from "../../utils/deriveProgramId";
 import path from "path";
 import { attachFileContents } from "../fileUtils/attachFileContents";
+import { v4 as uuidv4 } from "uuid";
+
+// TODO: chunk really large fileTree payloads (> ~16 MB) – Chrome drops giant SSE frames.
+
+const MAX_BUILD_MINUTES = Number(process.env.MAX_BUILD_MINUTES) || 15;
+const MAX_DEPLOY_MINUTES = Number(process.env.MAX_DEPLOY_MINUTES) || 6;
 
 interface PipelineArgs {
   projectId: string;
@@ -52,15 +58,21 @@ export async function runDeployPipeline({
     
     // 2 ─ code generation ─────────────────────────────────────────────────
     sendProgress({ stage: "code-gen", message: "Generating Anchor code…" });
-    await handleGenerateCode({ projectId, graph, workspace, sendProgress, userId });
+    const { sentinelId } =
+          await handleGenerateCode({ projectId, graph, workspace, sendProgress, userId });
 
     /* 3 ─ build program --------------------------------------------------- */
     console.log("[PIPELINE] ⏳ anchor build started…");
-    sendProgress({ stage: "build", message: "Building program…" });
+    
+    // wait until all src + UI files are on disk
+    // allow up to 3 min for large repos (90 × 2 s)
+    await waitForTaskCompletion(sentinelId, 90, 2_000);
+    
+    sendProgress({ stage: "build-started", message: "Building program…" });
     const buildTask = await startAnchorBuildTask(projectId, userId);
     
-    // Convert env-driven minutes → retry count (2-second interval)
-    const buildMinutes = Number(process.env.MAX_BUILD_MINUTES) || 15;
+    // Compute retry count based on configured build timeout
+    const buildMinutes = MAX_BUILD_MINUTES;
     const buildRetries = Math.ceil(buildMinutes * 60_000 / 2_000);
     
     // Check build status and bail early if not successful
@@ -150,11 +162,8 @@ export async function runDeployPipeline({
     if (!walletSigned) {
       sendProgress({ stage: "deploy", message: "Deploying / upgrading…" });
 
-      // Parse deployment timeout from env with better handling
-      const deployMinutesRaw = Number(process.env.MAX_DEPLOY_MINUTES);
-      const deployMinutes = Number.isFinite(deployMinutesRaw) && deployMinutesRaw >= 1
-        ? Math.ceil(deployMinutesRaw)
-        : 6;
+      // Calculate deployment timeout from env (default 6 minutes)
+      const deployMinutes = MAX_DEPLOY_MINUTES;
       const deployTimeoutMs = deployMinutes * 60_000;
       
       // Convert timeout ms to retry count (2-second interval)
@@ -211,6 +220,54 @@ export async function runDeployPipeline({
       // If no programId is available, derive it deterministically
       if (!programId) {
         programId = deriveProgramId(projectId).toBase58();
+      }
+    }
+
+    // Copy the Anchor-generated IDL to the frontend idl directory
+    if (programId) {
+      sendProgress({
+        stage: "copy-idl",
+        message: "Saving Anchor IDL for frontend..."
+      });
+
+      try {
+        // Find the program name from the file tree
+        const rootPath = workspace.rootPath ?? (
+          await import("../fileUtils").then(m => m.getProjectRootPath(projectId))
+        );
+
+        // Default program name (same as in handleGenerateCode)
+        const programName = 'my_program'; // Using the same default as in handleGenerateCode
+
+        // Generate a task ID for running commands
+        const idlTaskId = uuidv4();
+
+        // NOTE: no leading \n, use ';' instead of '&&' after `then`
+        const copyIdlCmd =
+          "set -e; " +
+          `cd /usr/src/${rootPath}; ` +
+          "mkdir -p idl; " +
+          `if [ -f target/idl/${programName}.json ]; then ` +
+          // update .metadata.address in-place with jq (no temp file needed)
+          `jq --arg addr '${programId}' '.metadata.address = \\$addr' ` +
+          `target/idl/${programName}.json > idl/solanaflow_token.json; ` +
+          `echo 'IDL copied to idl/solanaflow_token.json'; ` +
+          "else " +
+          `echo '{}' > idl/solanaflow_token.json; ` +
+          `echo 'IDL placeholder generated'; ` +
+          "fi";
+
+        await runCommand(
+          `docker exec ${workspace.containerName} bash -c "${copyIdlCmd}"`,
+          ".",
+          idlTaskId,
+          { skipSuccessUpdate: true }
+        );
+
+        console.log(`[DEPLOY] IDL copied to idl/solanaflow_token.json for program ${programId}`);
+      } catch (error) {
+        console.error("[DEPLOY] IDL copy failed for program", programId, error);
+        // Non-fatal error, continue with deployment
       }
     }
 

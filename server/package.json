@@ -6,9 +6,10 @@
         "start": "node -r module-alias/register dist/app.js",
         "dev": "ts-node -r tsconfig-paths/register src/app.ts",
         "lint": "eslint . --ext .ts",
-        "test": "jest --runInBand --passWithNoTests src/__tests__/placeholder.test.ts",
+        "test": "jest --passWithNoTests",
         "test:watch": "jest --watchAll   --config jest.config.js",
-        "test:cov": "jest --coverage   --config jest.config.js"
+        "test:cov": "jest --coverage   --config jest.config.js",
+        "seed:warm": "node -r dotenv-flow/config -r ts-node/register/transpile-only -r tsconfig-paths/register scripts/seedWarmDonor.ts"
     },
     "_moduleAliases": {
         "@": "dist"

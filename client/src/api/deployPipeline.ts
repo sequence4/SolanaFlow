@@ -1,5 +1,6 @@
 import { fetchEventSource, EventSourceMessage } from '@microsoft/fetch-event-source';
 import { API_URL } from '@/config/api';
+import eventBus from '@/lib/eventBus';
 
 export function deployPipeline(
   projectId: string,
@@ -7,6 +8,7 @@ export function deployPipeline(
   onProgress: (msg: unknown) => void,
   walletSigned = true,
 ) {
+  if (!projectId) throw new Error("deployPipeline called without projectId");
   console.log(`[SSE] Starting deploy pipeline for project: ${projectId}`);
   console.log(`[SSE] API_URL: ${API_URL}`);
   
@@ -41,7 +43,10 @@ export function deployPipeline(
       try {
         const msg = JSON.parse(event.data);
         console.log(`[SSE] Received message:`, msg);
-        onProgress(msg);
+        eventBus.emit('progress', msg);
+        if (onProgress) {
+          onProgress(msg);
+        }
       } catch (error) {
         console.error(`[SSE] Error parsing message:`, error);
       }

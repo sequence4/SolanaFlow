@@ -2,12 +2,16 @@ import { updateOrCreateFile } from '../fileUtils';
 import type { FileTreeItem } from '../../types/FileTreeItem';
 import path from 'path';
 
+// Define the callback type for file write progress
+export type InsertSrcProgressFn = (item: FileTreeItem) => void;
+
 export async function insertSrcFiles(
   rootNode: FileTreeItem,
   projectId: string,
   existingFilePaths: Set<string>,
   // basePath?: string, // Keep original basePath if needed by calling logic, or remove if rootPath from handleGenerateCode is always project root
   creatorId: string | null = null,
+  onFile: (path: string, content: string) => void = () => {},
 ): Promise<string[]> {
   const fileTaskIds: string[] = [];
   const queue: { node: FileTreeItem }[] = [
@@ -56,6 +60,10 @@ export async function insertSrcFiles(
       );
       if (taskId) {
         console.log(`[DEBUG_INSERT_SRC] Added taskId ${taskId} for file: ${projectRelativePath}`);
+        
+        // stream the file *now* – don't block the queue
+        if (onFile) onFile(projectRelativePath, node.code || '');
+        
         fileTaskIds.push(taskId);
       }
     }

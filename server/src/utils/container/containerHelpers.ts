@@ -9,22 +9,55 @@ export async function resolveContainerUrl(name: string): Promise<string> {
     throw new Error('Container creation failed – see previous logs.');
   }
 
-  try {
-    execSync(`docker start ${name}`, { stdio: "ignore" });
-  } catch {
+  // ① Make sure the container is running (ignore "already running" errors)
+  try { execSync(`docker start ${name}`, { stdio: 'ignore' }); } catch {/* nop */}
+
+  /* -------------------------------------------------------------
+   * ② Retry `docker port … 3000/tcp` for up to 60 s (60 × 1000 ms)
+   *    Docker sometimes needs a short moment to register the random
+   *    host-port after `docker run -P`.  A tight loop eliminates the
+   *    "No public port '3000/tcp' published" race we observed.
+   * ------------------------------------------------------------ */
+  let mapping = '';
+  const MAX_WAIT_MS   = 60_000;      // wait up to 60 s
+  const POLL_INTERVAL = 1_000;       // check every second
+  const retries       = Math.ceil(MAX_WAIT_MS / POLL_INTERVAL);
+
+  for (let i = 0; i < retries; i++) {
+    try {
+      mapping = execSync(`docker port ${name} 3000/tcp`, {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+    } catch {/* container might still be booting */}
+    if (!mapping.trim()) await new Promise(r => setTimeout(r, POLL_INTERVAL));
+  }
+  if (!mapping.trim()) {
+    throw new Error(`port 3000/tcp not published for ${name} after ${MAX_WAIT_MS/1000} s`);
   }
 
-  const out = execSync(`docker port ${name} 3000/tcp`, { encoding: "utf8" }).trim();
-  if (!out) throw new Error(`port not found for ${name}`);
-  const m = out.match(/:(\d+)$/);
-  if (!m) throw new Error(`port parse fail for ${name}`);
+  console.log(`[resolveContainerUrl] ${name} → ${mapping.trim()}`);
 
-  const port   = m[1];
+  // Parse "…:hostPort"
+  const m = mapping.match(/:(\d+)\s*$/);
+  if (!m) throw new Error(`cannot parse docker port output: ${mapping}`);
+  const port = m[1];
 
-  /* ① Explicit FQDN → respect it. ② Otherwise use loop-back */
-  const host   = process.env.PUBLIC_FQDN ?? "127.0.0.1";
-  const scheme = process.env.CONTAINER_URL_SCHEME ?? "http";
+  /* ---------- choose public hostname ---------- */
+  let host = process.env.PUBLIC_FQDN?.trim();
+  if (!host) {
+    try { host = execSync(
+      "curl -s --max-time 2 http://169.254.169.254/latest/meta-data/public-hostname"
+    ).toString().trim(); } catch {/* ignore */}
+  }
+  if (!host) {
+    host = execSync("curl -s ifconfig.me").toString().trim();
+  }
+  if (!host) throw new Error(
+    "Cannot resolve PUBLIC_FQDN and could not auto-detect EC2 hostname."
+  );
 
+  const scheme = process.env.CONTAINER_URL_SCHEME ?? 'http';
   return `${scheme}://${host}:${port}`;
 }
 

@@ -33,6 +33,7 @@ CREATE TABLE "task" (
   created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   creator_id   UUID,
   result       TEXT,
+  task_type    TEXT,
   last_updated TIMESTAMP,
   project_id   UUID REFERENCES "solanaproject"(id) ON DELETE CASCADE,
   status       VARCHAR(50) CHECK (status IN ('queued','doing','finished',

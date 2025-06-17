@@ -8,7 +8,7 @@ const UxContext = createContext<UxContextType>({
   parentTab: 'program-builder',
   setParentTab: () => {},
 
-  activeTab: 'workflow',
+  activeTab: 'interface',
   setActiveTab: () => {},
 
   isChatOpen: false,

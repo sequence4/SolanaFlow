@@ -2,6 +2,7 @@ import React, { useState, useContext, memo } from "react";
 import { FileTreeItemType } from "@/interfaces/FileTreeItemType";
 import FileContext from "@/context/file/FileContext";
 import { ChevronDown, ChevronRight, FileText, Folder } from "lucide-react";
+import FileArrivalTicker from "./FileArrivalTicker";
 
 /* ---------- recursive leaf ---------- */
 const TreeItem = memo(({ node, level = 0 }: { node: FileTreeItemType; level?: number }) => {
@@ -66,10 +67,14 @@ export default function FileExplorer() {
   const roots: FileTreeItemType[] = Array.isArray(fileTree) ? fileTree : [fileTree];
 
   return (
-    <div className="h-full overflow-y-auto bg-[#1e1e20] border-r border-[#2a2a2d]">
-      {roots.map(node => (
-        <TreeItem key={node.path ?? node.name} node={node} />
-      ))}
-    </div>
+    <>
+      <div className="h-full overflow-y-auto bg-[#1e1e20] border-r border-[#2a2a2d]">
+        {roots.map(node => (
+          <TreeItem key={node.path ?? node.name} node={node} />
+        ))}
+      </div>
+      {/* ticker overlay */}
+      <FileArrivalTicker />
+    </>
   );
 } 

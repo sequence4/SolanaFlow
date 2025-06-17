@@ -2,6 +2,31 @@ import { execSync } from 'child_process';
 import pool from 'src/config/database';
 
 /**
+ * Checks if the Docker server version supports the --pull=always flag (added in 23.0.0)
+ */
+function dockerSupportsPullAlways(): boolean {
+  try {
+    const versionStr = execSync('docker version --format "{{.Server.Version}}"', 
+                      { encoding: 'utf8' }).trim();
+    const versionParts = versionStr.split('.').map(Number);
+    
+    // Simple semver comparison for major version
+    if (versionParts[0] >= 23) {
+      return true;
+    }
+    return false;
+  } catch {
+    return false; // On any error, assume the flag isn't supported
+  }
+}
+
+/** Returns true if we should append --pull=always to `docker run`.
+ *  The flag is safe only on tag references: Docker forbids it on digests. */
+function pullAlwaysAllowed(imageRef: string): boolean {
+  return dockerSupportsPullAlways() && !imageRef.includes('@');
+}
+
+/**
  * Returns true when the Docker daemon is overlay2 on an XFS filesystem
  * mounted with the `pquota` option (the only case where `--storage-opt size=`
  * is accepted). Falls back to false on any error.
@@ -67,7 +92,12 @@ function ensureDockerSpace(minBytes = 3 * 1024 * 1024 * 1024): void {
  */
 export async function startProjectContainer(projId: string): Promise<string> {
   const name  = `userproj-${projId}-${Date.now()}`.slice(0, 63);        // 64-char limit
-  const image = process.env.SOLANAFLOW_BUILD_IMAGE ?? 'ghcr.io/sequence4/solana-toolchain:latest';
+  // Use the tag only, let --pull=always refresh it
+  const image = process.env.SOLANAFLOW_BUILD_IMAGE ?? 
+              'ghcr.io/sequence4/solana-toolchain:runtime-latest';
+  
+  const withPullAlways = pullAlwaysAllowed(image);
+              
   // 📦 three isolated caches
   const vCargo       = 'solanaflow-cargo-registry';
   const vTargetBuild = 'solanaflow-cargo-target';
@@ -78,25 +108,32 @@ export async function startProjectContainer(projId: string): Promise<string> {
     execSync(`docker pull --platform linux/arm64 ${image}`, { stdio: 'inherit' });
 
     /* 2 ─ run container with explicit platform, project label & random host-port */
-    const quota = sizeOptSupported() ? '--storage-opt size=20G \\' : '';
-
     // NEW: make sure the host has enough free space (≥ 3 GiB)
     ensureDockerSpace();
 
-    execSync(
-      `docker run -d --platform linux/arm64 \
-       --name  ${name} \
-       --label solanaflow.project=${projId} \
-       ${quota} \
-       -v ${vCargo}:/root/.cargo \
-       -v ${vSccache}:/opt/sccache \
-       -v ${vTargetBuild}:/usr/src/target \
-       -e CARGO_TARGET_DIR=/usr/src/target \
-       -p 0.0.0.0::3000 \
-       ${image} \
-       bash -c "cd /usr/src && tail -f /dev/null"`,
-      { stdio: 'inherit' }
-    );
+    const runArgs: string[] = [
+      'docker', 'run', 
+      ...(withPullAlways ? ['--pull=always'] : []),
+      '-d',
+      '--platform', 'linux/arm64',
+      '--name', name,
+      '--label', `solanaflow.project=${projId}`,
+      // attach 20 GiB quota only when overlay2 + xfs +pquota
+      ...(sizeOptSupported() ? ['--storage-opt', 'size=20G'] : []),
+      '-v', `${vCargo}:/root/.cargo`,
+      '-v', `${vSccache}:/opt/sccache`,
+      '-v', `${vTargetBuild}:/usr/src/target`,
+      '-e', 'CARGO_TARGET_DIR=/usr/src/target',
+      '-e', 'HOSTNAME=0.0.0.0',
+      // publish container port 3000 → random host port
+      '-p', '0:3000',
+      image,
+      'bash', '-lc',
+      '"node /usr/share/solanaflow/web/.next/standalone/server.js -H 0.0.0.0 & pid=$!; trap \\"kill $pid\\" TERM INT; wait $pid"'
+    ];
+
+    console.log('[startProjectContainer] RUN CMD:\n', runArgs.join(' '));
+    execSync(runArgs.join(' '), { stdio: 'inherit' });
 
     return name;
   } catch (err: any) {

@@ -19,22 +19,42 @@ function toPascal(str: string): string {
 }
 
 function generateLibRs(programName: string, programId: string, instructions: InstructionDetail[], state: StateDetail[]): string {
-  const instructionImports = instructions.map(inst => `pub use instructions::${inst.name}::*;`).join('\n');
+  // Create a Set to track which instruction names we've seen
+  const seenInstructions = new Set<string>();
   
-  const instructionDefs = instructions.map(inst => {
-    const ctx = inst.context_name ?? `${toPascal(inst.name)}Context`;
-    const param = inst.params_name ?? `${toPascal(inst.name)}Params`;
-    // Each instruction string is formatted here.
-    // Ensure no unescaped backticks if this were a template literal itself.
-    // Newlines are preserved.
-    const rustCode = [
-      `    pub fn ${inst.name}(ctx: Context<${ctx}>, params: ${param}) -> Result<()> {`,
-      `        // instruction file already exports \\\`${inst.name}\\\``,
-      `        instructions::${inst.name}::${inst.name}(ctx, params)`,
-      `    }`
-    ].join('\n');
-    return rustCode;
-  }).join('\n\n');
+  // Deduplicate instruction imports
+  const instructionImports = instructions
+    .filter(inst => {
+      if (seenInstructions.has(inst.name)) return false;
+      seenInstructions.add(inst.name);
+      return true;
+    })
+    .map(inst => `pub use instructions::${inst.name}::*;`)
+    .join('\n');
+  
+  // Reset the Set for function definitions
+  seenInstructions.clear();
+  
+  const instructionDefs = instructions
+    .filter(inst => {
+      if (seenInstructions.has(inst.name)) return false;
+      seenInstructions.add(inst.name);
+      return true;
+    })
+    .map(inst => {
+      const ctx = inst.context_name ?? `${toPascal(inst.name)}Context`;
+      const param = inst.params_name ?? `${toPascal(inst.name)}Params`;
+      // Each instruction string is formatted here.
+      // Ensure no unescaped backticks if this were a template literal itself.
+      // Newlines are preserved.
+      const rustCode = [
+        `    pub fn ${inst.name}(ctx: Context<${ctx}>, params: ${param}) -> Result<()> {`,
+        `        // instruction file already exports \\\`${inst.name}\\\``,
+        `        instructions::${inst.name}::${inst.name}(ctx, params)`,
+        `    }`
+      ].join('\n');
+      return rustCode;
+    }).join('\n\n');
 
   return `use anchor_lang::prelude::*;
 
@@ -58,9 +78,31 @@ function generateModRs(instructions: InstructionDetail[]): string {
     return "// No instructions generated";
   }
   
-  return instructions.map(inst => `pub mod ${inst.name};`).join('\n') + 
-    '\n\n' + 
-    instructions.map(inst => `pub use ${inst.name}::*;`).join('\n');
+  // Create Sets to track which instruction names we've seen
+  const seenModules = new Set<string>();
+  const seenUses = new Set<string>();
+  
+  // Deduplicate pub mod declarations
+  const pubModLines = instructions
+    .filter(inst => {
+      if (seenModules.has(inst.name)) return false;
+      seenModules.add(inst.name);
+      return true;
+    })
+    .map(inst => `pub mod ${inst.name};`)
+    .join('\n');
+  
+  // Deduplicate pub use declarations
+  const pubUseLines = instructions
+    .filter(inst => {
+      if (seenUses.has(inst.name)) return false;
+      seenUses.add(inst.name);
+      return true;
+    })
+    .map(inst => `pub use ${inst.name}::*;`)
+    .join('\n');
+  
+  return pubModLines + '\n\n' + pubUseLines;
 }
 
 function generateStateRs(state: StateDetail[]): string {
@@ -90,12 +132,22 @@ export function genSrcFiles(
 ): FileTreeItem | null {
   try {
     // Parse & canonicalise first so downstream generators see final names
-    const { instructions, state } = parseNodeDetails(projectState);
+    const { instructions: rawInstructions, state } = parseNodeDetails(projectState);
 
-    for (const inst of instructions) {
+    // For each instruction, get the canonical name from the function signature
+    for (const inst of rawInstructions) {
       const m = inst.code.match(/pub\s+fn\s+([a-zA-Z0-9_]+)/);
       if (m) inst.name = m[1];          // canonical symbol overrides draft
     }
+
+    // Deduplicate instructions by name, keeping the first occurrence
+    const unique = new Map<string, InstructionDetail>();
+    for (const inst of rawInstructions) {
+      if (!unique.has(inst.name)) {
+        unique.set(inst.name, inst);
+      }
+    }
+    const instructions = Array.from(unique.values());
 
     // Anchor expects: programs/<programName>/src/…
     const programRoot = `./programs/${programName}`;
@@ -132,23 +184,6 @@ export function genSrcFiles(
       type: "file",
       code: modCode,
     });
-
-    // The following block is to be deleted as per user instruction
-    // // Choose the canonical Rust symbol by inspecting the snippet itself.
-    // for (const inst of instructions) {
-    //   const fnMatch = inst.code.match(/pub\s+fn\s+([a-zA-Z0-9_]+)/);
-    //   const canonical = fnMatch ? fnMatch[1] : inst.name;  // fallback
-    // 
-    //   instrDir.children?.push({
-    //     name: `${canonical}.rs`,
-    //     path: `${programRoot}/src/instructions/${canonical}.rs`,
-    //     type: "file",
-    //     code: inst.code,
-    //   });
-    // 
-    //   // overwrite inst.name so later helpers (mod.rs/lib.rs) stay in sync
-    //   inst.name = canonical;
-    // }
 
     // This loop should be the one that writes individual instruction files
     // using the already canonicalized inst.name from the earlier loop.

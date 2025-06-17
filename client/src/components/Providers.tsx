@@ -1,6 +1,7 @@
 "use client";
 
-import { WalletConnectionProvider } from "@/context/WalletConnectionProvider";
+
+import WalletConnectionProvider from "@/context/WalletConnectionProvider";
 import AuthProvider from "@/context/auth/AuthProvider";
 import ProjectProvider from "@/context/project/ProjectContextProvider";
 import FileContextProvider from "@/context/file/FileContextProvider";
@@ -16,22 +17,22 @@ export default function Providers({
 }) {
   return (
     <>
-      <WalletConnectionProvider>
-        <Provider>
-          <AuthProvider>
-            <ProjectProvider>
-              <FileContextProvider>
-                <UxContextProvider>
-                  <TaskLogsProvider>
+      <Provider>
+        <UxContextProvider>
+          <WalletConnectionProvider>
+            <AuthProvider>
+              <ProjectProvider>
+                <TaskLogsProvider>
+                  <FileContextProvider>
                     {children}
                     <Toaster />
-                  </TaskLogsProvider>
-                </UxContextProvider>
-              </FileContextProvider>
-            </ProjectProvider>
-          </AuthProvider>
-        </Provider>
-      </WalletConnectionProvider>
+                  </FileContextProvider>
+                </TaskLogsProvider>
+              </ProjectProvider>
+            </AuthProvider>
+          </WalletConnectionProvider>
+        </UxContextProvider>
+      </Provider>
     </>
   );
 } 

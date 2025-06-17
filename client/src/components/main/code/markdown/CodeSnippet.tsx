@@ -15,7 +15,7 @@ const CodeSnippet: React.FC<{ children?: React.ReactNode }> = ({ children }) => 
   const codeSnippetTextColor = useColorModeValue("var(--code-snippet-text-light)", "#676f82");
 
   return (
-    <div
+    <pre
       className="relative p-[10px] my-[10px] text-[0.8rem]"
       style={{
         maxWidth: "100%",
@@ -40,7 +40,7 @@ const CodeSnippet: React.FC<{ children?: React.ReactNode }> = ({ children }) => 
         <GoCopy />
       </Button>
       {children}
-    </div>
+    </pre>
   );
 };
 

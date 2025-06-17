@@ -18,6 +18,8 @@ import { taskApi } from '@/api/taskApi';
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useTaskLogs } from "@/context/logs/useTaskLogs";
+import eventBus from '@/lib/eventBus';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,6 +49,7 @@ export interface AIMessageType {
   files?: FileTreeItemType[];
   timestamp?: Date;
   status?: 'sending' | 'sent' | 'error';
+  isLogLine?: boolean;       
 }
 
 const Chat: React.FC = () => {
@@ -62,6 +65,9 @@ const Chat: React.FC = () => {
     const [selectedModel, setSelectedModel] = useState('gpt-4o');
     const [isExpanded, setIsExpanded] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
+    const taskLogs = useTaskLogs();  // Complete taskLogs object including systemLogs and setSuppressToast
+    const { systemLogs } = taskLogs;
+    const [lastLogIndex, setLastLogIndex] = useState(0);  // 🟡 NEW
   
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -104,6 +110,31 @@ const Chat: React.FC = () => {
         }
     }, [input]);
 
+    // ───────────────────────────────────────────────────────────────────────────
+    //  Whenever TaskLogsProvider pushes new lines, append them as AI messages
+    // ───────────────────────────────────────────────────────────────────────────
+    useEffect(() => {
+        if (!systemLogs?.length) return;
+
+        // Grab the slice we have not injected yet
+        const fresh = systemLogs.slice(lastLogIndex);
+
+        if (fresh.length) {
+            const logMessages: AIMessageType[] = fresh.map(line => ({
+                text: line,
+                sender: 'ai',           // show as if the assistant "thinks out loud"
+                timestamp: new Date(),
+                status: 'sent',
+                isLogLine: true,
+            }));
+
+            setMessages(prev => [...prev, ...logMessages]);
+            setLastLogIndex(systemLogs.length);
+            // Ensure scroll sticks to bottom
+            scrollToBottom();
+        }
+    }, [systemLogs, lastLogIndex]);
+
     const fetchFileContent = async (projectId: string, filePath: string): Promise<string> => {
         try {
             const data = await fileApi.getFileContent(projectId, filePath);
@@ -122,6 +153,23 @@ const Chat: React.FC = () => {
     }, [connected, publicKey]);
 
     const sendMessage = async () => {
+        const trimmed = input.trim().toLowerCase();
+        if (trimmed === 'build') {
+          // 1) prevent toast
+          taskLogs.setSuppressToast(true);
+
+          // 2) forward build command globally
+          eventBus.emit('chat-build-command');
+
+          // 3) still echo the user message in the thread
+          setMessages(prev => [
+            ...prev,
+            { text: input, sender: 'user', timestamp: new Date(), status: 'sent' }
+          ]);
+          setInput('');
+          return;                             // stop normal AI flow
+        }
+        
         if (input.trim()) {
             const selectedFiles = [selectedFile, ...additionalFiles].filter(
                 (file): file is FileTreeItemType => Boolean(file)
@@ -321,6 +369,7 @@ const Chat: React.FC = () => {
                     <AnimatePresence>
                         {messages.map((message, index) => {
                             const isUser = message.sender === 'user';
+                            const isLog  = message.isLogLine === true;
                             const displayTime = message.timestamp
                                 ? formatTime(message.timestamp)
                                 : "03:02 PM";
@@ -337,7 +386,9 @@ const Chat: React.FC = () => {
                                         className={`max-w-[85%] rounded-lg ${
                                             isUser
                                                 ? "bg-[#0066ff] text-white rounded-tr-none"
-                                                : "bg-[#1a1a22] text-gray-100 rounded-tl-none border border-[#2a2a33]"
+                                                : isLog
+                                                  ? "bg-transparent text-[#7dd3fc]"           /* cyan-ish text, no bubble */
+                                                  : "bg-[#1a1a22] text-gray-100 rounded-tl-none border border-[#2a2a33]"
                                         }`}
                                         style={{
                                             whiteSpace: 'pre-wrap',

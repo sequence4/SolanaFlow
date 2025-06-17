@@ -15,8 +15,12 @@ ENV PATH="${HOME}/.nvm/versions/node/${NODE_VERSION}/bin:${PATH}"
 # Install base utilities.
 RUN mkdir -p /workdir && mkdir -p /tmp && \
     apt-get update -qq && apt-get upgrade -qq && apt-get install -qq \
+    bash \
     build-essential git curl wget jq pkg-config python3-pip \
     libssl-dev libudev-dev zlib1g-dev llvm clang cmake make libprotobuf-dev protobuf-compiler
+
+# Optional - make generic shells resolve too
+RUN ln -sf /bin/bash /bin/sh
 
 # Install rust.
 RUN curl "https://sh.rustup.rs" -sfo rustup.sh && \

@@ -2,6 +2,33 @@ import { deployPipeline as sseDeploy } from '@/api/deployPipeline';
 import { ProjectContextType } from '@/context/project/ProjectContextTypes';
 import { useContext } from 'react';
 import FileContext from '@/context/file/FileContext';
+import { FileTreeItemType } from '@/interfaces/FileTreeItemType';
+import UxContext from "@/context/ux/UxContext";
+
+// Track file tree state internally to handle streaming
+let currentFileTree: FileTreeItemType[] = [];
+
+// Helper function to add a file to the tree
+function addFileToTree(path: string, content: string, setFileTree?: (tree: any) => void) {
+  if (!setFileTree) return;
+  
+  // Extract filename from path
+  const pathParts = path.split('/');
+  const fileName = pathParts[pathParts.length - 1];
+  
+  // Create a file node
+  const fileItem: FileTreeItemType = {
+    name: fileName,
+    path,
+    type: 'file',
+    ext: fileName.split('.').pop(),
+    content
+  };
+  
+  // Add to tree - simple version just adds at root level
+  currentFileTree.push(fileItem);
+  setFileTree([...currentFileTree]);
+}
 
 export function runDeployPipelineWithLogs(
   projectContext: ProjectContextType,
@@ -16,11 +43,16 @@ export function runDeployPipelineWithLogs(
   setArtifactUrl?: (url: string) => void,
   onComplete?: (status?: 'error') => void,
   setFileTree?: (tree: any) => void,
+  setActiveTab?: (tab: string) => void,
 ) {
+  // Reset the file tree collection for streaming
+  currentFileTree = [];
   
   taskLogs.resetLogs();
   taskLogs.setIsVisible(true);
   taskLogs.addSystemLog("🚀 Starting deployment pipeline...");
+
+  const { activeTab, setActiveTab: uxSetActiveTab } = useContext(UxContext);
 
   const update = (msg: any) => {
     console.log(`[deployPipeline] Received update from SSE:`, msg);
@@ -29,6 +61,26 @@ export function runDeployPipelineWithLogs(
     if (msg.stage) {
       taskLogs.updateStage(msg.stage);
     }
+
+    if (msg.stage === 'ui-stream') {
+      currentFileTree = [];
+      if (setFileTree) setFileTree([]);
+      taskLogs.addSystemLog("📝  streaming UI…");
+    }
+
+    if (msg.event === 'file-written') {
+      if (setFileTree) addFileToTree(msg.path, msg.content, setFileTree);
+      taskLogs.addSystemLog(`📄 ${msg.path}`);
+    }
+
+    /* ------------ AUTO TAB SWITCH on ui-complete ------------- */
+    if (msg.stage === "ui-complete" || msg.event === "ui-complete") {
+      // Skip if we're already there or the user manually picked a tab **after** the build started
+      if (activeTab !== "interface") {
+        uxSetActiveTab("interface");
+      }
+    }
+    /* ---------------------------------------------------------- */
 
     if (msg.stage === "file-tree-start") {
       taskLogs.addSystemLog("📂 Building project file tree…");

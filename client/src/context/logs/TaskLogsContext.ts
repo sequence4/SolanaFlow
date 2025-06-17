@@ -23,6 +23,10 @@ export interface TaskLogsContextType {
   networkStats: string;
   nodeVersion: string;
   isBuilding: boolean;
+  uiReady: boolean;
+  fileTree: any;
+  buildPhase: 'waiting' | 'started' | 'done';
+  suppressToast: boolean;                 // NEW – read-only flag
   
   /**
    * Subscribe to fine-grained progress updates without forcing a
@@ -40,8 +44,9 @@ export interface TaskLogsContextType {
   addSystemLog: (log: string) => void;
   resetLogs: () => void;
   setSteps: (steps: Step[]) => void;
-  updateStage: (stage: string) => void;
+  updateStage: (stage: string, data?: any) => void;
   setIsBuilding: (b: boolean) => void;
+  setSuppressToast: (b: boolean) => void; // NEW – setter
 }
 
 const TaskLogsContext = createContext<TaskLogsContextType>({
@@ -56,6 +61,10 @@ const TaskLogsContext = createContext<TaskLogsContextType>({
   networkStats: "4.2 MB/s",
   nodeVersion: "v18.12.1",
   isBuilding: false,
+  uiReady: false,
+  fileTree: null,
+  buildPhase: 'waiting',
+  suppressToast: false,
   
   onProgress: () => () => {},
   
@@ -69,6 +78,7 @@ const TaskLogsContext = createContext<TaskLogsContextType>({
   setSteps: () => {},
   updateStage: () => {},
   setIsBuilding: () => {},
+  setSuppressToast: () => {},
 });
 
 export default TaskLogsContext; 

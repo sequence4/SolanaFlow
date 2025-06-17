@@ -9,7 +9,7 @@ import UxContext from "@/context/ux/UxContext";
 import { Button } from "@/components/ui/button";
 import { FaCircle } from "react-icons/fa";
 import { LuWallet } from "react-icons/lu";
-import { MessageSquareMore } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 
 export default function LayoutHeader() {
   const { connected, publicKey, connect, disconnect, select } = useWallet();
@@ -70,7 +70,7 @@ export default function LayoutHeader() {
           className="h-8 rounded-full border-none px-2 flex items-center"
           onClick={() => setIsChatOpen(!isChatOpen)}
         >
-          <MessageSquareMore size={18} />
+          <MessageSquare size={18} />
         </Button>
       </div>
     </div>

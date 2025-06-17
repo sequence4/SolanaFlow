@@ -22,11 +22,17 @@ export interface ProjectStateType {
   mode: "basic" | "advanced";
   nodes: any[];
   edges: any[]; 
-  config: any; 
+  config: Record<string, unknown>;
   programId?: string;
   instructions?: InstructionType[];
   projectFiles?: any;
-  fileTree?: FileTreeItemType;
+  /**
+   * A complete tree (or array of trees) representing every file we've received
+   * from the backend.  Added so the builder can seed a blank tree on project
+   * creation without tripping type errors.
+   */
+  fileTree?: import('../../interfaces/FileTreeItemType').FileTreeItemType |
+             import('../../interfaces/FileTreeItemType').FileTreeItemType[];
   built: boolean;
   deployed: boolean;
 }

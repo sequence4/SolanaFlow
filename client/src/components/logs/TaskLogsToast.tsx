@@ -22,6 +22,7 @@ export default function TaskLogsToast() {
     showDetails,
     setShowDetails,
     systemLogs,
+    uiReady
   } = useTaskLogs();
 
   if (!isVisible) return null;
@@ -58,6 +59,8 @@ export default function TaskLogsToast() {
           <div className="h-6 w-6 rounded-full bg-[#0A0B10] flex items-center justify-center">
             {progress === 100 ? (
                 <Check className="h-4 w-4 text-green-500" />
+            ) : uiReady ? (
+                <Check className="h-4 w-4 text-blue-500" />
             ) : (
                 <Loader2 className="h-4 w-4 text-blue-400 animate-spin" />
             )}
@@ -65,6 +68,7 @@ export default function TaskLogsToast() {
           <h3 className="font-medium text-sm">
             {safeStep < 0 ? "Waiting for pipeline..." :
              progress === 100 || safeStep >= STAGES.length ? "Completed" : 
+             uiReady ? "UI ready - preview available" :
              STAGES[safeStep].label}
           </h3>
         </div>

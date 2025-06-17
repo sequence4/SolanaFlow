@@ -10,6 +10,7 @@ import pool from 'src/config/database';
 import { pruneContainerResources } from './container/pruneContainer';
 import { startProjectContainer } from './container/startProjectContainer';
 import { Connection, sendAndConfirmRawTransaction } from '@solana/web3.js';
+import { spawn, SpawnOptions } from 'child_process';
 
 //const USER_WORKSPACE_IMAGE = "ghcr.io/sequence4/solanaflow:latest";
 
@@ -96,6 +97,75 @@ export async function runCommand(
     );
   });
 };
+
+export async function runSpawn(
+  command: string,
+  cwd: string,
+  taskId: string,
+  options: { skipSuccessUpdate?: boolean; sendProgress?: (data: unknown) => void } = {}
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, { cwd, shell: true });
+    let stdoutData = '';
+    let stderrData = '';
+    
+    /* ----- debounce helper ----- */
+    let lastFlush = 0;
+    const FLUSH_MS = Number(process.env.SPAWN_FLUSH_MS) || 750;
+    const flushIfDue = async () => {
+      const now = Date.now();
+      if (now - lastFlush > FLUSH_MS) {
+        lastFlush = now;
+        await updateTaskStatus(taskId, 'doing', stdoutData + stderrData).catch(console.error);
+      }
+    };
+    
+    child.stdout.on('data', chunk => {
+      const text = chunk.toString();
+      stdoutData += text;
+      flushIfDue();
+      if (options.sendProgress) {
+        options.sendProgress({ message: text });
+      }
+    });
+    
+    child.stderr.on('data', chunk => {
+      const text = chunk.toString();
+      stderrData += text;
+      flushIfDue();
+      if (options.sendProgress) {
+        options.sendProgress({ message: text });
+      }
+    });
+    
+    child.on('error', error => {
+      const result = `Error starting process: ${error.message}`;
+      updateTaskStatus(taskId, 'failed', result).catch(console.error);
+      reject(new Error(result));
+    });
+    
+    child.on('close', async code => {
+      if (code !== 0) {
+        const result = `Error: process exited with code ${code}\n\nStdout: ${stdoutData}\n\nStderr: ${stderrData}`;
+        await updateTaskStatus(taskId, 'failed', result);
+        return reject(new Error(result));
+      }
+      
+      // Final flush to ensure latest content is saved
+      await updateTaskStatus(taskId, 'doing', stdoutData + stderrData).catch(console.error);
+      
+      if (!options.skipSuccessUpdate) {
+        if (hasWarning(stdoutData) || hasWarning(stderrData)) {
+          const result = `Warning detected:\n\nStdout: ${stdoutData.trim()}\n\nStderr: ${stderrData.trim()}`;
+          await updateTaskStatus(taskId, 'warning', result);
+        } else {
+          await updateTaskStatus(taskId, 'succeed', 'Success');
+        }
+      }
+      resolve(stdoutData.trim());
+    });
+  });
+}
 
 export async function compileTs(
   tsFileName: string,
@@ -1119,4 +1189,48 @@ export async function broadcastSignedTx(projectId: string, encodedTx: string): P
   const raw  = Buffer.from(encodedTx, 'base64');
   const sig  = await sendAndConfirmRawTransaction(conn, raw);
   return sig;
+}
+
+/**
+ * Runs a command in a detached process, not waiting for completion.
+ * Useful for long-running processes like dev servers.
+ */
+export async function runCommandDetached(
+  command: string,
+  cwd: string,
+  taskId: string,
+  options: { shell?: string } = {}
+): Promise<void> {
+  console.log(`[DETACHED] Running command: ${command} in ${cwd}`);
+  
+  const spawnOptions: SpawnOptions = {
+    cwd,
+    detached: true,
+    stdio: 'ignore',
+    shell: options.shell || '/bin/bash'  // guarantees a shell is available inside the tool-chain image
+  };
+  
+  try {
+    const child = spawn(command, [], spawnOptions);
+    
+    // Unref the child to allow the parent process to exit independently
+    child.unref();
+    
+    console.log(`[DETACHED] Process started with PID ${child.pid}`);
+    
+    // Log the start but don't wait for completion
+    await updateTaskStatus(
+      taskId, 
+      'doing', 
+      `Started detached process: ${command} (PID: ${child.pid})`
+    );
+  } catch (error: any) {
+    console.error(`[DETACHED] Failed to start command: ${error.message}`);
+    await updateTaskStatus(
+      taskId, 
+      'failed', 
+      `Failed to start detached process: ${error.message}`
+    );
+    throw error;
+  }
 }

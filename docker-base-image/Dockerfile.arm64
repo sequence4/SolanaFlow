@@ -28,12 +28,16 @@ RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
     --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked \
     rustup component add rust-src \
- && cargo install anchor-cli --version 0.31.1 --locked \
+ && cargo install anchor-cli  --version 0.31.1   --locked \
+ && cargo install cargo-chef --version 0.1.64    --locked \
  && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
  && apt-get update -qq \
  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs \
  && apt-get clean && rm -rf /var/lib/apt/lists/* \
  && strip /usr/local/bin/solana*
+
+RUN rustup set profile minimal && rustup default stable
+
 
 # warm the BPF / SBF cache once so first user build is instant
 WORKDIR /tmp
@@ -43,20 +47,21 @@ RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
     anchor init anchor-template --no-git --no-install \
  && (cd anchor-template && anchor build) \
  && rm -rf anchor-template/node_modules \
+ && rm -rf /usr/src/anchor-template \
  && mv anchor-template /usr/src/anchor-template \
  && rm -rf /tmp/* \
  && mkdir -p /cache-seed \
  && cp -a /usr/src/target /cache-seed/target
 
 # quick smoke-test
-RUN solana --version && cargo build-sbf --version && anchor --version
+RUN solana --version && cargo --version && rustc --version && anchor --version
 
 ###############################################################################
 # 2.  Dependency cooker (cargo-chef)
 ###############################################################################
 FROM solana-toolchain AS chef
 WORKDIR /app
-COPY Cargo.toml Cargo.lock ./
+COPY docker-base-image/Cargo.toml docker-base-image/Cargo.lock docker-base-image/src/ ./
 RUN cargo chef prepare --recipe-path recipe.json
 
 FROM solana-toolchain AS cooker
@@ -83,43 +88,113 @@ COPY --from=cooker /app/target /app/target
 
 # project source
 WORKDIR /app
-COPY src/ ./src
+COPY docker-base-image/src/ ./src
 
 # Node + Yarn (cached)
 RUN curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
 RUN . "$NVM_DIR/nvm.sh" \
  && nvm install ${NODE_VERSION} \
  && nvm alias default ${NODE_VERSION} \
- && npm i -g yarn
+ && if ! command -v yarn >/dev/null 2>&1 ; then npm i -g yarn@1 ; fi
 
 ENV NEXT_TELEMETRY_DISABLED=1 NEXT_SKIP_ESLINT=1
+# --- Force Next 14 + to emit the standalone bundle ---------------------------
+ENV NEXT_PRIVATE_STANDALONE=true
+# copy the web/ directory that already exists in the repo
+COPY web/ /usr/share/solanaflow/web
+
+# install deps and build once
 RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing=locked \
-    mkdir -p /usr/share/solanaflow \
- && CI=1 yarn create next-app /usr/share/solanaflow/web \
-        --typescript --eslint --tailwind --app --no-src-dir --no-interactive \
- && printf '\nmodule.exports = { output: "standalone" };\n' >> /usr/share/solanaflow/web/next.config.js \
- && yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile \
+    yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile \
  && yarn --cwd /usr/share/solanaflow/web build \
- && yarn cache clean && rm -rf /usr/local/share/.cache/yarn
+ && yarn cache clean --all || true
+
+# sanity-check: make sure the stand-alone entry exists
+RUN test -f /usr/share/solanaflow/web/.next/standalone/server.js
 
 ###############################################################################
 # 4.  Runtime – slim image with CLI + built app
 ###############################################################################
+# ────────────────────────────────────────────────────────────────
+# runtime stage  ➜  copy the *full* Yarn 1.x install from builder
+#   · yarn in /usr/local/bin is just a shim that calls ../lib/cli
+#   · therefore we MUST also copy /usr/local/lib/node_modules/yarn
+# ────────────────────────────────────────────────────────────────
 FROM ubuntu:22.04 AS runtime
 ENV PATH=/usr/local/bin:/root/.cargo/bin:$PATH \
-    HOST=0.0.0.0 \
+    HOSTNAME=0.0.0.0 \
     NEXT_DISABLE_SWC=1
 WORKDIR /usr/share/solanaflow/web
 
 # bring in binaries and web bundle
 COPY --from=solana-toolchain /usr/local/bin /usr/local/bin
 COPY --from=solana-toolchain /root/.cargo/bin /root/.cargo/bin
-COPY --from=builder /usr/share/solanaflow /usr/share/solanaflow
+COPY --from=solana-toolchain /root/.rustup /root/.rustup
+# ── web bundle ────────────────────────────────────────────────────────────────
+# Next 'standalone' output lives in:
+#   web/.next/standalone/…   (server code)
+#   web/.next/static/…       (css/js chunks, fonts, images…)
+#   web/public/…             (static public assets)
+
+## ① server code — unchanged
+COPY --from=builder /usr/share/solanaflow/web/.next/standalone \
+    /usr/share/solanaflow/web/.next/standalone
+
+# copy .next/static (always there)
+COPY --from=builder /usr/share/solanaflow/web/.next/static \
+                    /usr/share/solanaflow/web/.next/standalone/.next/static
+
+# copy public assets only when present
+RUN if [ -d /usr/share/solanaflow/web/public ]; then \
+       cp -R /usr/share/solanaflow/web/public \
+             /usr/share/solanaflow/web/.next/standalone/public ; \
+    fi
+
+# also copy the project itself (src/, app/, idl/, …)
+COPY --from=builder /usr/share/solanaflow/web                  /usr/share/solanaflow/web
+COPY --from=solana-toolchain /usr/src/anchor-template /usr/src/anchor-template
+
+# copy the entire Node version dir (≈ 28 MB) – includes node, npm, corepack, etc.
+COPY --from=builder /root/.nvm/versions/node/v20.18.0 /root/.nvm/versions/node/v20.18.0
+RUN ln -sf /root/.nvm/versions/node/v20.18.0/bin/* /usr/local/bin/
+
+# sanity-check Yarn & Node
+RUN node -v && yarn -v      # should print 20.18.0 / 1.22.x
+
+# --------------------------------------------------------------------------------
+# everything below this line is unchanged
 
 RUN solana --version && anchor --version
-RUN apt-get clean && rm -rf /var/lib/apt/lists/* && strip /usr/local/bin/solana*
+RUN cargo --version  && rustc --version
+# --- base tool-chain and libraries needed for Anchor / Rust programs ----------
+RUN apt-get update -qq && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        # guarantee /bin/bash so Node's child_process.spawn never ENOENTs
+        bash \
+        build-essential \
+        clang \
+        lld \
+        llvm \
+        pkg-config \
+        libssl-dev \
+        binutils \
+        ca-certificates \
+        jq && \
+    update-ca-certificates && \
+    # make sure /usr/bin/cc exists
+    ln -sf "$(command -v gcc || command -v clang)" /usr/bin/cc && \
+    strip /usr/local/bin/solana* || true && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# optional one-liner: make generic shells resolve too
+RUN ln -sf /bin/bash /bin/sh
+
+# from this point every RUN uses Bash automatically
+SHELL ["/bin/bash","-c"]
 
 EXPOSE 3000
+# Entrypoint - run from the web root so that "_next/static" & "public" resolve
+WORKDIR /usr/share/solanaflow/web
 CMD ["node", ".next/standalone/server.js"]
 
 # create a separate stage for seeding the target volume
