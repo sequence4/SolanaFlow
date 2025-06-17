@@ -140,7 +140,7 @@ COPY --from=solana-toolchain /root/.rustup /root/.rustup
 COPY --from=builder /usr/share/solanaflow/web/.next/standalone \
     /usr/share/solanaflow/web/.next/standalone
 
-# also copy the project itself (src/, app/, idl/, …)m
+# also copy the project itself (src/, app/, idl/, …)
 COPY --from=builder /usr/share/solanaflow/web                  /usr/share/solanaflow/web
 COPY --from=solana-toolchain /usr/src/anchor-template /usr/src/anchor-template
 

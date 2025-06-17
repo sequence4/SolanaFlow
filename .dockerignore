@@ -1,0 +1,5 @@
+# keep build slim
+*.log
+node_modules/
+target/
+cache-seed/
