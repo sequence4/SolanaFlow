@@ -377,12 +377,13 @@ export const handleGenerateCode = async ({
         // tell frontend UI files are done
         sendProgress({ stage: "ui-complete" });
 
-        // launch the already-built Next.js bundle in production mode
+        // 🟢 start the server **inside the container** so cwd is valid
         runCommandDetached(
-          'node .next/standalone/server.js',
-          '/usr/share/solanaflow/web',
-          `next-serve-${projectId}`,
-          { shell: '/bin/bash' }   // explicit, future-proof
+          `docker exec -w /usr/share/solanaflow/web ` +
+          `${workspace.containerName} bash -lc '` +
+          `node .next/standalone/server.js'`,
+          '.',                              // host cwd irrelevant
+          `next-serve-${projectId}`         // no extra options needed
         ).catch(console.error);
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
