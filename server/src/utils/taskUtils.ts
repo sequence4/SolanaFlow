@@ -15,16 +15,17 @@ export async function createTask(
   name: string,
   creatorId: string | null,
   projectId: string,
+  taskType: string | null = null,
   customId?: string,
 ): Promise<string> {
   const client = await pool.connect();
   try {
     const id = customId ?? uuidv4();
     await client.query(
-      `INSERT INTO task (id,name,creator_id,project_id,status,created_at)
-       VALUES ($1,$2,$3,$4,'queued',NOW())
+      `INSERT INTO task (id,name,creator_id,project_id,status,created_at,task_type)
+       VALUES ($1,$2,$3,$4,'queued',NOW(),$5)
        ON CONFLICT (id) DO NOTHING`,
-      [id, name, creatorId, projectId],
+      [id, name, creatorId, projectId, taskType],
     );
     return id;
   } finally {
@@ -189,6 +190,6 @@ export async function pollTaskStatus(
 export async function markWriteDone(projectId: string) {
   // Generate a real UUID and keep the human-readable tag in "title"
   const id = uuidv4();                         // ✅ valid uuid
-  await createTask(`WRITE_SRCS_${projectId}`, null, projectId, id);
+  await createTask(`WRITE_SRCS_${projectId}`, null, projectId, null, id);
   await updateTaskStatus(id, "succeed", "UI + SRC files written");
 }
