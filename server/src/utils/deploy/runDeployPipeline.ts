@@ -58,14 +58,15 @@ export async function runDeployPipeline({
     
     // 2 ─ code generation ─────────────────────────────────────────────────
     sendProgress({ stage: "code-gen", message: "Generating Anchor code…" });
-    await handleGenerateCode({ projectId, graph, workspace, sendProgress, userId });
+    const { sentinelId } =
+          await handleGenerateCode({ projectId, graph, workspace, sendProgress, userId });
 
     /* 3 ─ build program --------------------------------------------------- */
     console.log("[PIPELINE] ⏳ anchor build started…");
     
     // wait until all src + UI files are on disk
     // allow up to 3 min for large repos (90 × 2 s)
-    await waitForTaskCompletion(`WRITE_SRCS_${projectId}`, 90, 2_000);
+    await waitForTaskCompletion(sentinelId, 90, 2_000);
     
     sendProgress({ stage: "build-started", message: "Building program…" });
     const buildTask = await startAnchorBuildTask(projectId, userId);

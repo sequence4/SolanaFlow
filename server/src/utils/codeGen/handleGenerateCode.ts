@@ -124,7 +124,7 @@ export const handleGenerateCode = async ({
   workspace,
   sendProgress,
   userId,
-}: Args): Promise<void> => {   
+}: Args): Promise<{ sentinelId: string }> => {   
     console.log('[GEN] projectId   =', projectId);
     console.log('[GEN] userId      =', userId);
     console.log('[GEN] workspace   =', workspace);
@@ -335,7 +335,7 @@ export const handleGenerateCode = async ({
           creatorId: string | null,
           workspace: WorkspaceHandle,
           sendProgress: (d: unknown) => void,
-        ): Promise<void> {
+        ): Promise<string> {
           return (async () => {
             const writeTaskIds = await insertSrcFiles(rootNode, projectId, existingFilePaths, creatorId, emitFileWritten(sendProgress));
             
@@ -352,10 +352,11 @@ export const handleGenerateCode = async ({
             // now it is safe to raise the sentinel
             const sentinelId = await markWriteDone(projectId);
             console.log('[GEN] write-done sentinel:', sentinelId);
+            return sentinelId;
           })();
         }
         
-        await writeFilesAndEmitTree(
+        const sentinelId = await writeFilesAndEmitTree(
           srcTree,
           projectId,
           existingFilePaths,
@@ -444,6 +445,9 @@ export const handleGenerateCode = async ({
           }
           await updateTaskStatus(dumpTaskId, 'succeed', 'Tree dumped and files printed');
         }
+        
+        // ─── end of function ────────────────────────────────
+        return { sentinelId };            // ← NEW
     } catch (err) {
         console.error('Error in handleGenerateCode:', err);
         throw err;

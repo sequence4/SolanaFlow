@@ -359,12 +359,12 @@ echo "BUILD_SUCCESS: $SO_PATH"
           { skipSuccessUpdate: true }
         );
         
-        console.log(`[BUILD] Executing build script in container ${containerName}...`);
-        const buildOutput = await runCommand(
+        console.log(`[BUILD] Executing build script in container ${containerName} (stream)…`);
+        const buildOutput = await runSpawn(
           `docker exec ${containerName} /bin/bash /tmp/build.sh`,
           '.',
           sanitizedTaskId,
-          { skipSuccessUpdate: true }
+          { sendProgress: d => console.log('[ANCHOR_BUILD]', (d as any).message?.trim() ?? '') }
         );
         
         // look for the *first* .so produced under the correct target directory
@@ -384,11 +384,12 @@ echo "BUILD_SUCCESS: $SO_PATH"
         if (soFileCheck.includes('BUILD_SUCCESS')) {
           console.log("[BUILD] ✔️  anchor build finished & .so produced");
           await updateTaskStatus(sanitizedTaskId, 'succeed', `Build completed successfully. .so file was created.`);
-        } else {
+        } else if (soFileCheck.includes('BUILD_FAILURE')) {
           const fullBuildError = `[BUILD] ❌  Build finished but no .so was created.\n\nBuild output:\n${buildOutput}`;
           console.error(fullBuildError);
           await updateTaskStatus(sanitizedTaskId, 'failed', fullBuildError);
         }
+        // no 'else' – runSpawn already set 'warning' when appropriate
       } catch (buildError: any) {
         console.error(`[BUILD] Anchor build failed with error: ${buildError.message}`);
         await updateTaskStatus(
@@ -1017,7 +1018,7 @@ export const closeProjectContainer = async (
 
 export async function getContainerName(projectId: string): Promise<string | null> {
   const result = await pool.query(
-    'SELECT container_name FROM solanaproject WHERE id = $1',
+    'SELECT "container_name" FROM solanaproject WHERE id = $1',
     [projectId]
   );
   if (!result.rows.length || !result.rows[0].container_name) {
