@@ -8,15 +8,12 @@ import { handleGenerateCode } from "../codeGen/handleGenerateCode";
 import { markContainerForCleanup } from "../container/cleanupQueue";
 import {
   startAnchorBuildTask,
-  startAnchorDeployTask,
   getBuildArtifactTask,
   runCommand
 } from "../projectUtils";
-import { waitForTaskCompletion, getTaskById } from "../taskUtils";
-import { deriveProgramId } from "../../utils/deriveProgramId";
+import { waitForTaskCompletion } from "../taskUtils";
 import path from "path";
 import { attachFileContents } from "../fileUtils/attachFileContents";
-import { v4 as uuidv4 } from "uuid";
 
 // ─── unified progress payload ────────────────────────────
 interface ProgressEvent {
@@ -31,7 +28,6 @@ interface ProgressEvent {
 // TODO: chunk really large fileTree payloads (> ~16 MB) – Chrome drops giant SSE frames.
 
 const MAX_BUILD_MINUTES = Number(process.env.MAX_BUILD_MINUTES) || 15;
-const MAX_DEPLOY_MINUTES = Number(process.env.MAX_DEPLOY_MINUTES) || 6;
 
 interface PipelineArgs {
   projectId: string;
@@ -195,114 +191,6 @@ export async function runDeployPipeline({
       artifact: base64So,
       fileTree
     });
-
-    /* 4 ─ deploy --------------------------------------------------------- */
-    let programId: string | undefined;
-    
-    if (!walletSigned) {
-
-      // Calculate deployment timeout from env (default 6 minutes)
-      const deployMinutes = MAX_DEPLOY_MINUTES;
-      const deployTimeoutMs = deployMinutes * 60_000;
-      
-      // Convert timeout ms to retry count (2-second interval)
-      const deployRetries = Math.ceil(deployTimeoutMs / 2_000);
-
-      // Launch the async deploy task inside the container
-      const deployTask = await startAnchorDeployTask(
-        projectId,
-        userId
-      );
-
-      // Allow up to specified minutes for Devnet transaction retries
-      const deployStatus = await waitForTaskCompletion(deployTask, deployRetries, 2_000);
-      if (deployStatus !== 'succeed' && deployStatus !== 'finished') {
-        throw new Error(`Deployment task failed with status: ${deployStatus}`);
-      }
-
-      // Retrieve the task's JSON result
-      const { status, result } = await getTaskById(deployTask);
-      
-      if (status !== 'succeed' && status !== 'finished') {
-        throw new Error(`Deployment task failed with status: ${status}`);
-      }
-      
-      if (!result) {
-        throw new Error("Deployment task finished without a result");
-      }
-      
-      try {
-        const parsed = JSON.parse(result) as 
-          | { status: "success"; programId: string }
-          | Record<string, unknown>;
-          
-        if (parsed.status === "success" && typeof parsed.programId === "string") {
-          programId = parsed.programId;
-        }
-      } catch { /* ignore malformed JSON; handled below */ }
-
-      if (!programId) {
-        throw new Error("Deployment task finished without a valid Program ID");
-      }
-    } else {
-      
-      // For wallet-signed deployments, extract programId from graph if available
-      const graphWithConfig = graph as unknown as { deployConfig?: { programId?: string } };
-      if (graphWithConfig.deployConfig?.programId) {
-        programId = graphWithConfig.deployConfig.programId;
-      }
-      
-      // If no programId is available, derive it deterministically
-      if (!programId) {
-        programId = deriveProgramId(projectId).toBase58();
-      }
-    }
-
-    // Copy the Anchor-generated IDL to the frontend idl directory
-    if (programId) {
-
-      try {
-        // Find the program name from the file tree
-        const rootPath = workspace.rootPath ?? (
-          await import("../fileUtils").then(m => m.getProjectRootPath(projectId))
-        );
-
-        // Default program name (same as in handleGenerateCode)
-        const programName = 'my_program'; // Using the same default as in handleGenerateCode
-
-        // Generate a task ID for running commands
-        const idlTaskId = uuidv4();
-
-        // NOTE: no leading \n, use ';' instead of '&&' after `then`
-        const copyIdlCmd =
-          "set -e; " +
-          `cd /usr/src/${rootPath}; ` +
-          "mkdir -p idl; " +
-          `if [ -f target/idl/${programName}.json ]; then ` +
-          // update .metadata.address in-place with jq (no temp file needed)
-          `jq --arg addr '${programId}' '.metadata.address = \\$addr' ` +
-          `target/idl/${programName}.json > idl/solanaflow_token.json; ` +
-          `echo 'IDL copied to idl/solanaflow_token.json'; ` +
-          "else " +
-          `echo '{}' > idl/solanaflow_token.json; ` +
-          `echo 'IDL placeholder generated'; ` +
-          "fi";
-
-        await runCommand(
-          `docker exec ${workspace.containerName} bash -c "${copyIdlCmd}"`,
-          ".",
-          idlTaskId,
-          { skipSuccessUpdate: true }
-        );
-
-        console.log(`[DEPLOY] IDL copied to idl/solanaflow_token.json for program ${programId}`);
-      } catch (error) {
-        console.error("[DEPLOY] IDL copy failed for program", programId, error);
-        // Non-fatal error, continue with deployment
-      }
-    }
-
-    // No completion event needed - we rely on the build completed event
 
   } catch (err) {
     sendProgress(<ProgressEvent>{
