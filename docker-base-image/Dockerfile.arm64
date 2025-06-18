@@ -31,6 +31,8 @@ ENV SCCACHE_BUCKET=solanaflow-cache \
 
 # add Anchor CLI + minimal Node once (not in the base image yet)
 RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
+    --mount=type=cache,id=cargo-registry,target=/root/.cargo/registry,sharing=locked \
+    --mount=type=cache,id=cargo-git,target=/root/.cargo/git,sharing=locked \
     --mount=type=cache,id=sccache,target=/opt/sccache,sharing=locked \
     --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked \
@@ -49,6 +51,8 @@ RUN rustup set profile minimal && rustup default stable
 # warm the BPF / SBF cache once so first user build is instant
 WORKDIR /tmp
 RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
+    --mount=type=cache,id=cargo-registry,target=/root/.cargo/registry,sharing=locked \
+    --mount=type=cache,id=cargo-git,target=/root/.cargo/git,sharing=locked \
     --mount=type=cache,id=sccache,target=/opt/sccache,sharing=locked \
     export CARGO_TARGET_DIR=/usr/src/target && \
     anchor init anchor-template --no-git --no-install \
@@ -71,7 +75,10 @@ RUN solana --version && cargo --version && rustc --version && anchor --version
 FROM solana-toolchain AS chef
 WORKDIR /app
 COPY docker-base-image/Cargo.toml docker-base-image/Cargo.lock docker-base-image/src/ ./
-RUN cargo chef prepare --recipe-path recipe.json
+RUN --mount=type=cache,id=cargo-registry,target=/root/.cargo/registry,sharing=locked \
+    --mount=type=cache,id=cargo-git,target=/root/.cargo/git,sharing=locked \
+    --mount=type=cache,id=sccache,target=/opt/sccache,sharing=locked \
+    cargo chef prepare --recipe-path recipe.json
 
 FROM solana-toolchain AS cooker
 WORKDIR /app
