@@ -20,7 +20,7 @@ import { v4 as uuidv4 } from "uuid";
 
 // ─── unified progress payload ────────────────────────────
 interface ProgressEvent {
-  stage : "environment" | "code-gen" | "build" | "deploy" | "done" | "error";
+  stage : "environment" | "code-gen" | "build" | "done" | "error";
   status: "active" | "completed" | "error";
   message: string;
   pct?: number;
@@ -79,6 +79,13 @@ export async function runDeployPipeline({
     });
     const { sentinelId } =
           await handleGenerateCode({ projectId, graph, workspace, sendProgress, userId });
+
+    // 2 ─ code generation ─────────────────────────────── done
+    sendProgress(<ProgressEvent>{
+      stage: "code-gen",
+      status: "completed",
+      message: "Code generation complete"
+    });
 
     /* 3 ─ build program --------------------------------------------------- */
     console.log("[PIPELINE] ⏳ anchor build started…");
@@ -193,11 +200,6 @@ export async function runDeployPipeline({
     let programId: string | undefined;
     
     if (!walletSigned) {
-      sendProgress(<ProgressEvent>{
-        stage : "deploy",
-        status: "active",
-        message: "Deploying / upgrading…"
-      });
 
       // Calculate deployment timeout from env (default 6 minutes)
       const deployMinutes = MAX_DEPLOY_MINUTES;
@@ -243,11 +245,6 @@ export async function runDeployPipeline({
         throw new Error("Deployment task finished without a valid Program ID");
       }
     } else {
-      sendProgress(<ProgressEvent>{
-        stage  : "deploy",
-        status : "completed",
-        message: "Wallet-signed deploy detected – skipping Anchor deploy step"
-      });
       
       // For wallet-signed deployments, extract programId from graph if available
       const graphWithConfig = graph as unknown as { deployConfig?: { programId?: string } };
@@ -263,11 +260,6 @@ export async function runDeployPipeline({
 
     // Copy the Anchor-generated IDL to the frontend idl directory
     if (programId) {
-      sendProgress(<ProgressEvent>{
-        stage: "deploy",
-        status: "active",
-        message: "Saving Anchor IDL for frontend..."
-      });
 
       try {
         // Find the program name from the file tree
@@ -312,7 +304,7 @@ export async function runDeployPipeline({
 
     // Only include programId in the completion event if we have one
     const completionEvent: ProgressEvent = { 
-      stage: "done", 
+      stage : "done", 
       status: "completed", 
       message: "Deployment complete" 
     } as const;

@@ -39,7 +39,12 @@ export default function ChatChecklistBubble() {
             )}
           </div>
 
-          <Progress value={step.status === "done" ? 100 : step.status === "active" ? 30 : 0} />
+          <Progress
+            value={
+              step.status === "done"   ? 100 :
+              step.status === "active" ? 50  : 0
+            }
+          />
 
           {step.description && (
             <p className="mt-2 text-[11px] text-gray-400">

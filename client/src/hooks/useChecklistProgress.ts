@@ -3,7 +3,7 @@ import eventBus, { ProgressPayload } from "../lib/eventBus";
 
 export interface Step {
   id: number;
-  stage: "environment" | "code-gen" | "build" | "deploy" | "done";
+  stage: "environment" | "code-gen" | "build" | "done";
   title: string;
   description: string;
   status: "pending" | "active" | "done" | "error";
@@ -13,8 +13,7 @@ const INITIAL: Step[] = [
   { id: 0, stage: "environment", title: "Environment", description: "", status: "pending" },
   { id: 1, stage: "code-gen"   , title: "Code gen"   , description: "", status: "pending" },
   { id: 2, stage: "build"      , title: "Build"      , description: "", status: "pending" },
-  { id: 3, stage: "deploy"     , title: "Deploy"     , description: "", status: "pending" },
-  { id: 4, stage: "done"       , title: "Complete"   , description: "", status: "pending" },
+  { id: 3, stage: "done"       , title: "Complete"   , description: "", status: "pending" },
 ];
 
 export function useChecklistProgress() {
