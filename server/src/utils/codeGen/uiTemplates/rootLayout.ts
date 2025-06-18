@@ -1,6 +1,5 @@
-export const ROOT_LAYOUT_TSX = `"use client";
-
-import "../src/globals.css";
+export const ROOT_LAYOUT_TSX = `
+import "./globals.css";
 import { WalletConnectionProvider } from "../src/context/WalletConnectionProvider";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -207,7 +207,8 @@ export const handleGenerateCode = async ({
               type: "directory" as const,
               children: [
                 { name: "page.tsx", path: "./web/app/page.tsx", type: "file" as const, code: HOME_PAGE_TSX },
-                { name: "layout.tsx", path: "./web/app/layout.tsx", type: "file" as const, code: ROOT_LAYOUT_TSX }
+                { name: "layout.tsx", path: "./web/app/layout.tsx", type: "file" as const, code: ROOT_LAYOUT_TSX },
+                { name: "globals.css", path: "./web/app/globals.css", type: "file" as const, code: GLOBALS_CSS }
               ]
             },
             {
@@ -251,8 +252,7 @@ export const handleGenerateCode = async ({
                   children: [
                     { name: "utils.ts", path: "./web/src/lib/utils.ts", type: "file" as const, code: UTILS_TS }
                   ]
-                },
-                { name: "globals.css", path: "./web/src/globals.css", type: "file" as const, code: GLOBALS_CSS }
+                }
               ]
             },
             { name: "tailwind.config.js", path: "./web/tailwind.config.js", type: "file" as const, code: TAILWIND_CONFIG },
