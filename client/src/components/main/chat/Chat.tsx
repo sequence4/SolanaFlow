@@ -127,8 +127,24 @@ const Chat: React.FC = () => {
         // Grab the slice we have not injected yet
         const fresh = systemLogs.slice(lastLogIndex);
 
-        if (fresh.length) {
-            const logMessages: AIMessageType[] = fresh.map(line => ({
+        /* 🔽 skip the environment / progress status lines we don't want in chat */
+        const IGNORE_PREFIXES = [
+          "Preparing your build environment",
+          "Container is up",
+          "Container URL",
+          "Generating Anchor code",
+          "Code generation complete",
+          "Building program",
+          "Linking target/deploy",
+          "Collecting project files"
+        ];
+
+        const visible = fresh.filter(
+          line => !IGNORE_PREFIXES.some(p => line.startsWith(p))
+        );
+
+        if (visible.length) {
+            const logMessages: AIMessageType[] = visible.map(line => ({
                 text: line,
                 sender: 'ai',           // show as if the assistant "thinks out loud"
                 timestamp: new Date(),
