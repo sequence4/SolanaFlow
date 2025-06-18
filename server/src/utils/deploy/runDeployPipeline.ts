@@ -77,7 +77,8 @@ export async function runDeployPipeline({
     
     // Check build status and bail early if not successful
     const buildStatus = await waitForTaskCompletion(buildTask, buildRetries, 2_000);
-    if (buildStatus !== 'succeed' && buildStatus !== 'finished') {
+    const OK_STATUSES = ['succeed', 'finished', 'warning']; // Anchor warns but succeeds
+    if (!OK_STATUSES.includes(buildStatus)) {
       throw new Error(`Build task ended with status: ${buildStatus}`);
     }
     
@@ -120,6 +121,9 @@ export async function runDeployPipeline({
     /* 3b ─ fetch artefact ------------------------------------------------ */
     console.log("[PIPELINE] 📦 fetching artefact (.so) from container");
     const { base64So } = await getBuildArtifactTask(projectId);
+    if (!base64So) {
+      throw new Error('Anchor built with warnings but produced no .so – check build log');
+    }
     console.log("[PIPELINE] 📦 artefact length:", base64So.length);
     
     /* ---------------------------------------------------------------- *

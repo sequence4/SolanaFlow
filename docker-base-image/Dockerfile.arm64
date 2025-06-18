@@ -41,7 +41,7 @@ RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
  && cargo install cargo-chef --version 0.1.64    --locked \
  && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
  && apt-get update -qq \
- && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs curl \
  && apt-get clean && rm -rf /var/lib/apt/lists/* \
  && strip /usr/local/bin/solana*
 
@@ -195,7 +195,8 @@ RUN apt-get update -qq && \
         libssl-dev \
         binutils \
         ca-certificates \
-        jq && \
+        jq \
+        curl && \
     update-ca-certificates && \
     # make sure /usr/bin/cc exists
     ln -sf "$(command -v gcc || command -v clang)" /usr/bin/cc && \
