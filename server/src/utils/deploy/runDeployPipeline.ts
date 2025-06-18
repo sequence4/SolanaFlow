@@ -80,19 +80,19 @@ export async function runDeployPipeline({
     const { sentinelId } =
           await handleGenerateCode({ projectId, graph, workspace, sendProgress, userId });
 
-    // 2 ─ code generation ─────────────────────────────── done
-    sendProgress(<ProgressEvent>{
-      stage: "code-gen",
-      status: "completed",
-      message: "Code generation complete"
-    });
-
     /* 3 ─ build program --------------------------------------------------- */
     console.log("[PIPELINE] ⏳ anchor build started…");
     
     // wait until all src + UI files are on disk
     // allow up to 3 min for large repos (90 × 2 s)
     await waitForTaskCompletion(sentinelId, 90, 2_000);
+
+    // ✅ code-gen really is done now
+    sendProgress(<ProgressEvent>{
+      stage   : "code-gen",
+      status  : "completed",
+      message : "Code generation complete"
+    });
     
     sendProgress(<ProgressEvent>{
       stage: "build",

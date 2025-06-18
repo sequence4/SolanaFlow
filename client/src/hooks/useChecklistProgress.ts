@@ -35,7 +35,7 @@ export function useChecklistProgress() {
             const pct =
               payload.pct ??                       // backend may send exact %
               (payload.status === "completed" ? 100 :
-               payload.status === "active"     ? 50  : 0);
+               payload.status === "active"     ? 0   : 0);
             
             return {
               ...s,

@@ -34,11 +34,11 @@ export default function ChatChecklistBubble() {
             </div>
             {/* NEW – live percentage */}
             <span className="text-[10px] font-mono text-gray-400">
-              {step.pct ?? (step.status === "done" ? 100 : step.status === "active" ? 50 : 0)}%
+              {step.pct ?? 0}%
             </span>
           </div>
 
-          <Progress value={step.pct ?? (step.status === "done" ? 100 : step.status === "active" ? 50 : 0)} />
+          <Progress value={step.pct ?? 0} />
 
           {step.description && (
             <p className="mt-2 text-[11px] text-gray-400">

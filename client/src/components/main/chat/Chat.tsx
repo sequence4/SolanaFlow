@@ -160,6 +160,18 @@ const Chat: React.FC = () => {
         console.log('Wallet public key:', publicKey?.toBase58() || 'Not connected');
     }, [connected, publicKey]);
 
+    // Listen for build completion and re-enable toast notifications
+    useEffect(() => {
+        const onMsg = (payload: any) => {
+            if (payload.stage === "build" && payload.status === "completed") {
+                taskLogs.setSuppressToast(false);   // re-enable after the very last event
+            }
+        };
+        
+        eventBus.on("progress", onMsg);
+        return () => eventBus.off("progress", onMsg);
+    }, [taskLogs]);
+
     const sendMessage = async () => {
         const trimmed = input.trim().toLowerCase();
         if (trimmed === 'build') {
