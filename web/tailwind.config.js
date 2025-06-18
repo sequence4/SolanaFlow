@@ -15,7 +15,18 @@ module.exports = {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
         },
+        brand: {
+          DEFAULT: 'hsl(var(--brand-primary-hsl))',
+          hover: 'hsl(var(--brand-primary-hover-hsl))',
+        },
       },
+      borderRadius: {
+        lg: 'var(--radius-lg)',
+        md: 'var(--radius-md)',
+      },
+      boxShadow: {
+        soft: 'var(--shadow-sm)',
+      }
     },
   },
   plugins: [],
