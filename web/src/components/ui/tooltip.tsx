@@ -13,12 +13,7 @@ const TooltipProvider = TooltipPrimitive.Provider
 /* ------------------------------------------------------------------
    Root component (wraps Trigger + Content)
 -------------------------------------------------------------------*/
-const Tooltip = React.forwardRef<
-  React.ElementRef<typeof TooltipPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Root>
->(({ ...props }, ref) => (
-  <TooltipPrimitive.Root ref={ref} {...props} />
-))
+const Tooltip = TooltipPrimitive.Root
 Tooltip.displayName = "Tooltip"
 
 /* ------------------------------------------------------------------
