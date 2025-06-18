@@ -18,6 +18,16 @@ import path from "path";
 import { attachFileContents } from "../fileUtils/attachFileContents";
 import { v4 as uuidv4 } from "uuid";
 
+// ── NEW – unified progress event ───────────────────────────────
+interface ProgressEvent {
+  stage: "environment" | "code-gen" | "build" | "deploy" | "done" | "error";
+  status: "active" | "completed" | "error";
+  message: string;
+  pct?: number;
+  [extra: string]: unknown;
+}
+// ────────────────────────────────────────────────────────────────
+
 // TODO: chunk really large fileTree payloads (> ~16 MB) – Chrome drops giant SSE frames.
 
 const MAX_BUILD_MINUTES = Number(process.env.MAX_BUILD_MINUTES) || 15;
@@ -40,7 +50,11 @@ export async function runDeployPipeline({
   sendProgress,
   walletSigned = false,
 }: PipelineArgs): Promise<void> {
-  sendProgress({ stage: "environment", message: "Preparing your build environment…" });
+  sendProgress(<ProgressEvent>{
+    stage: "environment",
+    status: "active",
+    message: "Preparing your build environment…"
+  });
 
   // declare outside try so `finally` can see it
   let workspace: WorkspaceHandle | null = null;
@@ -49,15 +63,20 @@ export async function runDeployPipeline({
     workspace = await prepEnv(projectId, userId);
 
     // emit the container URL so the UI can tune in
-    sendProgress({
-      stage: "container-ready",
-      containerUrl: workspace.containerUrl,
-      message: "Container is up"
+    sendProgress(<ProgressEvent>{
+      stage: "environment",
+      status: "completed",
+      message: "Container is up",
+      containerUrl: workspace.containerUrl
     });
  
     
     // 2 ─ code generation ─────────────────────────────────────────────────
-    sendProgress({ stage: "code-gen", message: "Generating Anchor code…" });
+    sendProgress(<ProgressEvent>{
+      stage: "code-gen",
+      status: "active",
+      message: "Generating Anchor code…"
+    });
     const { sentinelId } =
           await handleGenerateCode({ projectId, graph, workspace, sendProgress, userId });
 
@@ -68,7 +87,11 @@ export async function runDeployPipeline({
     // allow up to 3 min for large repos (90 × 2 s)
     await waitForTaskCompletion(sentinelId, 90, 2_000);
     
-    sendProgress({ stage: "build-started", message: "Building program…" });
+    sendProgress(<ProgressEvent>{
+      stage: "build",
+      status: "active",
+      message: "Building program…"
+    });
     const buildTask = await startAnchorBuildTask(projectId, userId);
     
     // Compute retry count based on configured build timeout
@@ -129,7 +152,11 @@ export async function runDeployPipeline({
     /* ---------------------------------------------------------------- *
      * 3c ─ build finished → gather file-tree with eager code
      * ---------------------------------------------------------------- */
-    sendProgress({ stage: "file-tree-start", message: "Collecting project files…" });
+    sendProgress(<ProgressEvent>{
+      stage: "build",
+      status: "active",
+      message: "Collecting project files…"
+    });
 
     // (1) build the raw tree via the existing utility
     const rootPath = workspace.rootPath ?? (
@@ -153,18 +180,23 @@ export async function runDeployPipeline({
     const fileTree = rawTree;  // now populated
 
     /* finally emit build-done with artefact + file tree */
-    sendProgress({
-      stage   : "build-done",
+    sendProgress(<ProgressEvent>{
+      stage   : "build",
+      status  : "completed",
       message : "Build finished",
       artifact: base64So,
-      fileTree                       // <= NEW
+      fileTree
     });
 
     /* 4 ─ deploy --------------------------------------------------------- */
     let programId: string | undefined;
     
     if (!walletSigned) {
-      sendProgress({ stage: "deploy", message: "Deploying / upgrading…" });
+      sendProgress(<ProgressEvent>{
+        stage : "deploy",
+        status: "active",
+        message: "Deploying / upgrading…"
+      });
 
       // Calculate deployment timeout from env (default 6 minutes)
       const deployMinutes = MAX_DEPLOY_MINUTES;
@@ -210,9 +242,10 @@ export async function runDeployPipeline({
         throw new Error("Deployment task finished without a valid Program ID");
       }
     } else {
-      sendProgress({
-        stage   : "deploy-skipped",
-        message : "Wallet-signed deploy detected – skipping Anchor deploy step"
+      sendProgress(<ProgressEvent>{
+        stage  : "deploy",
+        status : "completed",
+        message: "Wallet-signed deploy detected – skipping Anchor deploy step"
       });
       
       // For wallet-signed deployments, extract programId from graph if available
@@ -229,8 +262,9 @@ export async function runDeployPipeline({
 
     // Copy the Anchor-generated IDL to the frontend idl directory
     if (programId) {
-      sendProgress({
-        stage: "copy-idl",
+      sendProgress(<ProgressEvent>{
+        stage: "deploy",
+        status: "active",
         message: "Saving Anchor IDL for frontend..."
       });
 
@@ -276,8 +310,9 @@ export async function runDeployPipeline({
     }
 
     // Only include programId in the completion event if we have one
-    const completionEvent: Record<string, unknown> = {
-      stage: "done",
+    const completionEvent: ProgressEvent = {
+      stage  : "done",
+      status : "completed",
       message: "Deployment complete"
     };
     
@@ -287,6 +322,13 @@ export async function runDeployPipeline({
 
     sendProgress(completionEvent);
 
+  } catch (err) {
+    sendProgress(<ProgressEvent>{
+      stage: "error",
+      status: "error",
+      message: err instanceof Error ? err.message : String(err)
+    });
+    throw err;
   } finally {
     /* ----------------------------------------------------------------
      * Queue container for later cleanup instead of immediate deletion

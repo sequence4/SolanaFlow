@@ -42,6 +42,7 @@ import {
   Trash2
 } from "lucide-react";
 import MarkdownRenderer from '@/components/main/code/markdown/MarkdownRenderer';
+import ChatChecklistBubble from './ChatChecklistBubble';
 
 export interface AIMessageType {
   text: string;
@@ -49,7 +50,8 @@ export interface AIMessageType {
   files?: FileTreeItemType[];
   timestamp?: Date;
   status?: 'sending' | 'sent' | 'error';
-  isLogLine?: boolean;       
+  isLogLine?: boolean;
+  isChecklist?: boolean;
 }
 
 const Chat: React.FC = () => {
@@ -115,6 +117,12 @@ const Chat: React.FC = () => {
     // ───────────────────────────────────────────────────────────────────────────
     useEffect(() => {
         if (!systemLogs?.length) return;
+        
+        // Suppress log spam while building
+        if (taskLogs.isBuilding || messages.some(m => m.isChecklist)) {
+          setLastLogIndex(systemLogs.length); // swallow logs
+          return;
+        }
 
         // Grab the slice we have not injected yet
         const fresh = systemLogs.slice(lastLogIndex);
@@ -133,7 +141,7 @@ const Chat: React.FC = () => {
             // Ensure scroll sticks to bottom
             scrollToBottom();
         }
-    }, [systemLogs, lastLogIndex]);
+    }, [systemLogs, lastLogIndex, taskLogs.isBuilding, messages]);
 
     const fetchFileContent = async (projectId: string, filePath: string): Promise<string> => {
         try {
@@ -161,10 +169,11 @@ const Chat: React.FC = () => {
           // 2) forward build command globally
           eventBus.emit('chat-build-command');
 
-          // 3) still echo the user message in the thread
+          // 3) insert checklist bubble before returning
           setMessages(prev => [
             ...prev,
-            { text: input, sender: 'user', timestamp: new Date(), status: 'sent' }
+            { text: input, sender: 'user', timestamp: new Date(), status: 'sent' },
+            { text: "", sender: 'ai', isChecklist: true, timestamp: new Date(), status: 'sent' }
           ]);
           setInput('');
           return;                             // stop normal AI flow
@@ -405,7 +414,9 @@ const Chat: React.FC = () => {
                                                     </div>
                                                 )}
                                                 <div className="leading-relaxed">
-                                                    <MarkdownRenderer content={message.text} />
+                                                    {message.isChecklist
+                                                        ? <ChatChecklistBubble />
+                                                        : <MarkdownRenderer content={message.text} />}
                                                 </div>
                                             </div>
                                         </div>
