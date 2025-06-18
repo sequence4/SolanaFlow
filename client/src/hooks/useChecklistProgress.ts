@@ -3,17 +3,17 @@ import eventBus, { ProgressPayload } from "../lib/eventBus";
 
 export interface Step {
   id: number;
-  stage: "environment" | "code-gen" | "build" | "done";
+  stage: "environment" | "code-gen" | "build";
   title: string;
   description: string;
   status: "pending" | "active" | "done" | "error";
+  pct?: number;
 }
 
 const INITIAL: Step[] = [
   { id: 0, stage: "environment", title: "Environment", description: "", status: "pending" },
   { id: 1, stage: "code-gen"   , title: "Code gen"   , description: "", status: "pending" },
   { id: 2, stage: "build"      , title: "Build"      , description: "", status: "pending" },
-  { id: 3, stage: "done"       , title: "Complete"   , description: "", status: "pending" },
 ];
 
 export function useChecklistProgress() {
@@ -31,10 +31,17 @@ export function useChecklistProgress() {
                 : payload.status === "error"
                 ? "error"
                 : "active";
+            
+            const pct =
+              payload.pct ??                       // backend may send exact %
+              (payload.status === "completed" ? 100 :
+               payload.status === "active"     ? 50  : 0);
+            
             return {
               ...s,
               status: nextStatus,
               description: payload.message ?? s.description,
+              pct
             };
           }
           return s;

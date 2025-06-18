@@ -20,7 +20,7 @@ import { v4 as uuidv4 } from "uuid";
 
 // ─── unified progress payload ────────────────────────────
 interface ProgressEvent {
-  stage : "environment" | "code-gen" | "build" | "done" | "error";
+  stage : "environment" | "code-gen" | "build" | "error";
   status: "active" | "completed" | "error";
   message: string;
   pct?: number;
@@ -302,18 +302,7 @@ export async function runDeployPipeline({
       }
     }
 
-    // Only include programId in the completion event if we have one
-    const completionEvent: ProgressEvent = { 
-      stage : "done", 
-      status: "completed", 
-      message: "Deployment complete" 
-    } as const;
-    
-    if (programId) {
-      completionEvent.programId = programId;
-    }
-
-    sendProgress(completionEvent);
+    // No completion event needed - we rely on the build completed event
 
   } catch (err) {
     sendProgress(<ProgressEvent>{
