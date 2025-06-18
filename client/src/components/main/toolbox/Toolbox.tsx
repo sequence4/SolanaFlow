@@ -168,9 +168,10 @@ export const Toolbox = () => {
               setActiveTab('code');
             }
             
-            if (msg.stage === "done" || msg.stage === "build-done") {
+            if (msg.stage === "build" && msg.status === "completed") {
               setIsBuilding(false);
               esRef.current?.close();
+              eventBus.emit("build-complete");
             }
           },
           true                                    // walletSigned

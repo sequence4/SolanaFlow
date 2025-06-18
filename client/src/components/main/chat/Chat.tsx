@@ -143,6 +143,26 @@ const Chat: React.FC = () => {
         }
     }, [systemLogs, lastLogIndex, taskLogs.isBuilding, messages]);
 
+    // ———————————————————————————————
+    //  Inject a friendly AI note once the build completes
+    // ———————————————————————————————
+    useEffect(() => {
+        const onComplete = () => {
+            setMessages(prev => [
+                ...prev,
+                {
+                    text: "✅ Build finished successfully! Let me know what you'd like to do next.",
+                    sender: "ai",
+                    timestamp: new Date(),
+                    status: "sent"
+                }
+            ]);
+            taskLogs.setSuppressToast(false);      // re-enable normal task-log toasts
+        };
+        eventBus.on("build-complete", onComplete);
+        return () => eventBus.off("build-complete", onComplete);
+    }, [taskLogs]);
+
     const fetchFileContent = async (projectId: string, filePath: string): Promise<string> => {
         try {
             const data = await fileApi.getFileContent(projectId, filePath);
@@ -339,7 +359,7 @@ const Chat: React.FC = () => {
 
     return (
         <div
-            className={`flex flex-col w-[25%] ${isExpanded ? "fixed inset-4 z-50" : "h-full"} transition-all duration-300 ease-in-out`}
+            className={`flex flex-col w-[32%] ${isExpanded ? "fixed inset-4 z-50" : "h-full"} transition-all duration-300 ease-in-out`}
         >
             <div className="flex flex-col h-full bg-[#0e0e12] overflow-hidden border border-[#232329] shadow-2xl">
                 {/* Header */}
