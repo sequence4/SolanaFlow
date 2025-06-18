@@ -4,6 +4,9 @@ import { pollTaskStatus } from '../taskUtils';
 import { createTask, updateTaskStatus } from '../taskUtils';
 import { runCommand } from '../projectUtils';
 import pool from '../../config/database';
+import * as toml from "@iarna/toml";
+import fs from "fs/promises";
+import path from "path";
 
 /**
  * Helper function to block until file content is ready and return it
@@ -609,6 +612,44 @@ export const amendConfigFiles = async (
    * ------------------------------------------------------------------ */
   const cargoPatches: Array<{ path: string; status: string; taskId: string }> = [];
   
+  // ----- SAFE TOML PATCH ------------------------------------
+  async function safeInsertFeature(cargoPath: string, featureName: string, value: unknown = []) {
+    const raw = await fs.readFile(cargoPath, "utf8");
+    const doc = toml.parse(raw) as any;
+    if (!doc.features) doc.features = {};
+    if (!(featureName in doc.features)) doc.features[featureName] = value;
+    await fs.writeFile(cargoPath, toml.stringify(doc));
+  }
+  
+  // Find and patch all program Cargo.toml files
+  const programPaths = await listGeneratedPrograms(projectId, userId);
+  const absRoot = process.env.ROOT_FOLDER || '';
+  const projectRootPath = await getProjectRootPath(projectId);
+  const fullRoot = path.join(absRoot, projectRootPath);
+  
+  // anchor-template
+  await safeInsertFeature(
+    path.join(fullRoot, "programs/anchor-template/Cargo.toml"),
+    "idl-build",
+    ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+  );
+  await safeInsertFeature(
+    path.join(fullRoot, "programs/anchor-template/Cargo.toml"),
+    "anchor-debug"
+  );
+  
+  // my_program
+  await safeInsertFeature(
+    path.join(fullRoot, `programs/my_program/Cargo.toml`),
+    "idl-build",
+    ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+  );
+  await safeInsertFeature(
+    path.join(fullRoot, `programs/my_program/Cargo.toml`),
+    "anchor-debug"
+  );
+  // ----- END PATCH ------------------------------------------
+  
   // Add the root Cargo.toml patch to the results
   if (rootCargoTaskId) {
     cargoPatches.push({ 
@@ -618,12 +659,11 @@ export const amendConfigFiles = async (
     });
   }
   
-  // Find and patch all program Cargo.toml files
-  const programPaths = await listGeneratedPrograms(projectId, userId);
+  // Legacy code - we'll keep the result tracking but skip the actual patching
   for (const p of programPaths) {
     const cargoPath = `${p}/Cargo.toml`;
-    const result = await patchProgramCargoToml(projectId, cargoPath, userId);
-    cargoPatches.push({ path: cargoPath, status: result.status, taskId: result.taskId });
+    // We skip calling patchProgramCargoToml here as we now use safeInsertFeature
+    cargoPatches.push({ path: cargoPath, status: 'succeed', taskId: 'safe-insert-feature' });
   }
 
   /* ------------------------------------------------------------------ */

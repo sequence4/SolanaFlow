@@ -184,6 +184,16 @@ export function validateManifest(content: string, path: string, isRoot: boolean)
     .split('\n')
     .map(removeComments)
     .filter(Boolean);
+    
+  // Check for duplicate feature keys
+  try {
+    const parsedToml = require('@iarna/toml').parse(content);
+    if (parsedToml.features && new Set(Object.keys(parsedToml.features)).size !== Object.keys(parsedToml.features).length) {
+      throw new Error(`duplicate feature keys in ${path}`);
+    }
+  } catch (error) {
+    issues.push(`${path}: ${error instanceof Error ? error.message : String(error)}`);
+  }
   
   // Validate different things based on whether it's the root or a crate
   if (isRoot) {

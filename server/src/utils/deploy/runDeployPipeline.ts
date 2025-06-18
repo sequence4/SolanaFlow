@@ -18,15 +18,15 @@ import path from "path";
 import { attachFileContents } from "../fileUtils/attachFileContents";
 import { v4 as uuidv4 } from "uuid";
 
-// ── NEW – unified progress event ───────────────────────────────
+// ─── unified progress payload ────────────────────────────
 interface ProgressEvent {
-  stage: "environment" | "code-gen" | "build" | "deploy" | "done" | "error";
+  stage : "environment" | "code-gen" | "build" | "deploy" | "done" | "error";
   status: "active" | "completed" | "error";
   message: string;
   pct?: number;
-  [extra: string]: unknown;
+  [k: string]: unknown;           // allow artefact / containerUrl etc.
 }
-// ────────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────
 
 // TODO: chunk really large fileTree payloads (> ~16 MB) – Chrome drops giant SSE frames.
 
@@ -117,8 +117,9 @@ export async function runDeployPipeline({
           m.getProjectRootPath(projectId)
         ));
 
-      sendProgress({
-        stage: "link-so",
+      sendProgress(<ProgressEvent>{
+        stage: "build",
+        status: "active",
         message: "Linking target/deploy → /usr/src/target/deploy"
       });
 
@@ -310,11 +311,11 @@ export async function runDeployPipeline({
     }
 
     // Only include programId in the completion event if we have one
-    const completionEvent: ProgressEvent = {
-      stage  : "done",
-      status : "completed",
-      message: "Deployment complete"
-    };
+    const completionEvent: ProgressEvent = { 
+      stage: "done", 
+      status: "completed", 
+      message: "Deployment complete" 
+    } as const;
     
     if (programId) {
       completionEvent.programId = programId;
