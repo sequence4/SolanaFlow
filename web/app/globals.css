@@ -22,9 +22,10 @@
     /* Shadows */
     --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.08);
 
-    /* Field accent color */
+    /* Field accent colour */
     --field-accent: rgba(160, 210, 255, 0.15);
 
+    /* ShadCN-style design-system tokens (light) */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
@@ -53,6 +54,7 @@
   }
 
   .dark {
+    /* Dark-mode overrides (unchanged) */
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
     --card: 222.2 84% 4.9%;
@@ -81,35 +83,18 @@
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-    font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
-  }
+  *   { @apply border-border; }
+  body{ @apply bg-background text-foreground; font-family:"Inter",ui-sans-serif,system-ui,sans-serif; }
 }
 
-/* Custom wallet adapter button styles */
-.wallet-adapter-button {
-  background: linear-gradient(135deg, #a0d2ff 0%, #d3c1ff 100%) !important;
-  border-radius: 9999px !important;
-  padding: 8px 24px !important;
-  color: white !important;
-  font-weight: 500 !important;
-  transition: all 0.3s ease !important;
-  box-shadow: 0 4px 12px rgba(160, 210, 255, 0.3) !important;
-}
+/* Custom wallet-adapter button tweaks */
+.wallet-adapter-button            { @apply rounded-full font-medium px-6 py-2 text-white transition-all shadow-lg; background:var(--brand-primary); }
+.wallet-adapter-button:hover      { background:var(--brand-primary-hover); transform:scale(1.05); }
+.wallet-adapter-button:disabled   { opacity:.6; transform:none; }
 
-.wallet-adapter-button:hover {
-  background: linear-gradient(135deg, #92c2ff 0%, #c0b4ff 100%) !important;
-  transform: scale(1.05) !important;
-}
-
-.wallet-adapter-button:disabled {
-  opacity: 0.6 !important;
-  transform: none !important;
-}
+/* Small animation utility */
+@keyframes fadeInUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:none} }
+.animate-fade-in    { animation:fadeInUp .3s ease-out; }
 
 /* Animation for reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
@@ -118,20 +103,4 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
-}
-
-/* Card fade-in animation */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fade-in {
-  animation: fadeInUp 0.3s ease-out;
 } 
