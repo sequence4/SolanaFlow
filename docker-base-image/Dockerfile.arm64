@@ -118,6 +118,7 @@ ENV NEXT_TELEMETRY_DISABLED=1 NEXT_SKIP_ESLINT=1
 ENV NEXT_PRIVATE_STANDALONE=true
 # copy the web/ directory that already exists in the repo
 COPY web/ /usr/share/solanaflow/web
+RUN mkdir -p /usr/share/solanaflow/web/public
 
 # install deps and build once
 RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing=locked \

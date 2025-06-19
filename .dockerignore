@@ -1,5 +1,13 @@
-# keep build slim
+# ── keep build slim ────────────────────────────────
 *.log
 node_modules/
 target/
 cache-seed/
+
+# ── re-include the Next.js app & its public assets ─
+!web/                 # bring the whole web directory back in
+!web/**
+
+# keep public folder (and any files it will hold)
+!web/public
+!web/public/**
