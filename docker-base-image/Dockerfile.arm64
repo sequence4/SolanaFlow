@@ -170,9 +170,11 @@ COPY --from=solana-toolchain /root/.rustup /root/.rustup
 COPY --from=builder /tmp/standalone \
                     /usr/share/solanaflow/web/.next/standalone
 
-# ② expose the same bundle through a symlink (saves space, keeps paths consistent)
-RUN mkdir -p /usr/share/solanaflow/web/.next/standalone/_next && \
-    ln -s /usr/share/solanaflow/web/.next/standalone/_next/static \
+# ② static assets ─ copy first, then publish via symlink
+COPY --from=builder /usr/share/solanaflow/web/.next/static \
+                    /usr/share/solanaflow/web/.next/standalone/_next/static
+
+RUN ln -s /usr/share/solanaflow/web/.next/standalone/_next/static \
           /usr/share/solanaflow/web/.next/static
 
 # ③ public assets (favicon, images…)
