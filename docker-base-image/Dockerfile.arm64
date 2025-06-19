@@ -135,7 +135,8 @@ RUN echo 'Preview of .next layout:' && \
 RUN STANDALONE_DIR=$(dirname "$(find /usr/share/solanaflow/web/.next -name server.js -print -quit)") && \
     test -n "$STANDALONE_DIR" || (echo '❌  server.js not found' && exit 1) && \
     echo "✔ Found server.js in $STANDALONE_DIR" && \
-    cp -a "$STANDALONE_DIR" /tmp/standalone
+    mkdir -p /tmp/standalone && \
+    cp -a "$STANDALONE_DIR"/. /tmp/standalone
 
 # create a separate stage for seeding the target volume
 FROM solana-toolchain AS seed-target
