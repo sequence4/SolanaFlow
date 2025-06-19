@@ -136,7 +136,9 @@ RUN STANDALONE_ROOT=$(dirname "$(find /usr/share/solanaflow/web/.next -name serv
     test -n "$STANDALONE_ROOT" && echo "✔ Found standalone directory at $STANDALONE_ROOT" || \
         (echo '❌  server.js (standalone) not found. Is output: \"standalone\" set?' && exit 1) && \
     mkdir -p /tmp/standalone && \
-    cp -a "$STANDALONE_ROOT"/. /tmp/standalone
+    cp -a "$STANDALONE_ROOT"/. /tmp/standalone && \
+    mkdir -p /tmp/standalone/.next && \
+    cp -a /usr/share/solanaflow/web/.next/static /tmp/standalone/.next/
 
 # create a separate stage for seeding the target volume
 FROM solana-toolchain AS seed-target
@@ -169,11 +171,7 @@ COPY --from=solana-toolchain /root/.rustup /root/.rustup
 COPY --from=builder /tmp/standalone \
                     /usr/share/solanaflow/web/.next/standalone
 
-# ② static chunks (CSS / JS)
-COPY --from=builder /usr/share/solanaflow/web/.next/static \
-                    /usr/share/solanaflow/web/.next/standalone/.next/static
-
-# ③ public assets (favicon, OG images…)
+# ② public assets (favicon, OG images…)
 COPY --from=builder /usr/share/solanaflow/web/public \
                     /usr/share/solanaflow/web/.next/standalone/public
 
