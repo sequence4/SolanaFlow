@@ -130,10 +130,7 @@ RUN echo 'Preview of .next layout:' && \
     find /usr/share/solanaflow/web/.next -maxdepth 3 -type f | head -n 30
 
 # sanity-check: make sure the stand-alone entry exists
-# succeed if either the flat or the nested layout exists
-RUN ( \
-      test -f /usr/share/solanaflow/web/.next/standalone/server.js \
-   || test -f /usr/share/solanaflow/web/.next/standalone/web/server.js )
+RUN find /usr/share/solanaflow/web/.next/standalone -name server.js -print -quit | grep -q .
 
 # create a separate stage for seeding the target volume
 FROM solana-toolchain AS seed-target
