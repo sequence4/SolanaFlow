@@ -131,20 +131,22 @@ RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing
 RUN echo 'Preview of .next layout:' && \
     find /usr/share/solanaflow/web/.next -maxdepth 3 -type f | head -n 30
 
-# Locate server.js anywhere under .next, then copy its parent dir
+# ─────────────────────────────────────────────────────────────────────────────
 RUN STANDALONE_ROOT=$(dirname "$(find /usr/share/solanaflow/web/.next -name server.js -print -quit)") && \
     test -n "$STANDALONE_ROOT" && echo "✔ Found standalone directory at $STANDALONE_ROOT" || \
-        (echo '❌  server.js (standalone) not found. Is output: \"standalone\" set?' && exit 1) && \
+        (echo '❌  server.js (standalone) not found. Is output: "standalone" set?' && exit 1) && \
     mkdir -p /tmp/standalone && \
     cp -a "$STANDALONE_ROOT"/. /tmp/standalone && \
-    # ── add compiled Tailwind / JS chunks into the standalone tree ──────────────
-    # In cached layers .next/static may be missing, so copy it only if present.
-    if [ -d /usr/share/solanaflow/web/.next/static ]; then
-      mkdir -p /tmp/standalone/.next
-      cp -a /usr/share/solanaflow/web/.next/static /tmp/standalone/.next/
-    else
-      echo "⚠️  .next/static not found in this layer (cached build) – skipping copy"
+    \
+    # add compiled Tailwind / JS chunks into the standalone tree ────────────── \
+    # In cached layers .next/static may be missing, so copy it only if present. \
+    if [ -d /usr/share/solanaflow/web/.next/static ]; then \
+        mkdir -p /tmp/standalone/.next && \
+        cp -a /usr/share/solanaflow/web/.next/static /tmp/standalone/.next/ ; \
+    else \
+        echo "⚠️  .next/static not found in this layer (cached build) – skipping copy" ; \
     fi
+# ─────────────────────────────────────────────────────────────────────────────
 
 # create a separate stage for seeding the target volume
 FROM solana-toolchain AS seed-target
