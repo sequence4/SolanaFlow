@@ -165,9 +165,10 @@ COPY --from=builder /usr/share/solanaflow/web/.next/standalone \
 COPY --from=builder /usr/share/solanaflow/web/.next/static \
                     /usr/share/solanaflow/web/.next/static
 
-# ③ static assets ─ location the standalone server actually serves ➜ _next/static
-COPY --from=builder /usr/share/solanaflow/web/.next/static \
-                    /usr/share/solanaflow/web/.next/standalone/_next/static
+# ③ expose the same bundle through a symlink (saves space, keeps paths consistent)
+RUN mkdir -p /usr/share/solanaflow/web/.next/standalone/_next && \
+    ln -s /usr/share/solanaflow/web/.next/static \
+          /usr/share/solanaflow/web/.next/standalone/_next/static
 
 # ④ public assets (favicon, images…)
 COPY --from=builder /usr/share/solanaflow/web/public \
