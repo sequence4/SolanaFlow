@@ -166,18 +166,21 @@ COPY --from=solana-toolchain /root/.rustup /root/.rustup
 #   web/.next/static/…       (css/js chunks, fonts, images…)
 #   web/public/…             (static public assets)
 
-# ① server code — copy the folder we staged at /tmp/standalone
+# ① server bundle — copy the folder we staged at /tmp/standalone
 COPY --from=builder /tmp/standalone \
                     /usr/share/solanaflow/web/.next/standalone
 
-# ② static assets ─ copy first, then publish via symlink
+# ② static assets  
+#    • place them **inside** the standalone tree  
+#    • expose the usual top-level `/_next/static` path with one symlink  
+#     (this avoids the "404 on CSS/JS" problem you observed)
 COPY --from=builder /usr/share/solanaflow/web/.next/static \
                     /usr/share/solanaflow/web/.next/standalone/_next/static
 
-RUN ln -s /usr/share/solanaflow/web/.next/standalone/_next/static \
-          /usr/share/solanaflow/web/.next/static
+RUN ln -sf /usr/share/solanaflow/web/.next/standalone/_next/static \
+           /usr/share/solanaflow/web/.next/static
 
-# ③ public assets (favicon, images…)
+# ③ public assets (favicon, OG images…)
 COPY --from=builder /usr/share/solanaflow/web/public \
                     /usr/share/solanaflow/web/.next/standalone/public
 
@@ -225,6 +228,7 @@ RUN ln -sf /bin/bash /bin/sh
 SHELL ["/bin/bash","-c"]
 
 EXPOSE 3000
-# Entrypoint - run from the web root so that "_next/static" & "public" resolve
+# Entrypoint – run from the web root so that "_next/static" & "public" resolve
 WORKDIR /usr/share/solanaflow/web
-CMD ["bash", "-c", "node $(find /usr/share/solanaflow/web/.next/standalone -name server.js)"]
+# NB: we exec the exact server.js we copied above
+CMD ["bash","-c","node $(find /usr/share/solanaflow/web/.next/standalone -name server.js)"]
