@@ -1,9 +1,22 @@
 // Simplified toast hook for the demo
-import { useToast as useToastOriginal } from "@/components/ui/toast"
 
-export const toast = (props: any) => {
-  const { toast } = useToastOriginal()
-  return toast(props)
+export interface ToastProps {
+  title?: string;
+  description?: string;
+  variant?: "default" | "destructive";
 }
 
-export { useToastOriginal as useToast } 
+export const useToast = () => {
+  const toast = (props: ToastProps) => {
+    // In a real implementation, this would show a toast notification
+    console.log("Toast:", props);
+  }
+  
+  return { toast }
+}
+
+export const toast = (props: ToastProps) => {
+  console.log("Toast:", props);
+  // In a real implementation, this would show a toast notification
+  return props;
+} 

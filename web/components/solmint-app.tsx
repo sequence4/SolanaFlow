@@ -3,16 +3,42 @@
 import { useState } from "react"
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui"
 import { useWallet } from "@solana/wallet-adapter-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { toast } from "@/hooks/use-toast"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
+import { Button } from "./ui/button"
+import { Badge } from "./ui/badge"
+import { toast } from "../hooks/use-toast"
 import { Copy, ExternalLink, Info, Moon, Sun, Loader2 } from "lucide-react"
 import { useTheme } from "next-themes"
+
+// Create simplified versions of components we're missing
+interface LabelProps extends React.LabelHTMLAttributes<HTMLLabelElement> {
+  htmlFor?: string;
+}
+
+const Label = ({ className = "", htmlFor, ...props }: LabelProps) => (
+  <label htmlFor={htmlFor} className={`text-sm font-medium ${className}`} {...props} />
+)
+
+const Input = ({ className = "", ...props }: React.InputHTMLAttributes<HTMLInputElement>) => (
+  <input className={`rounded-md border px-3 py-2 ${className}`} {...props} />
+)
+
+interface AlertProps extends React.HTMLAttributes<HTMLDivElement> {
+  variant?: string;
+}
+
+const Alert = ({ className = "", children, variant, ...props }: AlertProps) => (
+  <div className={`bg-blue-50 border border-blue-200 p-3 rounded-md ${variant === 'destructive' ? 'bg-red-50 border-red-200 text-red-700' : ''} ${className}`} {...props}>{children}</div>
+)
+
+const AlertDescription = ({ className = "", ...props }: React.HTMLAttributes<HTMLParagraphElement>) => (
+  <p className={`text-sm ${className}`} {...props} />
+)
+
+const TooltipProvider = ({ children }: { children: React.ReactNode }) => <>{children}</>
+const Tooltip = ({ children }: { children: React.ReactNode }) => <>{children}</>
+const TooltipTrigger = ({ children }: { children: React.ReactNode }) => <>{children}</>
+const TooltipContent = ({ children }: { children: React.ReactNode }) => <>{children}</>
 
 export default function SolMintApp() {
   const { publicKey, connected } = useWallet()

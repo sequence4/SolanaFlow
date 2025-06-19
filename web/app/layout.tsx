@@ -2,9 +2,8 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 
-import { ThemeProvider }        from "@/components/theme-provider"
-import { Toaster }              from "@/components/ui/toaster"
-import { WalletContextProvider } from "@/components/wallet-context-provider"
+import { ThemeProvider } from "../components/theme-provider"
+import { WalletContextProvider } from "../components/wallet-context-provider"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -20,7 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           <WalletContextProvider>
             {children}
-            <Toaster />
+            <div id="toast-container" className="fixed top-0 right-0 p-4 z-50" />
           </WalletContextProvider>
         </ThemeProvider>
       </body>
