@@ -113,7 +113,7 @@ RUN . "$NVM_DIR/nvm.sh" \
  && nvm alias default ${NODE_VERSION} \
  && if ! command -v yarn >/dev/null 2>&1 ; then npm i -g yarn@1 ; fi
 
-ENV NEXT_TELEMETRY_DISABLED=1 NEXT_SKIP_ESLINT=1
+ENV NEXT_TELEMETRY_DISABLED=1 NEXT_SKIP_ESLINT=1 NEXT_PRIVATE_STANDALONE=true
 # copy the web/ directory that already exists in the repo
 COPY web/ /usr/share/solanaflow/web
 # bump this from the CLI to bust the build cache whenever web/ changes
@@ -169,7 +169,11 @@ COPY --from=solana-toolchain /root/.rustup /root/.rustup
 COPY --from=builder /tmp/standalone \
                     /usr/share/solanaflow/web/.next/standalone
 
-# ② create symlink for top-level static path (points to assets already in standalone)
+# ② static chunks (CSS/JS)
+COPY --from=builder /usr/share/solanaflow/web/.next/static \
+                    /usr/share/solanaflow/web/.next/standalone/_next/static
+
+# ③ create symlink for top-level static path (points to assets already in standalone)
 RUN mkdir -p /usr/share/solanaflow/web/.next && \
     ln -sf /usr/share/solanaflow/web/.next/standalone/_next/static \
            /usr/share/solanaflow/web/.next/static
