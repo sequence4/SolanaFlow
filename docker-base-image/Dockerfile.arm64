@@ -125,8 +125,15 @@ RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing
         next build \
  && yarn cache clean --all || true
 
+# Debug: show where Next placed the standalone output
+RUN echo 'Preview of .next layout:' && \
+    find /usr/share/solanaflow/web/.next -maxdepth 3 -type f | head -n 30
+
 # sanity-check: make sure the stand-alone entry exists
-RUN test -f /usr/share/solanaflow/web/.next/standalone/server.js
+# succeed if either the flat or the nested layout exists
+RUN ( \
+      test -f /usr/share/solanaflow/web/.next/standalone/server.js \
+   || test -f /usr/share/solanaflow/web/.next/standalone/web/server.js )
 
 # create a separate stage for seeding the target volume
 FROM solana-toolchain AS seed-target
@@ -156,9 +163,14 @@ COPY --from=solana-toolchain /root/.rustup /root/.rustup
 #   web/.next/static/…       (css/js chunks, fonts, images…)
 #   web/public/…             (static public assets)
 
-## ① server code — unchanged
-COPY --from=builder /usr/share/solanaflow/web/.next/standalone \
-                    /usr/share/solanaflow/web/.next/standalone
+## ① server code — support both layouts
+# flat layout (no /web sub-dir) – silently skipped if file absent
+COPY --from=builder /usr/share/solanaflow/web/.next/standalone/server.js \
+                    /usr/share/solanaflow/web/.next/standalone/server.js
+
+# nested layout (default for pnpm workspace builds)
+COPY --from=builder /usr/share/solanaflow/web/.next/standalone/web \
+                    /usr/share/solanaflow/web/.next/standalone/web
 
 # ② static assets ─ root location (kept) ✔
 COPY --from=builder /usr/share/solanaflow/web/.next/static \
@@ -219,4 +231,4 @@ SHELL ["/bin/bash","-c"]
 EXPOSE 3000
 # Entrypoint - run from the web root so that "_next/static" & "public" resolve
 WORKDIR /usr/share/solanaflow/web
-CMD ["node", "/usr/share/solanaflow/web/.next/standalone/server.js"]
+CMD ["bash", "-c", "node $(find /usr/share/solanaflow/web/.next/standalone -name server.js)"]
