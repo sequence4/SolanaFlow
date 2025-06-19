@@ -123,7 +123,9 @@ RUN mkdir -p /usr/share/solanaflow/web/public
 # install deps and build once
 RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing=locked \
     yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile \
- && yarn --cwd /usr/share/solanaflow/web build \
+# ---- build a *standalone* bundle ----
+ && yarn --cwd /usr/share/solanaflow/web \
+        next build --output standalone \
  && yarn cache clean --all || true
 
 # sanity-check: make sure the stand-alone entry exists
