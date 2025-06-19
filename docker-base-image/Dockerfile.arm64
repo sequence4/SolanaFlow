@@ -166,20 +166,16 @@ COPY --from=solana-toolchain /root/.rustup /root/.rustup
 #   web/.next/static/…       (css/js chunks, fonts, images…)
 #   web/public/…             (static public assets)
 
-## ① server code — copy the folder we staged at /tmp/standalone
+# ① server code — copy the folder we staged at /tmp/standalone
 COPY --from=builder /tmp/standalone \
                     /usr/share/solanaflow/web/.next/standalone
 
-# ② static assets ─ root location (kept) ✔
-COPY --from=builder /usr/share/solanaflow/web/.next/static \
-                    /usr/share/solanaflow/web/.next/static
-
-# ③ expose the same bundle through a symlink (saves space, keeps paths consistent)
+# ② expose the same bundle through a symlink (saves space, keeps paths consistent)
 RUN mkdir -p /usr/share/solanaflow/web/.next/standalone/_next && \
-    ln -s /usr/share/solanaflow/web/.next/static \
-          /usr/share/solanaflow/web/.next/standalone/_next/static
+    ln -s /usr/share/solanaflow/web/.next/standalone/_next/static \
+          /usr/share/solanaflow/web/.next/static
 
-# ④ public assets (favicon, images…)
+# ③ public assets (favicon, images…)
 COPY --from=builder /usr/share/solanaflow/web/public \
                     /usr/share/solanaflow/web/.next/standalone/public
 
