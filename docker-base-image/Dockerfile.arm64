@@ -114,8 +114,6 @@ RUN . "$NVM_DIR/nvm.sh" \
  && if ! command -v yarn >/dev/null 2>&1 ; then npm i -g yarn@1 ; fi
 
 ENV NEXT_TELEMETRY_DISABLED=1 NEXT_SKIP_ESLINT=1
-# --- Force Next 14 + to emit the standalone bundle ---------------------------
-ENV NEXT_PRIVATE_STANDALONE=true
 # copy the web/ directory that already exists in the repo
 COPY web/ /usr/share/solanaflow/web
 RUN mkdir -p /usr/share/solanaflow/web/public
@@ -123,9 +121,8 @@ RUN mkdir -p /usr/share/solanaflow/web/public
 # install deps and build once
 RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing=locked \
     yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile \
-# ---- build a *standalone* bundle ----
  && yarn --cwd /usr/share/solanaflow/web \
-        next build --output standalone \
+        next build \
  && yarn cache clean --all || true
 
 # sanity-check: make sure the stand-alone entry exists
@@ -222,4 +219,4 @@ SHELL ["/bin/bash","-c"]
 EXPOSE 3000
 # Entrypoint - run from the web root so that "_next/static" & "public" resolve
 WORKDIR /usr/share/solanaflow/web
-CMD ["bash","-lc","cd /usr/share/solanaflow/web/.next/standalone && exec node server.js"]
+CMD ["node", "/usr/share/solanaflow/web/.next/standalone/server.js"]
