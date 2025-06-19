@@ -1,7 +1,6 @@
 /**
- * PostCSS config required by Tailwind when building in CI / Docker.
- * DO NOT remove – the Dockerfile just copies the whole web/ folder,
- * so this file will automatically be present in the final image.
+ * PostCSS config required by Tailwind in CI / Docker.
+ * Copied verbatim into the final runtime image by the Dockerfile.
  */
 module.exports = {
   plugins: {
