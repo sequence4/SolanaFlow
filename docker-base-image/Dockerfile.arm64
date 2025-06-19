@@ -131,15 +131,11 @@ RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing
 RUN echo 'Preview of .next layout:' && \
     find /usr/share/solanaflow/web/.next -maxdepth 3 -type f | head -n 30
 
-# sanity-check: make sure the stand-alone entry exists
-RUN SERVER_JS=$(find /usr/share/solanaflow/web/.next -name server.js -print -quit) \
- && echo "✔ Found server.js at $SERVER_JS" \
- || (echo '❌  Next build produced no server.js – standalone output missing' && exit 1)
-
-# export the directory path for the next stage
-ARG STANDALONE_DIR
-RUN STANDALONE_DIR=$(dirname $(find /usr/share/solanaflow/web/.next -name server.js -print -quit)) && \
-    echo "STANDALONE_DIR=$STANDALONE_DIR" >> /tmp/standalone-env
+# locate server.js once, save its directory for later
+RUN STANDALONE_DIR=$(dirname "$(find /usr/share/solanaflow/web/.next -name server.js -print -quit)") && \
+    test -n "$STANDALONE_DIR" || (echo '❌  Next build produced no server.js' && exit 1) && \
+    echo "✔ Found server.js in $STANDALONE_DIR" && \
+    echo "$STANDALONE_DIR" > /tmp/standalone-dir.txt
 
 # create a separate stage for seeding the target volume
 FROM solana-toolchain AS seed-target
@@ -160,8 +156,7 @@ ENV PATH=/usr/local/bin:/root/.cargo/bin:$PATH \
 WORKDIR /usr/share/solanaflow/web
 
 # Import the standalone directory path from the builder stage
-COPY --from=builder /tmp/standalone-env /standalone-env
-ENV $(cat /standalone-env | xargs)
+COPY --from=builder /tmp/standalone-dir.txt /standalone-dir.txt
 
 # bring in binaries and web bundle
 COPY --from=solana-toolchain /usr/local/bin /usr/local/bin
@@ -173,8 +168,8 @@ COPY --from=solana-toolchain /root/.rustup /root/.rustup
 #   web/.next/static/…       (css/js chunks, fonts, images…)
 #   web/public/…             (static public assets)
 
-## ① server code — copy the exact folder found above
-COPY --from=builder ${STANDALONE_DIR} \
+## ① server code — copy whatever folder contains server.js
+COPY --from=builder $(cat /standalone-dir.txt) \
                     /usr/share/solanaflow/web/.next/standalone
 
 # ② static assets ─ root location (kept) ✔
