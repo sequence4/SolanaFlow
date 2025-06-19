@@ -158,7 +158,11 @@ COPY --from=builder /usr/share/solanaflow/web/.next/standalone \
 
 # copy .next/static (always there)
 COPY --from=builder /usr/share/solanaflow/web/.next/static \
-                    /usr/share/solanaflow/web/.next/standalone/.next/static
+                    /usr/share/solanaflow/web/.next/static
+
+# copy public assets to project root
+COPY --from=builder /usr/share/solanaflow/web/public \
+                    /usr/share/solanaflow/web/public
 
 # copy public assets only when present
 RUN if [ -d /usr/share/solanaflow/web/public ]; then \
