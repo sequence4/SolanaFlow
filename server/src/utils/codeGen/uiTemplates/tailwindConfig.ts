@@ -6,6 +6,13 @@ module.exports = {
     './src/**/*.{js,ts,jsx,tsx}',
     './components/**/*.{js,ts,jsx,tsx}'
   ],
+  safelist: [
+    'min-h-screen',
+    'bg-background',
+    'text-foreground',
+    'font-sans',
+    'antialiased'
+  ],
   theme: {
     extend: {
       colors: {

@@ -5,10 +5,12 @@ const nextConfig = {
 
   /* --- wallet adapter must be transpiled --- */
   transpilePackages: [
+    '@solana/wallet-adapter-base',
     '@solana/wallet-adapter-react',
     '@solana/wallet-adapter-react-ui',
-    '@solana/wallet-adapter-base',
-    'next-themes',
+    '@solana/wallet-adapter-wallets',
+    '@solana/wallet-adapter-phantom',
+    '@solana/wallet-adapter-solflare',
   ],
 
   // relax frame restrictions so the SolanaFlow UI can embed it
@@ -28,5 +30,6 @@ const nextConfig = {
     ];
   },
 };
+
 module.exports = nextConfig;
 

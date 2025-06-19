@@ -282,10 +282,21 @@ export const handleGenerateCode = async ({
         // All UI files done
         sendProgress({ event: 'ui-complete', message: 'UI streaming finished' });
 
-        sendProgress({
-          stage: 'next-build-skipped',
-          message: 'Skipped Next.js rebuild – bundle already baked during image build'
-        });
+        // Run Next.js build to ensure Tailwind processes all the new files
+        sendProgress({ stage: 'next-build', message: 'Running Next.js build to process Tailwind CSS...' });
+        try {
+          await runCommand(
+            // force standalone output _inside_ the running container
+            `docker exec -e NEXT_PRIVATE_STANDALONE=true -w /usr/share/solanaflow/web ` +
+            `${workspace.containerName} npm run build`,
+            '.',
+            projectId
+          );
+          sendProgress({ stage: 'next-build-done', message: 'Next.js build completed' });
+        } catch (error) {
+          console.error('Error during Next.js build:', error);
+          sendProgress({ stage: 'next-build-failed', message: 'Next.js build failed' });
+        }
 
         // ───────────────────────── write graph-derived Rust sources ──────────────
         // For now, assume a basic program structure exists or will be created
