@@ -2,13 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===== SolanaFlow / v0 design tokens ===== */
 @layer base {
   :root {
-    /* Brand colors - soft blue to lavender gradient */
-    --brand-primary: linear-gradient(135deg, #a0d2ff 0%, #d3c1ff 100%);
-    --brand-primary-hover: linear-gradient(135deg, #92c2ff 0%, #c0b4ff 100%);
+    /* Brand colours – soft blue → lavender gradient */
+    --brand-primary: linear-gradient(135deg, #0ad2ff 0%, #9c22ff 100%);
+    --brand-primary-hover: linear-gradient(135deg, #0bb9e5 0%, #8320e2 100%);
 
-    /* Spacing tokens */
+    /* Spacing scale */
     --space-xs: 4px;
     --space-sm: 8px;
     --space-md: 16px;
