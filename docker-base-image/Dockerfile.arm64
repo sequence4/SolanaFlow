@@ -218,4 +218,4 @@ SHELL ["/bin/bash","-c"]
 EXPOSE 3000
 # Entrypoint - run from the web root so that "_next/static" & "public" resolve
 WORKDIR /usr/share/solanaflow/web
-CMD ["node", ".next/standalone/server.js"]
+CMD ["node", "-C", "/usr/share/solanaflow/web", ".next/standalone/server.js"]
