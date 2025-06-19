@@ -163,14 +163,9 @@ COPY --from=solana-toolchain /root/.rustup /root/.rustup
 #   web/.next/static/…       (css/js chunks, fonts, images…)
 #   web/public/…             (static public assets)
 
-## ① server code — support both layouts
-# flat layout (no /web sub-dir) – silently skipped if file absent
-COPY --from=builder /usr/share/solanaflow/web/.next/standalone/server.js \
-                    /usr/share/solanaflow/web/.next/standalone/server.js
-
-# nested layout (default for pnpm workspace builds)
-COPY --from=builder /usr/share/solanaflow/web/.next/standalone/web \
-                    /usr/share/solanaflow/web/.next/standalone/web
+## ① server code — copy the entire standalone directory (works for both layouts)
+COPY --from=builder /usr/share/solanaflow/web/.next/standalone \
+                    /usr/share/solanaflow/web/.next/standalone
 
 # ② static assets ─ root location (kept) ✔
 COPY --from=builder /usr/share/solanaflow/web/.next/static \
