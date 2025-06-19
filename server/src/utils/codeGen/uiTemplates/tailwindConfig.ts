@@ -7,9 +7,8 @@ module.exports = {
     './components/**/*.{js,ts,jsx,tsx}'
   ],
   safelist: [
+    { pattern: /^(bg|text|border|hover:bg|hover:text)-/ },
     'min-h-screen',
-    'bg-background',
-    'text-foreground',
     'font-sans',
     'antialiased'
   ],
@@ -54,6 +53,9 @@ module.exports = {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 0.2rem)",
         sm: "calc(var(--radius) - 0.4rem)",
+      },
+      fontFamily: {
+        sans: ["ui-sans-serif", "system-ui", "sans-serif"],
       },
     },
   },
