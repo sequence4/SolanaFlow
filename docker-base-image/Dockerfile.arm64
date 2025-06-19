@@ -131,10 +131,10 @@ RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing
 RUN echo 'Preview of .next layout:' && \
     find /usr/share/solanaflow/web/.next -maxdepth 3 -type f | head -n 30
 
-# Copy the entire standalone directory to preserve static assets
-RUN STANDALONE_ROOT=/usr/share/solanaflow/web/.next/standalone && \
-    test -d "$STANDALONE_ROOT" || (echo '❌  standalone directory not found' && exit 1) && \
-    echo "✔ Found standalone directory at $STANDALONE_ROOT" && \
+# Locate server.js anywhere under .next, then copy its parent dir
+RUN STANDALONE_ROOT=$(dirname "$(find /usr/share/solanaflow/web/.next -name server.js -print -quit)") && \
+    test -n "$STANDALONE_ROOT" && echo "✔ Found standalone directory at $STANDALONE_ROOT" || \
+        (echo '❌  server.js (standalone) not found. Is output: \"standalone\" set?' && exit 1) && \
     mkdir -p /tmp/standalone && \
     cp -a "$STANDALONE_ROOT"/. /tmp/standalone
 
