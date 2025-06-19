@@ -131,11 +131,11 @@ RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing
 RUN echo 'Preview of .next layout:' && \
     find /usr/share/solanaflow/web/.next -maxdepth 3 -type f | head -n 30
 
-# locate server.js once, save its directory for later
+# locate server.js once, copy its parent dir to a fixed path
 RUN STANDALONE_DIR=$(dirname "$(find /usr/share/solanaflow/web/.next -name server.js -print -quit)") && \
-    test -n "$STANDALONE_DIR" || (echo '❌  Next build produced no server.js' && exit 1) && \
+    test -n "$STANDALONE_DIR" || (echo '❌  server.js not found' && exit 1) && \
     echo "✔ Found server.js in $STANDALONE_DIR" && \
-    echo "$STANDALONE_DIR" > /tmp/standalone-dir.txt
+    cp -a "$STANDALONE_DIR" /tmp/standalone
 
 # create a separate stage for seeding the target volume
 FROM solana-toolchain AS seed-target
@@ -156,7 +156,7 @@ ENV PATH=/usr/local/bin:/root/.cargo/bin:$PATH \
 WORKDIR /usr/share/solanaflow/web
 
 # Import the standalone directory path from the builder stage
-COPY --from=builder /tmp/standalone-dir.txt /standalone-dir.txt
+COPY --from=builder /tmp/standalone /standalone
 
 # bring in binaries and web bundle
 COPY --from=solana-toolchain /usr/local/bin /usr/local/bin
@@ -168,8 +168,8 @@ COPY --from=solana-toolchain /root/.rustup /root/.rustup
 #   web/.next/static/…       (css/js chunks, fonts, images…)
 #   web/public/…             (static public assets)
 
-## ① server code — copy whatever folder contains server.js
-COPY --from=builder $(cat /standalone-dir.txt) \
+## ① server code — copy the folder we staged at /tmp/standalone
+COPY --from=builder /tmp/standalone \
                     /usr/share/solanaflow/web/.next/standalone
 
 # ② static assets ─ root location (kept) ✔
