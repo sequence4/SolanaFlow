@@ -131,12 +131,12 @@ RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing
 RUN echo 'Preview of .next layout:' && \
     find /usr/share/solanaflow/web/.next -maxdepth 3 -type f | head -n 30
 
-# locate server.js once, copy its parent dir to a fixed path
-RUN STANDALONE_DIR=$(dirname "$(find /usr/share/solanaflow/web/.next -name server.js -print -quit)") && \
-    test -n "$STANDALONE_DIR" || (echo '❌  server.js not found' && exit 1) && \
-    echo "✔ Found server.js in $STANDALONE_DIR" && \
+# Copy the entire standalone directory to preserve static assets
+RUN STANDALONE_ROOT=/usr/share/solanaflow/web/.next/standalone && \
+    test -d "$STANDALONE_ROOT" || (echo '❌  standalone directory not found' && exit 1) && \
+    echo "✔ Found standalone directory at $STANDALONE_ROOT" && \
     mkdir -p /tmp/standalone && \
-    cp -a "$STANDALONE_DIR"/. /tmp/standalone
+    cp -a "$STANDALONE_ROOT"/. /tmp/standalone
 
 # create a separate stage for seeding the target volume
 FROM solana-toolchain AS seed-target
@@ -162,22 +162,16 @@ COPY --from=solana-toolchain /root/.cargo/bin /root/.cargo/bin
 COPY --from=solana-toolchain /root/.rustup /root/.rustup
 # ── web bundle ────────────────────────────────────────────────────────────────
 # Next 'standalone' output lives in:
-#   web/.next/standalone/…   (server code)
-#   web/.next/static/…       (css/js chunks, fonts, images…)
+#   web/.next/standalone/…   (server code + _next/static)
 #   web/public/…             (static public assets)
 
-# ① server bundle — copy the folder we staged at /tmp/standalone
+# ① server bundle — copy the complete standalone folder (includes _next/static)
 COPY --from=builder /tmp/standalone \
                     /usr/share/solanaflow/web/.next/standalone
 
-# ② static assets  
-#    • place them **inside** the standalone tree  
-#    • expose the usual top-level `/_next/static` path with one symlink  
-#     (this avoids the "404 on CSS/JS" problem you observed)
-COPY --from=builder /usr/share/solanaflow/web/.next/static \
-                    /usr/share/solanaflow/web/.next/standalone/_next/static
-
-RUN ln -sf /usr/share/solanaflow/web/.next/standalone/_next/static \
+# ② create symlink for top-level static path (points to assets already in standalone)
+RUN mkdir -p /usr/share/solanaflow/web/.next && \
+    ln -sf /usr/share/solanaflow/web/.next/standalone/_next/static \
            /usr/share/solanaflow/web/.next/static
 
 # ③ public assets (favicon, OG images…)
