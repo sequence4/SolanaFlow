@@ -160,17 +160,17 @@ COPY --from=solana-toolchain /root/.rustup /root/.rustup
 COPY --from=builder /usr/share/solanaflow/web/.next/standalone \
                     /usr/share/solanaflow/web/.next/standalone
 
-# ② static assets for both root and stand-alone server
+# ② static assets ─ root location (kept) ✔
 COPY --from=builder /usr/share/solanaflow/web/.next/static \
                     /usr/share/solanaflow/web/.next/static
-COPY --from=builder /usr/share/solanaflow/web/.next/static \
-                    /usr/share/solanaflow/web/.next/standalone/.next/static
 
-# copy public assets only when present
-RUN if [ -d /usr/share/solanaflow/web/public ]; then \
-       cp -R /usr/share/solanaflow/web/public \
-             /usr/share/solanaflow/web/.next/standalone/public ; \
-    fi
+# ③ static assets ─ location the standalone server actually serves ➜ _next/static
+COPY --from=builder /usr/share/solanaflow/web/.next/static \
+                    /usr/share/solanaflow/web/.next/standalone/_next/static
+
+# ④ public assets (favicon, images…)
+COPY --from=builder /usr/share/solanaflow/web/public \
+                    /usr/share/solanaflow/web/.next/standalone/public
 
 # also copy the project itself (src/, app/, idl/, …)
 COPY --from=builder /usr/share/solanaflow/web                  /usr/share/solanaflow/web
