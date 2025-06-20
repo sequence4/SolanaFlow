@@ -1,29 +1,85 @@
-/** @type {import('tailwindcss').Config} */
-module.exports = {
-  darkMode: "class",
+export const tailwindConfig = `import type { Config } from "tailwindcss";
 
-  /* Scan every place where .tsx files live */
+export default {
+  darkMode: ["class"],
   content: [
-    "./app/**/*.{js,ts,jsx,tsx}",      // Next-13/14 App Router files
-    "./pages/**/*.{js,ts,jsx,tsx}",    // classic pages (if any)
-    "./src/**/*.{js,ts,jsx,tsx}",      // SolMintApp + shadcn-ui
-    "./components/**/*.{js,ts,jsx,tsx}"
+    "./app/**/*.{ts,tsx}",
+    "./components/**/*.{ts,tsx}",
+    "./src/**/*.{ts,tsx}",
   ],
 
-  theme: { extend: {} },
+  theme: {
+    container: {
+      center: true,
+      padding: "2rem",
+      screens: { "2xl": "1400px" },
+    },
 
-  plugins: [require("tailwindcss-animate")],
+    extend: {
+      /* 👉  Map shadcn tokens to colour utilities */
+      colors: {
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
+      },
 
-  /* Prevent JIT from stripping dynamic/third-party classes */
-  safelist: [
-    "scale-[1.02]",
-    "blur-3xl",
-    "bg-gradient-to-r",
-    "from-blue-500",
-    "to-purple-500",
-    "hover:from-blue-600",
-    "hover:to-purple-600",
-    "hover:scale-105",
-    "shadow-lg"
+      borderRadius: {
+        lg: "var(--radius)",
+      },
+
+      keyframes: {
+        "accordion-down": {
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
+        },
+        "accordion-up": {
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+      },
+      animation: {
+        "accordion-down": "accordion-down 0.2s ease-out",
+        "accordion-up": "accordion-up 0.2s ease-out",
+      },
+    },
+  },
+
+  plugins: [
+    require("tailwindcss-animate"),       // v0 default
   ],
-};
+
+  /* 🛡 Fancy class names needed by your cards & blobs */
+  safelist: ["scale-[1.02]", "blur-3xl"],
+} satisfies Config;
+`;
+TS
