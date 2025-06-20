@@ -1,7 +1,7 @@
-export const HOME_PAGE_TSX = `"use client";
+export const homePage = `"use client";
 
-// Single–page entry that shows the fully styled SolMint UI
-import SolMintApp from "../src/components/SolMintApp";
+// Single-page entry that shows the fully styled SolMint UI
+import SolMintApp from "@/components/SolMintApp";
 
 export default function Home() {
   return <SolMintApp />;

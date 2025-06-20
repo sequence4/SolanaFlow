@@ -1,29 +1,24 @@
-export const GLOBALS_CSS = `@tailwind base;
+export const globalsCss = `@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    /* Brand colors - soft blue to lavender gradient */
-    --brand-primary: linear-gradient(135deg, #a0d2ff 0%, #d3c1ff 100%);
-    --brand-primary-hover: linear-gradient(135deg, #92c2ff 0%, #c0b4ff 100%);
+    /* Brand colours */
+    --brand-primary: linear-gradient(135deg,#a0d2ff 0%,#d3c1ff 100%);
+    --brand-primary-hover: linear-gradient(135deg,#92c2ff 0%,#c0b4ff 100%);
 
-    /* Spacing tokens */
+    /* Space / radius / shadow tokens */
     --space-xs: 4px;
     --space-sm: 8px;
     --space-md: 16px;
     --space-lg: 28px;
-
-    /* Border radius */
     --radius-md: 12px;
     --radius-lg: 20px;
+    --shadow-sm: 0 2px 6px rgba(0,0,0,.08);
+    --field-accent: rgba(160,210,255,.15);
 
-    /* Shadows */
-    --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.08);
-
-    /* Field accent color */
-    --field-accent: rgba(160, 210, 255, 0.15);
-
+    /* shadcn-ui design tokens ------------- */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
@@ -43,6 +38,8 @@ export const GLOBALS_CSS = `@tailwind base;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 221.2 83.2% 53.3%;
+
+    /* Charts */
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
@@ -80,57 +77,35 @@ export const GLOBALS_CSS = `@tailwind base;
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
+  * {@apply border-border;}
   body {
     @apply bg-background text-foreground;
-    font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+    font-family:"Inter",ui-sans-serif,system-ui,sans-serif;
   }
 }
 
-/* Custom wallet adapter button styles */
-.wallet-adapter-button {
-  background: linear-gradient(135deg, #a0d2ff 0%, #d3c1ff 100%) !important;
-  border-radius: 9999px !important;
-  padding: 8px 24px !important;
-  color: white !important;
-  font-weight: 500 !important;
-  transition: all 0.3s ease !important;
-  box-shadow: 0 4px 12px rgba(160, 210, 255, 0.3) !important;
+/* ---- Wallet adapter button look-&-feel ---- */
+.wallet-adapter-button{
+  background:linear-gradient(135deg,#a0d2ff 0%,#d3c1ff 100%)!important;
+  border-radius:9999px!important;
+  padding:8px 24px!important;
+  color:#fff!important;
+  font-weight:500!important;
+  transition:all .3s ease!important;
+  box-shadow:0 4px 12px rgba(160,210,255,.3)!important;
+}
+.wallet-adapter-button:hover{
+  background:linear-gradient(135deg,#92c2ff 0%,#c0b4ff 100%)!important;
+  transform:scale(1.05)!important;
+}
+.wallet-adapter-button:disabled{opacity:.6!important;transform:none!important}
+
+/* reduced-motion */
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;}
 }
 
-.wallet-adapter-button:hover {
-  background: linear-gradient(135deg, #92c2ff 0%, #c0b4ff 100%) !important;
-  transform: scale(1.05) !important;
-}
-
-.wallet-adapter-button:disabled {
-  opacity: 0.6 !important;
-  transform: none !important;
-}
-
-/* Animation for reduced motion preference */
-@media (prefers-reduced-motion: reduce) {
-  * {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-
-/* Card fade-in animation */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fade-in {
-  animation: fadeInUp 0.3s ease-out;
-}`;
+/* fade in */
+@keyframes fadeInUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);} }
+.animate-fade-in{animation:fadeInUp .3s ease-out;}
+`;

@@ -12,3 +12,4 @@ export * from "./globalsCss";
 export * from "./tailwindConfig";
 export * from "./postcssConfig";
 export * from "./walletProvider";
+export * from "./solMintApp";
