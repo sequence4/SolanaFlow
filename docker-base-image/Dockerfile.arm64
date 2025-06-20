@@ -164,7 +164,7 @@ FROM --platform=$BUILDPLATFORM ubuntu:22.04 AS runtime
 ENV PATH=/usr/local/bin:/root/.cargo/bin:$PATH \
     HOSTNAME=0.0.0.0 \
     NEXT_DISABLE_SWC=1
-WORKDIR /usr/share/solanaflow/web
+WORKDIR /usr/share/solanaflow/web/.next/standalone
 
 # bring in binaries and web bundle
 COPY --from=solana-toolchain /usr/local/bin /usr/local/bin
@@ -226,8 +226,12 @@ RUN ln -sf /bin/bash /bin/sh
 # from this point every RUN uses Bash automatically
 SHELL ["/bin/bash","-c"]
 
+# ────────────────────────────────────────────────────────────────
+# Runtime: serve from the standalone bundle so _next/static works
+# ────────────────────────────────────────────────────────────────
+WORKDIR /usr/share/solanaflow/web/.next/standalone   
+
+ENV PORT=3000                                        
 EXPOSE 3000
-# Entrypoint – run from the web root so that "_next/static" & "public" resolve
-WORKDIR /usr/share/solanaflow/web
-# NB: we exec the exact server.js we copied above
-CMD ["bash","-c","node $(find /usr/share/solanaflow/web/.next/standalone -name server.js)"]
+
+CMD ["node","server.js"]        

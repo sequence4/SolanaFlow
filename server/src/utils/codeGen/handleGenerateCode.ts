@@ -395,11 +395,10 @@ export const handleGenerateCode = async ({
 
         // 🟢 start the server **inside the container** so cwd is valid
         runCommandDetached(
-          `docker exec -w /usr/share/solanaflow/web ` +
-          `${workspace.containerName} bash -lc '` +
-          `node .next/standalone/server.js'`,
-          '.',                              // host cwd irrelevant
-          `next-serve-${projectId}`         // no extra options needed
+          `docker exec -w /usr/share/solanaflow/web/.next/standalone ` +
+          `${workspace.containerName} node server.js -p 3000`,
+          '.',
+          `next-serve-${projectId}`
         ).catch(console.error);
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
