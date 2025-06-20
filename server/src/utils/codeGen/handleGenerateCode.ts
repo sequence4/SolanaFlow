@@ -17,8 +17,8 @@ import { randomUUID } from 'crypto';
 import path from "path";
 import { attachFileContents } from "../fileUtils/attachFileContents";
 import {
-  HOME_PAGE_TSX,
-  ROOT_LAYOUT_TSX,
+  homePage,
+  rootLayout,
   MINT_FORM_TSX,
   TOKEN_CREATED_SUCCESS_TSX,
   WALLET_TSX,
@@ -27,10 +27,11 @@ import {
   UI_INPUT_TSX,
   UI_LABEL_TSX,
   UTILS_TS,
-  GLOBALS_CSS,
-  TAILWIND_CONFIG,
+  globalsCss,
+  tailwindConfig,
   POSTCSS_CONFIG,
-  WALLET_CONNECTION_PROVIDER_TSX
+  walletProvider,
+  solMintApp
 } from './uiTemplates';
 
 /** Extract all file paths from a file tree recursively. */
@@ -206,9 +207,9 @@ export const handleGenerateCode = async ({
               path: "./web/app",
               type: "directory" as const,
               children: [
-                { name: "page.tsx", path: "./web/app/page.tsx", type: "file" as const, code: HOME_PAGE_TSX },
-                { name: "layout.tsx", path: "./web/app/layout.tsx", type: "file" as const, code: ROOT_LAYOUT_TSX },
-                { name: "globals.css", path: "./web/app/globals.css", type: "file" as const, code: GLOBALS_CSS }
+                { name: "page.tsx", path: "./web/app/page.tsx", type: "file" as const, code: homePage },
+                { name: "layout.tsx", path: "./web/app/layout.tsx", type: "file" as const, code: rootLayout },
+                { name: "globals.css", path: "./web/app/globals.css", type: "file" as const, code: globalsCss }
               ]
             },
             {
@@ -225,6 +226,7 @@ export const handleGenerateCode = async ({
                     { name: "token-created-success.tsx", path: "./web/src/components/token-created-success.tsx", type: "file" as const, code: TOKEN_CREATED_SUCCESS_TSX },
                     { name: "theme-toggle.tsx", path: "./web/src/components/theme-toggle.tsx", type: "file" as const, code: THEME_TOGGLE_TSX },
                     { name: "wallet.tsx", path: "./web/src/components/wallet.tsx", type: "file" as const, code: WALLET_TSX },
+                    { name: "SolMintApp.tsx", path: "./web/src/components/SolMintApp.tsx", type: "file" as const, code: solMintApp },
                     {
                       name: "ui",
                       path: "./web/src/components/ui",
@@ -242,7 +244,7 @@ export const handleGenerateCode = async ({
                   path: "./web/src/context",
                   type: "directory" as const,
                   children: [
-                    { name: "WalletConnectionProvider.tsx", path: "./web/src/context/WalletConnectionProvider.tsx", type: "file" as const, code: WALLET_CONNECTION_PROVIDER_TSX }
+                    { name: "wallet-context-provider.tsx", path: "./web/src/context/wallet-context-provider.tsx", type: "file" as const, code: walletProvider }
                   ]
                 },
                 {
@@ -255,7 +257,7 @@ export const handleGenerateCode = async ({
                 }
               ]
             },
-            { name: "tailwind.config.js", path: "./web/tailwind.config.js", type: "file" as const, code: TAILWIND_CONFIG },
+            { name: "tailwind.config.js", path: "./web/tailwind.config.js", type: "file" as const, code: tailwindConfig },
             { name: "postcss.config.js", path: "./web/postcss.config.js", type: "file" as const, code: POSTCSS_CONFIG },
             {
               name: "idl",
