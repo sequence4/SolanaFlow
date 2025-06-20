@@ -94,10 +94,14 @@ RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
 ###############################################################################
 FROM --platform=linux/arm64 solana-toolchain AS builder
 ARG NODE_VERSION=v20.18.0
+# Add APP_ID build argument with default value
+ARG APP_ID=local
 ENV HOME=/root
 ENV PATH=/usr/local/bin:$HOME/.cargo/bin:$PATH
 ENV NVM_DIR=$HOME/.nvm
 ENV PATH="$NVM_DIR/versions/node/${NODE_VERSION}/bin:$PATH"
+# Expose APP_ID as environment variable for Next.js build
+ENV APP_ID=${APP_ID}
 
 # reuse compiled dependencies
 COPY --from=cooker /app/target /app/target
@@ -161,9 +165,12 @@ COPY --from=solana-toolchain /cache-seed/target /target-seed
 #   · therefore we MUST also copy /usr/local/lib/node_modules/yarn
 # ────────────────────────────────────────────────────────────────
 FROM --platform=$BUILDPLATFORM ubuntu:22.04 AS runtime
+# Add APP_ID build argument with default value
+ARG APP_ID=local
 ENV PATH=/usr/local/bin:/root/.cargo/bin:$PATH \
     HOSTNAME=0.0.0.0 \
-    NEXT_DISABLE_SWC=1
+    NEXT_DISABLE_SWC=1 \
+    APP_ID=${APP_ID}
 WORKDIR /usr/share/solanaflow/web/.next/standalone
 
 # bring in binaries and web bundle
