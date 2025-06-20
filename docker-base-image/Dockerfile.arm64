@@ -179,13 +179,12 @@ COPY --from=solana-toolchain /root/.rustup /root/.rustup
 COPY --from=builder /tmp/standalone \
                     /usr/share/solanaflow/web/.next/standalone
 
-# ② public assets (favicon, OG images…)
+# also copy the project itself (src/, app/, idl/, …)
 COPY --from=builder /usr/share/solanaflow/web/public \
                     /usr/share/solanaflow/web/.next/standalone/public
 
-# also copy the project itself (src/, app/, idl/, …)
-COPY --from=builder /usr/share/solanaflow/web                  /usr/share/solanaflow/web
-COPY --from=solana-toolchain /usr/src/anchor-template /usr/src/anchor-template
+COPY --from=builder /usr/share/solanaflow/web \
+                    /usr/share/solanaflow/web
 
 # copy the entire Node version dir (≈ 28 MB) – includes node, npm, corepack, etc.
 COPY --from=builder /root/.nvm/versions/node/v20.18.0 /root/.nvm/versions/node/v20.18.0
@@ -229,9 +228,7 @@ SHELL ["/bin/bash","-c"]
 # ────────────────────────────────────────────────────────────────
 # Runtime: serve from the standalone bundle so _next/static works
 # ────────────────────────────────────────────────────────────────
-WORKDIR /usr/share/solanaflow/web/.next/standalone   
-
-ENV PORT=3000                                        
+WORKDIR /usr/share/solanaflow/web/.next/standalone
+ENV PORT=3000
 EXPOSE 3000
-
-CMD ["node","server.js"]        
+CMD ["node","server.js","-p","3000","-H","0.0.0.0"]

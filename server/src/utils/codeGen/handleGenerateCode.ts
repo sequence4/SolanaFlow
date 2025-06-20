@@ -395,7 +395,7 @@ export const handleGenerateCode = async ({
 
         // 🟢 start the server **inside the container** so cwd is valid
         runCommandDetached(
-          `docker exec -w /usr/share/solanaflow/web/.next/standalone ` +
+          `docker exec -e PORT=3000 -w /usr/share/solanaflow/web/.next/standalone ` +
           `${workspace.containerName} node server.js -p 3000`,
           '.',
           `next-serve-${projectId}`
