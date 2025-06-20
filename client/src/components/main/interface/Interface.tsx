@@ -37,10 +37,23 @@ const Interface = () => {
         }
     };
 
-    const openInNewTab = () => {
-        if (containerUrl) {
-            window.open(containerUrl, '_blank');
+    const iframeSrc = React.useMemo(() => {
+        if (!containerUrl) return "";
+        try {
+            const url = new URL(containerUrl);
+            // in prod we serve each dApp via NGINX at /dapp/
+            if (process.env.NODE_ENV === "production") {
+                return `/dapp${url.pathname || "/"}`;
+            }
+            // local dev keeps the full http://localhost:327xx form
+            return containerUrl;
+        } catch {
+            return containerUrl;
         }
+    }, [containerUrl]);
+
+    const openInNewTab = () => {
+        if (iframeSrc) window.open(iframeSrc, "_blank");
     };
 
     /* ───────── periodic health-check ───────── */
@@ -97,7 +110,8 @@ const Interface = () => {
                     </div>
                     <div className="flex-1 w-full">
                         <iframe
-                            src={containerUrl}
+                            key={iframeSrc}      /* force reload when URL changes */
+                            src={iframeSrc}
                             style={{ width: '100%', height: '100%', border: 'none' }}
                             allow="clipboard-read; clipboard-write"
                             sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
