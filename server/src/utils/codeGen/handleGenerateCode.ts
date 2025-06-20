@@ -379,7 +379,8 @@ export const handleGenerateCode = async ({
         sendProgress({ stage: "src-gen-done", message: "Rust sources ready" });
 
         // ++++++++++++++++ ② NEW – generate dApp UI ++++++++++++++++
-        const dAppUiTree = genUi("SolanaFlow Token")[0];  // Get the first item from the array
+        //const dAppUiTree = genUi("SolanaFlow Token")[0];
+        /*
         await insertSrcFiles(
           dAppUiTree,
           projectId,
@@ -388,6 +389,7 @@ export const handleGenerateCode = async ({
           // stream every written file immediately
           (path, content) => sendProgress({ event: "file-written", path, content })
         );
+        */
         // tell frontend UI files are done
         sendProgress({ stage: "ui-complete" });
 
