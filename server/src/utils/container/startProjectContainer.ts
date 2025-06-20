@@ -125,6 +125,16 @@ export async function startProjectContainer(projId: string): Promise<string> {
       '-v', `${vTargetBuild}:/usr/src/target`,
       '-e', 'CARGO_TARGET_DIR=/usr/src/target',
       '-e', 'HOSTNAME=0.0.0.0',
+      // Add APP_ID environment variable for Next.js inside the container
+      '-e', `APP_ID=${projId}`,
+      // Add Traefik labels for routing
+      '--label', 'traefik.enable=true',
+      '--label', `traefik.http.routers.dapp-${projId}.rule=PathPrefix(\`/dapp/${projId}\`)`,
+      '--label', `traefik.http.routers.dapp-${projId}.entrypoints=web,websecure`,
+      '--label', `traefik.http.routers.dapp-${projId}.middlewares=strip-${projId}`,
+      '--label', `traefik.http.middlewares.strip-${projId}.stripprefix.prefixes=/dapp/${projId}`,
+      '--label', `traefik.http.routers.dapp-${projId}.service=dapp-${projId}`,
+      '--label', `traefik.http.services.dapp-${projId}.loadbalancer.server.port=3000`,
       // publish container port 3000 → random host port
       '-p', '0:3000',
       image,

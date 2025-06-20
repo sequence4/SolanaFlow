@@ -1,0 +1,44 @@
+services:
+  traefik:
+    image: traefik:v3.4
+    platform: linux/arm64          # remove after publishing an amd64 tag
+    command:
+      - "--core.defaultRuleSyntax=v2"
+      - "--api.insecure=true"      # ⚠ disable in production
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.traefik.address=:8080"
+    ports:
+      - "0.0.0.0:8000:80"
+      - "0.0.0.0:8443:443"
+      - "0.0.0.0:8181:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [web]
+
+  dapp:
+    image: ghcr.io/sequence4/solana-toolchain:runtime-latest
+    platform: linux/arm64
+    networks: [web]
+    environment:
+      APP_ID: "${APP_ID:-demo}"       # exported in CI or your shell
+
+    labels:
+      - "traefik.enable=true"
+
+      # Router: match everything under /dapp/<id>/ …
+      - "traefik.http.routers.dapp-$${APP_ID}.rule=PathPrefix(`/dapp/$${APP_ID}`)"
+      - "traefik.http.routers.dapp-$${APP_ID}.entrypoints=web,websecure"
+
+      # Middleware: strip the prefix before proxying
+      - "traefik.http.routers.dapp-$${APP_ID}.middlewares=strip-$${APP_ID}"
+      - "traefik.http.middlewares.strip-$${APP_ID}.stripprefix.prefixes=/dapp/$${APP_ID}"
+
+      # Service: forward to port 3000 in the container
+      - "traefik.http.routers.dapp-$${APP_ID}.service=dapp-$${APP_ID}"
+      - "traefik.http.services.dapp-$${APP_ID}.loadbalancer.server.port=3000"
+
+networks:
+  web:
