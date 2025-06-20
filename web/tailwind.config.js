@@ -1,11 +1,22 @@
-export const tailwindConfig = `import type { Config } from "tailwindcss";
+/* web/tailwind.config.js
+   -----------------------------------------------------------
+   CommonJS version so Node can load it without `"type": "module"`.
+   Includes:
+     • dark-mode toggle
+     • content globs for app/, components/, src/
+     • full shadcn-ui colour tokens → utilities like border-border
+     • keyframes, animation, safelist (card hover + blobs)
+*/
 
-export default {
-  darkMode: ["class"],
+const { fontFamily } = require("tailwindcss/defaultTheme");
+
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  darkMode: "class",
   content: [
-    "./app/**/*.{ts,tsx}",
-    "./components/**/*.{ts,tsx}",
-    "./src/**/*.{ts,tsx}",
+    "./app/**/*.{js,ts,jsx,tsx}",
+    "./components/**/*.{js,ts,jsx,tsx}",
+    "./src/**/*.{js,ts,jsx,tsx}",
   ],
 
   theme: {
@@ -16,39 +27,38 @@ export default {
     },
 
     extend: {
-      /* 👉  Map shadcn tokens to colour utilities */
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
+        border:       "hsl(var(--border))",
+        input:        "hsl(var(--input))",
+        ring:         "hsl(var(--ring))",
+        background:   "hsl(var(--background))",
+        foreground:   "hsl(var(--foreground))",
         primary: {
-          DEFAULT: "hsl(var(--primary))",
+          DEFAULT:    "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
         },
         secondary: {
-          DEFAULT: "hsl(var(--secondary))",
+          DEFAULT:    "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",
         },
         muted: {
-          DEFAULT: "hsl(var(--muted))",
+          DEFAULT:    "hsl(var(--muted))",
           foreground: "hsl(var(--muted-foreground))",
         },
         accent: {
-          DEFAULT: "hsl(var(--accent))",
+          DEFAULT:    "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
         },
         destructive: {
-          DEFAULT: "hsl(var(--destructive))",
+          DEFAULT:    "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
         },
         card: {
-          DEFAULT: "hsl(var(--card))",
+          DEFAULT:    "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
         popover: {
-          DEFAULT: "hsl(var(--popover))",
+          DEFAULT:    "hsl(var(--popover))",
           foreground: "hsl(var(--popover-foreground))",
         },
       },
@@ -60,26 +70,32 @@ export default {
       keyframes: {
         "accordion-down": {
           from: { height: "0" },
-          to: { height: "var(--radix-accordion-content-height)" },
+          to:   { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
           from: { height: "var(--radix-accordion-content-height)" },
-          to: { height: "0" },
+          to:   { height: "0" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
-        "accordion-up": "accordion-up 0.2s ease-out",
+        "accordion-up":   "accordion-up 0.2s ease-out",
+      },
+
+      fontFamily: {
+        sans: ["Inter", ...fontFamily.sans],
       },
     },
   },
 
   plugins: [
-    require("tailwindcss-animate"),       // v0 default
+    require("tailwindcss-animate"),
   ],
 
-  /* 🛡 Fancy class names needed by your cards & blobs */
-  safelist: ["scale-[1.02]", "blur-3xl"],
-} satisfies Config;
-`;
-TS
+  safelist: [
+    "scale-[1.02]", "blur-3xl",
+    // wallet-adapter button gradient + hover zoom
+    "bg-gradient-to-r", "from-blue-500", "to-purple-500",
+    "hover:from-blue-600", "hover:to-purple-600", "hover:scale-105", "shadow-lg",
+  ],
+};

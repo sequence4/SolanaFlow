@@ -142,7 +142,7 @@ RUN STANDALONE_ROOT=$(dirname "$(find /usr/share/solanaflow/web/.next -name serv
     # In cached layers .next/static may be missing, so copy it only if present. \
     if [ -d /usr/share/solanaflow/web/.next/static ]; then \
         mkdir -p /tmp/standalone/.next && \
-        cp -a /usr/share/solanaflow/web/.next/static /tmp/standalone/.next/ ; \
+        cp -a /usr/share/solanaflow/web/.next/static/. /tmp/standalone/.next/static/ ; \
     else \
         echo "⚠️  .next/static not found in this layer (cached build) – skipping copy" ; \
     fi
@@ -185,6 +185,9 @@ COPY --from=builder /usr/share/solanaflow/web/public \
 
 COPY --from=builder /usr/share/solanaflow/web \
                     /usr/share/solanaflow/web
+
+COPY --from=builder /usr/share/solanaflow/web/.next/static \
+                    /usr/share/solanaflow/web/.next/standalone/.next/static
 
 # copy the entire Node version dir (≈ 28 MB) – includes node, npm, corepack, etc.
 COPY --from=builder /root/.nvm/versions/node/v20.18.0 /root/.nvm/versions/node/v20.18.0
