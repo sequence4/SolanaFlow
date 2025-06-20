@@ -3,11 +3,6 @@ const nextConfig = {
   /* --- mandatory for Docker test -f step --- */
   output: 'standalone',                     
 
-  /* --- support for older Next.js versions --- */
-  experimental: {
-    outputStandalone: true
-  },
-
   /* --- wallet adapter must be transpiled --- */
   transpilePackages: [
     '@solana/wallet-adapter-base',
