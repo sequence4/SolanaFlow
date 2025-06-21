@@ -305,11 +305,11 @@ export const handleGenerateCode = async ({
 
         await runCommand(
           `docker exec -d \
-      -e PORT=3000 \
-      -e APP_BASE_PATH= \
-      -w /usr/share/solanaflow/web \
-      ${workspace.containerName} \
-      node .next/standalone/server.js -H 0.0.0.0 -p 3000`,
+            -e PORT=3000 \
+            -e APP_BASE_PATH= \
+            -w /usr/share/solanaflow/web \
+            ${workspace.containerName} \
+            bash -lc "exec node .next/standalone/server.js -H 0.0.0.0 -p 3000"`,
           '.',
           `next-start-${projectId}`
         );
