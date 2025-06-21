@@ -189,7 +189,7 @@ export async function startProjectContainer(
     /* 1 ─ ensure image is present & host-arch-compatible (force x86_64) */
     execSync(`docker pull ${image}`, { stdio: 'inherit' });
 
-    // — pin to immutable digest if available
+    // ── pin to immutable digest and then re-tag it so `docker run` will work
     let imageRef = image;
     try {
       const digest = execSync(
@@ -197,11 +197,14 @@ export async function startProjectContainer(
         { encoding: 'utf8' }
       ).trim();
       if (digest) {
-        console.log("[startProjectContainer] using digest reference:", digest);
-        imageRef = digest;
+        console.log("[startProjectContainer] pulled digest:", digest);
+        // re-tag the digest to the original repo:tag
+        execSync(`docker tag ${digest} ${image}`, { stdio: 'inherit' });
+        imageRef = image;
       }
-    } catch {
-      console.warn("[startProjectContainer] could not retrieve digest; falling back to tag");
+    } catch (e) {
+      console.warn("[startProjectContainer] digest tagging failed; using tag:", e);
+      imageRef = image;
     }
 
     /* 1b ─ ensure the traefik network exists on the remote host */
