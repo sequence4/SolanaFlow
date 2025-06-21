@@ -47,11 +47,18 @@ function sizeOptSupported(): boolean {
 }
 
 /**
- * Returns true when DOCKER_HOST is set to an ssh:// or tcp:// value.
- *  Used to skip local-disk checks against the wrong host               */
+ * Returns true when the Docker daemon is overlay2 on an XFS filesystem
+ * mounted with the `pquota` option (the only case where `--storage-opt size=`
+ * is accepted). Falls back to false on any error.
+ */
 function isRemoteDocker(): boolean {
   const h = process.env.DOCKER_HOST ?? "";
-  return h.startsWith("ssh://") || h.startsWith("tcp://");
+  const remote = h.startsWith("ssh://") || h.startsWith("tcp://");
+  const forced = process.env.FORCE_REMOTE_DOCKER === "1";
+  /* quick trace so we see what the server really received */
+  console.debug("[docker] DOCKER_HOST =", h || "<unset>",
+                "| FORCE_REMOTE_DOCKER =", process.env.FORCE_REMOTE_DOCKER);
+  return remote || forced;
 }
 
 /**
@@ -76,19 +83,26 @@ function getDockerFreeBytes(): number {
  * Throws 'LOW_DOCKER_SPACE' if the space is still insufficient.
  */
 function ensureDockerSpace(minBytes = 3 * 1024 * 1024 * 1024): void {
-  /* Remote daemon → local df is meaningless, so skip the guard. */
+  /* Skip entirely for remote builds or when the dev forces it */
   if (isRemoteDocker()) {
-    console.warn("[startProjectContainer] remote Docker detected – " +
-                 "disk-space probe skipped");
+    console.warn("[startProjectContainer] remote Docker detected – "
+               + "disk-space probe skipped");
     return;
   }
 
-  if (getDockerFreeBytes() >= minBytes) return;
+  const free = getDockerFreeBytes();
 
-  console.warn(
-    `[startProjectContainer] Low Docker disk (<${minBytes} bytes). ` +
-    "Running docker system prune -af --volumes …"
-  );
+  /* If the probe failed (MAX_SAFE_INTEGER) we treat it as "unknown" and skip. */
+  if (free === Number.MAX_SAFE_INTEGER) {
+    console.warn("[startProjectContainer] Unable to measure Docker disk – "
+               + "skipping space guard");
+    return;
+  }
+
+  if (free >= minBytes) return;
+
+  console.warn(`[startProjectContainer] Low Docker disk (<${minBytes} bytes). `
+             + "Running docker system prune -af --volumes …");
   try {
     execSync("docker system prune -af --volumes", { stdio: "inherit" });
   } catch (e) {
