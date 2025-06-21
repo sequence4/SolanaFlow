@@ -1,5 +1,5 @@
 // ░░ FIRST, make sure env-vars are in place ░░
-import './bootstrapEnv';
+import './bootstrapEnv';               // this already guarantees DOCKER_HOST
 import express from 'express';
 import cors from 'cors';
 import authRoutes from '@/routes/authRoutes';
@@ -18,11 +18,7 @@ import internalCertRoute from '@/routes/internalCertRoute';
 import artifactRoute from '@/routes/artifactRoute';
 import { startCleanupWorker } from "./workers/cleanupWorker";
 
-if (!process.env.DOCKER_HOST || !process.env.DOCKER_HOST.trim()) {
-  console.error('[BOOT] DOCKER_HOST missing – aborting startup');
-  process.exit(1);
-}
-console.log('[DEBUG] DOCKER_HOST =', process.env.DOCKER_HOST);
+console.log('[BOOT] DOCKER_HOST =', process.env.DOCKER_HOST);
 
 const app = express();
 const PORT = process.env.PORT || 9999;

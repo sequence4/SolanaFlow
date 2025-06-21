@@ -11,3 +11,9 @@ console.debug(
   '[bootstrapEnv] DOCKER_HOST =',
   process.env.DOCKER_HOST ?? '<undefined>'
 );
+
+/* Abort early if the critical var is still missing ------------------------- */
+if (!process.env.DOCKER_HOST || !process.env.DOCKER_HOST.trim()) {
+  console.error('[bootstrapEnv] DOCKER_HOST missing – aborting startup');
+  process.exit(1);
+}
