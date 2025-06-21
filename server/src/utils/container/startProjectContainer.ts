@@ -203,7 +203,6 @@ export async function startProjectContainer(
     
     const runArgs: string[] = [
       'docker','run',
-      '--pull=always','-d','--platform','linux/amd64',
       '--name', name,
       '--label', `solanaflow.project=${projId}`,
       '-v', `${vCargo}:/root/.cargo`,
