@@ -62,7 +62,19 @@ export async function runDeployPipeline({
   try {
     workspace = await prepEnv(projectId, userId, devMode);
 
+    sendProgress(<ProgressEvent>{
+      stage: 'environment',
+      status: 'active',
+      message: 'Pulling tool-chain image…'    // new granular step
+    });
+    
     // emit the container URL so the UI can tune in
+    sendProgress(<ProgressEvent>{
+      stage: 'environment',
+      status: 'active',
+      message: 'Image pulled — starting container…'
+    });
+
     sendProgress(<ProgressEvent>{
       stage: "environment",
       status: "completed",

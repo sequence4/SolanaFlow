@@ -1,5 +1,4 @@
-// ░░ FIRST, make sure env-vars are in place ░░
-import './bootstrapEnv';               // this already guarantees DOCKER_HOST
+import 'dotenv/config';   
 import express from 'express';
 import cors from 'cors';
 import authRoutes from '@/routes/authRoutes';
@@ -17,8 +16,6 @@ import poolRoutes from '@/routes/poolRoutes';
 import internalCertRoute from '@/routes/internalCertRoute';
 import artifactRoute from '@/routes/artifactRoute';
 import { startCleanupWorker } from "./workers/cleanupWorker";
-
-console.log('[BOOT] DOCKER_HOST =', process.env.DOCKER_HOST);
 
 const app = express();
 const PORT = process.env.PORT || 9999;

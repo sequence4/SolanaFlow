@@ -26,6 +26,7 @@ console.debug(
  * FORCE_REMOTE_DOCKER unset, so the backend will happily use
  * the default Unix socket /var/run/docker.sock.
  * ──────────────────────────────────────────────────────────── */
+/*
 if (
   process.env.FORCE_REMOTE_DOCKER === '1' &&
   (!process.env.DOCKER_HOST || process.env.DOCKER_HOST.trim() === '')
@@ -35,6 +36,7 @@ if (
   );
   process.exit(1);
 }
+*/
 
 /* Optional: ensure the local socket path is set so downstream
  * helpers (e.g. dockerode) have a consistent default.

@@ -3,6 +3,14 @@ import pool from 'src/config/database';
 import { format } from 'node:util';
 import os from 'os';
 
+/* ──────────────── timing helper ──────────────── */
+function timed(cmd: string, label = cmd.split(' ')[1]): Buffer {
+  console.time(`[${label}]`);          // start timer
+  const out = execSync(cmd, { stdio: 'inherit' });  // still blocking
+  console.timeEnd(`[${label}]`);       // stop timer
+  return out;
+}
+
 // Comment out the fixed port constant
 // const PINNED_HOST_PORT = process.env.DAPP_HOST_PORT ?? '31000';
 
@@ -82,7 +90,7 @@ function sizeOptSupported(): boolean {
 function isRemoteDocker(): boolean {
   const h = process.env.DOCKER_HOST ?? "";
   const remote = h.startsWith("ssh://") || h.startsWith("tcp://");
-  const forced = process.env.FORCE_REMOTE_DOCKER === "1";
+  const forced = !!process.env.DOCKER_HOST && process.env.FORCE_REMOTE_DOCKER === "1";
   /* quick trace so we see what the server really received */
   console.debug("[docker] DOCKER_HOST =", h || "<unset>",
                 "| FORCE_REMOTE_DOCKER =", process.env.FORCE_REMOTE_DOCKER);
@@ -195,16 +203,18 @@ export async function startProjectContainer(
   const vSccache     = 'solanaflow-sccache';
 
   try {
+    process.env.DOCKER_CLI_DEBUG = process.env.DOCKER_CLI_DEBUG ?? '1'; // show HTTP calls
+    
     /* 1 ─ ensure image is present & host-arch-compatible (force x86_64) */
-    execSync(`docker pull ${image}`, { stdio: 'inherit' });
+    timed(`docker pull ${image}`, 'pull');
 
     // ── pin to immutable digest and then re-tag it so `docker run` will work
     let imageRef = image;
     try {
-      const digest = execSync(
+      const digest = timed(
         `docker inspect -f "{{index .RepoDigests 0}}" ${image}`,
-        { encoding: 'utf8' }
-      ).trim();
+        'inspect'
+      ).toString().trim();
       if (digest) {
         console.log("[startProjectContainer] pulled digest:", digest);
         // re-tag the digest to the original repo:tag
@@ -221,7 +231,7 @@ export async function startProjectContainer(
       execSync('docker network inspect traefik', { stdio: 'ignore' });
     } catch {
       console.warn('[startProjectContainer] creating missing "traefik" network');
-      execSync('docker network create traefik --driver bridge', { stdio: 'inherit' });
+      timed('docker network create traefik --driver bridge', 'net-create');
     }
 
     /* 2 ─ run container with explicit platform, project label & random host-port */
@@ -265,12 +275,11 @@ export async function startProjectContainer(
     ];
 
     console.log("[startProjectContainer] RUN CMD:\n", runArgs.join(" "));
-    execSync(runArgs.join(" "), { stdio: "inherit" });
+    timed(runArgs.join(" "), 'docker-run');
     
     let assignedPort = '';
     if (useDevServer) {
-      const portLine = execSync(`docker port ${name} ${INTERNAL_PORT}/tcp`)
-                         .toString().trim();           // e.g. "0.0.0.0:32768"
+      const portLine = timed(`docker port ${name} ${INTERNAL_PORT}/tcp`, 'docker-port').toString().trim();           // e.g. "0.0.0.0:32768"
       assignedPort = portLine.split(':').pop() || '';
     }
     
