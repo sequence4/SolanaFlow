@@ -17,9 +17,3 @@ if (!process.env.DOCKER_HOST || !process.env.DOCKER_HOST.trim()) {
   console.error('[bootstrapEnv] DOCKER_HOST missing – aborting startup');
   process.exit(1);
 }
-
-/* ─── make DOCKER_HOST immutable so later dotenv loads can't clear it ─── */
-Object.defineProperty(process.env, 'DOCKER_HOST', {
-  writable: false,
-  configurable: false
-});
