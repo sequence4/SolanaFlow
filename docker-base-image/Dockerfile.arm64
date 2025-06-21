@@ -200,6 +200,8 @@ COPY --from=builder /usr/share/solanaflow/web/.next/static \
 COPY --from=builder /root/.nvm/versions/node/v20.18.0 /root/.nvm/versions/node/v20.18.0
 RUN ln -sf /root/.nvm/versions/node/v20.18.0/bin/* /usr/local/bin/
 
+COPY --from=builder /usr/share/solanaflow/web/.next/static /usr/share/solanaflow/web/.next/static
+
 # sanity-check Yarn & Node
 RUN node -v && yarn -v      # should print 20.18.0 / 1.22.x
 
