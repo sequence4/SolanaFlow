@@ -1,5 +1,6 @@
 import { execSync } from 'child_process';
 import pool from 'src/config/database';
+import { format } from 'node:util';
 
 // ────────────────────────────────────────────────
 // Host port that every dApp container will publish
@@ -164,7 +165,11 @@ export async function startProjectContainer(projId: string): Promise<string> {
       '-e', `APP_ID=${projId}`,
       // Add Traefik labels for routing
       '--label', 'traefik.enable=true',
-      '--label', `traefik.http.routers.dapp-${projId}.rule='PathPrefix(\`/dapp/${projId}\`)'`,
+      '--label', format(
+        'traefik.http.routers.dapp-%s.rule=PathPrefix(`/dapp/%s`)',
+        projId,
+        projId,
+      ),
       '--label', `traefik.http.routers.dapp-${projId}.entrypoints=web,websecure`,
       '--label', `traefik.http.routers.dapp-${projId}.middlewares=strip-${projId}`,
       '--label', `traefik.http.middlewares.strip-${projId}.stripprefix.prefixes='/dapp/${projId}'`,
@@ -180,6 +185,7 @@ export async function startProjectContainer(projId: string): Promise<string> {
     console.log('[startProjectContainer] RUN CMD:\n', runArgs.join(' '));
     execSync(runArgs.join(' '), { stdio: 'inherit' });
 
+    console.log(`[startProjectContainer] dApp ↗ http://$HOST:${PINNED_HOST_PORT}/dapp/${projId}`);
     return name;
   } catch (err: any) {
     /* ---------- quarantine on failure ---------- */

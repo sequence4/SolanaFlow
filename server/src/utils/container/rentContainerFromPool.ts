@@ -102,21 +102,7 @@ export async function rentContainerFromPool(): Promise<RentedContainer | null> {
     // Add Traefik labels to the container
     addTraefikLabels(name, projectId);
     
-    // Persist the random host-port (needed so the same donor is not re-selected)
-    const hostPort = Number(process.env.DAPP_HOST_PORT ?? '31000');
-    if (hostPort === 0) {
-      throw new Error(
-        `[rent] container ${name} started without a published 3000/tcp port`
-      );
-    }
-    if (!Number.isNaN(hostPort)) {
-      await pool.query(
-        'UPDATE warm_container_pool SET port = $2 WHERE name = $1',
-        [name, hostPort]
-      );
-    }
-    
-    return { name, url, port: hostPort };
+    return { name, url: `http://$HOST:${process.env.DAPP_HOST_PORT ?? '31000'}`, port: Number(process.env.DAPP_HOST_PORT ?? '31000') };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
