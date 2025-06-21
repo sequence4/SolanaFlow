@@ -202,9 +202,11 @@ export async function startProjectContainer(projId: string): Promise<{
     const hostPort = mapped || PINNED_HOST_PORT;
 
     const host = process.env.PUBLIC_HOSTNAME ?? 'localhost';
-    const containerUrl = `http://${host}:${hostPort}`;
+    const base = `http://${host}:${hostPort}`;
+    // Include the PathPrefix so the front-end can load it directly
+    const containerUrl = `${base}/dapp/${projId}`;
     console.log(
-      `[startProjectContainer] ➜  ${containerUrl}/dapp/${projId}`,
+      `[startProjectContainer] ➜  ${containerUrl}`,
     );
     return {
       containerName: name,
