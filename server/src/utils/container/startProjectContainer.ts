@@ -314,16 +314,20 @@ export async function startProjectContainer(
       `--label=traefik.http.services.dapp-${projId}.loadbalancer.healthcheck.timeout=30s`,
       // pin to one SG-approved port so the UI link is always stable
       '-p', `${hostPort}:${INTERNAL_PORT}`,
+      // ---- Mount *once* to the path where the generator writes files ----
+      '-v', `${process.env.ROOT_FOLDER}/${projId}/web:/usr/src/${projId}/web`,
+      
+      // ---- Legacy mount kept for backwards compatibility (same host dir) ----
       '-v', `${process.env.ROOT_FOLDER}/${projId}/web:/usr/share/solanaflow/web`,
       imageRef,
       ...(useDevServer
         ? [
             'bash', '-lc',
-            `"cd /usr/share/solanaflow/web && yarn install --frozen-lockfile && npx next dev -H 0.0.0.0 -p 3000"`
+            `"cd /usr/src/${projId}/web && yarn install --frozen-lockfile && npx next dev -H 0.0.0.0 -p 3000"`
           ]
         : [
             'bash', '-lc',
-            `"node /usr/share/solanaflow/web/.next/standalone/server.js -H 0.0.0.0 -p ${INTERNAL_PORT} & pid=$!; trap 'kill $pid' TERM INT; wait $pid"`
+            `"node /usr/src/${projId}/web/.next/standalone/server.js -H 0.0.0.0 -p ${INTERNAL_PORT} & pid=$!; trap 'kill $pid' TERM INT; wait $pid"`
           ])
     ];
 
