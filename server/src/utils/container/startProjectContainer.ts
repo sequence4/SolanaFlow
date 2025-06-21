@@ -171,7 +171,10 @@ export async function startProjectContainer(projId: string): Promise<{
       'docker', 'run', 
       ...(withPullAlways ? ['--pull=always'] : []),
       '-d',
-      '--platform', 'linux/arm64',
+      // homing-pigeon: only set --platform if host arch differs
+      ...(execSync('docker info --format "{{.Architecture}}"',
+                  {encoding:'utf8'}).trim() === 'aarch64'
+          ? ['--platform','linux/arm64'] : []),
       '--name', name,
       '--label', `solanaflow.project=${projId}`,
       // attach 20 GiB quota only when overlay2 + xfs +pquota
@@ -194,9 +197,13 @@ export async function startProjectContainer(projId: string): Promise<{
       `--label='traefik.http.middlewares.strip-${projId}.stripprefix.prefixes=/dapp/${projId}'`,
       `--label=traefik.http.routers.dapp-${projId}.service=dapp-${projId}`,
       `--label=traefik.http.services.dapp-${projId}.loadbalancer.server.port=3000`,
-      '--network', 'traefik',              // let Traefik proxy via :80/:443
+      // Local-dev: expose 31000 → 3000 and mount web sources
+      '-p', `${PINNED_HOST_PORT}:3000`,
+      '-v', `${process.env.ROOT_FOLDER}/${projId}/web:/usr/share/solanaflow/web`,
       image,
-      'bash', '-lc', 'exec sleep infinity'
+      'bash','-lc',
+      'cd /usr/share/solanaflow/web && exec node .next/standalone/server.js ' +
+      '-H 0.0.0.0 -p 3000'
     ];
 
     console.log('[startProjectContainer] RUN CMD:\n', runArgs.join(' '));

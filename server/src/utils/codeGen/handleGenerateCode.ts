@@ -303,16 +303,7 @@ export const handleGenerateCode = async ({
           sendProgress({ stage: 'next-build-failed', message: 'Next.js build failed' });
         }
 
-        await runCommand(
-          `docker exec -d \
-            -e PORT=3000 \
-            -e APP_BASE_PATH= \
-            -w /usr/share/solanaflow/web \
-            ${workspace.containerName} \
-            bash -lc "exec node .next/standalone/server.js -H 0.0.0.0 -p 3000"`,
-          '.',
-          `next-start-${projectId}`
-        );
+        /* runtime server already started by docker run → nothing to do */
 
         // ───────────────────────── write graph-derived Rust sources ──────────────
         // For now, assume a basic program structure exists or will be created
