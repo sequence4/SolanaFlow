@@ -279,15 +279,15 @@ export async function startProjectContainer(
       '--platform', targetPlatform,                    // dynamic arch selection
       '--name', name,
       '--label', `solanaflow.project=${projId}`,
+      '--restart', 'unless-stopped',
       ...(sizeOptSupported() ? ['--storage-opt', 'size=20G'] : []),  // guard FS quota
       '-v', `${vCargo}:/root/.cargo`,
       '-v', `${vSccache}:/opt/sccache`,
       '-v', `${vTargetBuild}:/usr/src/target`,
       '-e', 'CARGO_TARGET_DIR=/usr/src/target',
       '-e', 'HOSTNAME=0.0.0.0',
-      // rust/anchor memory guard & cache
-      '--memory', '4g',
-      '--memory-swap', '-1',
+      // keep the two env-vars, but **drop** the --memory flags —
+      // anchor build needs >4 GiB during LTO
       '-e', 'CARGO_BUILD_JOBS=1',
       '-e', 'RUSTC_WRAPPER=sccache',
       '-e', `APP_ID=${projId}`,
@@ -299,6 +299,7 @@ export async function startProjectContainer(
       `--label='traefik.http.middlewares.strip-${projId}.stripprefix.prefixes=/dapp/${projId}'`,
       `--label=traefik.http.routers.dapp-${projId}.service=dapp-${projId}`,
       `--label=traefik.http.services.dapp-${projId}.loadbalancer.server.port=${INTERNAL_PORT}`,
+      `--label=traefik.http.services.dapp-${projId}.loadbalancer.healthcheck.timeout=30s`,
       // pin to one SG-approved port so the UI link is always stable
       '-p', `${HOST_PORT}:${INTERNAL_PORT}`,
       '-v', `${process.env.ROOT_FOLDER}/${projId}/web:/usr/share/solanaflow/web`,
