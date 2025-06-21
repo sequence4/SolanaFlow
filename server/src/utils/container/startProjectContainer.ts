@@ -8,9 +8,14 @@ import { format } from 'node:util';
 const PINNED_HOST_PORT = process.env.DAPP_HOST_PORT ?? '31000';
 // ────────────────────────────────────────────────
 
-const portInUse = (port: string): boolean =>
-  !!execSync(`docker ps --filter "publish=${port}" --format '{{.ID}}'`)
-       .toString().trim();
+function portInUse(port: string): boolean {
+  try {
+    return !!execSync(`docker ps --filter publish=${port} --format '{{.ID}}'`)
+             .toString().trim();
+  } catch {                       // treat any error as "port free"
+    return false;
+  }
+}
 
 /**
  * Checks if the Docker server version supports the --pull=always flag (added in 23.0.0)
@@ -171,16 +176,14 @@ export async function startProjectContainer(projId: string): Promise<{
       // Add APP_ID environment variable for Next.js inside the container
       '-e', `APP_ID=${projId}`,
       // Add Traefik labels for routing
-      '--label', 'traefik.enable=true',
-      // Quote value so back-ticks survive the shell → Docker → Traefik chain
-      '--label', '\'traefik.http.routers.dapp-' + projId +
-                 '.rule=PathPrefix(`/dapp/' + projId + '`)\'',
-      '--label', `traefik.http.routers.dapp-${projId}.entrypoints=web,websecure`,
-      '--label', `traefik.http.routers.dapp-${projId}.middlewares=strip-${projId}`,
-      '--label', '\'traefik.http.middlewares.strip-' + projId +
-                 '.stripprefix.prefixes=/dapp/' + projId + '\'',
-      '--label', `traefik.http.routers.dapp-${projId}.service=dapp-${projId}`,
-      '--label', `traefik.http.services.dapp-${projId}.loadbalancer.server.port=3000`,
+      '--label=traefik.enable=true',
+      // Use simpler double-quoted label format endorsed by Traefik docs
+      `--label=traefik.http.routers.dapp-${projId}.rule=PathPrefix(\`/dapp/${projId}\`)`,
+      `--label=traefik.http.routers.dapp-${projId}.entrypoints=web,websecure`,
+      `--label=traefik.http.routers.dapp-${projId}.middlewares=strip-${projId}`,
+      `--label=traefik.http.middlewares.strip-${projId}.stripprefix.prefixes=/dapp/${projId}`,
+      `--label=traefik.http.routers.dapp-${projId}.service=dapp-${projId}`,
+      `--label=traefik.http.services.dapp-${projId}.loadbalancer.server.port=3000`,
       // publish container port 3000 → fixed host port or let Docker choose if busy
       ...(portInUse(PINNED_HOST_PORT)
           ? ['-p', '0:3000']               // let Docker choose a free port
