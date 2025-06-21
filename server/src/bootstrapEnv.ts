@@ -1,11 +1,8 @@
 import path from 'node:path';
-import { config as loadEnv } from 'dotenv';
+import { config as loadDotenv } from 'dotenv';
 
-/**
- * Load server/.env *before* anything else is imported.
- * We resolve relative to this file so it works in dev (ts-node) and prod (dist/).
- */
-loadEnv({
-  path: path.resolve(__dirname, '..', '.env'),
-  override: false,          // keep any variables you already exported in the shell
+/* absolutised so it works from any CWD (ts-node or compiled JS) */
+loadDotenv({
+  path: path.resolve(__dirname, '..', '.env'), // server/.env
+  override: false                        // shell > file if both define a key
 }); 

@@ -19,10 +19,9 @@ import artifactRoute from '@/routes/artifactRoute';
 import { startCleanupWorker } from "./workers/cleanupWorker";
 
 if (!process.env.DOCKER_HOST) {
-  console.error('[BOOT] DOCKER_HOST is not set – refusing to start');
-  process.exit(1);
+  throw new Error('DOCKER_HOST missing – check server/.env');
 }
-console.log('[BOOT] DOCKER_HOST =', process.env.DOCKER_HOST);
+console.log('[DEBUG] DOCKER_HOST =', process.env.DOCKER_HOST);
 
 const app = express();
 const PORT = process.env.PORT || 9999;
