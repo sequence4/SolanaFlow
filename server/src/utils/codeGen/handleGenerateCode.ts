@@ -300,6 +300,14 @@ export const handleGenerateCode = async ({
           sendProgress({ stage: 'next-build-failed', message: 'Next.js build failed' });
         }
 
+        await runCommand(
+          `docker exec -d -w /usr/src/${workspace.rootPath}/web ` +
+          `${workspace.containerName} ` +
+          `node .next/standalone/server.js -H 0.0.0.0`,
+          '.',
+          `next-start-${projectId}`
+        );
+
         // ───────────────────────── write graph-derived Rust sources ──────────────
         // For now, assume a basic program structure exists or will be created
         // TODO: implement findProgramsDirectory and initAnchorProject when available

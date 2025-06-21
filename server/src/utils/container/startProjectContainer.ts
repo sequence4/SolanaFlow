@@ -196,7 +196,7 @@ export async function startProjectContainer(projId: string): Promise<{
       image,
       'bash',
       '-lc',
-      '"exec node /usr/share/solanaflow/web/.next/standalone/server.js -H 0.0.0.0"'
+      '"exec sleep infinity"'
     ];
 
     console.log('[startProjectContainer] RUN CMD:\n', runArgs.join(' '));
