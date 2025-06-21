@@ -6,9 +6,9 @@
 import Docker from 'dockerode';
 
 // 1️⃣  Remove misleading env vars _before_ constructing the client
-delete process.env.DOCKER_HOST;
-delete process.env.DOCKER_TLS_VERIFY;
-delete process.env.DOCKER_CERT_PATH;
+//delete process.env.DOCKER_HOST;
+//delete process.env.DOCKER_TLS_VERIFY;
+//delete process.env.DOCKER_CERT_PATH;
 
 // 2️⃣  Build a single client that always hits the local socket
 const docker = new Docker({

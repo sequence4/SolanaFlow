@@ -207,23 +207,22 @@ export async function startProjectContainer(projId: string): Promise<{
              `${process.env.ROOT_FOLDER}/${projId}/web:/workspace/web`]
           : ['-v',
              `${process.env.ROOT_FOLDER}/${projId}/web:/usr/share/solanaflow/web`]),
-      image,
-      'bash','-lc',
-      (
-        useDevServer
-          ? [
-              'cd /workspace/web',
-              // keep basePath so links work behind Traefik
-              `APP_BASE_PATH=/dapp/${projId}`,
-              'yarn install --frozen-lockfile',
-              'yarn dev -H 0.0.0.0 -p 3000'
-            ].join(' && ')
-          : [
-              'cd /usr/share/solanaflow/web',
-              'NEXT_PRIVATE_STANDALONE=1 APP_BASE_PATH= npm run build',
-              'node .next/standalone/server.js -H 0.0.0.0 -p 3000'
-            ].join(' && ')
-      )
+             image,
+              'bash','-lc',
+              (
+                useDevServer
+                ? [
+                    'cd /workspace/web',
+                    `export APP_BASE_PATH=/dapp/${projId}`,
+                    'yarn install --frozen-lockfile',
+                    'yarn dev -H 0.0.0.0 -p 3000'
+                  ].join(' && ')
+                : [
+                    'cd /usr/share/solanaflow/web',
+                    'NEXT_PRIVATE_STANDALONE=1 APP_BASE_PATH= npm run build',
+                    'node .next/standalone/server.js -H 0.0.0.0 -p 3000'
+                  ].join(' && ')
+                )
     ];
 
     console.log('[startProjectContainer] RUN CMD:\n', runArgs.join(' '));
