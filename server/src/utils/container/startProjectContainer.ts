@@ -194,8 +194,9 @@ export async function startProjectContainer(projId: string): Promise<{
       `--label=traefik.http.services.dapp-${projId}.loadbalancer.server.port=3000`,
       '--network', 'traefik',              // let Traefik proxy via :80/:443
       image,
-      'bash', '-lc',
-      "exec node /usr/share/solanaflow/web/.next/standalone/server.js -H 0.0.0.0"
+      'bash',
+      '-lc',
+      '"exec node /usr/share/solanaflow/web/.next/standalone/server.js -H 0.0.0.0"'
     ];
 
     console.log('[startProjectContainer] RUN CMD:\n', runArgs.join(' '));
