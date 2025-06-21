@@ -98,17 +98,40 @@ function isRemoteDocker(): boolean {
 }
 
 /**
+ * Returns the Docker daemon's root directory path.
+ * Falls back to '/var/lib/docker' if unable to determine.
+ */
+function getDockerRoot(): string {
+  try {
+    return execSync(
+      'docker info --format "{{.DockerRootDir}}"',
+      { encoding: 'utf8' }
+    ).trim() || '/var/lib/docker';
+  } catch { 
+    return '/var/lib/docker'; 
+  }
+}
+
+/**
  * Returns free bytes left on the partition that backs /var/lib/docker.
  * Falls back to Number.MAX_SAFE_INTEGER on any failure so we never block.
  */
 function getDockerFreeBytes(): number {
   try {
+    const rootDir = getDockerRoot();
+    // Check if rootDir exists before running df
+    if (!execSync(`test -d "${rootDir}" && echo "exists"`, { encoding: "utf8" }).includes("exists")) {
+      console.warn(`[getDockerFreeBytes] Docker root '${rootDir}' not found, skipping probe`);
+      return Number.MAX_SAFE_INTEGER;  // Skip probe if rootDir doesn't exist
+    }
+    
     const out = execSync(
-      "df -B1 /var/lib/docker | tail -1 | awk '{print $4}'",
+      `df -B1 ${rootDir} | tail -1 | awk '{print $4}'`,
       { encoding: "utf8" }
     ).trim();
     return Number(out || 0);
-  } catch {
+  } catch (e) {
+    console.warn("[getDockerFreeBytes] probe failed:", e);
     return Number.MAX_SAFE_INTEGER;
   }
 }
@@ -211,15 +234,21 @@ export async function startProjectContainer(
     // ── pin to immutable digest and then re-tag it so `docker run` will work
     let imageRef = image;
     try {
-      const digest = timed(
-        `docker inspect -f "{{index .RepoDigests 0}}" ${image}`,
-        'inspect'
-      ).toString().trim();
-      if (digest) {
-        console.log("[startProjectContainer] pulled digest:", digest);
-        // re-tag the digest to the original repo:tag
-        execSync(`docker tag ${digest} ${image}`, { stdio: 'inherit' });
-        imageRef = image;
+      let digest = '';
+      try {
+        const buf = timed(
+          `docker inspect -f "{{index .RepoDigests 0}}" ${image}`,
+          'inspect'
+        );
+        digest = buf ? buf.toString().trim() : '';
+        if (digest) {
+          console.log('[startProjectContainer] pulled digest:', digest);
+          execSync(`docker tag ${digest} ${image}`, { stdio: 'inherit' });
+          imageRef = image;          // pinned
+        }
+      } catch (e) {
+        console.warn('[startProjectContainer] no digest found – using tag only');
+        imageRef = image;            // safe fallback
       }
     } catch (e) {
       console.warn("[startProjectContainer] digest tagging failed; using tag:", e);
