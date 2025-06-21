@@ -292,7 +292,7 @@ export const handleGenerateCode = async ({
             `docker exec \
       -e NEXT_PRIVATE_STANDALONE=true \
       -e APP_BASE_PATH= \
-      -w /usr/share/solanaflow/web ` +
+      -w ${process.env.SF_DEV_SERVER === '1' ? '/workspace/web' : '/usr/share/solanaflow/web'} ` +
             `${workspace.containerName} npm run build`,
             '.',
             projectId

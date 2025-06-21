@@ -141,8 +141,11 @@ export async function startProjectContainer(projId: string): Promise<{
 }> {
   const name  = `userproj-${projId}-${Date.now()}`.slice(0, 63);        // 64-char limit
   // Use the tag only, let --pull=always refresh it
-  const image = process.env.SOLANAFLOW_BUILD_IMAGE ?? 
+  const image = process.env.SOLANAFLOW_BUILD_IMAGE ??
               'ghcr.io/sequence4/solana-toolchain:runtime-latest';
+
+  /** Toggle: `SF_DEV_SERVER=1` ⇒ start `next dev` instead of standalone build */
+  const useDevServer = process.env.SF_DEV_SERVER === '1';
   
   const withPullAlways = pullAlwaysAllowed(image);
               
@@ -152,8 +155,8 @@ export async function startProjectContainer(projId: string): Promise<{
   const vSccache     = 'solanaflow-sccache';
 
   try {
-    /* 1 ─ ensure image is present & host-arch-compatible */
-    execSync(`docker pull --platform linux/arm64 ${image}`, { stdio: 'inherit' });
+    /* 1 ─ ensure image is present & host-arch-compatible (force x86_64) */
+    execSync(`docker pull --platform linux/amd64 ${image}`, { stdio: 'inherit' });
 
     /* 1b ─ ensure the traefik network exists on the remote host */
     try {
@@ -172,9 +175,7 @@ export async function startProjectContainer(projId: string): Promise<{
       ...(withPullAlways ? ['--pull=always'] : []),
       '-d',
       // homing-pigeon: only set --platform if host arch differs
-      ...(execSync('docker info --format "{{.Architecture}}"',
-                  {encoding:'utf8'}).trim() === 'aarch64'
-          ? ['--platform','linux/arm64'] : []),
+      '--platform','linux/amd64',
       '--name', name,
       '--label', `solanaflow.project=${projId}`,
       // attach 20 GiB quota only when overlay2 + xfs +pquota
@@ -199,11 +200,30 @@ export async function startProjectContainer(projId: string): Promise<{
       `--label=traefik.http.services.dapp-${projId}.loadbalancer.server.port=3000`,
       // Local-dev: expose 31000 → 3000 and mount web sources
       '-p', `${PINNED_HOST_PORT}:3000`,
-      '-v', `${process.env.ROOT_FOLDER}/${projId}/web:/usr/share/solanaflow/web`,
+      // ───────────────────────────────────────────
+      // In dev we mount at /workspace/web so we don't shadow the image build
+      ...(useDevServer
+          ? ['-v',
+             `${process.env.ROOT_FOLDER}/${projId}/web:/workspace/web`]
+          : ['-v',
+             `${process.env.ROOT_FOLDER}/${projId}/web:/usr/share/solanaflow/web`]),
       image,
       'bash','-lc',
-      'cd /usr/share/solanaflow/web && exec node .next/standalone/server.js ' +
-      '-H 0.0.0.0 -p 3000'
+      (
+        useDevServer
+          ? [
+              'cd /workspace/web',
+              // keep basePath so links work behind Traefik
+              `APP_BASE_PATH=/dapp/${projId}`,
+              'yarn install --frozen-lockfile',
+              'yarn dev -H 0.0.0.0 -p 3000'
+            ].join(' && ')
+          : [
+              'cd /usr/share/solanaflow/web',
+              'NEXT_PRIVATE_STANDALONE=1 APP_BASE_PATH= npm run build',
+              'node .next/standalone/server.js -H 0.0.0.0 -p 3000'
+            ].join(' && ')
+      )
     ];
 
     console.log('[startProjectContainer] RUN CMD:\n', runArgs.join(' '));
