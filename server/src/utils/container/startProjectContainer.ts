@@ -165,7 +165,7 @@ export async function startProjectContainer(projId: string): Promise<string> {
       '-e', `APP_ID=${projId}`,
       // Add Traefik labels for routing
       '--label', 'traefik.enable=true',
-      '--label', `traefik.http.routers.dapp-${projId}.rule=PathPrefix(\\\`/dapp/${projId}\\\`)`,
+      '--label', `traefik.http.routers.dapp-${projId}.rule=PathPrefix(\`/dapp/${projId}\`)`,
       '--label', `traefik.http.routers.dapp-${projId}.entrypoints=web,websecure`,
       '--label', `traefik.http.routers.dapp-${projId}.middlewares=strip-${projId}`,
       '--label', `traefik.http.middlewares.strip-${projId}.stripprefix.prefixes='/dapp/${projId}'`,
