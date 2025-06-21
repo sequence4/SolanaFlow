@@ -39,17 +39,7 @@ const Interface = () => {
 
     const iframeSrc = React.useMemo(() => {
         if (!containerUrl) return "";
-        try {
-            const url = new URL(containerUrl);
-            // in prod we serve each dApp via NGINX at /dapp/
-            if (process.env.NODE_ENV === "production") {
-                return `/dapp${url.pathname || "/"}`;
-            }
-            // local dev keeps the full http://localhost:327xx form
-            return containerUrl;
-        } catch {
-            return containerUrl;
-        }
+        return containerUrl;
     }, [containerUrl]);
 
     const openInNewTab = () => {

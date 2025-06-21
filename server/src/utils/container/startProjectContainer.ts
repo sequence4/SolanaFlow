@@ -184,10 +184,7 @@ export async function startProjectContainer(projId: string): Promise<{
       `--label='traefik.http.middlewares.strip-${projId}.stripprefix.prefixes=/dapp/${projId}'`,
       `--label=traefik.http.routers.dapp-${projId}.service=dapp-${projId}`,
       `--label=traefik.http.services.dapp-${projId}.loadbalancer.server.port=3000`,
-      // publish container port 3000 → fixed host port or let Docker choose if busy
-      ...(portInUse(PINNED_HOST_PORT)
-          ? ['-p', '0:3000']               // let Docker choose a free port
-          : ['-p', `${PINNED_HOST_PORT}:3000`]),
+      '--network', 'traefik',              // let Traefik proxy via :80/:443
       image,
       'bash', '-lc',
       '"node /usr/share/solanaflow/web/.next/standalone/server.js -H 0.0.0.0 & pid=$!; trap \\"kill $pid\\" TERM INT; wait $pid"'
@@ -196,15 +193,9 @@ export async function startProjectContainer(projId: string): Promise<{
     console.log('[startProjectContainer] RUN CMD:\n', runArgs.join(' '));
     execSync(runArgs.join(' '), { stdio: 'inherit' });
 
-    const mapped = execSync(
-      `docker port ${name} 3000/tcp | head -n1 | awk -F: '{print $2}'`
-    ).toString().trim();
-    const hostPort = mapped || PINNED_HOST_PORT;
-
     const host = process.env.PUBLIC_HOSTNAME ?? 'localhost';
-    const base = `http://${host}:${hostPort}`;
-    // Include the PathPrefix so the front-end can load it directly
-    const containerUrl = `${base}/dapp/${projId}`;
+    // Traefik serves everything over 80/443
+    const containerUrl = `https://${host}/dapp/${projId}`;
     console.log(
       `[startProjectContainer] ➜  ${containerUrl}`,
     );
