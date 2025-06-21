@@ -1,12 +1,24 @@
 import { execSync } from 'child_process';
 import pool from 'src/config/database';
 import { format } from 'node:util';
+import os from 'os';
 
 // ────────────────────────────────────────────────
 // Host port that every dApp container will publish
 // Change the default if 31000 is taken, or expose it via .env
 const PINNED_HOST_PORT = process.env.DAPP_HOST_PORT ?? '31000';
 // ────────────────────────────────────────────────
+
+function getDockerHostIP(): string {
+  const dh = process.env.DOCKER_HOST;
+  if (!dh) return 'localhost';
+  try {
+    const u = new URL(dh);
+    return u.hostname || 'localhost';
+  } catch {
+    return 'localhost';
+  }
+}
 
 function portInUse(port: string): boolean {
   try {
@@ -170,67 +182,55 @@ export async function startProjectContainer(projId: string): Promise<{
     // NEW: make sure the host has enough free space (≥ 3 GiB)
     ensureDockerSpace();
 
+    const internalPort = 3000;
+    const devMode = process.env.SF_DEV_SERVER === "1";
+    
     const runArgs: string[] = [
-      'docker', 'run', 
-      ...(withPullAlways ? ['--pull=always'] : []),
-      '-d',
-      // homing-pigeon: only set --platform if host arch differs
-      '--platform','linux/amd64',
-      '--name', name,
-      '--label', `solanaflow.project=${projId}`,
-      // attach 20 GiB quota only when overlay2 + xfs +pquota
-      ...(sizeOptSupported() ? ['--storage-opt', 'size=20G'] : []),
-      '-v', `${vCargo}:/root/.cargo`,
-      '-v', `${vSccache}:/opt/sccache`,
-      '-v', `${vTargetBuild}:/usr/src/target`,
-      '-e', 'CARGO_TARGET_DIR=/usr/src/target',
-      '-e', 'HOSTNAME=0.0.0.0',
-      // Add APP_ID environment variable for Next.js inside the container
-      '-e', `APP_ID=${projId}`,
-      // 👉 new – the value the Next build baked in
-      '-e', `APP_BASE_PATH=/dapp/${projId}`,
-      // Add Traefik labels for routing
-      '--label=traefik.enable=true',
-      // Quote the whole rule so the shell never touches the back-ticks
-      `--label='traefik.http.routers.dapp-${projId}.rule=PathPrefix(\`/dapp/${projId}\`)'`,
+      "docker", "run", "-d", "--platform", "linux/amd64",
+      "--name", name,
+      "--label", `solanaflow.project=${projId}`,
+      "-v", `${vCargo}:/root/.cargo`,
+      "-v", `${vSccache}:/opt/sccache`,
+      "-v", `${vTargetBuild}:/usr/src/target`,
+      "-e", "CARGO_TARGET_DIR=/usr/src/target",
+      "-e", "HOSTNAME=0.0.0.0",
+      "-e", `APP_ID=${projId}`,
+      "-e", `APP_BASE_PATH=/dapp/${projId}`,
+      "--label=traefik.enable=true",
+      `--label=traefik.http.routers.dapp-${projId}.rule=PathPrefix(\`/dapp/${projId}\`)`,
       `--label=traefik.http.routers.dapp-${projId}.entrypoints=web,websecure`,
-      `--label='traefik.http.routers.dapp-${projId}.middlewares=strip-${projId}'`,
-      `--label='traefik.http.middlewares.strip-${projId}.stripprefix.prefixes=/dapp/${projId}'`,
+      `--label=traefik.http.routers.dapp-${projId}.middlewares=strip-${projId}`,
+      `--label=traefik.http.middlewares.strip-${projId}.stripprefix.prefixes=/dapp/${projId}`,
       `--label=traefik.http.routers.dapp-${projId}.service=dapp-${projId}`,
-      `--label=traefik.http.services.dapp-${projId}.loadbalancer.server.port=3000`,
-      // Local-dev: expose 31000 → 3000 and mount web sources
-      '-p', `${PINNED_HOST_PORT}:3000`,
-      // ───────────────────────────────────────────
-      // In dev we mount at /workspace/web so we don't shadow the image build
-      ...(useDevServer
-          ? ['-v',
-             `${process.env.ROOT_FOLDER}/${projId}/web:/workspace/web`]
-          : ['-v',
-             `${process.env.ROOT_FOLDER}/${projId}/web:/usr/share/solanaflow/web`]),
-             image,
-              'bash','-lc',
-              (
-                useDevServer
-                ? [
-                    'cd /workspace/web',
-                    `export APP_BASE_PATH=/dapp/${projId}`,
-                    'yarn install --frozen-lockfile',
-                    'yarn dev -H 0.0.0.0 -p 3000'
-                  ].join(' && ')
-                : [
-                    'cd /usr/share/solanaflow/web',
-                    'NEXT_PRIVATE_STANDALONE=1 APP_BASE_PATH= npm run build',
-                    'node .next/standalone/server.js -H 0.0.0.0 -p 3000'
-                  ].join(' && ')
-                )
+      `--label=traefik.http.services.dapp-${projId}.loadbalancer.server.port=${internalPort}`,
+      "-p", "0:3000",  // ⚠️ dynamic port
+      "-v", `${process.env.ROOT_FOLDER}/${projId}/web:/usr/share/solanaflow/web`,
+      image,
+      ...(devMode
+        ? [
+            "bash", "-lc",
+            [
+              "cd /usr/share/solanaflow/web",
+              "yarn install --frozen-lockfile",
+              "yarn dev -H 0.0.0.0 -p 3000"
+            ].join(" && ")
+          ]
+        : [
+            "node", "/usr/share/solanaflow/web/.next/standalone/server.js",
+            "-H", "0.0.0.0", "-p", "3000"
+          ])
     ];
 
-    console.log('[startProjectContainer] RUN CMD:\n', runArgs.join(' '));
-    execSync(runArgs.join(' '), { stdio: 'inherit' });
+    console.log("[startProjectContainer] RUN CMD:\n", runArgs.join(" "));
+    execSync(runArgs.join(" "), { stdio: "inherit" });
+    
+    const inspectOut = execSync(`docker inspect ${name}`, { encoding: "utf8" });
+    const parsed = JSON.parse(inspectOut)[0];
+    const portMap = parsed.NetworkSettings.Ports["3000/tcp"];
+    const assignedPort = portMap?.[0]?.HostPort ?? "3000";
+    const dockerHost = getDockerHostIP();
+    const containerUrl = `http://${dockerHost}:${assignedPort}`;
 
-    const host = process.env.PUBLIC_HOSTNAME ?? 'localhost';
-    // Traefik serves everything over 80/443
-    const containerUrl = `https://${host}/dapp/${projId}`;
     console.log(
       `[startProjectContainer] ➜  ${containerUrl}`,
     );
