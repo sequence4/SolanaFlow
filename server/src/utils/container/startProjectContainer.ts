@@ -195,7 +195,7 @@ export async function startProjectContainer(projId: string): Promise<{
       '--network', 'traefik',              // let Traefik proxy via :80/:443
       image,
       'bash', '-lc',
-      '"node /usr/share/solanaflow/web/.next/standalone/server.js -H 0.0.0.0 & pid=$!; trap \\"kill $pid\\" TERM INT; wait $pid"'
+      "exec node /usr/share/solanaflow/web/.next/standalone/server.js -H 0.0.0.0"
     ];
 
     console.log('[startProjectContainer] RUN CMD:\n', runArgs.join(' '));

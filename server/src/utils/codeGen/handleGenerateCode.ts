@@ -395,13 +395,6 @@ export const handleGenerateCode = async ({
         // tell frontend UI files are done
         sendProgress({ stage: "ui-complete" });
 
-        // 🟢 start the server **inside the container** so cwd is valid
-        runCommandDetached(
-          `docker exec -e PORT=3000 -w /usr/share/solanaflow/web/.next/standalone ` +
-          `${workspace.containerName} node server.js -p 3000`,
-          '.',
-          `next-serve-${projectId}`
-        ).catch(console.error);
         // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
         // ─────────── Run static lint on Cargo manifests before amending ───────────
