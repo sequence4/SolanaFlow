@@ -8,6 +8,10 @@ import { format } from 'node:util';
 const PINNED_HOST_PORT = process.env.DAPP_HOST_PORT ?? '31000';
 // ────────────────────────────────────────────────
 
+const portInUse = (port: string): boolean =>
+  !!execSync(`docker ps --filter "publish=${port}" --format '{{.ID}}'`)
+       .toString().trim();
+
 /**
  * Checks if the Docker server version supports the --pull=always flag (added in 23.0.0)
  */
@@ -124,9 +128,12 @@ function ensureDockerSpace(minBytes = 3 * 1024 * 1024 * 1024): void {
  * Starts a new Docker container for a project
  * 
  * @param projId - The project ID
- * @returns The name of the created container
+ * @returns The container details including name and URL
  */
-export async function startProjectContainer(projId: string): Promise<string> {
+export async function startProjectContainer(projId: string): Promise<{
+  containerName: string;
+  containerUrl: string;
+}> {
   const name  = `userproj-${projId}-${Date.now()}`.slice(0, 63);        // 64-char limit
   // Use the tag only, let --pull=always refresh it
   const image = process.env.SOLANAFLOW_BUILD_IMAGE ?? 
@@ -174,8 +181,10 @@ export async function startProjectContainer(projId: string): Promise<string> {
                  '.stripprefix.prefixes=/dapp/' + projId + '\'',
       '--label', `traefik.http.routers.dapp-${projId}.service=dapp-${projId}`,
       '--label', `traefik.http.services.dapp-${projId}.loadbalancer.server.port=3000`,
-      // publish container port 3000 → **fixed** host port
-      '-p', `${PINNED_HOST_PORT}:3000`,
+      // publish container port 3000 → fixed host port or let Docker choose if busy
+      ...(portInUse(PINNED_HOST_PORT)
+          ? ['-p', '0:3000']               // let Docker choose a free port
+          : ['-p', `${PINNED_HOST_PORT}:3000`]),
       image,
       'bash', '-lc',
       '"node /usr/share/solanaflow/web/.next/standalone/server.js -H 0.0.0.0 & pid=$!; trap \\"kill $pid\\" TERM INT; wait $pid"'
@@ -184,11 +193,20 @@ export async function startProjectContainer(projId: string): Promise<string> {
     console.log('[startProjectContainer] RUN CMD:\n', runArgs.join(' '));
     execSync(runArgs.join(' '), { stdio: 'inherit' });
 
+    const mapped = execSync(
+      `docker port ${name} 3000/tcp | head -n1 | awk -F: '{print $2}'`
+    ).toString().trim();
+    const hostPort = mapped || PINNED_HOST_PORT;
+
     const host = process.env.PUBLIC_HOSTNAME ?? 'localhost';
+    const containerUrl = `http://${host}:${hostPort}`;
     console.log(
-      `[startProjectContainer] ➜  http://${host}:${PINNED_HOST_PORT}/dapp/${projId}`,
+      `[startProjectContainer] ➜  ${containerUrl}/dapp/${projId}`,
     );
-    return name;
+    return {
+      containerName: name,
+      containerUrl
+    };
   } catch (err: any) {
     /* ---------- quarantine on failure ---------- */
     const reason = err.stderr?.toString() || err.message || 'unknown';
