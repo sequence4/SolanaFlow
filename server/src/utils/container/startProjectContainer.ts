@@ -283,10 +283,10 @@ export async function startProjectContainer(
       '-e', `APP_ID=${projId}`,
       '-e', `APP_BASE_PATH=/dapp/${projId}`,
       '--label=traefik.enable=true',
-      `--label=traefik.http.routers.dapp-${projId}.rule=PathPrefix(\\\`/dapp/${projId}\\\`)`,
+      `--label='traefik.http.routers.dapp-${projId}.rule=PathPrefix(\`/dapp/${projId}\`)'`,
       `--label=traefik.http.routers.dapp-${projId}.entrypoints=web,websecure`,
-      `--label=traefik.http.routers.dapp-${projId}.middlewares=strip-${projId}`,
-      `--label=traefik.http.middlewares.strip-${projId}.stripprefix.prefixes=/dapp/${projId}`,
+      `--label='traefik.http.routers.dapp-${projId}.middlewares=strip-${projId}'`,
+      `--label='traefik.http.middlewares.strip-${projId}.stripprefix.prefixes=/dapp/${projId}'`,
       `--label=traefik.http.routers.dapp-${projId}.service=dapp-${projId}`,
       `--label=traefik.http.services.dapp-${projId}.loadbalancer.server.port=${INTERNAL_PORT}`,
       '-p', `0:${INTERNAL_PORT}`,                      // random host-port → 3000 in container
