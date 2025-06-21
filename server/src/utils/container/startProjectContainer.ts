@@ -180,6 +180,15 @@ export async function startProjectContainer(
   
   const withPullAlways = pullAlwaysAllowed(image);
               
+  // ── pick architecture: env override > host default
+  const hostArch = execSync('docker info --format "{{.Architecture}}"')
+                  .toString().trim();                       // "x86_64" | "aarch64"
+
+  const targetPlatform =
+    process.env.SF_DOCKER_PLATFORM            // explicit override
+    ?? (hostArch === 'x86_64' ? 'linux/amd64' // EC2/Intel boxes
+                              : 'linux/arm64'); // Apple Silicon, Graviton, …
+  
   // 📦 three isolated caches
   const vCargo       = 'solanaflow-cargo-registry';
   const vTargetBuild = 'solanaflow-cargo-target';
@@ -220,10 +229,13 @@ export async function startProjectContainer(
     ensureDockerSpace();
     
     const runArgs: string[] = [
-      'docker','run',
-      '--platform', 'linux/amd64',
+      'docker', 'run',
+      ...(withPullAlways ? ['--pull=always'] : []),     // refresh tag (Docker ≥ 23)
+      '-d',                                            // detached – let pipeline continue
+      '--platform', targetPlatform,                    // dynamic arch selection
       '--name', name,
       '--label', `solanaflow.project=${projId}`,
+      ...(sizeOptSupported() ? ['--storage-opt', 'size=20G'] : []),  // guard FS quota
       '-v', `${vCargo}:/root/.cargo`,
       '-v', `${vSccache}:/opt/sccache`,
       '-v', `${vTargetBuild}:/usr/src/target`,
@@ -232,25 +244,23 @@ export async function startProjectContainer(
       '-e', `APP_ID=${projId}`,
       '-e', `APP_BASE_PATH=/dapp/${projId}`,
       '--label=traefik.enable=true',
-      `--label='traefik.http.routers.dapp-${projId}.rule=PathPrefix(\`/dapp/${projId}\`)'`,
+      `--label=traefik.http.routers.dapp-${projId}.rule=PathPrefix(\\\`/dapp/${projId}\\\`)`,
       `--label=traefik.http.routers.dapp-${projId}.entrypoints=web,websecure`,
-      `--label='traefik.http.routers.dapp-${projId}.middlewares=strip-${projId}'`,
-      `--label='traefik.http.middlewares.strip-${projId}.stripprefix.prefixes=/dapp/${projId}'`,
+      `--label=traefik.http.routers.dapp-${projId}.middlewares=strip-${projId}`,
+      `--label=traefik.http.middlewares.strip-${projId}.stripprefix.prefixes=/dapp/${projId}`,
       `--label=traefik.http.routers.dapp-${projId}.service=dapp-${projId}`,
       `--label=traefik.http.services.dapp-${projId}.loadbalancer.server.port=${INTERNAL_PORT}`,
-      '-p', `0:${INTERNAL_PORT}`,                // let Docker choose
+      '-p', `0:${INTERNAL_PORT}`,                      // random host-port → 3000 in container
       '-v', `${process.env.ROOT_FOLDER}/${projId}/web:/usr/share/solanaflow/web`,
       imageRef,
       ...(useDevServer
         ? [
-            'bash','-lc',
-            `"cd /usr/share/solanaflow/web \\
-            && yarn install --frozen-lockfile \\
-            && npx next dev -H 0.0.0.0 -p 3000"`
+            'bash', '-lc',
+            `"cd /usr/share/solanaflow/web && yarn install --frozen-lockfile && npx next dev -H 0.0.0.0 -p 3000"`
           ]
         : [
-            'node','/usr/share/solanaflow/web/.next/standalone/server.js',
-            '-H','0.0.0.0','-p', String(INTERNAL_PORT)
+            'bash', '-lc',
+            `"node /usr/share/solanaflow/web/.next/standalone/server.js -H 0.0.0.0 -p ${INTERNAL_PORT} & pid=$!; trap 'kill $pid' TERM INT; wait $pid"`
           ])
     ];
 
