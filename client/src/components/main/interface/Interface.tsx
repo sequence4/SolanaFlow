@@ -4,7 +4,6 @@ import '@/styles/interface/interfaceStyle.css';
 import ProjectContext from "@/context/project/ProjectContext";
 import { projectApi } from '@/api/projectApi';
 import { Loader2, RefreshCw, ExternalLink } from "lucide-react";
-import isWsl from "is-wsl";
 
 const Interface = () => {
     const { projectContext, setProjectContext } = useContext(ProjectContext);
@@ -13,6 +12,10 @@ const Interface = () => {
     const [isRefreshing, setIsRefreshing] = useState(false);
     // manual override typed by the user
     const [manualUrl, setManualUrl] = useState<string>("");
+
+    // Treat "localhost" as "dev / Docker-Desktop" so we can probe the high port.
+    const isLocalDev = typeof window !== "undefined" &&
+                       window.location.hostname === "localhost";
 
     // helper: pick manual first, then backend, otherwise blank
     const activeUrl = manualUrl || containerUrl || "";
@@ -75,7 +78,7 @@ const Interface = () => {
     // Auto-open the local high-port when running on WSL / Docker-Desktop
     useEffect(() => {
         // auto-fallback only if no backend url yet
-        if (containerUrl || !isWsl) return;
+        if (containerUrl || !isLocalDev) return;
 
         // quick probe: pick the first published host-port for this container
         (async () => {
@@ -87,7 +90,7 @@ const Interface = () => {
                 console.warn("[Interface] WSL auto-port probe failed:", e);
             }
         })();
-    }, [isWsl, projectId, containerUrl]);
+    }, [isLocalDev, projectId, containerUrl]);
 
     return (
         <div className="relative w-full h-full">
