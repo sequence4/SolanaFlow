@@ -3,11 +3,11 @@ import pool from 'src/config/database';
 import { format } from 'node:util';
 import os from 'os';
 
-// ────────────────────────────────────────────────
-// Host port that every dApp container will publish
-// Change the default if 31000 is taken, or expose it via .env
-const PINNED_HOST_PORT = process.env.DAPP_HOST_PORT ?? '31000';
-// ────────────────────────────────────────────────
+// Comment out the fixed port constant
+// const PINNED_HOST_PORT = process.env.DAPP_HOST_PORT ?? '31000';
+
+// Define internal port constant
+const INTERNAL_PORT = 3000;
 
 function getDockerHostIP(): string {
   const dh = process.env.DOCKER_HOST;
@@ -142,12 +142,31 @@ function ensureDockerSpace(minBytes = 3 * 1024 * 1024 * 1024): void {
 }
 
 /**
+ * Resolves the container URL using the appropriate host and port
+ */
+export function resolveContainerUrl(port: string) {
+  const fqdn = process.env.PUBLIC_FQDN;
+  if (fqdn) return `http://${fqdn}:${port}`;
+
+  const dockerHost = process.env.DOCKER_HOST;
+  if (dockerHost && dockerHost.startsWith('tcp://')) {
+    try { return `http://${new URL(dockerHost).hostname}:${port}`; }
+    catch {/* fall through */}
+  }
+  return `http://localhost:${port}`;
+}
+
+/**
  * Starts a new Docker container for a project
  * 
  * @param projId - The project ID
+ * @param devMode - Whether to run in development mode with hot-reload
  * @returns The container details including name and URL
  */
-export async function startProjectContainer(projId: string): Promise<{
+export async function startProjectContainer(
+  projId: string,
+  devMode = false,
+): Promise<{
   containerName: string;
   containerUrl: string;
 }> {
@@ -157,7 +176,7 @@ export async function startProjectContainer(projId: string): Promise<{
               'ghcr.io/sequence4/solana-toolchain:runtime-latest';
 
   /** Toggle: `SF_DEV_SERVER=1` ⇒ start `next dev` instead of standalone build */
-  const useDevServer = process.env.SF_DEV_SERVER === '1';
+  const useDevServer = devMode || process.env.SF_DEV_SERVER === '1';
   
   const withPullAlways = pullAlwaysAllowed(image);
               
@@ -181,55 +200,55 @@ export async function startProjectContainer(projId: string): Promise<{
     /* 2 ─ run container with explicit platform, project label & random host-port */
     // NEW: make sure the host has enough free space (≥ 3 GiB)
     ensureDockerSpace();
-
-    const internalPort = 3000;
-    const devMode = process.env.SF_DEV_SERVER === "1";
     
     const runArgs: string[] = [
-      "docker", "run", "-d", "--platform", "linux/amd64",
-      "--name", name,
-      "--label", `solanaflow.project=${projId}`,
-      "-v", `${vCargo}:/root/.cargo`,
-      "-v", `${vSccache}:/opt/sccache`,
-      "-v", `${vTargetBuild}:/usr/src/target`,
-      "-e", "CARGO_TARGET_DIR=/usr/src/target",
-      "-e", "HOSTNAME=0.0.0.0",
-      "-e", `APP_ID=${projId}`,
-      "-e", `APP_BASE_PATH=/dapp/${projId}`,
-      "--label=traefik.enable=true",
+      'docker','run',
+      '--pull=always','-d','--platform','linux/amd64',
+      '--name', name,
+      '--label', `solanaflow.project=${projId}`,
+      '-v', `${vCargo}:/root/.cargo`,
+      '-v', `${vSccache}:/opt/sccache`,
+      '-v', `${vTargetBuild}:/usr/src/target`,
+      '-e', 'CARGO_TARGET_DIR=/usr/src/target',
+      '-e', 'HOSTNAME=0.0.0.0',
+      '-e', `APP_ID=${projId}`,
+      '-e', `APP_BASE_PATH=/dapp/${projId}`,
+      '--label=traefik.enable=true',
       `--label=traefik.http.routers.dapp-${projId}.rule=PathPrefix(\`/dapp/${projId}\`)`,
       `--label=traefik.http.routers.dapp-${projId}.entrypoints=web,websecure`,
       `--label=traefik.http.routers.dapp-${projId}.middlewares=strip-${projId}`,
       `--label=traefik.http.middlewares.strip-${projId}.stripprefix.prefixes=/dapp/${projId}`,
       `--label=traefik.http.routers.dapp-${projId}.service=dapp-${projId}`,
-      `--label=traefik.http.services.dapp-${projId}.loadbalancer.server.port=${internalPort}`,
-      "-p", "0:3000",  // ⚠️ dynamic port
-      "-v", `${process.env.ROOT_FOLDER}/${projId}/web:/usr/share/solanaflow/web`,
+      `--label=traefik.http.services.dapp-${projId}.loadbalancer.server.port=${INTERNAL_PORT}`,
+      '-p', `0:${INTERNAL_PORT}`,                // let Docker choose
+      '-v', `${process.env.ROOT_FOLDER}/${projId}/web:/usr/share/solanaflow/web`,
       image,
-      ...(devMode
+      ...(useDevServer
         ? [
-            "bash", "-lc",
+            'bash','-lc',
             [
-              "cd /usr/share/solanaflow/web",
-              "yarn install --frozen-lockfile",
-              "yarn dev -H 0.0.0.0 -p 3000"
-            ].join(" && ")
+              'cd /usr/share/solanaflow/web',
+              'yarn install --frozen-lockfile',
+              'npx next dev -H 0.0.0.0 -p 3000'   // HMR dev server
+            ].join(' && ')
           ]
         : [
-            "node", "/usr/share/solanaflow/web/.next/standalone/server.js",
-            "-H", "0.0.0.0", "-p", "3000"
+            'node','/usr/share/solanaflow/web/.next/standalone/server.js',
+            '-H','0.0.0.0','-p', String(INTERNAL_PORT)
           ])
     ];
 
     console.log("[startProjectContainer] RUN CMD:\n", runArgs.join(" "));
     execSync(runArgs.join(" "), { stdio: "inherit" });
     
-    const inspectOut = execSync(`docker inspect ${name}`, { encoding: "utf8" });
-    const parsed = JSON.parse(inspectOut)[0];
-    const portMap = parsed.NetworkSettings.Ports["3000/tcp"];
-    const assignedPort = portMap?.[0]?.HostPort ?? "3000";
-    const dockerHost = getDockerHostIP();
-    const containerUrl = `http://${dockerHost}:${assignedPort}`;
+    let assignedPort = '';
+    if (useDevServer) {
+      const portLine = execSync(`docker port ${name} ${INTERNAL_PORT}/tcp`)
+                         .toString().trim();           // e.g. "0.0.0.0:32768"
+      assignedPort = portLine.split(':').pop() || '';
+    }
+    
+    const containerUrl = resolveContainerUrl(assignedPort || process.env.DAPP_HOST_PORT || '3000');
 
     console.log(
       `[startProjectContainer] ➜  ${containerUrl}`,

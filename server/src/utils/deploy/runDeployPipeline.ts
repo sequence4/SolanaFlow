@@ -37,6 +37,9 @@ interface PipelineArgs {
 
   /** When true, the program was already deployed by a wallet-signed tx */
   walletSigned?: boolean;
+  
+  /** When true, run the container in dev mode with hot-reload */
+  devMode?: boolean;
 }
 
 export async function runDeployPipeline({
@@ -45,6 +48,7 @@ export async function runDeployPipeline({
   graph,
   sendProgress,
   walletSigned = false,
+  devMode = false,
 }: PipelineArgs): Promise<void> {
   sendProgress(<ProgressEvent>{
     stage: "environment",
@@ -56,7 +60,7 @@ export async function runDeployPipeline({
   let workspace: WorkspaceHandle | null = null;
 
   try {
-    workspace = await prepEnv(projectId, userId);
+    workspace = await prepEnv(projectId, userId, devMode);
 
     // emit the container URL so the UI can tune in
     sendProgress(<ProgressEvent>{

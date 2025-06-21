@@ -35,6 +35,7 @@ function getWorkspaceFreeBytes(container: string): number {
 export async function prepEnv(
   projectId: string,
   userId: string,
+  devMode = false,
 ): Promise<WorkspaceHandle> {
   const res = await pool.query<{
     root_path: string;
@@ -76,7 +77,7 @@ export async function prepEnv(
   } else {
     // cold-start fallback: spin up a brand-new workspace
     try {
-      const container = await startProjectContainer(projectId);
+      const container = await startProjectContainer(projectId, devMode);
       containerName = container.containerName;
       if (!containerName) {
         throw new Error('No warm containers available and cold-start disabled');
