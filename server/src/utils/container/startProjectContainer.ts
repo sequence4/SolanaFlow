@@ -214,10 +214,10 @@ export async function startProjectContainer(
       '-e', `APP_ID=${projId}`,
       '-e', `APP_BASE_PATH=/dapp/${projId}`,
       '--label=traefik.enable=true',
-      `--label=traefik.http.routers.dapp-${projId}.rule=PathPrefix(\`/dapp/${projId}\`)`,
+      `--label='traefik.http.routers.dapp-${projId}.rule=PathPrefix(\`/dapp/${projId}\`)'`,
       `--label=traefik.http.routers.dapp-${projId}.entrypoints=web,websecure`,
-      `--label=traefik.http.routers.dapp-${projId}.middlewares=strip-${projId}`,
-      `--label=traefik.http.middlewares.strip-${projId}.stripprefix.prefixes=/dapp/${projId}`,
+      `--label='traefik.http.routers.dapp-${projId}.middlewares=strip-${projId}'`,
+      `--label='traefik.http.middlewares.strip-${projId}.stripprefix.prefixes=/dapp/${projId}'`,
       `--label=traefik.http.routers.dapp-${projId}.service=dapp-${projId}`,
       `--label=traefik.http.services.dapp-${projId}.loadbalancer.server.port=${INTERNAL_PORT}`,
       '-p', `0:${INTERNAL_PORT}`,                // let Docker choose
@@ -226,11 +226,9 @@ export async function startProjectContainer(
       ...(useDevServer
         ? [
             'bash','-lc',
-            [
-              'cd /usr/share/solanaflow/web',
-              'yarn install --frozen-lockfile',
-              'npx next dev -H 0.0.0.0 -p 3000'   // HMR dev server
-            ].join(' && ')
+            `"cd /usr/share/solanaflow/web \\
+            && yarn install --frozen-lockfile \\
+            && npx next dev -H 0.0.0.0 -p 3000"`
           ]
         : [
             'node','/usr/share/solanaflow/web/.next/standalone/server.js',
