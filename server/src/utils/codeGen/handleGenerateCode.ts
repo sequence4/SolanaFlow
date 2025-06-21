@@ -284,23 +284,35 @@ export const handleGenerateCode = async ({
         // All UI files done
         sendProgress({ event: 'ui-complete', message: 'UI streaming finished' });
 
-        // Run Next.js build to ensure Tailwind processes all the new files
-        sendProgress({ stage: 'next-build', message: 'Running Next.js build to process Tailwind CSS...' });
-        try {
-          await runCommand(
-            // force standalone output _inside_ the running container
-            `docker exec \
-      -e NEXT_PRIVATE_STANDALONE=true \
-      -e APP_BASE_PATH= \
-      -w ${process.env.SF_DEV_SERVER === '1' ? '/workspace/web' : '/usr/share/solanaflow/web'} ` +
-            `${workspace.containerName} npm run build`,
-            '.',
-            projectId
-          );
-          sendProgress({ stage: 'next-build-done', message: 'Next.js build completed' });
-        } catch (error) {
-          console.error('Error during Next.js build:', error);
-          sendProgress({ stage: 'next-build-failed', message: 'Next.js build failed' });
+        /* In dev-server mode the container is already running `yarn dev`,
+           so a full `next build` is both slow and unnecessary. Skip it. */
+        if (!process.env.SF_DEV_SERVER) {
+          sendProgress({
+            stage: 'next-build',
+            message: 'Running Next.js build to process Tailwind CSS…'
+          });
+          try {
+            await runCommand(
+              // force standalone output _inside_ the running container
+              `docker exec \
+    -e NEXT_PRIVATE_STANDALONE=true \
+    -e APP_BASE_PATH= \
+    -w /usr/share/solanaflow/web \
+    ${workspace.containerName} npm run build`,
+              '.',
+              projectId
+            );
+            sendProgress({
+              stage: 'next-build-done',
+              message: 'Next.js build completed'
+            });
+          } catch (error) {
+            console.error('Error during Next.js build:', error);
+            sendProgress({
+              stage: 'next-build-failed',
+              message: 'Next.js build failed'
+            });
+          }
         }
 
         /* runtime server already started by docker run → nothing to do */
