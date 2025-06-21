@@ -1,4 +1,4 @@
-import 'dotenv-flow/config'; 
+import 'dotenv/config';  // guarantees DOCKER_HOST is loaded
 import express from 'express';
 import cors from 'cors';
 import authRoutes from '@/routes/authRoutes';
@@ -16,6 +16,12 @@ import poolRoutes from '@/routes/poolRoutes';
 import internalCertRoute from '@/routes/internalCertRoute';
 import artifactRoute from '@/routes/artifactRoute';
 import { startCleanupWorker } from "./workers/cleanupWorker";
+
+if (!process.env.DOCKER_HOST) {
+  console.error('[BOOT] DOCKER_HOST is not set – refusing to start');
+  process.exit(1);
+}
+console.log('[BOOT] DOCKER_HOST =', process.env.DOCKER_HOST);
 
 const app = express();
 const PORT = process.env.PORT || 9999;
