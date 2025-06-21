@@ -14,8 +14,10 @@ const Interface = () => {
     const [manualUrl, setManualUrl] = useState<string>("");
 
     // Treat "localhost" as "dev / Docker-Desktop" so we can probe the high port.
-    const isLocalDev = typeof window !== "undefined" &&
-                       window.location.hostname === "localhost";
+    const isLocalDev =
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" ||
+       window.location.hostname === "127.0.0.1");
 
     // helper: pick manual first, then backend, otherwise blank
     const activeUrl = manualUrl || containerUrl || "";

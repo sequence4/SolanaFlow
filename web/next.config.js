@@ -16,8 +16,9 @@ const nextConfig = {
   ],
 
   /* ✨ tell Next.js every route lives under /dapp/<id>/ */
-  basePath: `/dapp/${APP_ID}`,                          // ← NEW
-  assetPrefix: `/dapp/${APP_ID}`,                       // ← NEW
+  /** Read at *build-time*  ➜  gets baked into server.js */
+  basePath: process.env.APP_BASE_PATH || "",
+  assetPrefix: process.env.APP_BASE_PATH || "",
 
   // relax frame restrictions so the SolanaFlow UI can embed it
   async headers() {

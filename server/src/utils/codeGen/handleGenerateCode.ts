@@ -289,7 +289,10 @@ export const handleGenerateCode = async ({
         try {
           await runCommand(
             // force standalone output _inside_ the running container
-            `docker exec -e NEXT_PRIVATE_STANDALONE=true -w /usr/share/solanaflow/web ` +
+            `docker exec \
+      -e NEXT_PRIVATE_STANDALONE=true \
+      -e APP_BASE_PATH= \
+      -w /usr/share/solanaflow/web ` +
             `${workspace.containerName} npm run build`,
             '.',
             projectId
@@ -301,7 +304,10 @@ export const handleGenerateCode = async ({
         }
 
         await runCommand(
-          `docker exec -d -w /usr/src/${workspace.rootPath}/web ` +
+          `docker exec -d \
+      -e PORT=3000 \
+      -e APP_BASE_PATH= \
+      -w /usr/src/${workspace.rootPath}/web ` +
           `${workspace.containerName} ` +
           `node .next/standalone/server.js -H 0.0.0.0`,
           '.',

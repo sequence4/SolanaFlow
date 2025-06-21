@@ -183,6 +183,8 @@ export async function startProjectContainer(projId: string): Promise<{
       '-e', 'HOSTNAME=0.0.0.0',
       // Add APP_ID environment variable for Next.js inside the container
       '-e', `APP_ID=${projId}`,
+      // 👉 new – the value the Next build baked in
+      '-e', `APP_BASE_PATH=/dapp/${projId}`,
       // Add Traefik labels for routing
       '--label=traefik.enable=true',
       // Quote the whole rule so the shell never touches the back-ticks
