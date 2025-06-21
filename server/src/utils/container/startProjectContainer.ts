@@ -3,11 +3,20 @@ import pool from 'src/config/database';
 import { format } from 'node:util';
 import os from 'os';
 
-/* ──────────────── timing helper ──────────────── */
-function timed(cmd: string, label = cmd.split(' ')[1]): Buffer {
-  console.time(`[${label}]`);          // start timer
-  const out = execSync(cmd, { stdio: 'inherit' });  // still blocking
-  console.timeEnd(`[${label}]`);       // stop timer
+/* ───────── timing helper ────────
+ * If you only need to *see* the output, use inherit=true.
+ * If you also need to *capture* the output (inspect / port),
+ * call with inherit = false (default) so execSync returns a Buffer. */
+function timed(
+  cmd: string,
+  label: string = cmd.split(' ')[1],
+  inherit: boolean = true,          // <-- default keeps logs on screen
+): Buffer {
+  console.time(`[${label}]`);
+  const out = inherit
+    ? (execSync(cmd, { stdio: 'inherit' }), Buffer.from('')) // nothing to return
+    :  execSync(cmd);                                        // capture stdout
+  console.timeEnd(`[${label}]`);
   return out;
 }
 
@@ -120,7 +129,8 @@ function getDockerFreeBytes(): number {
   try {
     const rootDir = getDockerRoot();
     // Check if rootDir exists before running df
-    if (!execSync(`test -d "${rootDir}" && echo "exists"`, { encoding: "utf8" }).includes("exists")) {
+    if (process.platform !== 'linux' ||
+        !execSync(`test -d "${rootDir}" && echo "exists"`, { encoding: "utf8" }).includes("exists")) {
       console.warn(`[getDockerFreeBytes] Docker root '${rootDir}' not found, skipping probe`);
       return Number.MAX_SAFE_INTEGER;  // Skip probe if rootDir doesn't exist
     }
@@ -238,7 +248,8 @@ export async function startProjectContainer(
       try {
         const buf = timed(
           `docker inspect -f "{{index .RepoDigests 0}}" ${image}`,
-          'inspect'
+          'inspect',
+          /* inherit? */ false,          // capture instead of inherit
         );
         digest = buf ? buf.toString().trim() : '';
         if (digest) {
@@ -308,7 +319,11 @@ export async function startProjectContainer(
     
     let assignedPort = '';
     if (useDevServer) {
-      const portLine = timed(`docker port ${name} ${INTERNAL_PORT}/tcp`, 'docker-port').toString().trim();           // e.g. "0.0.0.0:32768"
+      const portLine = timed(
+        `docker port ${name} ${INTERNAL_PORT}/tcp`,
+        'docker-port',
+        /* inherit? */ false,
+      ).toString().trim();           // e.g. "0.0.0.0:32768"
       assignedPort = portLine.split(':').pop() || '';
     }
     
