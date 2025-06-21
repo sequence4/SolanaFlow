@@ -3,7 +3,6 @@ import { config as loadDotenv } from 'dotenv';
 
 loadDotenv({
   path: path.resolve(__dirname, '..', '.env'),
-  override: true          // file should win over blanks made by earlier loads
 });
 
 /* Quick sanity so you see the value every time the server starts */
@@ -17,12 +16,3 @@ if (!process.env.DOCKER_HOST || !process.env.DOCKER_HOST.trim()) {
   console.error('[bootstrapEnv] DOCKER_HOST missing – aborting startup');
   process.exit(1);
 }
-
-/* ─── guard against late dotenv loads that null-out the var ─────────────── */
-const ORIGINAL_DOCKER_HOST = process.env.DOCKER_HOST;          // keep a copy
-queueMicrotask(() => {
-  if (!process.env.DOCKER_HOST || !process.env.DOCKER_HOST.trim()) {
-    process.env.DOCKER_HOST = ORIGINAL_DOCKER_HOST;
-    console.debug('[bootstrapEnv] DOCKER_HOST restored after late dotenv load');
-  }
-});
