@@ -299,13 +299,11 @@ export async function startProjectContainer(
       '-v', `${vTargetBuild}:/usr/src/target`,
       '-e', 'CARGO_TARGET_DIR=/usr/src/target',
       '-e', 'HOSTNAME=0.0.0.0',
-      // keep the two env-vars, but **drop** the --memory flags —
-      // anchor build needs >4 GiB during LTO
       '-e', 'CARGO_BUILD_JOBS=1',
       '-e', 'RUSTC_WRAPPER=sccache',
+      // RUSTFLAGS is exported in /tmp/build.sh; keep it *out* of docker run to avoid quoting issues
       '-e', `APP_ID=${projId}`,
       '-e', `APP_BASE_PATH=/dapp/${projId}`,
-      '-e', 'RUSTFLAGS=-Ccodegen-units=1 -Clinker-plugin-lto -Clto=thin -Cpanic=abort -Copt-level=z',
       '--label=traefik.enable=true',
       `--label='traefik.http.routers.dapp-${projId}.rule=PathPrefix(\`/dapp/${projId}\`)'`,
       `--label=traefik.http.routers.dapp-${projId}.entrypoints=web,websecure`,
