@@ -101,8 +101,10 @@ export async function rentContainerFromPool(): Promise<RentedContainer | null> {
     
     // Add Traefik labels to the container
     addTraefikLabels(name, projectId);
-    
-    return { name, url: `http://$HOST:${process.env.DAPP_HOST_PORT ?? '31000'}`, port: Number(process.env.DAPP_HOST_PORT ?? '31000') };
+
+    // keep the authoritative URL coming from resolveContainerUrl()
+    const port = Number(url.split(':').pop());
+    return { name, url, port };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
