@@ -1,6 +1,12 @@
 import { execSync } from 'child_process';
 import pool from 'src/config/database';
 
+// ────────────────────────────────────────────────
+// Host port that every dApp container will publish
+// Change the default if 31000 is taken, or expose it via .env
+const PINNED_HOST_PORT = process.env.DAPP_HOST_PORT ?? '31000';
+// ────────────────────────────────────────────────
+
 /**
  * Checks if the Docker server version supports the --pull=always flag (added in 23.0.0)
  */
@@ -164,8 +170,8 @@ export async function startProjectContainer(projId: string): Promise<string> {
       '--label', `traefik.http.middlewares.strip-${projId}.stripprefix.prefixes='/dapp/${projId}'`,
       '--label', `traefik.http.routers.dapp-${projId}.service=dapp-${projId}`,
       '--label', `traefik.http.services.dapp-${projId}.loadbalancer.server.port=3000`,
-      // publish container port 3000 → random host port
-      '-p', '0:3000',
+      // publish container port 3000 → **fixed** host port
+      '-p', `${PINNED_HOST_PORT}:3000`,
       image,
       'bash', '-lc',
       '"node /usr/share/solanaflow/web/.next/standalone/server.js -H 0.0.0.0 & pid=$!; trap \\"kill $pid\\" TERM INT; wait $pid"'

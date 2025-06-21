@@ -103,7 +103,7 @@ export async function rentContainerFromPool(): Promise<RentedContainer | null> {
     addTraefikLabels(name, projectId);
     
     // Persist the random host-port (needed so the same donor is not re-selected)
-    const hostPort = Number(url.split(':').pop());
+    const hostPort = Number(process.env.DAPP_HOST_PORT ?? '31000');
     if (hostPort === 0) {
       throw new Error(
         `[rent] container ${name} started without a published 3000/tcp port`
