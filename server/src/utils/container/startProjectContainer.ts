@@ -177,11 +177,11 @@ export async function startProjectContainer(projId: string): Promise<{
       '-e', `APP_ID=${projId}`,
       // Add Traefik labels for routing
       '--label=traefik.enable=true',
-      // Use simpler double-quoted label format endorsed by Traefik docs
-      `--label=traefik.http.routers.dapp-${projId}.rule=PathPrefix(\`/dapp/${projId}\`)`,
+      // Quote the whole rule so the shell never touches the back-ticks
+      `--label='traefik.http.routers.dapp-${projId}.rule=PathPrefix(\`/dapp/${projId}\`)'`,
       `--label=traefik.http.routers.dapp-${projId}.entrypoints=web,websecure`,
-      `--label=traefik.http.routers.dapp-${projId}.middlewares=strip-${projId}`,
-      `--label=traefik.http.middlewares.strip-${projId}.stripprefix.prefixes=/dapp/${projId}`,
+      `--label='traefik.http.routers.dapp-${projId}.middlewares=strip-${projId}'`,
+      `--label='traefik.http.middlewares.strip-${projId}.stripprefix.prefixes=/dapp/${projId}'`,
       `--label=traefik.http.routers.dapp-${projId}.service=dapp-${projId}`,
       `--label=traefik.http.services.dapp-${projId}.loadbalancer.server.port=3000`,
       // publish container port 3000 → fixed host port or let Docker choose if busy
