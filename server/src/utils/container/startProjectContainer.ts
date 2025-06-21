@@ -22,7 +22,17 @@ function timed(
 
 // ─── container ports ─────────────────────────────────────────
 const INTERNAL_PORT = 3000;          // inside container
-const HOST_PORT     = 31000;         // fixed public port (SG must allow)
+const MIN_PORT = 31000, MAX_PORT = 32767;
+
+function pickFreePort(): number {
+  for (let p = MIN_PORT; p <= MAX_PORT; p++) {
+    try {
+      if (!execSync(`docker ps --filter publish=${p} --format '{{.ID}}'`)
+            .toString().trim()) return p;          // free
+    } catch { /* ignore, keep scanning */ }
+  }
+  throw new Error('NO_FREE_PORT');
+}
 
 function getDockerHostIP(): string {
   const dh = process.env.DOCKER_HOST;
@@ -232,6 +242,9 @@ export async function startProjectContainer(
   try {
     process.env.DOCKER_CLI_DEBUG = process.env.DOCKER_CLI_DEBUG ?? '1'; // show HTTP calls
     
+    // find a free high port *once* for this container
+    const hostPort = pickFreePort();
+    
     /* 1 ─ ensure image is present & host-arch-compatible (force x86_64) */
     timed(`docker pull ${image}`, 'pull');
 
@@ -301,7 +314,7 @@ export async function startProjectContainer(
       `--label=traefik.http.services.dapp-${projId}.loadbalancer.server.port=${INTERNAL_PORT}`,
       `--label=traefik.http.services.dapp-${projId}.loadbalancer.healthcheck.timeout=30s`,
       // pin to one SG-approved port so the UI link is always stable
-      '-p', `${HOST_PORT}:${INTERNAL_PORT}`,
+      '-p', `${hostPort}:${INTERNAL_PORT}`,
       '-v', `${process.env.ROOT_FOLDER}/${projId}/web:/usr/share/solanaflow/web`,
       imageRef,
       ...(useDevServer
@@ -318,7 +331,7 @@ export async function startProjectContainer(
     console.log("[startProjectContainer] RUN CMD:\n", runArgs.join(" "));
     timed(runArgs.join(" "), 'docker-run');
     
-    const containerUrl = resolveContainerUrl(String(HOST_PORT));
+    const containerUrl = resolveContainerUrl(String(hostPort));
 
     console.log(
       `[startProjectContainer] ➜  ${containerUrl}`,

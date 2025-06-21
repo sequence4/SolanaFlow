@@ -314,7 +314,7 @@ set -euo pipefail
 cd /usr/src/${rootPath}
 
 echo "===== Running anchor build ====="
-anchor build
+anchor build -- --jobs 1
 
 # ── determine the correct target directory and find the first .so file ──
 SO_DIR="\${CARGO_TARGET_DIR:-target}/deploy"
