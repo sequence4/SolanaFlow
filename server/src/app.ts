@@ -1,4 +1,12 @@
-import 'dotenv/config';  // guarantees DOCKER_HOST is loaded
+// --- load the right .env no matter the CWD ───────────────────────────────
+import path from 'node:path';
+import { config as loadEnv } from 'dotenv';
+
+loadEnv({
+  path: path.resolve(__dirname, '..', '.env'),   // => server/.env
+  override: false                                // keep existing vars from the shell
+});
+// ─────────────────────────────────────────────────────────────────────────
 import express from 'express';
 import cors from 'cors';
 import authRoutes from '@/routes/authRoutes';
