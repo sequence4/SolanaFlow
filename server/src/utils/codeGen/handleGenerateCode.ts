@@ -12,7 +12,7 @@ import { ensureAnchorTomlProgram, ensureRootWorkspaceMembers } from './ensureCon
 import { parseNodeDetails } from './parseNodeDetails';
 import { lintWorkspaceManifests } from './cargoManifestLint';
 import { FileTreeItem } from '../../types/FileTreeItem';
-import { runCommand, runCommandDetached } from "../projectUtils";
+import { runCommand } from "../projectUtils";
 import { randomUUID } from 'crypto';
 import path from "path";
 import { attachFileContents } from "../fileUtils/attachFileContents";
@@ -307,9 +307,9 @@ export const handleGenerateCode = async ({
           `docker exec -d \
       -e PORT=3000 \
       -e APP_BASE_PATH= \
-      -w /usr/src/${workspace.rootPath}/web ` +
-          `${workspace.containerName} ` +
-          `node .next/standalone/server.js -H 0.0.0.0`,
+      -w /usr/share/solanaflow/web \
+      ${workspace.containerName} \
+      node .next/standalone/server.js -H 0.0.0.0 -p 3000`,
           '.',
           `next-start-${projectId}`
         );
