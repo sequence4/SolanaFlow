@@ -22,7 +22,7 @@ function addTraefikLabels(container: string, projectId: string): void {
       `docker container update \
         --env-add APP_ID=${projectId} \
         --label-add traefik.enable=true \
-        --label-add 'traefik.http.routers.dapp-${projectId}.rule=PathPrefix(\\\`/dapp/${projectId}\\\`)' \
+        --label-add 'traefik.http.routers.dapp-${projectId}.rule=PathPrefix(\`/dapp/${projectId}\`)' \
         --label-add traefik.http.routers.dapp-${projectId}.entrypoints=web,websecure \
         --label-add traefik.http.routers.dapp-${projectId}.middlewares=strip-${projectId} \
         --label-add 'traefik.http.middlewares.strip-${projectId}.stripprefix.prefixes=/dapp/${projectId}' \

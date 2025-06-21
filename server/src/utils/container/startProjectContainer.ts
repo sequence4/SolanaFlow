@@ -47,6 +47,14 @@ function sizeOptSupported(): boolean {
 }
 
 /**
+ * Returns true when DOCKER_HOST is set to an ssh:// or tcp:// value.
+ *  Used to skip local-disk checks against the wrong host               */
+function isRemoteDocker(): boolean {
+  const h = process.env.DOCKER_HOST ?? "";
+  return h.startsWith("ssh://") || h.startsWith("tcp://");
+}
+
+/**
  * Returns free bytes left on the partition that backs /var/lib/docker.
  * Falls back to Number.MAX_SAFE_INTEGER on any failure so we never block.
  */
@@ -68,6 +76,13 @@ function getDockerFreeBytes(): number {
  * Throws 'LOW_DOCKER_SPACE' if the space is still insufficient.
  */
 function ensureDockerSpace(minBytes = 3 * 1024 * 1024 * 1024): void {
+  /* Remote daemon → local df is meaningless, so skip the guard. */
+  if (isRemoteDocker()) {
+    console.warn("[startProjectContainer] remote Docker detected – " +
+                 "disk-space probe skipped");
+    return;
+  }
+
   if (getDockerFreeBytes() >= minBytes) return;
 
   console.warn(
@@ -129,7 +144,7 @@ export async function startProjectContainer(projId: string): Promise<string> {
       '-e', `APP_ID=${projId}`,
       // Add Traefik labels for routing
       '--label', 'traefik.enable=true',
-      '--label', `traefik.http.routers.dapp-${projId}.rule='PathPrefix(\\\`/dapp/${projId}\\\`)'`,
+      '--label', `traefik.http.routers.dapp-${projId}.rule='PathPrefix(\`/dapp/${projId}\`)'`,
       '--label', `traefik.http.routers.dapp-${projId}.entrypoints=web,websecure`,
       '--label', `traefik.http.routers.dapp-${projId}.middlewares=strip-${projId}`,
       '--label', `traefik.http.middlewares.strip-${projId}.stripprefix.prefixes='/dapp/${projId}'`,
