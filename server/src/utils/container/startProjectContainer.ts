@@ -165,10 +165,13 @@ export async function startProjectContainer(projId: string): Promise<string> {
       '-e', `APP_ID=${projId}`,
       // Add Traefik labels for routing
       '--label', 'traefik.enable=true',
-      '--label', `traefik.http.routers.dapp-${projId}.rule=PathPrefix(\`/dapp/${projId}\`)`,
+      // Quote value so back-ticks survive the shell → Docker → Traefik chain
+      '--label', '\'traefik.http.routers.dapp-' + projId +
+                 '.rule=PathPrefix(`/dapp/' + projId + '`)\'',
       '--label', `traefik.http.routers.dapp-${projId}.entrypoints=web,websecure`,
       '--label', `traefik.http.routers.dapp-${projId}.middlewares=strip-${projId}`,
-      '--label', `traefik.http.middlewares.strip-${projId}.stripprefix.prefixes='/dapp/${projId}'`,
+      '--label', '\'traefik.http.middlewares.strip-' + projId +
+                 '.stripprefix.prefixes=/dapp/' + projId + '\'',
       '--label', `traefik.http.routers.dapp-${projId}.service=dapp-${projId}`,
       '--label', `traefik.http.services.dapp-${projId}.loadbalancer.server.port=3000`,
       // publish container port 3000 → **fixed** host port
@@ -183,7 +186,7 @@ export async function startProjectContainer(projId: string): Promise<string> {
 
     const host = process.env.PUBLIC_HOSTNAME ?? 'localhost';
     console.log(
-      `[startProjectContainer] ➜ http://${host}:${PINNED_HOST_PORT}/dapp/${projId}`,
+      `[startProjectContainer] ➜  http://${host}:${PINNED_HOST_PORT}/dapp/${projId}`,
     );
     return name;
   } catch (err: any) {
