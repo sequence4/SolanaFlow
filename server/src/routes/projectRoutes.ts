@@ -55,5 +55,27 @@ router.post('/:id/run-script', authMiddleware, runProjectCommand);
 router.post('/:id/install-packages', authMiddleware, installPackages);
 router.post('/:id/ephemeral', authMiddleware, createEphemeralKeypair);
 router.post('/:projectId/install-node-dependencies', authMiddleware, installNodeDependencies);
+router.get('/:id/local-port', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const containerName = `project-${id}`;
+    
+    // Execute docker command to get the port mapping
+    const { exec } = require('child_process');
+    exec(`docker container port ${containerName} | grep 3000 | head -1 | cut -d: -f2`, (err: Error | null, stdout: string) => {
+      if (err) {
+        console.error(`[projectRoutes] Error getting container port: ${err.message}`);
+        return res.status(500).json({ error: 'Failed to get container port' });
+      }
+      
+      const hostPort = stdout.trim();
+      res.json({ hostPort });
+    });
+  } catch (error) {
+    console.error('[projectRoutes] Error in local-port endpoint:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 export default router;

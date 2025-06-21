@@ -4,12 +4,18 @@ import '@/styles/interface/interfaceStyle.css';
 import ProjectContext from "@/context/project/ProjectContext";
 import { projectApi } from '@/api/projectApi';
 import { Loader2, RefreshCw, ExternalLink } from "lucide-react";
+import isWsl from "is-wsl";
 
 const Interface = () => {
     const { projectContext, setProjectContext } = useContext(ProjectContext);
     const { id: projectId, containerUrl } = projectContext;
     
     const [isRefreshing, setIsRefreshing] = useState(false);
+    // manual override typed by the user
+    const [manualUrl, setManualUrl] = useState<string>("");
+
+    // helper: pick manual first, then backend, otherwise blank
+    const activeUrl = manualUrl || containerUrl || "";
 
     const handleRefreshContainerUrl = async () => {
         if (!projectId || isRefreshing) return;
@@ -38,13 +44,11 @@ const Interface = () => {
     };
 
     const iframeSrc = React.useMemo(() => {
-        if (!containerUrl) return "";
-        return containerUrl;
-    }, [containerUrl]);
+        if (!activeUrl) return "";
+        return activeUrl;
+    }, [activeUrl]);
 
-    const openInNewTab = () => {
-        if (iframeSrc) window.open(iframeSrc, "_blank");
-    };
+    const openInNewTab = () => activeUrl && window.open(activeUrl, "_blank");
 
     /* ───────── periodic health-check ───────── */
     useEffect(() => {
@@ -65,6 +69,26 @@ const Interface = () => {
         return () => clearInterval(id);
     }, [projectId, containerUrl, projectContext, setProjectContext]);
 
+    // Reset any manual override when the backend pushes a fresh containerUrl
+    useEffect(() => { setManualUrl(""); }, [containerUrl]);
+
+    // Auto-open the local high-port when running on WSL / Docker-Desktop
+    useEffect(() => {
+        // auto-fallback only if no backend url yet
+        if (containerUrl || !isWsl) return;
+
+        // quick probe: pick the first published host-port for this container
+        (async () => {
+            try {
+                const res = await fetch(`/api/projects/${projectId}/local-port`);
+                const { hostPort } = await res.json();          // backend returns {"hostPort":32776}
+                if (hostPort) setManualUrl(`http://localhost:${hostPort}`);
+            } catch (e) {
+                console.warn("[Interface] WSL auto-port probe failed:", e);
+            }
+        })();
+    }, [isWsl, projectId, containerUrl]);
+
     return (
         <div className="relative w-full h-full">
             {containerUrl ? (
@@ -72,9 +96,12 @@ const Interface = () => {
                     <div className="flex items-center justify-between p-2 bg-[#0F1119] border-b border-[#1F2937]">
                         <div className="flex items-center">
                             <div className="h-3 w-3 rounded-full bg-green-500 mr-2"></div>
-                            <span className="text-sm text-gray-300 font-mono truncate">
-                                {containerUrl}
-                            </span>
+                            <input
+                                type="text"
+                                value={activeUrl}
+                                onChange={e => setManualUrl(e.target.value.trim())}
+                                className="bg-transparent w-72 truncate font-mono text-sm text-gray-300 focus:outline-none"
+                            />
                         </div>
                         <div className="flex items-center space-x-2">
                             <Button 
@@ -100,8 +127,8 @@ const Interface = () => {
                     </div>
                     <div className="flex-1 w-full">
                         <iframe
-                            key={iframeSrc}      /* force reload when URL changes */
-                            src={iframeSrc}
+                            key={activeUrl}      /* force reload when URL changes */
+                            src={activeUrl}
                             style={{ width: '100%', height: '100%', border: 'none' }}
                             allow="clipboard-read; clipboard-write"
                             sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
