@@ -187,7 +187,22 @@ export async function startProjectContainer(
 
   try {
     /* 1 ─ ensure image is present & host-arch-compatible (force x86_64) */
-    execSync(`docker pull --platform=linux/amd64 ${image}`, { stdio: 'inherit' });
+    execSync(`docker pull ${image}`, { stdio: 'inherit' });
+
+    // — pin to immutable digest if available
+    let imageRef = image;
+    try {
+      const digest = execSync(
+        `docker inspect -f "{{index .RepoDigests 0}}" ${image}`,
+        { encoding: 'utf8' }
+      ).trim();
+      if (digest) {
+        console.log("[startProjectContainer] using digest reference:", digest);
+        imageRef = digest;
+      }
+    } catch {
+      console.warn("[startProjectContainer] could not retrieve digest; falling back to tag");
+    }
 
     /* 1b ─ ensure the traefik network exists on the remote host */
     try {
@@ -222,7 +237,7 @@ export async function startProjectContainer(
       `--label=traefik.http.services.dapp-${projId}.loadbalancer.server.port=${INTERNAL_PORT}`,
       '-p', `0:${INTERNAL_PORT}`,                // let Docker choose
       '-v', `${process.env.ROOT_FOLDER}/${projId}/web:/usr/share/solanaflow/web`,
-      image,
+      imageRef,
       ...(useDevServer
         ? [
             'bash','-lc',
