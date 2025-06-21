@@ -314,6 +314,7 @@ set -euo pipefail
 cd /usr/src/${rootPath}
 
 echo "===== Running anchor build ====="
+export RUSTFLAGS="-Ccodegen-units=1 -Clinker-plugin-lto -Clto=thin -Cpanic=abort -Copt-level=z"
 anchor build -- --jobs 1
 
 # ── determine the correct target directory and find the first .so file ──

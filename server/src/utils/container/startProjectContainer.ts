@@ -305,6 +305,7 @@ export async function startProjectContainer(
       '-e', 'RUSTC_WRAPPER=sccache',
       '-e', `APP_ID=${projId}`,
       '-e', `APP_BASE_PATH=/dapp/${projId}`,
+      '-e', 'RUSTFLAGS=-Ccodegen-units=1 -Clinker-plugin-lto -Clto=thin -Cpanic=abort -Copt-level=z',
       '--label=traefik.enable=true',
       `--label='traefik.http.routers.dapp-${projId}.rule=PathPrefix(\`/dapp/${projId}\`)'`,
       `--label=traefik.http.routers.dapp-${projId}.entrypoints=web,websecure`,
