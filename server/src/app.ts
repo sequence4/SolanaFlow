@@ -18,8 +18,9 @@ import internalCertRoute from '@/routes/internalCertRoute';
 import artifactRoute from '@/routes/artifactRoute';
 import { startCleanupWorker } from "./workers/cleanupWorker";
 
-if (!process.env.DOCKER_HOST) {
-  throw new Error('DOCKER_HOST missing – check server/.env');
+if (!process.env.DOCKER_HOST || !process.env.DOCKER_HOST.trim()) {
+  console.error('[BOOT] DOCKER_HOST missing – aborting startup');
+  process.exit(1);
 }
 console.log('[DEBUG] DOCKER_HOST =', process.env.DOCKER_HOST);
 

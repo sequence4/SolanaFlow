@@ -4,7 +4,7 @@
     "scripts": {
         "build": "tsc -p tsconfig.build.json",
         "start": "node -r module-alias/register dist/app.js",
-        "dev": "ts-node -r ./src/bootstrapEnv.ts -r tsconfig-paths/register src/app.ts",
+        "dev": "ts-node -r tsconfig-paths/register src/app.ts",
         "lint": "eslint . --ext .ts",
         "test": "jest --passWithNoTests",
         "test:watch": "jest --watchAll   --config jest.config.js",
