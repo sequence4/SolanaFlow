@@ -323,11 +323,11 @@ export async function startProjectContainer(
       ...(useDevServer
         ? [
             'bash', '-lc',
-            `"cd /usr/src/${projId}/web && yarn install --frozen-lockfile && npx next dev -H 0.0.0.0 -p 3000"`
+            `"cd /usr/share/solanaflow/web && yarn install --frozen-lockfile && npx next dev -H 0.0.0.0 -p 3000"`
           ]
         : [
             'bash', '-lc',
-            `"node /usr/src/${projId}/web/.next/standalone/server.js -H 0.0.0.0 -p ${INTERNAL_PORT} & pid=$!; trap 'kill $pid' TERM INT; wait $pid"`
+            `"node /usr/share/solanaflow/web/.next/standalone/server.js -H 0.0.0.0 -p ${INTERNAL_PORT} & pid=$!; trap 'kill $pid' TERM INT; wait $pid"`
           ])
     ];
 
