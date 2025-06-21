@@ -187,7 +187,7 @@ export async function startProjectContainer(
 
   try {
     /* 1 ─ ensure image is present & host-arch-compatible (force x86_64) */
-    execSync(`docker pull ${image}`, { stdio: 'inherit' });
+    execSync(`docker pull --platform=linux/amd64 ${image}`, { stdio: 'inherit' });
 
     /* 1b ─ ensure the traefik network exists on the remote host */
     try {
