@@ -150,6 +150,21 @@ pnpm dev --filter server
 - **Default port**: http://localhost:9999
 - This starts the Express server in development mode using `ts-node`.
 
+## Development (WSL + Docker)
+
+To run dApps inside Docker containers in dev mode (with hot-reload):
+
+1. Set `SF_DEV_SERVER=1` in `.env`
+2. Ensure `ROOT_FOLDER` points to your local project workspace
+3. Launch the backend:
+```bash
+source server/.env
+pnpm --filter server dev
+```
+
+The Interface tab will show your dApp via `yarn dev` inside a Docker container.
+Docker automatically chooses a free host port, and the backend resolves it correctly.
+
 ---
 
 ## Scripts
@@ -196,6 +211,6 @@ pnpm test --filter server
 
 Copyright © 2025 Sequence4 Ltd. All rights reserved.
 
-This code is provided for personal or non-commercial use only. You may not reproduce, redistribute, or use it for commercial purposes without explicit written permission from the author(s). The code is provided “as is,” without warranty of any kind.
+This code is provided for personal or non-commercial use only. You may not reproduce, redistribute, or use it for commercial purposes without explicit written permission from the author(s). The code is provided "as is," without warranty of any kind.
 
 
