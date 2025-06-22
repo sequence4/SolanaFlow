@@ -28,6 +28,8 @@ import {
   UI_LABEL_TSX,
   UTILS_TS,
   POSTCSS_CONFIG,
+  THEME_PROVIDER_TSX,
+  USE_TOAST_TS,
   walletProvider,
   solMintApp
 } from './uiTemplates';
@@ -233,6 +235,7 @@ export const handleGenerateCode = async ({
                     { name: "token-created-success.tsx", path: "./web/src/components/token-created-success.tsx", type: "file" as const, code: TOKEN_CREATED_SUCCESS_TSX },
                     { name: "theme-toggle.tsx", path: "./web/src/components/theme-toggle.tsx", type: "file" as const, code: THEME_TOGGLE_TSX },
                     { name: "wallet.tsx", path: "./web/src/components/wallet.tsx", type: "file" as const, code: WALLET_TSX },
+                    { name: "theme-provider.tsx", path: "./web/src/components/theme-provider.tsx", type: "file" as const, code: THEME_PROVIDER_TSX },
                     { name: "SolMintApp.tsx", path: "./web/src/components/SolMintApp.tsx", type: "file" as const, code: solMintApp },
                     {
                       name: "ui",
@@ -248,6 +251,14 @@ export const handleGenerateCode = async ({
                         { name: "tooltip.tsx", path: "./web/src/components/ui/tooltip.tsx", type: "file" as const, code: TOOLTIP_TSX },
                       ]
                     }
+                  ]
+                },
+                {
+                  name: "hooks",
+                  path: "./web/src/hooks",
+                  type: "directory" as const,
+                  children: [
+                    { name: "use-toast.ts", path: "./web/src/hooks/use-toast.ts", type: "file" as const, code: USE_TOAST_TS }
                   ]
                 },
                 {
