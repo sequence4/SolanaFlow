@@ -256,6 +256,7 @@ export async function startProjectContainer(
   const vCargo       = 'solanaflow-cargo-registry';
   const vTargetBuild = 'solanaflow-cargo-target';
   const vSccache     = 'solanaflow-sccache';
+  const vYarnCache   = 'solanaflow-yarn-cache';      // NEW – keeps registry tarballs
 
   try {
     process.env.DOCKER_CLI_DEBUG = process.env.DOCKER_CLI_DEBUG ?? '1'; // show HTTP calls
@@ -316,12 +317,14 @@ export async function startProjectContainer(
       '-v', `${vCargo}:/root/.cargo`,
       '-v', `${vSccache}:/opt/sccache`,
       '-v', `${vTargetBuild}:/usr/src/target`,
+      '-v', `${vYarnCache}:/usr/local/share/.cache/yarn/v6`,
       // Mount host project directory into the container at the correct path
       '-v', `${hostProjectDir}:/usr/src/${rootPath}`,
       '-e', 'CARGO_TARGET_DIR=/usr/src/target',
       '-e', 'HOSTNAME=0.0.0.0',
       '-e', 'CARGO_BUILD_JOBS=1',
       '-e', 'RUSTC_WRAPPER=sccache',
+      '-e', 'YARN_CACHE_FOLDER=/usr/local/share/.cache/yarn/v6',
       // RUSTFLAGS is exported in /tmp/build.sh; keep it *out* of docker run to avoid quoting issues
       '-e', `APP_ID=${projId}`,
       '-e', `APP_BASE_PATH=/dapp/${projId}`,
@@ -349,7 +352,6 @@ export async function startProjectContainer(
         `"if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
         `cp -R /usr/share/solanaflow/web/* /usr/src/${rootPath}/web/; fi; ` +
         `cd /usr/src/${rootPath}/web && ` +
-        `yarn install --frozen-lockfile && ` +
         `npx next dev -H 0.0.0.0 -p ${INTERNAL_PORT} & ` +
         `pid=$!; trap 'kill $pid' TERM INT; wait $pid"`
       );

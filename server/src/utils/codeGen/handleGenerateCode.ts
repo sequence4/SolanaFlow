@@ -15,6 +15,7 @@ import { FileTreeItem } from '../../types/FileTreeItem';
 import { runCommand, runCommandDetached } from "../projectUtils";
 import { randomUUID } from 'crypto';
 import path from "path";
+import { execSync } from 'child_process';
 import { attachFileContents } from "../fileUtils/attachFileContents";
 import {
   homePage,
@@ -283,6 +284,21 @@ export const handleGenerateCode = async ({
 
         // All UI files done
         sendProgress({ event: 'ui-complete', message: 'UI streaming finished' });
+
+        /* ──────────────────────  Generate yarn.lock once  ────────────────────── */
+        {
+          const webDir = path.join(process.env.ROOT_FOLDER!, workspace.rootPath, 'web');
+          sendProgress({ stage: 'deps', message: 'Installing JS deps (yarn.lock)…' });
+
+          // network-timeout avoids ESOCKETTIMEDOUT under QEMU; prefer-offline seeds cache
+          const yarnCmd = 'yarn install --silent --network-timeout 600000 --prefer-offline';
+
+          // run on the host so the lock-file lives on the bind-mount
+          execSync(yarnCmd, { cwd: webDir, stdio: 'inherit' });
+
+          sendProgress({ stage: 'deps', message: 'yarn.lock generated' });
+        }
+        /* ──────────────────────────────────────────────────────────────────────── */
 
         /* In dev-server mode the container is already running `yarn dev`,
            so a full `next build` is both slow and unnecessary. Skip it. */
