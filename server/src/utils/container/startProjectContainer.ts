@@ -2,6 +2,8 @@ import { execSync } from 'child_process';
 import pool from 'src/config/database';
 import { format } from 'node:util';
 import os from 'os';
+import fs from 'fs';
+import path from 'path';
 
 /* ───────── timing helper ────────
  * If you only need to *see* the output, use inherit=true.
@@ -223,6 +225,26 @@ export async function startProjectContainer(
   /** Toggle: `SF_DEV_SERVER=1` ⇒ start `next dev` instead of standalone build */
   const useDevServer = devMode || process.env.SF_DEV_SERVER === '1';
   
+  /* ─── validate host web directory ──────────────────────────────── */
+  const hostWebDir = path.join(process.env.ROOT_FOLDER || '', projId, 'web');
+
+  if (!fs.existsSync(hostWebDir)) {
+    throw new Error(
+      `[startProjectContainer] Host web directory not found: ${hostWebDir} – ` +
+      `code-generation must run before container launch.`,
+    );
+  }
+
+  const hasAppDir   = fs.existsSync(path.join(hostWebDir, 'app'));
+  const hasPagesDir = fs.existsSync(path.join(hostWebDir, 'pages'));
+
+  if (!hasAppDir && !hasPagesDir) {
+    throw new Error(
+      `[startProjectContainer] Neither app/ nor pages/ folder found in ${hostWebDir}.`
+    );
+  }
+  /* ──────────────────────────────────────────────────────────────── */
+  
   const withPullAlways = pullAlwaysAllowed(image);
               
   // ── pick architecture: env override > host default
@@ -316,14 +338,14 @@ export async function startProjectContainer(
       // pin to one SG-approved port so the UI link is always stable
       '-p', `${hostPort}:${INTERNAL_PORT}`,
       // ---- Mount *once* to the path where the generator writes files ----
-      '-v', `${process.env.ROOT_FOLDER}/${projId}/web:/usr/src/${projId}/web`,
+      '-v', `${hostWebDir}:/usr/share/solanaflow/web`,
       
       // ---- Legacy mount kept for backwards compatibility (same host dir) ----
-      '-v', `${process.env.ROOT_FOLDER}/${projId}/web:/usr/share/solanaflow/web`,
+      // REMOVED: '-v', `${process.env.ROOT_FOLDER}/${projId}/web:/usr/src/${projId}/web`,
       
       /* New: ensure all subsequent commands execute _inside_
-       * /usr/src/${projId}/web, so we don't need mkdir at runtime */
-      '--workdir', `/usr/src/${projId}/web`,
+       * /usr/share/solanaflow/web, so we don't need mkdir at runtime */
+      '--workdir', '/usr/share/solanaflow/web',
       
       imageRef,
       // ─── launch command ────────────────────────────────────────────────
@@ -332,7 +354,7 @@ export async function startProjectContainer(
             'bash', '-lc',
             // DEV mode: wait for ./app or ./pages, then start Next.js
             `
-            cd /usr/src/${projId}/web \\
+            cd /usr/share/solanaflow/web \\
             && until [ -d app ] || [ -d pages ]; do sleep 1; done \\
             && yarn install --frozen-lockfile \\
             && npx next dev -H 0.0.0.0 -p 3000
@@ -342,7 +364,7 @@ export async function startProjectContainer(
             'bash', '-lc',
             // STANDALONE mode: wait for .next build, then run it
             `
-            cd /usr/src/${projId}/web \\
+            cd /usr/share/solanaflow/web \\
             && until [ -d .next ]; do sleep 1; done \\
             && node .next/standalone/server.js -H 0.0.0.0 -p ${INTERNAL_PORT} \\
             & pid=$!; trap 'kill $pid' TERM INT; wait $pid
