@@ -225,22 +225,21 @@ export async function startProjectContainer(
   /** Toggle: `SF_DEV_SERVER=1` ⇒ start `next dev` instead of standalone build */
   const useDevServer = devMode || process.env.SF_DEV_SERVER === '1';
   
-  /* ─── validate host web directory ──────────────────────────────── */
+  /* ─── ensure host web directory exists ─────────────────────────── */
   const hostWebDir = path.join(process.env.ROOT_FOLDER || '', projId, 'web');
 
   if (!fs.existsSync(hostWebDir)) {
-    throw new Error(
-      `[startProjectContainer] Host web directory not found: ${hostWebDir} – ` +
-      `code-generation must run before container launch.`,
-    );
+    // create it so the bind-mount works; code-generation will fill it later
+    fs.mkdirSync(hostWebDir, { recursive: true });
+    console.log(`[startProjectContainer] created empty dir ${hostWebDir}`);
   }
 
-  const hasAppDir   = fs.existsSync(path.join(hostWebDir, 'app'));
-  const hasPagesDir = fs.existsSync(path.join(hostWebDir, 'pages'));
-
-  if (!hasAppDir && !hasPagesDir) {
-    throw new Error(
-      `[startProjectContainer] Neither app/ nor pages/ folder found in ${hostWebDir}.`
+  // Log whether entry points are already present; no hard failure
+  const hasApp   = fs.existsSync(path.join(hostWebDir, 'app'));
+  const hasPages = fs.existsSync(path.join(hostWebDir, 'pages'));
+  if (!hasApp && !hasPages) {
+    console.log(
+      `[startProjectContainer] ${projId}: waiting for app/ or pages/ to appear…`
     );
   }
   /* ──────────────────────────────────────────────────────────────── */
