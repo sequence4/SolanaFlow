@@ -300,7 +300,10 @@ export const handleGenerateCode = async ({
           projectId,
           existingFilePaths,
           creatorId,
-          (path, code) => sendProgress({ event: 'file-written', path, content: code }),
+          (path, code) => {
+            sendProgress({ event: 'file-written', path, content: code });
+            if (path.endsWith("tsconfig.json")) console.log("[GEN] wrote tsconfig", code.slice(0,40));
+          },
         );
 
         // All UI files done
@@ -329,6 +332,37 @@ export const handleGenerateCode = async ({
             message: 'Running Next.js build to process Tailwind CSS…'
           });
           try {
+            // Force-write the tsconfig.json file to ensure it has the correct configuration
+            await runCommand(
+              `docker exec ${workspace.containerName} bash -lc 'cat > /usr/share/solanaflow/web/tsconfig.json <<EOF
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "node",
+    "target": "es5",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [{ "name": "next" }],
+    "baseUrl": "src",
+    "paths": { "@/*": ["*"] }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}
+EOF'`,
+              '.', 
+              projectId
+            );
+            
             await runCommand(
               // force standalone output _inside_ the running container
               `docker exec \

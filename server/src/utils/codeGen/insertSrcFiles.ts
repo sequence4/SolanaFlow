@@ -51,6 +51,10 @@ export async function insertSrcFiles(
       console.log(`[DEBUG_INSERT_SRC] Processing file: ${projectRelativePath}`);
       console.log(`[DEBUG_INSERT_SRC] Code to write (first 50 chars): ${node.code?.substring(0,50)}`);
 
+      if (projectRelativePath === "web/tsconfig.json") {
+        console.log("[DEBUG_INSERT_SRC] About to process tsconfig.json - exists in paths?", existingFilePaths.has(projectRelativePath));
+      }
+
       const taskId = await updateOrCreateFile(
         projectId,
         projectRelativePath, 
@@ -60,6 +64,10 @@ export async function insertSrcFiles(
       );
       if (taskId) {
         console.log(`[DEBUG_INSERT_SRC] Added taskId ${taskId} for file: ${projectRelativePath}`);
+        
+        if (projectRelativePath === "web/tsconfig.json") {
+          console.log("[DEBUG_INSERT_SRC] taskId for tsconfig.json =", taskId);
+        }
         
         // stream the file *now* – don't block the queue
         if (onFile) onFile(projectRelativePath, node.code || '');
