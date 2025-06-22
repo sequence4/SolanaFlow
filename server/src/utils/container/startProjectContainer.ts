@@ -289,6 +289,7 @@ export async function startProjectContainer(
       'docker', 'run',
       ...(withPullAlways ? ['--pull=always'] : []),     // refresh tag (Docker ≥ 23)
       '-d',                                            // detached – let pipeline continue
+      '--user', '0:0',                                 // 🔸 run container as root (fixes mkdir EACCES)
       '--platform', targetPlatform,                    // dynamic arch selection
       '--name', name,
       '--label', `solanaflow.project=${projId}`,
