@@ -2,29 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ------------- v0 design-tokens ------------- */
+/* --- shadcn-ui semantic colour tokens (needed by border-border etc.) --- */
 @layer base {
   :root {
-    /* Brand colors - soft blue to lavender gradient */
-    --brand-primary: linear-gradient(135deg, #a0d2ff 0%, #d3c1ff 100%);
-    --brand-primary-hover: linear-gradient(135deg, #92c2ff 0%, #c0b4ff 100%);
-
-    /* Spacing tokens */
-    --space-xs: 4px;
-    --space-sm: 8px;
-    --space-md: 16px;
-    --space-lg: 28px;
-
-    /* Border radius */
-    --radius-md: 12px;
-    --radius-lg: 20px;
-
-    /* Shadows */
-    --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.08);
-
-    /* Field accent color */
-    --field-accent: rgba(160, 210, 255, 0.15);
-
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
@@ -44,11 +24,6 @@
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 221.2 83.2% 53.3%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
     --radius: 0.5rem;
   }
 
@@ -80,6 +55,7 @@
   }
 }
 
+/* ------------- v0 design-tokens ------------- */
 @layer base {
   * {
     @apply border-border;
