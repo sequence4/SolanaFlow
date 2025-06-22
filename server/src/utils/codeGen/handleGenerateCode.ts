@@ -388,12 +388,12 @@ export const handleGenerateCode = async ({
         {
           sendProgress({ stage: 'deps', message: 'Installing JS deps in container…' });
 
-          // Runs: docker exec <container> bash -lc "cd /usr/src/<rootPath>/web && yarn install --silent --network-timeout 600000"
+          // Use -w to set the working directory rather than cd
           const installCmd = [
             'docker exec',
+            '-w', `${containerWebDir}`,
             workspace.containerName,
-            'bash -lc',
-            `"cd ${containerWebDir} && yarn install --silent --network-timeout 600000 --prefer-offline"`
+            'yarn install --silent --network-timeout 600000 --prefer-offline'
           ].join(' ');
 
           await runCommand(installCmd, '.', projectId);
