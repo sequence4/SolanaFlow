@@ -384,18 +384,20 @@ export const handleGenerateCode = async ({
         // All UI files done
         sendProgress({ event: 'ui-complete', message: 'UI streaming finished' });
 
-        /* ──────────────────────  Generate yarn.lock once  ────────────────────── */
+        /* ──────────────────────  Install JS deps inside the container  ────────────────────── */
         {
-          const webDir = path.join(process.env.ROOT_FOLDER!, workspace.rootPath, 'web');
-          sendProgress({ stage: 'deps', message: 'Installing JS deps (yarn.lock)…' });
+          // Tell the UI we're installing inside the container
+          sendProgress({ stage: 'deps', message: 'Installing JS deps in container…' });
 
-          // network-timeout avoids ESOCKETTIMEDOUT under QEMU; prefer-offline seeds cache
-          const yarnCmd = 'yarn install --silent --network-timeout 600000 --prefer-offline';
+          // `containerWebDir` is `/usr/src/<rootPath>/web`
+          const installCmd =
+            `docker exec ${workspace.containerName} bash -lc ` +
+            `'"cd ${containerWebDir} && yarn install --silent --network-timeout 600000 --prefer-offline"'`;
 
-          // run on the host so the lock-file lives on the bind-mount
-          execSync(yarnCmd, { cwd: webDir, stdio: 'inherit' });
+          // Use runCommand so progress is tracked in your task system
+          await runCommand(installCmd, '.', projectId);
 
-          sendProgress({ stage: 'deps', message: 'yarn.lock generated' });
+          sendProgress({ stage: 'deps', message: 'JS dependencies installed' });
         }
         /* ──────────────────────────────────────────────────────────────────────── */
 
