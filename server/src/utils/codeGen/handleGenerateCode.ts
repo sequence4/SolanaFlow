@@ -252,6 +252,34 @@ export const handleGenerateCode = async ({
                 }
               ]
             },
+            {  // --- fixed tsconfig for Next ↔ TS path aliases ---
+              name: "tsconfig.json",
+              path: "./web/tsconfig.json",
+              type: "file" as const,
+              code: `{
+  "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "node",
+    "target": "es5",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [{ "name": "next" }],
+    "baseUrl": "src",
+    "paths": { "@/*": ["*"] }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}`
+            },
             { name: "postcss.config.js", path: "./web/postcss.config.js", type: "file" as const, code: POSTCSS_CONFIG },
             {
               name: "idl",
