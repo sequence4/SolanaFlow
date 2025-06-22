@@ -1,5 +1,4 @@
 import { refreshWorkspaceTree } from './refreshWorkspaceTree';
-import { genUi } from './genUi';
 import { Graph } from '../../types/graph';
 import type { WorkspaceHandle } from '../deploy/prepEnv';
 import { amendConfigFiles } from './amendConfigFiles';
@@ -28,8 +27,6 @@ import {
   UI_INPUT_TSX,
   UI_LABEL_TSX,
   UTILS_TS,
-  globalsCss,
-  tailwindConfig,
   POSTCSS_CONFIG,
   walletProvider,
   solMintApp
@@ -161,8 +158,6 @@ export const handleGenerateCode = async ({
         else console.log('No valid function code found in nodes');
 
         console.log('DEBUG handleGenerateCode functionCode:', functionCode);
-
-        //const frontendTaskId = await genUi(nodes);   // possible skip this step if not working correctly (save til end) 
         
         sendProgress({ stage: 'file-tree', message: 'Refreshing file tree…' });
         const fileTreeTaskIds = await refreshWorkspaceTree(projectId, userId);
@@ -197,7 +192,7 @@ export const handleGenerateCode = async ({
         // For streaming, use the userId as creatorId
         const creatorId = userId;
         
-        // Build the UI file tree
+        // Define minimal UI tree structure
         const uiTree = {
           name: ".",
           path: "./web",
@@ -209,8 +204,7 @@ export const handleGenerateCode = async ({
               type: "directory" as const,
               children: [
                 { name: "page.tsx", path: "./web/app/page.tsx", type: "file" as const, code: homePage },
-                { name: "layout.tsx", path: "./web/app/layout.tsx", type: "file" as const, code: rootLayout },
-                { name: "globals.css", path: "./web/app/globals.css", type: "file" as const, code: globalsCss }
+                { name: "layout.tsx", path: "./web/app/layout.tsx", type: "file" as const, code: rootLayout }
               ]
             },
             {
@@ -258,7 +252,6 @@ export const handleGenerateCode = async ({
                 }
               ]
             },
-            { name: "tailwind.config.js", path: "./web/tailwind.config.js", type: "file" as const, code: tailwindConfig },
             { name: "postcss.config.js", path: "./web/postcss.config.js", type: "file" as const, code: POSTCSS_CONFIG },
             {
               name: "idl",
@@ -422,25 +415,10 @@ export const handleGenerateCode = async ({
           workspace,
           sendProgress,
         );
-        // no extra progress needed here – ui-ready already fired
-        sendProgress({ stage: "src-gen-done", message: "Rust sources ready" });
 
-        // ++++++++++++++++ ② NEW – generate dApp UI ++++++++++++++++
-        //const dAppUiTree = genUi("SolanaFlow Token")[0];
-        /*
-        await insertSrcFiles(
-          dAppUiTree,
-          projectId,
-          existingFilePaths,
-          creatorId,
-          // stream every written file immediately
-          (path, content) => sendProgress({ event: "file-written", path, content })
-        );
-        */
-        // tell frontend UI files are done
+        sendProgress({ stage: "src-gen-done", message: "Rust sources ready" });
         sendProgress({ stage: "ui-complete" });
 
-        // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
         // ─────────── Run static lint on Cargo manifests before amending ───────────
         console.log('[GEN] Running static Cargo.toml linter...');
