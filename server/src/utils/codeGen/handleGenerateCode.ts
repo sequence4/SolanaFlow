@@ -12,7 +12,7 @@ import { ensureAnchorTomlProgram, ensureRootWorkspaceMembers } from './ensureCon
 import { parseNodeDetails } from './parseNodeDetails';
 import { lintWorkspaceManifests } from './cargoManifestLint';
 import { FileTreeItem } from '../../types/FileTreeItem';
-import { runCommand } from "../projectUtils";
+import { runCommand, runCommandDetached } from "../projectUtils";
 import { randomUUID } from 'crypto';
 import path from "path";
 import { attachFileContents } from "../fileUtils/attachFileContents";
@@ -306,6 +306,18 @@ export const handleGenerateCode = async ({
               stage: 'next-build-done',
               message: 'Next.js build completed'
             });
+
+            // Only launch the Next.js server in container if not in dev mode
+            if (process.env.SF_DEV_SERVER !== '1') {
+              // 🟢 start the server **inside the container** so cwd is valid
+              runCommandDetached(
+                `docker exec -w /usr/share/solanaflow/web ` +
+                `${workspace.containerName} bash -lc '` +
+                `node .next/standalone/server.js'`,
+                '.',                              // host cwd irrelevant
+                `next-serve-${projectId}`         // no extra options needed
+              ).catch(console.error);
+            }
           } catch (error) {
             console.error('Error during Next.js build:', error);
             sendProgress({
