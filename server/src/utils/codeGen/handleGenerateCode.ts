@@ -386,19 +386,28 @@ export const handleGenerateCode = async ({
 
         /* ──────────────────────  Install JS deps inside the container  ────────────────────── */
         {
-          // Tell the UI we're installing inside the container
           sendProgress({ stage: 'deps', message: 'Installing JS deps in container…' });
 
-          // `containerWebDir` is `/usr/src/<rootPath>/web`
-          const installCmd =
-            `docker exec ${workspace.containerName} bash -lc ` +
-            `'"cd ${containerWebDir} && yarn install --silent --network-timeout 600000 --prefer-offline"'`;
+          // Runs: docker exec <container> bash -lc "cd /usr/src/<rootPath>/web && yarn install --silent --network-timeout 600000"
+          const installCmd = [
+            'docker exec',
+            workspace.containerName,
+            'bash -lc',
+            `"cd ${containerWebDir} && yarn install --silent --network-timeout 600000 --prefer-offline"`
+          ].join(' ');
 
-          // Use runCommand so progress is tracked in your task system
           await runCommand(installCmd, '.', projectId);
-
           sendProgress({ stage: 'deps', message: 'JS dependencies installed' });
         }
+
+        // ─── Restart Next.js dev server so it picks up next-themes, toast, etc.
+        sendProgress({ stage: 'deps', message: 'Restarting Next.js server…' });
+        await runCommand(
+          `docker exec ${workspace.containerName} bash -lc "pkill -f 'next dev' && cd ${containerWebDir} && yarn dev &"`,
+          '.', projectId
+        );
+        sendProgress({ stage: 'deps', message: 'Dev server restarted' });
+
         /* ──────────────────────────────────────────────────────────────────────── */
 
         /* In dev-server mode the container is already running `yarn dev`,
