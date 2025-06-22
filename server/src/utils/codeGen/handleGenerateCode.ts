@@ -131,6 +131,12 @@ export const handleGenerateCode = async ({
     //console.log('[GEN] first node  =', graph.nodes[0]);
     
     try {
+        // --------------------------------------------------------------------
+        // All container-side UI work must happen in the SAME bind-mounted tree
+        // that startProjectContainer exposes at /usr/src/<rootPath>/web.
+        // --------------------------------------------------------------------
+        const containerWebDir = `/usr/src/${workspace.rootPath}/web`;
+
         if (graph.nodes.length === 0) throw new Error('No nodes found');
         let functionCode = null;
 
@@ -334,7 +340,7 @@ export const handleGenerateCode = async ({
           try {
             // Force-write the tsconfig.json file to ensure it has the correct configuration
             await runCommand(
-              `docker exec ${workspace.containerName} bash -lc 'cat > /usr/share/solanaflow/web/tsconfig.json <<EOF
+              `docker exec ${workspace.containerName} bash -lc 'cat > ${containerWebDir}/tsconfig.json <<EOF
 {
   "compilerOptions": {
     "module": "esnext",
@@ -368,7 +374,7 @@ EOF'`,
               `docker exec \
     -e NEXT_PRIVATE_STANDALONE=true \
     -e APP_BASE_PATH= \
-    -w /usr/share/solanaflow/web \
+    -w ${containerWebDir} \
     ${workspace.containerName} npm run build`,
               '.',
               projectId
@@ -382,7 +388,7 @@ EOF'`,
             if (process.env.SF_DEV_SERVER !== '1') {
               // 🟢 start the server **inside the container** so cwd is valid
               runCommandDetached(
-                `docker exec -w /usr/share/solanaflow/web ` +
+                `docker exec -w ${containerWebDir} ` +
                 `${workspace.containerName} bash -lc '` +
                 `node .next/standalone/server.js'`,
                 '.',                              // host cwd irrelevant
