@@ -320,6 +320,11 @@ export async function startProjectContainer(
       
       // ---- Legacy mount kept for backwards compatibility (same host dir) ----
       '-v', `${process.env.ROOT_FOLDER}/${projId}/web:/usr/share/solanaflow/web`,
+      
+      /* New: ensure all subsequent commands execute _inside_
+       * /usr/src/${projId}/web, so we don't need mkdir at runtime */
+      '--workdir', `/usr/src/${projId}/web`,
+      
       imageRef,
       // ─── launch command ────────────────────────────────────────────────
       ...(useDevServer
@@ -327,8 +332,7 @@ export async function startProjectContainer(
             'bash', '-lc',
             // DEV mode: wait for ./app or ./pages, then start Next.js
             `
-            mkdir -p /usr/src/${projId}/web \\
-            && cd /usr/src/${projId}/web \\
+            cd /usr/src/${projId}/web \\
             && until [ -d app ] || [ -d pages ]; do sleep 1; done \\
             && yarn install --frozen-lockfile \\
             && npx next dev -H 0.0.0.0 -p 3000
@@ -338,8 +342,7 @@ export async function startProjectContainer(
             'bash', '-lc',
             // STANDALONE mode: wait for .next build, then run it
             `
-            mkdir -p /usr/src/${projId}/web \\
-            && cd /usr/src/${projId}/web \\
+            cd /usr/src/${projId}/web \\
             && until [ -d .next ]; do sleep 1; done \\
             && node .next/standalone/server.js -H 0.0.0.0 -p ${INTERNAL_PORT} \\
             & pid=$!; trap 'kill $pid' TERM INT; wait $pid
