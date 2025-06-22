@@ -31,6 +31,12 @@ import {
   walletProvider,
   solMintApp
 } from './uiTemplates';
+import {
+  CARD_TSX,
+  BADGE_TSX,
+  ALERT_TSX,
+  TOOLTIP_TSX
+} from "./uiTemplates";
 
 /** Extract all file paths from a file tree recursively. */
 function flattenPaths(tree: any[]): string[] {
@@ -235,7 +241,11 @@ export const handleGenerateCode = async ({
                       children: [
                         { name: "button.tsx", path: "./web/src/components/ui/button.tsx", type: "file" as const, code: UI_BUTTON_TSX },
                         { name: "input.tsx", path: "./web/src/components/ui/input.tsx", type: "file" as const, code: UI_INPUT_TSX },
-                        { name: "label.tsx", path: "./web/src/components/ui/label.tsx", type: "file" as const, code: UI_LABEL_TSX }
+                        { name: "label.tsx", path: "./web/src/components/ui/label.tsx", type: "file" as const, code: UI_LABEL_TSX },
+                        { name: "card.tsx",    path: "./web/src/components/ui/card.tsx",    type: "file" as const, code: CARD_TSX },
+                        { name: "badge.tsx",   path: "./web/src/components/ui/badge.tsx",   type: "file" as const, code: BADGE_TSX },
+                        { name: "alert.tsx",   path: "./web/src/components/ui/alert.tsx",   type: "file" as const, code: ALERT_TSX },
+                        { name: "tooltip.tsx", path: "./web/src/components/ui/tooltip.tsx", type: "file" as const, code: TOOLTIP_TSX },
                       ]
                     }
                   ]
