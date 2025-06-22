@@ -320,14 +320,25 @@ export async function startProjectContainer(
       // ---- Legacy mount kept for backwards compatibility (same host dir) ----
       '-v', `${process.env.ROOT_FOLDER}/${projId}/web:/usr/share/solanaflow/web`,
       imageRef,
+      // NEW – wait until app/ or pages/ exists, then start from /usr/src/<id>/web
       ...(useDevServer
         ? [
             'bash', '-lc',
-            `"cd /usr/share/solanaflow/web && yarn install --frozen-lockfile && npx next dev -H 0.0.0.0 -p 3000"`
+            `
+            cd /usr/src/${projId}/web \\
+            && until [ -d app ] || [ -d pages ]; do sleep 1; done \\
+            && yarn install --frozen-lockfile \\
+            && npx next dev -H 0.0.0.0 -p 3000
+            `
           ]
         : [
             'bash', '-lc',
-            `"node /usr/share/solanaflow/web/.next/standalone/server.js -H 0.0.0.0 -p ${INTERNAL_PORT} & pid=$!; trap 'kill $pid' TERM INT; wait $pid"`
+            `
+            cd /usr/src/${projId}/web \\
+            && until [ -d .next ]; do sleep 1; done \\
+            && node .next/standalone/server.js -H 0.0.0.0 -p ${INTERNAL_PORT} \\
+            & pid=$!; trap 'kill $pid' TERM INT; wait $pid
+            `
           ])
     ];
 
