@@ -226,18 +226,19 @@ export async function startProjectContainer(
   /** Toggle: `SF_DEV_SERVER=1` ⇒ start `next dev` instead of standalone build */
   const useDevServer = devMode || process.env.SF_DEV_SERVER === '1';
   
-  // Determine if running in local dev mode (Next.js dev server)
-  let projectDir = '';
+  // Determine project root path and ensure host directory exists for mounting
   const rootPath = await getProjectRootPath(projId);
   const hostRoot = process.env.ROOT_FOLDER;
   if (!hostRoot) {
     throw new Error('ROOT_FOLDER environment not set – cannot locate project directory');
   }
-  projectDir = path.join(hostRoot, rootPath);
-  
-  if (useDevServer) {
-    // Ensure the project web directory exists before launching container
-    fs.mkdirSync(path.join(projectDir, 'web'), { recursive: true });
+  const hostProjectDir = path.join(hostRoot, rootPath);
+  if (!fs.existsSync(hostProjectDir)) {
+    fs.mkdirSync(hostProjectDir, { recursive: true });
+  }
+  const hostWebDir = path.join(hostProjectDir, 'web');
+  if (!fs.existsSync(hostWebDir)) {
+    fs.mkdirSync(hostWebDir, { recursive: true });
   }
   
   const withPullAlways = pullAlwaysAllowed(image);
@@ -302,114 +303,67 @@ export async function startProjectContainer(
     // NEW: make sure the host has enough free space (≥ 3 GiB)
     ensureDockerSpace();
     
-    let runArgs: string[];
+    const runArgs: string[] = [
+      'docker', 'run',
+      ...(withPullAlways ? ['--pull=always'] : []),     // refresh tag (Docker ≥ 23)
+      '-d',                                            // detached – let pipeline continue
+      '--user', '0:0',                                 // 🔸 run container as root (fixes mkdir EACCES)
+      '--platform', targetPlatform,                    // dynamic arch selection
+      '--name', name,
+      '--label', `solanaflow.project=${projId}`,
+      '--restart', 'unless-stopped',
+      ...(sizeOptSupported() ? ['--storage-opt', 'size=20G'] : []),  // guard FS quota
+      '-v', `${vCargo}:/root/.cargo`,
+      '-v', `${vSccache}:/opt/sccache`,
+      '-v', `${vTargetBuild}:/usr/src/target`,
+      // Mount host project directory into the container at the correct path
+      '-v', `${hostProjectDir}:/usr/src/${rootPath}`,
+      '-e', 'CARGO_TARGET_DIR=/usr/src/target',
+      '-e', 'HOSTNAME=0.0.0.0',
+      '-e', 'CARGO_BUILD_JOBS=1',
+      '-e', 'RUSTC_WRAPPER=sccache',
+      // RUSTFLAGS is exported in /tmp/build.sh; keep it *out* of docker run to avoid quoting issues
+      '-e', `APP_ID=${projId}`,
+      '-e', `APP_BASE_PATH=/dapp/${projId}`,
+      '-e', `SF_DEV_SERVER=${useDevServer ? '1' : ''}`,
+      '--label=traefik.enable=true',
+      `--label='traefik.http.routers.dapp-${projId}.rule=PathPrefix(\`/dapp/${projId}\`)'`,
+      `--label=traefik.http.routers.dapp-${projId}.entrypoints=web,websecure`,
+      `--label='traefik.http.routers.dapp-${projId}.middlewares=strip-${projId}'`,
+      `--label='traefik.http.middlewares.strip-${projId}.stripprefix.prefixes=/dapp/${projId}'`,
+      `--label=traefik.http.routers.dapp-${projId}.service=dapp-${projId}`,
+      `--label=traefik.http.services.dapp-${projId}.loadbalancer.server.port=${INTERNAL_PORT}`,
+      `--label=traefik.http.services.dapp-${projId}.loadbalancer.healthcheck.timeout=30s`,
+      // pin to one SG-approved port so the UI link is always stable
+      '-p', `${hostPort}:${INTERNAL_PORT}`,
+      // Set working directory to the project's web folder
+      '-w', `/usr/src/${rootPath}/web`,
+      imageRef,
+    ];
+
+    // Add the appropriate command based on dev vs production mode
     if (useDevServer) {
-      runArgs = [
-        'docker', 'run',
-        ...(withPullAlways ? ['--pull=always'] : []),     // refresh tag (Docker ≥ 23)
-        '-d',                                            // detached – let pipeline continue
-        '--user', '0:0',                                 // 🔸 run container as root (fixes mkdir EACCES)
-        '--platform', targetPlatform,                    // dynamic arch selection
-        '--name', name,
-        '--label', `solanaflow.project=${projId}`,
-        '--restart', 'unless-stopped',
-        ...(sizeOptSupported() ? ['--storage-opt', 'size=20G'] : []),  // guard FS quota
-        '-v', `${vCargo}:/root/.cargo`,
-        '-v', `${vSccache}:/opt/sccache`,
-        '-v', `${vTargetBuild}:/usr/src/target`,
-        '-e', 'CARGO_TARGET_DIR=/usr/src/target',
-        '-e', 'HOSTNAME=0.0.0.0',
-        '-e', 'CARGO_BUILD_JOBS=1',
-        '-e', 'RUSTC_WRAPPER=sccache',
-        // RUSTFLAGS is exported in /tmp/build.sh; keep it *out* of docker run to avoid quoting issues
-        '-e', `APP_ID=${projId}`,
-        '-e', `APP_BASE_PATH=/dapp/${projId}`,
-        // Mount the host's project web folder into the container
-        '-v', `${projectDir}/web:/usr/share/solanaflow/web`,
-        '-e', 'SF_DEV_SERVER=1',
-        '--label=traefik.enable=true',
-        `--label='traefik.http.routers.dapp-${projId}.rule=PathPrefix(\`/dapp/${projId}\`)'`,
-        `--label=traefik.http.routers.dapp-${projId}.entrypoints=web,websecure`,
-        `--label='traefik.http.routers.dapp-${projId}.middlewares=strip-${projId}'`,
-        `--label='traefik.http.middlewares.strip-${projId}.stripprefix.prefixes=/dapp/${projId}'`,
-        `--label=traefik.http.routers.dapp-${projId}.service=dapp-${projId}`,
-        `--label=traefik.http.services.dapp-${projId}.loadbalancer.server.port=${INTERNAL_PORT}`,
-        `--label=traefik.http.services.dapp-${projId}.loadbalancer.healthcheck.timeout=30s`,
-        // pin to one SG-approved port so the UI link is always stable
-        '-p', `${hostPort}:${INTERNAL_PORT}`,
-        imageRef,
-        'bash', '-c',
-        // Wait for Next.js build output (.next) before starting the server
-        `"until [ -f /usr/share/solanaflow/web/.next/standalone/server.js ]; do sleep 2; done; \\
-         cd /usr/share/solanaflow/web; \\
-         node .next/standalone/server.js -H 0.0.0.0 & pid=$!; trap \\"kill $pid\\" TERM INT; wait $pid"`
-      ];
+      runArgs.push(
+        'bash', '-lc',
+        // Copy base Next.js app if needed, then start dev server with hot-reload
+        `"if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
+        `cp -R /usr/share/solanaflow/web/* /usr/src/${rootPath}/web/; fi; ` +
+        `cd /usr/src/${rootPath}/web && ` +
+        `yarn install --frozen-lockfile && ` +
+        `npx next dev -H 0.0.0.0 -p ${INTERNAL_PORT} & ` +
+        `pid=$!; trap 'kill $pid' TERM INT; wait $pid"`
+      );
     } else {
-      runArgs = [
-        'docker', 'run',
-        ...(withPullAlways ? ['--pull=always'] : []),     // refresh tag (Docker ≥ 23)
-        '-d',                                            // detached – let pipeline continue
-        '--user', '0:0',                                 // 🔸 run container as root (fixes mkdir EACCES)
-        '--platform', targetPlatform,                    // dynamic arch selection
-        '--name', name,
-        '--label', `solanaflow.project=${projId}`,
-        '--restart', 'unless-stopped',
-        ...(sizeOptSupported() ? ['--storage-opt', 'size=20G'] : []),  // guard FS quota
-        '-v', `${vCargo}:/root/.cargo`,
-        '-v', `${vSccache}:/opt/sccache`,
-        '-v', `${vTargetBuild}:/usr/src/target`,
-        '-e', 'CARGO_TARGET_DIR=/usr/src/target',
-        '-e', 'HOSTNAME=0.0.0.0',
-        '-e', 'CARGO_BUILD_JOBS=1',
-        '-e', 'RUSTC_WRAPPER=sccache',
-        // RUSTFLAGS is exported in /tmp/build.sh; keep it *out* of docker run to avoid quoting issues
-        '-e', `APP_ID=${projId}`,
-        '-e', `APP_BASE_PATH=/dapp/${projId}`,
-        '--label=traefik.enable=true',
-        `--label='traefik.http.routers.dapp-${projId}.rule=PathPrefix(\`/dapp/${projId}\`)'`,
-        `--label=traefik.http.routers.dapp-${projId}.entrypoints=web,websecure`,
-        `--label='traefik.http.routers.dapp-${projId}.middlewares=strip-${projId}'`,
-        `--label='traefik.http.middlewares.strip-${projId}.stripprefix.prefixes=/dapp/${projId}'`,
-        `--label=traefik.http.routers.dapp-${projId}.service=dapp-${projId}`,
-        `--label=traefik.http.services.dapp-${projId}.loadbalancer.server.port=${INTERNAL_PORT}`,
-        `--label=traefik.http.services.dapp-${projId}.loadbalancer.healthcheck.timeout=30s`,
-        // pin to one SG-approved port so the UI link is always stable
-        '-p', `${hostPort}:${INTERNAL_PORT}`,
-        // ---- Mount *once* to the path where the generator writes files ----
-        '-v', `${projectDir}/web:/usr/share/solanaflow/web`,
-        
-        // ---- Legacy mount kept for backwards compatibility (same host dir) ----
-        // REMOVED: '-v', `${process.env.ROOT_FOLDER}/${projId}/web:/usr/src/${projId}/web`,
-        
-        /* New: ensure all subsequent commands execute _inside_
-         * /usr/share/solanaflow/web, so we don't need mkdir at runtime */
-        '--workdir', '/usr/share/solanaflow/web',
-        
-        imageRef,
-        // ─── launch command ────────────────────────────────────────────────
-        ...(useDevServer
-          ? [
-              'bash', '-lc',
-              // DEV mode: wait for ./app or ./pages, then start Next.js
-              `
-              cd /usr/share/solanaflow/web \\
-              && until [ -d app ] || [ -d pages ]; do sleep 1; done \\
-              && yarn install --frozen-lockfile \\
-              && npx next dev -H 0.0.0.0 -p 3000
-              `
-            ]
-          : [
-              'bash', '-lc',
-              // STANDALONE mode: wait for .next build, then run it
-              `
-              cd /usr/share/solanaflow/web \\
-              && until [ -d .next ]; do sleep 1; done \\
-              && node .next/standalone/server.js -H 0.0.0.0 -p ${INTERNAL_PORT} \\
-              & pid=$!; trap 'kill $pid' TERM INT; wait $pid
-              `
-            ])
-        // ───────────────────────────────────────────────────────────────────
-      ];
+      runArgs.push(
+        'bash', '-lc',
+        // Copy base Next.js app if needed, then run standalone server
+        `"if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
+        `cp -R /usr/share/solanaflow/web/* /usr/src/${rootPath}/web/; fi; ` +
+        `cd /usr/src/${rootPath}/web && ` +
+        `until [ -d .next ]; do sleep 1; done && ` +
+        `node .next/standalone/server.js -H 0.0.0.0 -p ${INTERNAL_PORT} & ` +
+        `pid=$!; trap 'kill $pid' TERM INT; wait $pid"`
+      );
     }
 
     console.log("[startProjectContainer] RUN CMD:\n", runArgs.join(" "));
