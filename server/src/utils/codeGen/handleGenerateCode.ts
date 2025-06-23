@@ -374,8 +374,24 @@ export const handleGenerateCode = async ({
 
         /* ──────────────────────  Install JS deps inside the container  ────────────────────── */
         {
-          sendProgress({ stage: 'deps', message: 'Installing JS deps in container…' });
+          // STEP 0  ➜ regenerate yarn.lock so the upcoming frozen install never bails
+          sendProgress({ stage: 'deps', message: 'Creating/refreshing yarn.lock in container…' });
 
+          const lockfileCmd = [
+            'docker exec',
+            // isolate Yarn's cache just like the main install
+            '-e', 'YARN_CACHE_FOLDER=/tmp/yarn-cache',
+            '-w', containerWebDir,
+            workspace.containerName,
+            // --lockfile-only writes yarn.lock without touching node_modules
+            'bash -lc "rm -rf \\$YARN_CACHE_FOLDER && mkdir -p \\$YARN_CACHE_FOLDER && yarn install --lockfile-only --check-files --no-cache --network-timeout 600000"'
+          ].join(' ');
+
+          await runCommand(lockfileCmd, '.', projectId);
+
+          sendProgress({ stage: 'deps', message: 'yarn.lock updated; installing deps…' });
+
+          // STEP 1  ➜ existing frozen install (unchanged)
           const installCmd = [
             'docker exec',
             // isolate Yarn's cache so every dApp build starts clean
