@@ -83,40 +83,6 @@ const emitFileWritten = (sendProgress: (data: unknown) => void): ((path: string,
   });
 };
 
-/** Write the token-minting UI tree, wait for all tasks, attach contents, and
- *  send a progress event.  MUST be called *before* Rust generation so the
- *  user sees the preview immediately.
- */
-async function writeUiFirst(
-  uiRoot   : FileTreeItem,
-  projectId: string,
-  existing : Set<string>,
-  workspace: WorkspaceHandle,
-  sendProgress: (d: unknown) => void,
-) {
-  // 1) schedule writes
-  const uiTaskIds = await insertSrcFiles(uiRoot, projectId, existing, null, emitFileWritten(sendProgress));
-
-  // 2) let the caller know we're starting UI writes
-  sendProgress({ stage: 'ui-write', message: 'Writing UI files…' });
-
-  // 3) wait for every task to finish (same timeouts you use elsewhere)
-  for (const tId of uiTaskIds) {
-    await waitForTaskCompletion(tId, 90, 2_000);
-  }
-
-  // 4) attach the written contents for the file-tree panel
-  const absRoot  = path.join(process.env.ROOT_FOLDER!, workspace.rootPath);
-  await attachFileContents([uiRoot], absRoot, workspace.containerName);
-
-  // 5) tell the FE the preview is ready
-  sendProgress({
-    stage: 'ui-ready',
-    message: 'UI code written – preview available',
-    fileTree: [uiRoot],
-  });
-}
-
 interface Args {
   projectId: string;
   graph: Graph;
@@ -386,18 +352,24 @@ export const handleGenerateCode = async ({
         // Tell FE we're starting incremental UI push
         sendProgress({ stage: 'ui-stream', message: 'Streaming UI files…' });
 
-        await insertSrcFiles(
+        // ─── write UI files and WAIT until every task finishes ────────────────
+        const uiWriteTaskIds = await insertSrcFiles(
           uiTree,
           projectId,
           existingFilePaths,
           creatorId,
           (path, code) => {
             sendProgress({ event: 'file-written', path, content: code });
-            if (path.endsWith("tsconfig.json")) console.log("[GEN] wrote tsconfig", code.slice(0,40));
+            if (path.endsWith('tsconfig.json'))
+              console.log('[GEN] wrote tsconfig', code.slice(0, 40));
           },
         );
 
-        // All UI files done
+        // block until every UI-write task is complete
+        for (const id of uiWriteTaskIds) {
+          await waitForTaskCompletion(id, 90, 2_000);
+        }
+
         sendProgress({ event: 'ui-complete', message: 'UI streaming finished' });
 
         /* ──────────────────────  Install JS deps inside the container  ────────────────────── */
