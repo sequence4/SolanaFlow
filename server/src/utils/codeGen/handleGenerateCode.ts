@@ -200,9 +200,15 @@ export const handleGenerateCode = async ({
         // Gather existing paths so insertSrcFiles can decide create vs update
         const existingFilePaths = new Set<string>(flattenPaths(initialTree));
         
-        // --- force-overwrite critical config files -------------------------
-        existingFilePaths.delete("web/package.json");
-        existingFilePaths.delete("web/tsconfig.json");
+        // --- force-overwrite critical config files (handles "./" prefix) ----
+        for (const f of ["web/package.json", "./web/package.json",
+                         "web/tsconfig.json", "./web/tsconfig.json"]) {
+          existingFilePaths.delete(f);
+        }
+        
+        console.log("[GEN] after delete, has package.json?",
+                    existingFilePaths.has("./web/package.json") ||
+                    existingFilePaths.has("web/package.json"));
 
         /* ─────────────────────  A)  generate and write the UI FIRST  ───────────────────── */
         sendProgress({ stage: 'ui-gen', message: 'Generating token-minting UI…' });
