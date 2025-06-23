@@ -29,7 +29,7 @@ import {
   UTILS_TS,
   POSTCSS_CONFIG,
   THEME_PROVIDER_TSX,
-  USE_TOAST_TS,
+  USE_TOAST_TSX,
   walletProvider,
   solMintApp
 } from './uiTemplates';
@@ -234,7 +234,7 @@ export const handleGenerateCode = async ({
                   path: "./web/src/hooks",
                   type: "directory" as const,
                   children: [
-                    { name: "use-toast.ts", path: "./web/src/hooks/use-toast.ts", type: "file" as const, code: USE_TOAST_TS }
+                    { name: "use-toast.tsx", path: "./web/src/hooks/use-toast.tsx", type: "file" as const, code: USE_TOAST_TSX }
                   ]
                 },
                 {

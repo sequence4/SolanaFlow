@@ -45,7 +45,7 @@ export function ThemeProvider({
 `
 
 /** --- use-toast hook + Toaster component ———————————————— */
-export const USE_TOAST_TS = /* tsx */ `
+export const USE_TOAST_TSX = /* tsx */ `
 'use client'
 
 import * as React from 'react'
