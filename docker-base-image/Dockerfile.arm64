@@ -179,6 +179,8 @@ WORKDIR /usr/share/solanaflow/web/.next/standalone
 COPY --from=solana-toolchain /usr/local/bin /usr/local/bin
 COPY --from=solana-toolchain /root/.cargo/bin /root/.cargo/bin
 COPY --from=solana-toolchain /root/.rustup /root/.rustup
+# pre-built Anchor workspace skeleton (speeds up prepEnv thin-copy)
+COPY --from=solana-toolchain /usr/src/anchor-template /usr/src/anchor-template
 # ── web bundle ────────────────────────────────────────────────────────────────
 # Next 'standalone' output lives in:
 #   web/.next/standalone/…   (server code + _next/static)
