@@ -264,8 +264,7 @@ export async function startProjectContainer(
     // find a free high port *once* for this container
     const hostPort = pickFreePort();
     
-    /* 1 ─ ensure image is present & host-arch-compatible (force x86_64) */
-    timed(`docker pull ${image}`, 'pull');
+    timed(`docker pull --platform linux/arm64 ${image}`, 'pull');
 
     // ── pin to immutable digest and then re-tag it so `docker run` will work
     let imageRef = image;
