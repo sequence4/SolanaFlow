@@ -4,8 +4,7 @@
   "workspaces": [
     "landing",
     "client",
-    "server",
-    "web"
+    "server"
   ],
   "devDependencies": {
     "@types/react": "18.3.4",
@@ -33,5 +32,5 @@
   "dependencies": {
     "@solana/web3.js": "^1.98.0",
     "buffer": "^6.0.3"
-  }
+  },
 }
