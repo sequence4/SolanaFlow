@@ -382,9 +382,7 @@ export const handleGenerateCode = async ({
             '-e', 'YARN_CACHE_FOLDER=/tmp/yarn-cache',
             '-w', containerWebDir,
             workspace.containerName,
-            'bash -lc "rm -rf $YARN_CACHE_FOLDER && mkdir -p $YARN_CACHE_FOLDER && ' +
-              // deterministic, network-only install
-              'yarn install --frozen-lockfile --check-files --no-cache --network-timeout 600000"'
+            'bash -lc "rm -rf \\$YARN_CACHE_FOLDER && mkdir -p \\$YARN_CACHE_FOLDER && yarn install --frozen-lockfile --check-files --no-cache --network-timeout 600000"'
           ].join(' ');
 
           await runCommand(installCmd, '.', projectId);
