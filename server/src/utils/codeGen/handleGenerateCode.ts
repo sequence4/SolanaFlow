@@ -357,6 +357,12 @@ export const handleGenerateCode = async ({
             },
             { name: "postcss.config.js", path: "./web/postcss.config.js", type: "file" as const, code: POSTCSS_CONFIG },
             {
+              name: ".yarnrc",
+              path: "./web/.yarnrc",
+              type: "file" as const,
+              code: "prefer-offline false\n"
+            },
+            {
               name: "idl",
               path: "./web/idl",
               type: "directory" as const,
@@ -391,9 +397,11 @@ export const handleGenerateCode = async ({
           // Use -w to set the working directory rather than cd
           const installCmd = [
             'docker exec',
-            '-w', `${containerWebDir}`,
+            '-w', containerWebDir,
             workspace.containerName,
-            'yarn install --silent --network-timeout 600000 --prefer-offline'
+            // ① nuke any pre-existing cache   ② do a network, locked install
+            `bash -lc "yarn cache clean --all \
+               && yarn install --check-files --frozen-lockfile --network-timeout 600000"`  // no --prefer-offline !
           ].join(' ');
 
           await runCommand(installCmd, '.', projectId);
