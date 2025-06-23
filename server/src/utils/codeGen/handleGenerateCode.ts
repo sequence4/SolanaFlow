@@ -394,14 +394,15 @@ export const handleGenerateCode = async ({
         {
           sendProgress({ stage: 'deps', message: 'Installing JS deps in container…' });
 
-          // Use -w to set the working directory rather than cd
           const installCmd = [
             'docker exec',
+            // isolate Yarn's cache so every dApp build starts clean
+            '-e', 'YARN_CACHE_FOLDER=/tmp/yarn-cache',
             '-w', containerWebDir,
             workspace.containerName,
-            // ① nuke any pre-existing cache   ② do a network, locked install
-            `bash -lc "yarn cache clean --all \
-               && yarn install --check-files --frozen-lockfile --network-timeout 600000"`  // no --prefer-offline !
+            'bash -lc "rm -rf $YARN_CACHE_FOLDER && mkdir -p $YARN_CACHE_FOLDER && ' +
+              // deterministic, network-only install
+              'yarn install --frozen-lockfile --check-files --no-cache --network-timeout 600000"'
           ].join(' ');
 
           await runCommand(installCmd, '.', projectId);
