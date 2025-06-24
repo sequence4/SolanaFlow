@@ -122,8 +122,10 @@ RUN . "$NVM_DIR/nvm.sh" \
 ENV NEXT_TELEMETRY_DISABLED=1 NEXT_SKIP_ESLINT=1 NEXT_PRIVATE_STANDALONE=true
 
 # ---------- bake node_modules once (cacheable) ----------
-COPY web/package.json web/yarn.lock ./web/
-RUN cd /web && yarn install --frozen-lockfile --production
+RUN mkdir -p /usr/share/solanaflow/web
+COPY web/package.json web/yarn.lock /usr/share/solanaflow/web/
+RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing=locked \
+    yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile --production
 # --------------------------------------------------------
 
 # copy the web/ directory that already exists in the repo
@@ -134,7 +136,7 @@ RUN mkdir -p /usr/share/solanaflow/web/public
 
 # install deps and build once
 RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing=locked \
-    yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile \
+    yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile --production --prefer-offline --check-files \
  && yarn --cwd /usr/share/solanaflow/web \
         next build
 
