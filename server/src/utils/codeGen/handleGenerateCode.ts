@@ -303,7 +303,8 @@ export const handleGenerateCode = async ({
     "@radix-ui/react-popover": "^1.0.7",
     "@radix-ui/react-slot": "^1.0.2",
     "@radix-ui/react-tooltip": "^1.2.7",
-    "@reown/appkit": "^1.7.10", 
+    "@reown/appkit": "^1.7.10",
+    "@msgpack/msgpack": "^3.0.0", 
     "@solana/wallet-adapter-react": "^0.15.35",
     "@solana/wallet-adapter-react-ui": "^0.9.35",
     "@solana/wallet-adapter-wallets": "^0.19.26",
@@ -417,7 +418,7 @@ export const handleGenerateCode = async ({
         // ─── Restart Next.js dev server so it picks up next-themes, toast, etc.
         sendProgress({ stage: 'deps', message: 'Restarting Next.js server…' });
         await runCommand(
-          `docker exec ${workspace.containerName} bash -lc "pkill -f 'next dev' && cd ${containerWebDir} && yarn dev &"`,
+          `docker exec ${workspace.containerName} bash -lc "pkill -f 'next dev' && cd ${containerWebDir} && yarn dev --turbo &"`,
           '.', projectId
         );
         sendProgress({ stage: 'deps', message: 'Dev server restarted' });
