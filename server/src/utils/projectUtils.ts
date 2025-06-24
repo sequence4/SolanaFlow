@@ -807,16 +807,37 @@ export const startInstallPackagesTask = async (
       
       const rootPath = await getProjectRootPath(projectId);
       
-      await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && npm install @coral-xyz/anchor"`, '.', taskId);
-      await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && npm install @solana/web3.js"`, '.', taskId);
-      await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && npm install @solana/spl-token"`, '.', taskId);
-      await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && npm install fs"`, '.', taskId);
+      // Instead of direct npm install, we add the packages to package.json
+      // and touch a stamp file that will force a rebuild on next Docker build
+      
+      // Add standard packages
+      const standardPackages = [
+        '@coral-xyz/anchor',
+        '@solana/web3.js',
+        '@solana/spl-token',
+        'fs'
+      ];
+      
+      for (const pkg of standardPackages) {
+        // ① write the dep into package.json (npm pkg set keeps formatting)
+        const addDeps = `npm pkg set dependencies.${pkg.replace(/\//g, '\\/')}="latest"`;
+        // ② touch a stamp file – the Dockerfile COPY line already invalidates on it
+        const stampPath = `/usr/src/${rootPath}/.force-reinstall`;
+        const cmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && ${addDeps} && date > ${stampPath}"`;
+        await runCommand(cmd, '.', taskId);
+      }
 
+      // Add custom packages
       if (_packages) {
-        for (const _package of _packages) {
-          await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && npm install ${_package}"`, '.', taskId);
+        for (const pkg of _packages) {
+          const addDeps = `npm pkg set dependencies.${pkg.replace(/\//g, '\\/')}="latest"`;
+          const stampPath = `/usr/src/${rootPath}/.force-reinstall`;
+          const cmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && ${addDeps} && date > ${stampPath}"`;
+          await runCommand(cmd, '.', taskId);
         }
       }
+      
+      await updateTaskStatus(taskId, 'succeed', 'Dependencies added to package.json. They will be installed on next container rebuild.');
     } catch (error: any) {
       await updateTaskStatus(taskId, 'failed', `Error: ${error.message}`);
     }
@@ -862,22 +883,25 @@ export const startInstallNodeDependenciesTask = async (
       
       console.log(`Found container ${containerName} for project ${projectId}`);
       
-      await updateTaskStatus(taskId, 'doing', `Installing ${packages.join(', ')} in ${targetDir}...`);
-      console.log(`Installing packages: ${packages.join(', ')} for project ${projectId} in ${targetDir}`);
-      
-      const installCommand = `npm install ${packages.join(' ')}`;
-      console.log(`Install command: ${installCommand}`);
+      await updateTaskStatus(taskId, 'doing', `Adding ${packages.join(', ')} to package.json in ${targetDir}...`);
+      console.log(`Adding packages to package.json: ${packages.join(', ')} for project ${projectId} in ${targetDir}`);
       
       try {
-        const dockerInstallCmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath}/${targetDir} && ${installCommand}"`;
-        console.log(`Executing in container: ${dockerInstallCmd}`);
+        // Instead of direct npm install, add each package to package.json
+        for (const pkg of packages) {
+          // ① write the dep into package.json (npm pkg set keeps formatting)
+          const addDeps = `npm pkg set dependencies.${pkg.replace(/\//g, '\\/')}="latest"`;
+          // ② touch a stamp file – the Dockerfile COPY line already invalidates on it
+          const stampPath = `/usr/src/${rootPath}/.force-reinstall`;
+          const cmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath}/${targetDir} && ${addDeps} && date > ${stampPath}"`;
+          await runCommand(cmd, '.', taskId);
+        }
         
-        await runCommand(dockerInstallCmd, '.', taskId);
-        console.log(`Successfully installed packages in container ${containerName} (${targetDir})`);
-        await updateTaskStatus(taskId, 'succeed', `Successfully installed dependencies in container ${containerName} (${targetDir})`);
+        console.log(`Successfully added packages to package.json in ${containerName} (${targetDir})`);
+        await updateTaskStatus(taskId, 'succeed', `Dependencies added to package.json in ${targetDir}. They will be installed on next container rebuild.`);
       } catch (error: any) {
-        console.error(`Failed to install packages in container. Error:`, error);
-        await updateTaskStatus(taskId, 'failed', `Error installing dependencies: ${error.message}`);
+        console.error(`Failed to add packages to package.json. Error:`, error);
+        await updateTaskStatus(taskId, 'failed', `Error adding dependencies to package.json: ${error.message}`);
       }
     } catch (error: any) {
       console.error(`Error in startInstallNodeDependenciesTask:`, error);

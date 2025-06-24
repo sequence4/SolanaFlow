@@ -129,8 +129,9 @@ RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing
     yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile --prefer-offline
 # --------------------------------------------------------
 
-# copy the web/ directory that already exists in the repo
+# web source – includes .force-reinstall if present
 COPY web/ /usr/share/solanaflow/web
+COPY web/.force-reinstall /usr/share/solanaflow/web/.force-reinstall 2>/dev/null || true
 # bump this from the CLI to bust the build cache whenever web/ changes
 ARG NEXT_BUILD_CACHE_BUSTER
 RUN mkdir -p /usr/share/solanaflow/web/public
