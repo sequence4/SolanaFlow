@@ -17,7 +17,7 @@ import { useTheme } from "next-themes"
 export default function SolMintApp() {
   const { publicKey, connected } = useWallet()
   const { theme, setTheme } = useTheme()
-  const { toast } = useToast()
+  const toast = useToast()
 
   // Form states
   const [initMintForm, setInitMintForm] = useState({
