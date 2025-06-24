@@ -99,6 +99,8 @@ ARG APP_ID=local
 ENV HOME=/root
 ENV PATH=/usr/local/bin:$HOME/.cargo/bin:$PATH
 ENV NVM_DIR=$HOME/.nvm
+# bump this in CI to invalidate only the web-copy layer ───────────────
+ARG WEB_CACHE_BUSTER=initial
 ENV PATH="$NVM_DIR/versions/node/${NODE_VERSION}/bin:$PATH"
 # Expose APP_ID as environment variable for Next.js build
 ENV APP_ID=${APP_ID}
@@ -118,8 +120,12 @@ RUN . "$NVM_DIR/nvm.sh" \
  && if ! command -v yarn >/dev/null 2>&1 ; then npm i -g yarn@1 ; fi
 
 ENV NEXT_TELEMETRY_DISABLED=1 NEXT_SKIP_ESLINT=1 NEXT_PRIVATE_STANDALONE=true
-# bump this in CI to invalidate only the web-copy layer ───────────────
-ARG  WEB_CACHE_BUSTER=initial
+
+# ---------- bake node_modules once (cacheable) ----------
+COPY web/package.json web/yarn.lock ./web/
+RUN cd /web && yarn install --frozen-lockfile --production
+# --------------------------------------------------------
+
 # copy the web/ directory that already exists in the repo
 COPY web/ /usr/share/solanaflow/web
 # bump this from the CLI to bust the build cache whenever web/ changes
@@ -130,8 +136,7 @@ RUN mkdir -p /usr/share/solanaflow/web/public
 RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing=locked \
     yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile \
  && yarn --cwd /usr/share/solanaflow/web \
-        next build \
- && yarn cache clean --all || true
+        next build
 
 # Debug: show where Next placed the standalone output
 RUN echo 'Preview of .next layout:' && \
