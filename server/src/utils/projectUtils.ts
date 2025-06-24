@@ -820,7 +820,8 @@ export const startInstallPackagesTask = async (
       
       for (const pkg of standardPackages) {
         // ① write the dep into package.json (npm pkg set keeps formatting)
-        const addDeps = `npm pkg set dependencies.${pkg.replace(/\//g, '\\/')}="latest"`;
+        // npm pkg set requires the whole arg in one quoted string; avoid slash-escaping hell
+        const addDeps = `npm pkg set "dependencies.${pkg}@latest"`;
         // ② touch a stamp file – the Dockerfile COPY line already invalidates on it
         const stampPath = `/usr/src/${rootPath}/.force-reinstall`;
         const cmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && ${addDeps} && date > ${stampPath}"`;
@@ -830,7 +831,8 @@ export const startInstallPackagesTask = async (
       // Add custom packages
       if (_packages) {
         for (const pkg of _packages) {
-          const addDeps = `npm pkg set dependencies.${pkg.replace(/\//g, '\\/')}="latest"`;
+          // npm pkg set requires the whole arg in one quoted string; avoid slash-escaping hell
+          const addDeps = `npm pkg set "dependencies.${pkg}@latest"`;
           const stampPath = `/usr/src/${rootPath}/.force-reinstall`;
           const cmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && ${addDeps} && date > ${stampPath}"`;
           await runCommand(cmd, '.', taskId);
@@ -890,10 +892,13 @@ export const startInstallNodeDependenciesTask = async (
         // Instead of direct npm install, add each package to package.json
         for (const pkg of packages) {
           // ① write the dep into package.json (npm pkg set keeps formatting)
-          const addDeps = `npm pkg set dependencies.${pkg.replace(/\//g, '\\/')}="latest"`;
+          // npm pkg set requires the whole arg in one quoted string; avoid slash-escaping hell
+          const addDeps = `npm pkg set "dependencies.${pkg}@latest"`;
           // ② touch a stamp file – the Dockerfile COPY line already invalidates on it
           const stampPath = `/usr/src/${rootPath}/.force-reinstall`;
-          const cmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath}/${targetDir} && ${addDeps} && date > ${stampPath}"`;
+          // CRA lives under /app, Next.js under /web; respect caller's targetDir
+          const subDir = targetDir === 'app' ? 'web' : targetDir;   // <- tweak if you use CRA elsewhere
+          const cmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath}/${subDir} && ${addDeps} && date > ${stampPath}"`;
           await runCommand(cmd, '.', taskId);
         }
         
