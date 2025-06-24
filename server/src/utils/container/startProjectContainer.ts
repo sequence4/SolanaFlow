@@ -343,6 +343,7 @@ export async function startProjectContainer(
       '-e', `APP_ID=${projId}`,
       '-e', `APP_BASE_PATH=/dapp/${projId}`,
       '-e', `SF_DEV_SERVER=${useDevServer ? '1' : ''}`,
+      '-e', 'COREPACK_ENABLE_STRICT=0',           // ← allow Yarn inside "web/"
       '--label=traefik.enable=true',
       `--label='traefik.http.routers.dapp-${projId}.rule=PathPrefix(\`/dapp/${projId}\`)'`,
       `--label=traefik.http.routers.dapp-${projId}.entrypoints=web,websecure`,

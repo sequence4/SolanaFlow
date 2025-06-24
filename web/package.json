@@ -8,7 +8,8 @@
     "build": "next build",
     "postbuild": "next lint",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "postinstall": "husky install || true"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.7",
