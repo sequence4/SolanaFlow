@@ -139,7 +139,8 @@ RUN mkdir -p /usr/share/solanaflow/web/public
 RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing=locked \
     yarn --cwd /usr/share/solanaflow/web install \
          --frozen-lockfile --prefer-offline --check-files --ignore-scripts --prod=false \
- && yarn --cwd /usr/share/solanaflow/web next build
+    && RUN --mount=type=cache,id=next-swc,target=/usr/share/solanaflow/web/.next/cache \
+       yarn --cwd /usr/share/solanaflow/web next build
 
 # Debug: show where Next placed the standalone output
 RUN echo 'Preview of .next layout:' && \
