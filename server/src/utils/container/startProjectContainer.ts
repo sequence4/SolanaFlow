@@ -1,3 +1,7 @@
+/**
+ * SF_HOST_PORT — bind container port 3000 to this host port.
+ * Default: 31000.  Useful for local dev so the browser URL is always predictable.
+ */
 import { execSync } from 'child_process';
 import pool from 'src/config/database';
 import { format } from 'node:util';
@@ -26,6 +30,11 @@ function timed(
 // ─── container ports ─────────────────────────────────────────
 const INTERNAL_PORT = 3000;          // inside container
 const MIN_PORT = 31000, MAX_PORT = 32767;
+
+/** Host side HTTP port.  
+ *  • If SF_HOST_PORT is set → use that.  
+ *  • Otherwise fall back to the old auto-picker.               */
+const DEFAULT_HOST_PORT = 31000;
 
 function pickFreePort(): number {
   for (let p = MIN_PORT; p <= MAX_PORT; p++) {
@@ -261,11 +270,6 @@ export async function startProjectContainer(
   try {
     process.env.DOCKER_CLI_DEBUG = process.env.DOCKER_CLI_DEBUG ?? '1'; // show HTTP calls
     
-    // find a free high port *once* for this container
-    const hostPort = pickFreePort();
-    
-    timed(`docker pull --platform linux/arm64 ${image}`, 'pull');
-
     // ── pin to immutable digest and then re-tag it so `docker run` will work
     let imageRef = image;
     try {
@@ -302,6 +306,17 @@ export async function startProjectContainer(
     /* 2 ─ run container with explicit platform, project label & random host-port */
     // NEW: make sure the host has enough free space (≥ 3 GiB)
     ensureDockerSpace();
+    
+    timed(`docker pull --platform linux/arm64 ${image}`, 'pull');
+
+    // choose the public port deterministically so the UI link is stable
+    const hostPort = process.env.SF_HOST_PORT
+      ? Number(process.env.SF_HOST_PORT) 
+      : pickFreePort();               // ← fallback for legacy callers
+
+    if (portInUse(String(hostPort))) {
+      throw new Error(`[startProjectContainer] requested hostPort ${hostPort} already in use`);
+    }
     
     const runArgs: string[] = [
       'docker', 'run',
