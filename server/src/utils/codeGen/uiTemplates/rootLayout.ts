@@ -4,7 +4,6 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import "@solana/wallet-adapter-react-ui/styles.css"; // wallet-adapter preset
 import ThemeProvider from "@/components/theme-provider";
-import { Toaster } from "@/components/ui/toaster";
 import { ToastProvider } from "@/hooks/use-toast";
 import { WalletContextProvider } from "@/components/wallet-context-provider";
 
@@ -33,7 +32,6 @@ export default function RootLayout({
             <ToastProvider>
               {children}
             </ToastProvider>
-            <Toaster />
           </WalletContextProvider>
         </ThemeProvider>
       </body>
