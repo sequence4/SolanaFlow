@@ -36,7 +36,7 @@ interface Props {
 /**
  * Wraps next-themes so every page and dialog gets dark-/light-mode support.
  */
-export function ThemeProvider({
+export default function ThemeProvider({
   children,
   ...props
 }: Props) {
