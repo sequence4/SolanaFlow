@@ -22,25 +22,11 @@ export * from "./tooltip";
 export const THEME_PROVIDER_TSX = /* tsx */ `
 'use client'
 
-import * as React from 'react'
-import { ThemeProvider as NextThemeProvider } from 'next-themes'
+import { ThemeProvider as NextThemesProvider } from "next-themes"
+import type { ComponentProps } from "react"
 
-interface Props {
-  children: React.ReactNode
-  attribute?: string
-  defaultTheme?: string
-  enableSystem?: boolean
-  disableTransitionOnChange?: boolean
-}
-
-/**
- * Wraps next-themes so every page and dialog gets dark-/light-mode support.
- */
-export default function ThemeProvider({
-  children,
-  ...props
-}: Props) {
-  return <NextThemeProvider {...props}>{children}</NextThemeProvider>
+export default function ThemeProvider(props: ComponentProps<typeof NextThemesProvider>) {
+  return <NextThemesProvider {...props} />
 }
 `
 
