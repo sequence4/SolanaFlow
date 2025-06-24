@@ -28,6 +28,7 @@ import {
   UI_LABEL_TSX,
   UTILS_TS,
   POSTCSS_CONFIG,
+  NEXT_CONFIG_JS,
   THEME_PROVIDER_TSX,
   USE_TOAST_TSX,
   walletProvider,
@@ -335,6 +336,12 @@ export const handleGenerateCode = async ({
             },
             { name: "postcss.config.js", path: "./web/postcss.config.js", type: "file" as const, code: POSTCSS_CONFIG },
             {
+              name: "next.config.js",
+              path: "./web/next.config.js",
+              type: "file" as const,
+              code: NEXT_CONFIG_JS
+            },
+            {
               name: ".yarnrc",
               path: "./web/.yarnrc",
               type: "file" as const,
@@ -386,7 +393,7 @@ export const handleGenerateCode = async ({
             '-w', containerWebDir,
             workspace.containerName,
             // --lockfile-only writes yarn.lock without touching node_modules
-            'bash -lc "rm -rf \\$YARN_CACHE_FOLDER && mkdir -p \\$YARN_CACHE_FOLDER && yarn install --lockfile-only --check-files --no-cache --network-timeout 600000"'
+            'bash -lc "rm -rf \\$YARN_CACHE_FOLDER && mkdir -p \\$YARN_CACHE_FOLDER && yarn install --lockfile-only --network-timeout 600000"'
           ].join(' ');
 
           await runCommand(lockfileCmd, '.', projectId);
@@ -400,7 +407,7 @@ export const handleGenerateCode = async ({
             '-e', 'YARN_CACHE_FOLDER=/tmp/yarn-cache',
             '-w', containerWebDir,
             workspace.containerName,
-            'bash -lc "rm -rf \\$YARN_CACHE_FOLDER && mkdir -p \\$YARN_CACHE_FOLDER && yarn install --frozen-lockfile --check-files --no-cache --network-timeout 600000"'
+            'bash -lc "mkdir -p \\$YARN_CACHE_FOLDER && yarn install --frozen-lockfile --network-timeout 600000"'
           ].join(' ');
 
           await runCommand(installCmd, '.', projectId);

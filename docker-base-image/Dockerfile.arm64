@@ -131,6 +131,7 @@ RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing
     yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile \
  && yarn --cwd /usr/share/solanaflow/web \
         next build \
+ # Keep yarn cache in dev mode
  && yarn cache clean --all || true
 
 # Debug: show where Next placed the standalone output
