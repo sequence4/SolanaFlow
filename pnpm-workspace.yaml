@@ -2,4 +2,3 @@ packages:
   - "client"
   - "server"
   - "landing"
-  - "web"
