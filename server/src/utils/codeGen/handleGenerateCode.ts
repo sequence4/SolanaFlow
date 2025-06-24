@@ -326,11 +326,12 @@ export const handleGenerateCode = async ({
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@tailwindcss/postcss": "^4.1.10",
     "autoprefixer": "^10.4.19",
     "eslint": "^8",
     "eslint-config-next": "14.2.0",
     "postcss": "^8.4.35",
-    "tailwindcss": "^3.4.1",
+    "tailwindcss": "^4.1.10",
     "typescript": "^5"
   }
 }`
