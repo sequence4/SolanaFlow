@@ -124,8 +124,9 @@ ENV NEXT_TELEMETRY_DISABLED=1 NEXT_SKIP_ESLINT=1 NEXT_PRIVATE_STANDALONE=true
 # ---------- bake node_modules once (cacheable) ----------
 RUN mkdir -p /usr/share/solanaflow/web
 COPY web/package.json web/yarn.lock /usr/share/solanaflow/web/
+# Install **all** deps so `next build` has its tool-chain.
 RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing=locked \
-    yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile --production
+    yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile
 # --------------------------------------------------------
 
 # copy the web/ directory that already exists in the repo
@@ -136,9 +137,9 @@ RUN mkdir -p /usr/share/solanaflow/web/public
 
 # install deps and build once
 RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing=locked \
-    yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile --production --prefer-offline --check-files \
- && yarn --cwd /usr/share/solanaflow/web \
-        next build
+    yarn --cwd /usr/share/solanaflow/web install \
+         --frozen-lockfile --prefer-offline --check-files --ignore-scripts --production \
+ && yarn --cwd /usr/share/solanaflow/web next build
 
 # Debug: show where Next placed the standalone output
 RUN echo 'Preview of .next layout:' && \
