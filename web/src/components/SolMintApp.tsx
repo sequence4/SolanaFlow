@@ -10,13 +10,15 @@ import { Label } from "@/components/ui/label"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { toast } from "@/hooks/use-toast"
+import { useToast } from "@/hooks/use-toast"
 import { Copy, ExternalLink, Info, Moon, Sun, Loader2 } from "lucide-react"
 import { useTheme } from "next-themes"
 
 export default function SolMintApp() {
   const { publicKey, connected } = useWallet()
   const { theme, setTheme } = useTheme()
+
+  const toast = useToast();
 
   // Form states
   const [initMintForm, setInitMintForm] = useState({
