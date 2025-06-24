@@ -292,6 +292,7 @@ export const handleGenerateCode = async ({
   "name": "solanaflow-web",
   "version": "0.1.0",
   "private": true,
+  "engines": { "node": ">=20.18.0" },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
