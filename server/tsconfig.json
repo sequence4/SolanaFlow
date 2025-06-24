@@ -30,8 +30,7 @@
 
     /* ---------- ambient types ---------- */
     /* --- ensure Node's ambient types are available --- */
-    "types": ["node"],
-    "typeRoots": ["./node_modules/@types", "./types"]
+    "types": ["node"]
   },
 
   "include": [
