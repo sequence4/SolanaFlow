@@ -135,12 +135,14 @@ COPY web/ /usr/share/solanaflow/web
 ARG NEXT_BUILD_CACHE_BUSTER
 RUN mkdir -p /usr/share/solanaflow/web/public
 
-# install deps and build once
+# ── 1️⃣ verify deps without re-downloading ──────────────────────────────
 RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing=locked \
     yarn --cwd /usr/share/solanaflow/web install \
-         --frozen-lockfile --prefer-offline --check-files --ignore-scripts --prod=false \
-    && RUN --mount=type=cache,id=next-swc,target=/usr/share/solanaflow/web/.next/cache \
-       yarn --cwd /usr/share/solanaflow/web next build
+         --frozen-lockfile --prefer-offline --check-files --ignore-scripts --prod=false
+
+# ── 2️⃣ build Next.js with a named SWC cache (re-used across builds) ────
+RUN --mount=type=cache,id=next-swc,target=/usr/share/solanaflow/web/.next/cache \
+    yarn --cwd /usr/share/solanaflow/web next build
 
 # Debug: show where Next placed the standalone output
 RUN echo 'Preview of .next layout:' && \
