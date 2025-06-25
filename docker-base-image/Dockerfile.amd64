@@ -94,10 +94,20 @@ RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
     # fail fast if the binary is still missing for any reason
     which anchor && anchor --version && \
     cargo install cargo-chef --version 0.1.64 --locked && \
+    # --------------------------------------------------------------------
+    #  Anchor-built BPF programs are compiled with Solana's LLVM tool-chain
+    #  (clang + lld).  If these binaries are missing, `anchor build` fails
+    #  immediately with "linker `cc` not found" or "clang: command not
+    #  found".  The official Solana/Anchor installation docs list clang,
+    #  lld and llvm as mandatory Linux dependencies.
+    # --------------------------------------------------------------------
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        nodejs curl && \
+        nodejs curl \
+        clang lld llvm \
+        # optional but nice-to-have for on-chain program deps
+        make ca-certificates && \
     apt-get clean && rm -rf /var/lib/apt/lists/* && \
     strip /usr/local/bin/solana* \
           /root/.cargo/bin/anchor \
