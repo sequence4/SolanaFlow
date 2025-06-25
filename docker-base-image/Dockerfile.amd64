@@ -16,14 +16,15 @@ FROM --platform=linux/amd64 rust:1.87.0-slim-bullseye AS bootstrap
 RUN apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         curl ca-certificates build-essential pkg-config libssl-dev libudev-dev gnupg
-# ✅ Anchor 0.31.x requires Solana 1.18.x – install a pinned release
-#    · use "-b /usr/local/bin" so the installer drops binaries where every stage
-#      can find them
-#    · omit "-u", which is *update-only* and silently skips a fresh install
-RUN curl -sSfL https://release.solana.com/v1.18.13/install \
-        | bash -s -- -b /usr/local/bin
-# /usr/local/bin is already on $PATH, so no extra PATH fiddling needed
-ENV PATH="/usr/local/bin:${PATH}"
+# ✅ Anchor 0.31 needs Solana ≥ 1.18 (see Anchor changelog)  
+#    We rely on the installer's *default* location
+#     (~/.local/share/solana/install/active_release/bin) exactly as the official
+#    docs describe.  Keeping the default makes future upgrades
+#    via `solana-install` predictable and avoids the nested-path confusion that
+#    broke the previous build.
+RUN curl -sSfL https://release.solana.com/v1.18.13/install | bash -s -
+# add Solana's active_release to PATH **before** the smoke-test
+ENV PATH="/root/.local/share/solana/install/active_release/bin:${PATH}"
 RUN solana --version   # smoke-test
 
 ARG BUILDKIT_INLINE_CACHE=1
