@@ -37,6 +37,21 @@ ENV AWS_REGION=${AWS_REGION} \
     SCCACHE_REGION=${AWS_REGION}
 LABEL stage=toolchain
 
+# ------------------------------------------------------------------
+# Ensure `sccache` exists *before* any command that triggers `rustc`
+# ( `rustup component add …`, `cargo install …` etc.).  Debian's
+# Bullseye repo already ships an amd64 binary at `/usr/bin/sccache`,
+# so we can install it in one fast APT pass and symlink it to the
+# path expected by the `RUSTC_WRAPPER` env we set above.  This keeps
+# image size small and avoids compiling sccache from source. See:
+#   • Debian package listing 
+#   • Why `RUSTC_WRAPPER` fails when the wrapper is absent 
+# ------------------------------------------------------------------
+RUN apt-get update -qq && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        sccache && \
+    ln -sf $(command -v sccache) /usr/local/bin/sccache
+
 # Work-around for sporadic "Failed to unpack llvm/bin/lld" when the Solana platform-tools cache gets corrupted. Purge it before we pre-warm the BPF/SBF tool-chain so every fresh build starts clean.
 RUN rm -rf /root/.cache/solana/platform-tools || true
 
@@ -59,9 +74,11 @@ RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
     cargo install cargo-chef --version 0.1.64 --locked && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get update -qq && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs curl && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        nodejs curl && \
     apt-get clean && rm -rf /var/lib/apt/lists/* && \
-    strip /usr/local/bin/solana*
+    strip /usr/local/bin/solana* && \
+    strip /usr/local/bin/sccache || true
 
 RUN rustup set profile minimal && rustup default stable
 
