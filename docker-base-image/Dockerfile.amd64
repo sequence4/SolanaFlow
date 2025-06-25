@@ -92,11 +92,15 @@ RUN set -euo pipefail; \
                   --tag v${ANCHOR_VERSION} \
                   anchor-cli --locked && \
     # ------------------------------------------------------------------
-    # Move the freshly-built binary into /usr/local/bin so later layers
-    # can find it.  In rust:*-slim images Cargo installs as root under
-    # /usr/local/cargo/bin.
+    # Move the freshly-built binary into /usr/local/bin so later layers can
+    # find it.  Cargo 1.87 installs as root to /root/.cargo/bin in Debian
+    # slim images; older images may use /usr/local/cargo/bin.  Copy whichever
+    # path exists:
     # ------------------------------------------------------------------
-    install -m0755 /usr/local/cargo/bin/anchor /usr/local/bin/anchor && \
+    install -m0755 "$(test -f /usr/local/cargo/bin/anchor && \
+                       echo /usr/local/cargo/bin/anchor || \
+                       echo /root/.cargo/bin/anchor)" \
+                   /usr/local/bin/anchor && \
     anchor --version && \
     cargo install cargo-chef --version 0.1.64 --locked --root /usr/local && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
@@ -109,10 +113,13 @@ RUN set -euo pipefail; \
 RUN rustup set profile minimal && rustup default stable
 
 # ------------------------------------------------------------------
-# rustup's "default" switch can recreate /usr/local/bin and remove the
-# first copy of Anchor. Re-copy it from Cargo's install location.
+# rustup's "default" switch can recreate /usr/local/bin and remove the first
+# copy of Anchor.  Re-copy from whichever Cargo install directory exists.
 # ------------------------------------------------------------------
-RUN install -m0755 /usr/local/cargo/bin/anchor /usr/local/bin/anchor
+RUN install -m0755 "$(test -f /usr/local/cargo/bin/anchor && \
+                       echo /usr/local/cargo/bin/anchor || \
+                       echo /root/.cargo/bin/anchor)" \
+                   /usr/local/bin/anchor
 
 # Warm up BPF/SBF cache once so first user build is instant
 WORKDIR /tmp
