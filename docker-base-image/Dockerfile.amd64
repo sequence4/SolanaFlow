@@ -17,7 +17,7 @@ RUN apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         curl ca-certificates build-essential pkg-config libssl-dev libudev-dev gnupg
 RUN cargo install agave-install --version 2.3.1 --locked
-RUN agave-install init 2.2.12 --no-modify-path --yes
+RUN agave-install init 2.2.12 --no-modify-path
 ENV PATH="/root/.local/share/solana/install/active_release/bin:${PATH}"
 RUN solana --version   # smoke-test
 
