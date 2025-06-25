@@ -64,7 +64,9 @@ ARG AWS_REGION                 # --build-arg AWS_REGION=eu-north-1
 ###############################################################################
 FROM bootstrap AS solana-toolchain
 ARG AWS_REGION
-ENV AWS_REGION=${AWS_REGION} SCCACHE_REGION=${AWS_REGION}
+ENV AWS_REGION=${AWS_REGION} \
+    SCCACHE_REGION=${AWS_REGION} \
+    PATH="/root/.cargo/bin:/usr/local/bin:${PATH}"
 
 # sccache first — required by rustc wrapper
 RUN cargo install --locked sccache && \
@@ -82,6 +84,8 @@ RUN rustup component add rust-src && \
     cargo install --git https://github.com/coral-xyz/anchor.git \
                   --tag v${ANCHOR_VERSION} \
                   anchor-cli --locked && \
+    # make the binary visible even if downstream stages reset PATH
+    ln -sf /root/.cargo/bin/anchor /usr/local/bin/anchor && \
     which anchor && anchor --version && \
     cargo install cargo-chef --version 0.1.64 --locked && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
