@@ -10,14 +10,14 @@
 # -----------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
-# 0. Bootstrap stage – Rust + Solana/Agave CLI (amd64 only, zero qemu)
+# 0. Bootstrap stage – Rust + Solana CLI 1.18 (amd64 only, zero qemu)
 # -----------------------------------------------------------------------------
 FROM --platform=linux/amd64 rust:1.87.0-slim-bullseye AS bootstrap
 RUN apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         curl ca-certificates build-essential pkg-config libssl-dev libudev-dev gnupg
-RUN cargo install agave-install --version 2.3.1 --locked
-RUN agave-install init 2.2.12 --no-modify-path
+# ✅ Anchor 0.31.x requires Solana 1.18.x – install a pinned release
+RUN curl -sSfL https://release.solana.com/v1.18.13/install | bash -s - -u
 ENV PATH="/root/.local/share/solana/install/active_release/bin:${PATH}"
 RUN solana --version   # smoke-test
 
