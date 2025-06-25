@@ -36,6 +36,14 @@ RUN set -euo pipefail; \
     curl --retry 5 --retry-delay 2 --retry-all-errors -fsSL "${SOLANA_INSTALL_ORIGIN}" -o /tmp/solana-install.sh \
         || { echo '⚠️  Origin failed, using GitHub mirror'; \
              curl --retry 5 --retry-delay 2 --retry-all-errors -fsSL "${SOLANA_INSTALL_MIRROR}" -o /tmp/solana-install.sh ; }; \
+    # -----------------------------------------------------------------------
+    # Force the wrapper to pull the *binary* installer from GitHub releases
+    # and pin the version so it never queries the archived "latest" API.
+    # This removes all Cloudflare traffic and eliminates HTTP-525, while
+    # keeping the original -b /usr/local/bin behaviour intact.
+    # -----------------------------------------------------------------------
+    export SOLANA_DOWNLOAD_ROOT="https://github.com/solana-labs/solana/releases/download" \
+           SOLANA_RELEASE="${SOLANA_VERSION}"; \
     sha256sum /tmp/solana-install.sh; \
     bash /tmp/solana-install.sh -b /usr/local/bin; \
     ls -1 /usr/local/bin | grep -E '^solana$'; \
