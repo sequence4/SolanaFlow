@@ -22,6 +22,7 @@ RUN apt-get update -qq && \
 #  • explicit -b /usr/local/bin so binary lands on a global PATH
 # -----------------------------------------------------------------------------
 RUN set -euo pipefail; \
+    install -d -m 0755 /usr/local/bin; \
     curl -sSfL https://release.solana.com/v1.18.13/install -o /tmp/solana-install.sh; \
     sha256sum /tmp/solana-install.sh; \
     bash /tmp/solana-install.sh -b /usr/local/bin; \
@@ -62,7 +63,7 @@ RUN rustup component add rust-src && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        nodejs clang lld llvm make ca-certificates && \
+        nodejs git clang lld llvm make ca-certificates && \
     apt-get clean && rm -rf /var/lib/apt/lists/* && \
     strip /usr/local/bin/solana* /root/.cargo/bin/anchor /usr/local/bin/sccache || true
 
@@ -138,7 +139,7 @@ RUN STANDALONE_ROOT=$(dirname "$(find /usr/share/solanaflow/web/.next -name serv
 # 4.  Runtime – slim image with CLI + built app
 ###############################################################################
 FROM --platform=$BUILDPLATFORM ubuntu:22.04 AS runtime
-ARG NODE_VERSION
+ARG NODE_VERSION=v20.18.0
 ARG APP_ID=local
 ENV PATH=/usr/local/bin:/root/.cargo/bin:$PATH \
     HOSTNAME=0.0.0.0 NEXT_DISABLE_SWC=1 APP_ID=${APP_ID}
