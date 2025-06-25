@@ -84,13 +84,22 @@ RUN rm -rf /root/.cache/solana/platform-tools || true
 # remote compiler cache
 ENV SCCACHE_BUCKET=solanaflow-cache RUSTC_WRAPPER=/usr/local/bin/sccache
 
+# ------------------------------------------------------------------
+# Install the *stable* Rust tool-chain up-front.  Doing this **before**
+# we install Anchor prevents `rustup default stable` from later
+# clobbering `/usr/local/bin` and deleting the freshly-built
+# `anchor` binary.  We run it in its own layer so the expensive
+# download is cached independently.
+# ------------------------------------------------------------------
+RUN rustup set profile minimal && \
+    rustup default stable
+
 # Anchor 0.31.2 (needs Solana ≥1.18) + minimal Node 20
 ARG ANCHOR_VERSION=0.31.2
 RUN set -euo pipefail; \
     rustup component add rust-src && \
-    # Install Anchor CLI straight into /usr/local so the binary ends up
-    # in /usr/local/bin/anchor and is immediately available on every layer.
-    # Using the supported --root flag avoids all the path-guessing problems.
+    # Install Anchor CLI directly under /usr/local so the binary persists
+    # across stages and is already on PATH.
     cargo install --git https://github.com/coral-xyz/anchor.git \
                   --tag v${ANCHOR_VERSION} \
                   anchor-cli --locked --root /usr/local && \
@@ -103,7 +112,7 @@ RUN set -euo pipefail; \
     apt-get clean && rm -rf /var/lib/apt/lists/* && \
     strip /usr/local/bin/solana* /usr/local/bin/anchor /usr/local/bin/sccache || true
 
-RUN rustup set profile minimal && rustup default stable
+RUN solana --version && cargo --version && rustc --version && anchor --version
 
 # Warm up BPF/SBF cache once so first user build is instant
 WORKDIR /tmp
@@ -114,8 +123,6 @@ RUN export CARGO_TARGET_DIR=/usr/src/target && \
     mv anchor-template /usr/src/anchor-template && \
     rm -rf /usr/src/target/debug /usr/src/target/**/incremental && \
     mkdir -p /cache-seed && cp -a /usr/src/target/deploy /cache-seed/target
-
-RUN solana --version && cargo --version && rustc --version && anchor --version
 
 ###############################################################################
 # 2.  Dependency cooker (cargo-chef)
