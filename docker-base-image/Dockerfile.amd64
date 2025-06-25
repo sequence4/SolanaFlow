@@ -45,8 +45,12 @@ RUN set -euo pipefail; \
     export SOLANA_DOWNLOAD_ROOT="https://github.com/solana-labs/solana/releases/download" \
            SOLANA_RELEASE="${SOLANA_VERSION}"; \
     sha256sum /tmp/solana-install.sh; \
-    bash /tmp/solana-install.sh -b /usr/local/bin; \
-    ls -1 /usr/local/bin | grep -E '^solana$'; \
+    bash /tmp/solana-install.sh \
+        --no-modify-path \
+        --data-dir /usr/local/solana \
+        "${SOLANA_VERSION}"; \
+    # expose the CLI suite on the global PATH
+    ln -sf /usr/local/solana/active_release/bin/solana* /usr/local/bin/; \
     solana --version
 
 ENV PATH="/usr/local/bin:${PATH}"
