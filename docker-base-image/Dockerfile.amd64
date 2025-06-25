@@ -64,6 +64,7 @@ ARG AWS_REGION                 # --build-arg AWS_REGION=eu-north-1
 ###############################################################################
 FROM bootstrap AS solana-toolchain
 ARG AWS_REGION
+ARG WEB_CACHE_BUSTER
 # use bash & fail-fast for every RUN in this stage
 SHELL ["/bin/bash","-c"]
 ENV AWS_REGION=${AWS_REGION} \
@@ -97,9 +98,9 @@ RUN rustup set profile minimal && \
 # Anchor 0.31.2 (needs Solana ≥1.18) + minimal Node 20
 ARG ANCHOR_VERSION=0.31.2
 RUN set -euo pipefail; \
+    echo "Cache bust: ${WEB_CACHE_BUSTER}" && \
     rustup component add rust-src && \
-    # Install Anchor CLI directly under /usr/local so the binary persists
-    # across stages and is already on PATH.
+    # Install Anchor CLI (persist binary under /usr/local) so it remains available
     cargo install --git https://github.com/coral-xyz/anchor.git \
                   --tag v${ANCHOR_VERSION} \
                   anchor-cli --locked --root /usr/local && \
