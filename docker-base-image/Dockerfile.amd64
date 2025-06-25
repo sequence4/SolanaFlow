@@ -47,10 +47,12 @@ LABEL stage=toolchain
 #   • Debian package listing 
 #   • Why `RUSTC_WRAPPER` fails when the wrapper is absent 
 # ------------------------------------------------------------------
-RUN apt-get update -qq && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        sccache && \
-    ln -sf $(command -v sccache) /usr/local/bin/sccache
+# Debian 11 (Bullseye) doesn't ship an `apt` package for *sccache* – it only
+# appears from Debian 12 (Bookworm) onwards.  Compile the wrapper with Cargo
+# instead so the binary is present **before** we enable `RUSTC_WRAPPER`.
+# (≈ 20 s on the builder image, negligible size increase after `strip`.)
+RUN cargo install --locked sccache && \
+    ln -sf /root/.cargo/bin/sccache /usr/local/bin/sccache
 
 # Work-around for sporadic "Failed to unpack llvm/bin/lld" when the Solana platform-tools cache gets corrupted. Purge it before we pre-warm the BPF/SBF tool-chain so every fresh build starts clean.
 RUN rm -rf /root/.cache/solana/platform-tools || true
