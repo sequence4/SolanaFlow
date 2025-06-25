@@ -88,19 +88,12 @@ ENV SCCACHE_BUCKET=solanaflow-cache RUSTC_WRAPPER=/usr/local/bin/sccache
 ARG ANCHOR_VERSION=0.31.2
 RUN set -euo pipefail; \
     rustup component add rust-src && \
+    # Install Anchor CLI straight into /usr/local so the binary ends up
+    # in /usr/local/bin/anchor and is immediately available on every layer.
+    # Using the supported --root flag avoids all the path-guessing problems.
     cargo install --git https://github.com/coral-xyz/anchor.git \
                   --tag v${ANCHOR_VERSION} \
-                  anchor-cli --locked && \
-    # ------------------------------------------------------------------
-    # Move the freshly-built binary into /usr/local/bin so later layers can
-    # find it.  Cargo 1.87 installs as root to /root/.cargo/bin in Debian
-    # slim images; older images may use /usr/local/cargo/bin.  Copy whichever
-    # path exists:
-    # ------------------------------------------------------------------
-    install -m0755 "$(test -f /usr/local/cargo/bin/anchor && \
-                       echo /usr/local/cargo/bin/anchor || \
-                       echo /root/.cargo/bin/anchor)" \
-                   /usr/local/bin/anchor && \
+                  anchor-cli --locked --root /usr/local && \
     anchor --version && \
     cargo install cargo-chef --version 0.1.64 --locked --root /usr/local && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
@@ -111,15 +104,6 @@ RUN set -euo pipefail; \
     strip /usr/local/bin/solana* /usr/local/bin/anchor /usr/local/bin/sccache || true
 
 RUN rustup set profile minimal && rustup default stable
-
-# ------------------------------------------------------------------
-# rustup's "default" switch can recreate /usr/local/bin and remove the first
-# copy of Anchor.  Re-copy from whichever Cargo install directory exists.
-# ------------------------------------------------------------------
-RUN install -m0755 "$(test -f /usr/local/cargo/bin/anchor && \
-                       echo /usr/local/cargo/bin/anchor || \
-                       echo /root/.cargo/bin/anchor)" \
-                   /usr/local/bin/anchor
 
 # Warm up BPF/SBF cache once so first user build is instant
 WORKDIR /tmp
