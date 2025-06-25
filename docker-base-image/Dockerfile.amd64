@@ -84,11 +84,14 @@ RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
     --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked \
     rustup component add rust-src && \
+    # install the *crate* named `anchor-cli`; do *not* pass --bin, otherwise
+    # Cargo looks for a binary target literally called "anchor-cli" and the
+    # real `anchor` binary never gets built.
     cargo install --git https://github.com/coral-xyz/anchor.git \
                   --tag v${ANCHOR_VERSION} \
-                  --bin anchor-cli \
+                  anchor-cli \
                   --locked && \
-    # sanity-check so the build fails here if Anchor isn't available
+    # fail fast if the binary is still missing for any reason
     which anchor && anchor --version && \
     cargo install cargo-chef --version 0.1.64 --locked && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
