@@ -75,7 +75,7 @@ RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
     --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked \
     rustup component add rust-src && \
-    cargo install anchor-cli --version 0.31.1 --locked && \
+    cargo install anchor-cli --version 0.31.1 --locked --root /usr/local && \
     cargo install cargo-chef --version 0.1.64 --locked && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get update -qq && \
