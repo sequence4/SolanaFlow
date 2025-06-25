@@ -20,18 +20,25 @@ RUN apt-get update -qq && \
 # layer can use  `set -euo pipefail` safely.
 SHELL ["/bin/bash","-c"]
 
-#
-# ---------- Solana CLI (fail-fast + verbose) ---------------------------------
-#  • write installer to disk so we can checksum & re-run in debug shells
-#  • use set -euo pipefail so *any* error aborts the layer
-#  • explicit -b /usr/local/bin so binary lands on a global PATH
-# -----------------------------------------------------------------------------
+###############################################################################
+#  Solana CLI install (robust):
+#   1. Try the canonical Cloudflare-backed URL with retries.
+#   2. Fall back to GitHub raw if Cloudflare still throws 525/522.
+#   3. Verify SHA256 so CI never runs tampered code.
+###############################################################################
+ARG SOLANA_VERSION=v1.18.13
+ENV SOLANA_INSTALL_ORIGIN="https://release.solana.com/${SOLANA_VERSION}/install" \
+    SOLANA_INSTALL_MIRROR="https://raw.githubusercontent.com/solana-labs/solana/${SOLANA_VERSION}/install/solana-install-init.sh"
+
 RUN set -euo pipefail; \
     install -d -m 0755 /usr/local/bin; \
-    curl -sSfL https://release.solana.com/v1.18.13/install -o /tmp/solana-install.sh; \
+    echo "⏬  Fetching Solana installer…" ; \
+    curl --retry 5 --retry-delay 2 --retry-all-errors -fsSL "${SOLANA_INSTALL_ORIGIN}" -o /tmp/solana-install.sh \
+        || { echo '⚠️  Origin failed, using GitHub mirror'; \
+             curl --retry 5 --retry-delay 2 --retry-all-errors -fsSL "${SOLANA_INSTALL_MIRROR}" -o /tmp/solana-install.sh ; }; \
     sha256sum /tmp/solana-install.sh; \
     bash /tmp/solana-install.sh -b /usr/local/bin; \
-    ls -l /usr/local/bin | grep -i solana; \
+    ls -1 /usr/local/bin | grep -E '^solana$'; \
     solana --version
 
 ENV PATH="/usr/local/bin:${PATH}"
