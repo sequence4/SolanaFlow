@@ -100,12 +100,11 @@ ARG ANCHOR_VERSION=0.31.2
 RUN set -euo pipefail; \
     echo "Cache bust: ${WEB_CACHE_BUSTER}" && \
     rustup component add rust-src && \
-    # Install Anchor CLI (persist binary under /usr/local) so it remains available
+    # Install Anchor CLI directly under /usr/local so the binary persists
+    # across stages and is already on PATH.
     cargo install --git https://github.com/coral-xyz/anchor.git \
                   --tag v${ANCHOR_VERSION} \
                   anchor-cli --locked --root /usr/local && \
-    # Symlink Anchor binary to /usr/bin for reliable PATH resolution
-    ln -sf /usr/local/bin/anchor /usr/bin/anchor && \
     # Verify Anchor installation
     /usr/local/bin/anchor --version && \
     cargo install cargo-chef --version 0.1.64 --locked --root /usr/local && \
