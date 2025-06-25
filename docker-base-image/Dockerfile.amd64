@@ -110,7 +110,7 @@ RUN set -euo pipefail; \
     # and export the wrapper for this same shell.
     # ------------------------------------------------------------------
     cargo install --locked sccache && \
-    ln -sf /root/.cargo/bin/sccache /usr/local/bin/sccache && \
+    ln -sf /usr/local/cargo/bin/sccache /usr/local/bin/sccache && \
     export RUSTC_WRAPPER=/usr/local/bin/sccache && \
     # ------------------------------------------------------------------
     # Now build & install Anchor under /usr/local.
