@@ -17,8 +17,13 @@ RUN apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         curl ca-certificates build-essential pkg-config libssl-dev libudev-dev gnupg
 # ✅ Anchor 0.31.x requires Solana 1.18.x – install a pinned release
-RUN curl -sSfL https://release.solana.com/v1.18.13/install | bash -s - -u
-ENV PATH="/root/.local/share/solana/install/active_release/bin:${PATH}"
+#    · use "-b /usr/local/bin" so the installer drops binaries where every stage
+#      can find them
+#    · omit "-u", which is *update-only* and silently skips a fresh install
+RUN curl -sSfL https://release.solana.com/v1.18.13/install \
+        | bash -s -- -b /usr/local/bin
+# /usr/local/bin is already on $PATH, so no extra PATH fiddling needed
+ENV PATH="/usr/local/bin:${PATH}"
 RUN solana --version   # smoke-test
 
 ARG BUILDKIT_INLINE_CACHE=1
