@@ -12,13 +12,23 @@
 FROM --platform=linux/amd64 rust:1.87.0-slim-bullseye AS bootstrap
 RUN apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        bash curl ca-certificates build-essential pkg-config libssl-dev libudev-dev gnupg
+        bash curl ca-certificates build-essential pkg-config libssl-dev libudev-dev gnupg \
+        xz-utils  # <- solana tarball needs this to unpack
 
-# Install Solana 1.18.13 globally so every stage can find the binary
-RUN curl -sSfL https://release.solana.com/v1.18.13/install \
-      | bash -s -- -b /usr/local/bin
+#
+# ---------- Solana CLI (fail-fast + verbose) ---------------------------------
+#  • write installer to disk so we can checksum & re-run in debug shells
+#  • use set -euo pipefail so *any* error aborts the layer
+#  • explicit -b /usr/local/bin so binary lands on a global PATH
+# -----------------------------------------------------------------------------
+RUN set -euo pipefail; \
+    curl -sSfL https://release.solana.com/v1.18.13/install -o /tmp/solana-install.sh; \
+    sha256sum /tmp/solana-install.sh; \
+    bash /tmp/solana-install.sh -b /usr/local/bin; \
+    ls -l /usr/local/bin | grep -i solana; \
+    solana --version
+
 ENV PATH="/usr/local/bin:${PATH}"
-RUN solana --version           # smoke-test
 
 ARG BUILDKIT_INLINE_CACHE=1
 ARG BASE_TOOLCHAIN=bootstrap   # local stage alias
