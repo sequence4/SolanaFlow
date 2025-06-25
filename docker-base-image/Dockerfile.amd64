@@ -104,7 +104,10 @@ RUN set -euo pipefail; \
     cargo install --git https://github.com/coral-xyz/anchor.git \
                   --tag v${ANCHOR_VERSION} \
                   anchor-cli --locked --root /usr/local && \
-    anchor --version && \
+    # Symlink Anchor binary to /usr/bin for reliable PATH resolution
+    ln -sf /usr/local/bin/anchor /usr/bin/anchor && \
+    # Verify Anchor installation
+    /usr/local/bin/anchor --version && \
     cargo install cargo-chef --version 0.1.64 --locked --root /usr/local && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get update -qq && \
@@ -113,7 +116,7 @@ RUN set -euo pipefail; \
     apt-get clean && rm -rf /var/lib/apt/lists/* && \
     strip /usr/local/bin/solana* /usr/local/bin/anchor /usr/local/bin/sccache || true
 
-RUN solana --version && cargo --version && rustc --version && anchor --version
+RUN solana --version && cargo --version && rustc --version && /usr/local/bin/anchor --version
 
 # Warm up BPF/SBF cache once so first user build is instant
 WORKDIR /tmp
@@ -201,7 +204,7 @@ COPY --from=builder /usr/share/solanaflow/web /usr/share/solanaflow/web
 COPY --from=builder /root/.nvm/versions/node/${NODE_VERSION} /root/.nvm/versions/node/${NODE_VERSION}
 RUN ln -sf /root/.nvm/versions/node/${NODE_VERSION}/bin/* /usr/local/bin/
 
-RUN node -v && yarn -v && solana --version && anchor --version && cargo --version
+RUN node -v && yarn -v && solana --version && /usr/local/bin/anchor --version && cargo --version
 
 RUN apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
