@@ -98,21 +98,28 @@ RUN rustup set profile minimal && \
 # Anchor 0.31.2 (needs Solana ≥1.18) + minimal Node 20
 ARG ANCHOR_VERSION=0.31.2
 RUN set -euo pipefail; \
-    echo "Cache bust: ${WEB_CACHE_BUSTER}" && \
-    rustup component add rust-src && \
-    # Install Anchor CLI directly under /usr/local so the binary persists
-    # across stages and is already on PATH.
-    cargo install --git https://github.com/coral-xyz/anchor.git \
-                  --tag v${ANCHOR_VERSION} \
-                  anchor-cli --locked --root /usr/local && \
-    # Verify Anchor installation
-    /usr/local/bin/anchor --version && \
-    cargo install cargo-chef --version 0.1.64 --locked --root /usr/local && \
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    echo "Cache bust: ${WEB_CACHE_BUSTER}" ; \
+    rustup component add rust-src ; \
+    # ------------------------------------------------------------------
+    # Install full native tool-chain *first* so Cargo can compile Anchor.
+    # ------------------------------------------------------------------
     apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        nodejs git clang lld llvm make ca-certificates && \
-    apt-get clean && rm -rf /var/lib/apt/lists/* && \
+        git clang lld llvm make pkg-config libssl-dev ca-certificates && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    # ------------------------------------------------------------------
+    # Build & install Anchor under /usr/local so the binary survives
+    # all later stages and is on $PATH immediately.
+    # ------------------------------------------------------------------
+    cargo install --git https://github.com/coral-xyz/anchor.git \
+                 --tag v${ANCHOR_VERSION} \
+                 anchor-cli --locked --root /usr/local ; \
+    /usr/local/bin/anchor --version ; \
+    # Optional tooling
+    cargo install cargo-chef --version 0.1.64 --locked --root /usr/local ; \
+    # Clean up to keep the layer small
+    apt-get clean && rm -rf /var/lib/apt/lists/* ; \
     strip /usr/local/bin/solana* /usr/local/bin/anchor /usr/local/bin/sccache || true
 
 RUN solana --version && cargo --version && rustc --version && /usr/local/bin/anchor --version
