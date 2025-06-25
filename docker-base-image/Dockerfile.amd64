@@ -35,6 +35,9 @@ FROM bootstrap AS solana-toolchain
 ARG AWS_REGION
 ENV AWS_REGION=${AWS_REGION} \
     SCCACHE_REGION=${AWS_REGION}
+# Anchor gets installed into /root/.cargo/bin; add that to $PATH so later
+# layers (e.g. "anchor init …" and "anchor build") can resolve the binary.
+ENV PATH="/root/.cargo/bin:${PATH}"
 LABEL stage=toolchain
 
 # ------------------------------------------------------------------
