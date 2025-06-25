@@ -37,7 +37,8 @@ ENV AWS_REGION=${AWS_REGION} \
     SCCACHE_REGION=${AWS_REGION}
 # Anchor gets installed into /root/.cargo/bin; add that to $PATH so later
 # layers (e.g. "anchor init …" and "anchor build") can resolve the binary.
-ENV PATH="/root/.cargo/bin:${PATH}"
+## 1️⃣  keep the default search path _and_ prepend Cargo's bin dir
+ENV PATH="/usr/local/bin:/root/.cargo/bin:${PATH}"
 LABEL stage=toolchain
 
 # ------------------------------------------------------------------
@@ -75,15 +76,19 @@ RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
     --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked \
     rustup component add rust-src && \
-    cargo install anchor-cli --version 0.31.1 --locked --root /usr/local && \
+    ## 2️⃣  install the current Anchor release into $HOME/.cargo/bin
+    cargo install anchor-cli --version 0.31.2 --locked && \
+    ## 3️⃣  fail fast if Anchor didn't land where we expect
+    anchor --version && \
     cargo install cargo-chef --version 0.1.64 --locked && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         nodejs curl && \
     apt-get clean && rm -rf /var/lib/apt/lists/* && \
-    strip /usr/local/bin/solana* && \
-    strip /usr/local/bin/sccache || true
+    strip /usr/local/bin/solana* \
+          /root/.cargo/bin/anchor \
+          /usr/local/bin/sccache || true
 
 RUN rustup set profile minimal && rustup default stable
 
@@ -94,6 +99,8 @@ RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
     --mount=type=cache,id=cargo-git-amd64,target=/root/.cargo/git,sharing=locked \
     --mount=type=cache,id=sccache,target=/opt/sccache,sharing=locked \
     export CARGO_TARGET_DIR=/usr/src/target && \
+    ## 4️⃣  Make absolutely sure Anchor resolves _now_
+    which anchor && anchor --version && \
     anchor init anchor-template --no-git --no-install && \
     (cd anchor-template && anchor build) && \
     rm -rf anchor-template/node_modules && \
