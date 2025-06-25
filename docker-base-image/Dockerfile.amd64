@@ -75,15 +75,11 @@ ENV AWS_REGION=${AWS_REGION} \
     #   • /usr/local/bin        – system-wide convenience links
     PATH="/usr/local/bin:/usr/local/cargo/bin:/root/.cargo/bin:${PATH}"
 
-# sccache first — required by rustc wrapper
-RUN cargo install --locked sccache && \
-    ln -sf /root/.cargo/bin/sccache /usr/local/bin/sccache
-
 # purge occasionally-corrupt llvm tool-chain cache
 RUN rm -rf /root/.cache/solana/platform-tools || true
 
-# remote compiler cache
-ENV SCCACHE_BUCKET=solanaflow-cache RUSTC_WRAPPER=/usr/local/bin/sccache
+# remote compiler cache bucket only (wrapper will be set later)
+ENV SCCACHE_BUCKET=solanaflow-cache
 
 # ------------------------------------------------------------------
 # Install the *stable* Rust tool-chain up-front.  Doing this **before**
@@ -101,7 +97,8 @@ RUN set -euo pipefail; \
     echo "Cache bust: ${WEB_CACHE_BUSTER}" ; \
     rustup component add rust-src ; \
     # ------------------------------------------------------------------
-    # Install full native tool-chain *first* so Cargo can compile Anchor.
+    # Install full native tool-chain *first* so Cargo can compile Anchor,
+    # **then** build sccache and anchor in one shot so the symlink survives.
     # ------------------------------------------------------------------
     apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -109,8 +106,14 @@ RUN set -euo pipefail; \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
     # ------------------------------------------------------------------
-    # Build & install Anchor under /usr/local so the binary survives
-    # all later stages and is on $PATH immediately.
+    # (re)install sccache *after* apt so the symlink can't be clobbered
+    # and export the wrapper for this same shell.
+    # ------------------------------------------------------------------
+    cargo install --locked sccache && \
+    ln -sf /root/.cargo/bin/sccache /usr/local/bin/sccache && \
+    export RUSTC_WRAPPER=/usr/local/bin/sccache && \
+    # ------------------------------------------------------------------
+    # Now build & install Anchor under /usr/local.
     # ------------------------------------------------------------------
     cargo install --git https://github.com/coral-xyz/anchor.git \
                  --tag v${ANCHOR_VERSION} \
