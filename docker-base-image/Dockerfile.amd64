@@ -64,13 +64,15 @@ ARG AWS_REGION                 # --build-arg AWS_REGION=eu-north-1
 ###############################################################################
 FROM bootstrap AS solana-toolchain
 ARG AWS_REGION
+# use bash & fail-fast for every RUN in this stage
+SHELL ["/bin/bash","-c"]
 ENV AWS_REGION=${AWS_REGION} \
     SCCACHE_REGION=${AWS_REGION} \
     # keep all three Cargo bin dirs on PATH:
     #   • /usr/local/cargo/bin  – default in rust:* images
     #   • /root/.cargo/bin      – where rustup puts per-user installs
     #   • /usr/local/bin        – system-wide convenience links
-    PATH="/usr/local/cargo/bin:/root/.cargo/bin:/usr/local/bin:${PATH}"
+    PATH="/usr/local/bin:/usr/local/cargo/bin:/root/.cargo/bin:${PATH}"
 
 # sccache first — required by rustc wrapper
 RUN cargo install --locked sccache && \
@@ -84,20 +86,19 @@ ENV SCCACHE_BUCKET=solanaflow-cache RUSTC_WRAPPER=/usr/local/bin/sccache
 
 # Anchor 0.31.2 (needs Solana ≥1.18) + minimal Node 20
 ARG ANCHOR_VERSION=0.31.2
-RUN rustup component add rust-src && \
+RUN set -euo pipefail; \
+    rustup component add rust-src && \
     cargo install --git https://github.com/coral-xyz/anchor.git \
                   --tag v${ANCHOR_VERSION} \
-                  anchor-cli --locked && \
-    # belt-and-braces: link whichever copy exists first
-    ln -sf $(command -v anchor) /usr/local/bin/anchor && \
-    which anchor && anchor --version && \
-    cargo install cargo-chef --version 0.1.64 --locked && \
+                  anchor-cli --locked --root /usr/local && \
+    anchor --version && \
+    cargo install cargo-chef --version 0.1.64 --locked --root /usr/local && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         nodejs git clang lld llvm make ca-certificates && \
     apt-get clean && rm -rf /var/lib/apt/lists/* && \
-    strip /usr/local/bin/solana* /root/.cargo/bin/anchor /usr/local/bin/sccache || true
+    strip /usr/local/bin/solana* /usr/local/bin/anchor /usr/local/bin/sccache || true
 
 RUN rustup set profile minimal && rustup default stable
 
