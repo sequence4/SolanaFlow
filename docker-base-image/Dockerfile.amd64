@@ -68,7 +68,15 @@ RUN [ -d /solana-src ] && ln -sf /opt/target /solana-src/target || true
 ENV SCCACHE_BUCKET=solanaflow-cache \
     RUSTC_WRAPPER=/usr/local/bin/sccache
 
-# add Anchor CLI + minimal Node once (not in the base image yet)
+###############################################################################
+#  🆕  Anchor CLI + minimal Node
+#       · Build-arg ANCHOR_VERSION busts the layer cache whenever it changes
+#       · Install from git tag so we're immune to crates.io yanks
+#       · Fail fast if the binary isn't where we expect
+###############################################################################
+ARG ANCHOR_VERSION=0.31.2
+ENV ANCHOR_VERSION=${ANCHOR_VERSION}
+
 RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
     --mount=type=cache,id=cargo-registry-amd64,target=/root/.cargo/registry,sharing=locked \
     --mount=type=cache,id=cargo-git-amd64,target=/root/.cargo/git,sharing=locked \
@@ -76,10 +84,12 @@ RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
     --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked \
     rustup component add rust-src && \
-    ## 2️⃣  install the current Anchor release into $HOME/.cargo/bin
-    cargo install anchor-cli --version 0.31.2 --locked && \
-    ## 3️⃣  fail fast if Anchor didn't land where we expect
-    anchor --version && \
+    cargo install --git https://github.com/coral-xyz/anchor.git \
+                  --tag v${ANCHOR_VERSION} \
+                  --bin anchor-cli \
+                  --locked && \
+    # sanity-check so the build fails here if Anchor isn't available
+    which anchor && anchor --version && \
     cargo install cargo-chef --version 0.1.64 --locked && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get update -qq && \
