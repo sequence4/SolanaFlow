@@ -15,6 +15,11 @@ RUN apt-get update -qq && \
         bash curl ca-certificates build-essential pkg-config libssl-dev libudev-dev gnupg \
         xz-utils  # <- solana tarball needs this to unpack
 
+# dash (the default /bin/sh in Debian-slim) can't handle "set -o pipefail".
+# Switch the shell to bash for the rest of this stage so the installer
+# layer can use  `set -euo pipefail` safely.
+SHELL ["/bin/bash","-c"]
+
 #
 # ---------- Solana CLI (fail-fast + verbose) ---------------------------------
 #  • write installer to disk so we can checksum & re-run in debug shells
