@@ -106,12 +106,12 @@ RUN set -euo pipefail; \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
     # ------------------------------------------------------------------
-    # (re)install sccache *after* apt so the symlink can't be clobbered
-    # and export the wrapper for this same shell.
+    # (re)install sccache *after* apt so the symlink can't be clobbered.
+    # We **do not** activate it yet because very early invocations inside
+    # `cargo install anchor-cli` can fail on some WSL kernels.
     # ------------------------------------------------------------------
     cargo install --locked sccache && \
     ln -sf /usr/local/cargo/bin/sccache /usr/local/bin/sccache && \
-    export RUSTC_WRAPPER=/usr/local/bin/sccache && \
     # ------------------------------------------------------------------
     # Now build & install Anchor under /usr/local.
     # ------------------------------------------------------------------
