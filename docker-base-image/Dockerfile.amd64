@@ -90,7 +90,13 @@ RUN set -euo pipefail; \
     rustup component add rust-src && \
     cargo install --git https://github.com/coral-xyz/anchor.git \
                   --tag v${ANCHOR_VERSION} \
-                  anchor-cli --locked --root /usr/local && \
+                  anchor-cli --locked && \
+    # ------------------------------------------------------------------
+    # Copy the freshly-built binary into /usr/local/bin so it survives
+    # Docker layer changes regardless of Cargo's internal layout.
+    # `cargo bin anchor` prints the full path where the binary was placed.
+    # ------------------------------------------------------------------
+    install -m0755 "$(cargo bin anchor)" /usr/local/bin/anchor && \
     anchor --version && \
     cargo install cargo-chef --version 0.1.64 --locked --root /usr/local && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
