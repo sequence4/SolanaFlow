@@ -89,23 +89,27 @@ RUN cargo chef cook --release --recipe-path recipe.json
 FROM --platform=linux/amd64 solana-toolchain AS builder
 ARG NODE_VERSION=v20.18.0
 ARG APP_ID=local
-ENV HOME=/root \
-    PATH=/usr/local/bin:$HOME/.cargo/bin:$PATH \
-    NVM_DIR=$HOME/.nvm \
-    NEXT_TELEMETRY_DISABLED=1 NEXT_SKIP_ESLINT=1 NEXT_PRIVATE_STANDALONE=true \
-    APP_ID=${APP_ID}
+ENV HOME="/root" \
+    PATH="/usr/local/bin:${HOME}/.cargo/bin:${PATH}" \
+    NVM_DIR="${HOME}/.nvm" \
+    NEXT_TELEMETRY_DISABLED="1" \
+    NEXT_SKIP_ESLINT="1" \
+    NEXT_PRIVATE_STANDALONE="true" \
+    APP_ID="${APP_ID}"
 
 # Node + Yarn
 RUN curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash && \
     . "$NVM_DIR/nvm.sh" && nvm install ${NODE_VERSION} && nvm alias default ${NODE_VERSION} && \
     if ! command -v yarn >/dev/null 2>&1 ; then npm i -g yarn@1 ; fi
+ENV PATH="${NVM_DIR}/versions/node/${NODE_VERSION}/bin:${PATH}"
 
 # reuse compiled deps
 COPY --from=cooker /app/target /app/target
 WORKDIR /app
 COPY docker-base-image/src/ ./src
 
-# Web deps & build
+# Install web dependencies and build Next.js app
+COPY web/package.json web/yarn.lock /usr/share/solanaflow/web/
 RUN mkdir -p /usr/share/solanaflow/web && \
     yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile --prefer-offline
 COPY web/ /usr/share/solanaflow/web
