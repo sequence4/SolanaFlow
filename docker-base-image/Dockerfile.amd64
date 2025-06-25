@@ -125,6 +125,9 @@ RUN set -euo pipefail; \
     apt-get clean && rm -rf /var/lib/apt/lists/* ; \
     strip /usr/local/bin/solana* /usr/local/bin/anchor /usr/local/bin/sccache || true
 
+# Make sure the wrapper is visible to *all* later layers
+ENV RUSTC_WRAPPER=/usr/local/bin/sccache
+
 RUN solana --version && cargo --version && rustc --version && /usr/local/bin/anchor --version
 
 # Warm up BPF/SBF cache once so first user build is instant
