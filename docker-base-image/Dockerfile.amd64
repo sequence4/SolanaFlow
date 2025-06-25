@@ -108,6 +108,13 @@ RUN set -euo pipefail; \
 
 RUN rustup set profile minimal && rustup default stable
 
+# ------------------------------------------------------------------
+# rustup's "default" switch can recreate /usr/local/bin, so we
+# *re-assert* the Anchor binary here.  Using `command -v` makes the
+# link regardless of where Cargo put the original file.
+# ------------------------------------------------------------------
+RUN install -m0755 "$(command -v anchor)" /usr/local/bin/anchor
+
 # Warm up BPF/SBF cache once so first user build is instant
 WORKDIR /tmp
 RUN export CARGO_TARGET_DIR=/usr/src/target && \
