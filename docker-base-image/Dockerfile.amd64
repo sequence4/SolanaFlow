@@ -71,6 +71,7 @@ SHELL ["/bin/bash","-c"]
 # ── sccache must be **local-only** while the image builds ───────────────
 # Any remote settings trigger an S3 lookup that fails inside Docker-for-WSL.
 ENV AWS_REGION=${AWS_REGION} \
+    # ---- force purely local cache during image build -----------------
     SCCACHE_REGION="" \
     SCCACHE_BUCKET="" \
     SCCACHE_CACHE_TYPE="local" \
@@ -138,7 +139,7 @@ RUN solana --version && cargo --version && rustc --version && /usr/local/bin/anc
 # Warm up BPF/SBF cache once so first user build is instant
 WORKDIR /tmp
 RUN export CARGO_TARGET_DIR=/usr/src/target && \
-    # compile warm-up without sccache
+    # compile warm-up *without* the sccache wrapper
     unset RUSTC_WRAPPER && \
     anchor init anchor-template --no-git --no-install && \
     # ------------------------------------------------------------------
@@ -156,6 +157,7 @@ RUN export CARGO_TARGET_DIR=/usr/src/target && \
 # ----------------------------------------------------------------------
 #  🎉  Warm-up finished – switch sccache *back on* (local-only).
 # ----------------------------------------------------------------------
+# ---- warm-up finished – re-enable local sccache ----------------------
 ENV RUSTC_WRAPPER=/usr/local/bin/sccache \
     SCCACHE_DISABLE=""
 
