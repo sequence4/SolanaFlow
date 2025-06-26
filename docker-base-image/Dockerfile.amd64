@@ -68,8 +68,13 @@ ARG AWS_REGION
 ARG WEB_CACHE_BUSTER
 # use bash & fail-fast for every RUN in this stage
 SHELL ["/bin/bash","-c"]
+# ── sccache must be **local-only** while the image builds ───────────────
+# Any remote settings trigger an S3 lookup that fails inside Docker-for-WSL.
 ENV AWS_REGION=${AWS_REGION} \
-    SCCACHE_REGION= \
+    SCCACHE_REGION="" \
+    SCCACHE_BUCKET="" \
+    SCCACHE_CACHE_TYPE="local" \
+    SCCACHE_DISABLE="1" \
     # keep all three Cargo bin dirs on PATH:
     #   • /usr/local/cargo/bin  – default in rust:* images
     #   • /root/.cargo/bin      – where rustup puts per-user installs
@@ -78,9 +83,6 @@ ENV AWS_REGION=${AWS_REGION} \
 
 # purge occasionally-corrupt llvm tool-chain cache
 RUN rm -rf /root/.cache/solana/platform-tools || true
-
-# disable remote S3 cache for image-builds; keep it purely local
-ENV SCCACHE_BUCKET=
 
 # ------------------------------------------------------------------
 # Install the *stable* Rust tool-chain up-front.  Doing this **before**
@@ -128,22 +130,27 @@ RUN set -euo pipefail; \
     apt-get clean && rm -rf /var/lib/apt/lists/* ; \
     strip /usr/local/bin/solana* /usr/local/bin/anchor /usr/local/bin/sccache || true
 
-# Activate sccache for every subsequent layer
-ENV RUSTC_WRAPPER=/usr/local/bin/sccache
-# keep compilation caching local; prevents any network look-ups
-ENV SCCACHE_DISABLE=1
-
+# ----------------------------------------------------------------------
+#  ⬇️  **DO NOT** enable sccache yet – it still tries S3 during warm-up.
+# ----------------------------------------------------------------------
 RUN solana --version && cargo --version && rustc --version && /usr/local/bin/anchor --version
 
 # Warm up BPF/SBF cache once so first user build is instant
 WORKDIR /tmp
 RUN export CARGO_TARGET_DIR=/usr/src/target && \
+    unset RUSTC_WRAPPER && \      # compile warm-up without sccache
     anchor init anchor-template --no-git --no-install && \
     (cd anchor-template && anchor build) && \
     rm -rf anchor-template/node_modules && \
     mv anchor-template /usr/src/anchor-template && \
     rm -rf /usr/src/target/debug /usr/src/target/**/incremental && \
     mkdir -p /cache-seed && cp -a /usr/src/target/deploy /cache-seed/target
+
+# ----------------------------------------------------------------------
+#  🎉  Warm-up finished – switch sccache *back on* (local-only).
+# ----------------------------------------------------------------------
+ENV RUSTC_WRAPPER=/usr/local/bin/sccache \
+    SCCACHE_DISABLE=""
 
 ###############################################################################
 # 2.  Dependency cooker (cargo-chef)
