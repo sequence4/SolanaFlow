@@ -147,7 +147,7 @@ RUN export CARGO_TARGET_DIR=/usr/src/target && \
     # stable tool-chain inside the image can parse it.
     # See <https://github.com/rust-lang/cargo/pull/12417> for details.
     # ------------------------------------------------------------------
-    sed -i 's/^version = \"4\"/version = \"3\"/' anchor-template/Cargo.lock && \
+    sed -i 's/^version = "4"/version = "3"/' anchor-template/Cargo.lock && \
     (cd anchor-template && anchor build) && \
     rm -rf anchor-template/node_modules && \
     mv anchor-template /usr/src/anchor-template && \
