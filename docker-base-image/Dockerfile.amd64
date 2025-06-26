@@ -138,7 +138,8 @@ RUN solana --version && cargo --version && rustc --version && /usr/local/bin/anc
 # Warm up BPF/SBF cache once so first user build is instant
 WORKDIR /tmp
 RUN export CARGO_TARGET_DIR=/usr/src/target && \
-    unset RUSTC_WRAPPER && \      # compile warm-up without sccache
+    # compile warm-up without sccache
+    unset RUSTC_WRAPPER && \
     anchor init anchor-template --no-git --no-install && \
     (cd anchor-template && anchor build) && \
     rm -rf anchor-template/node_modules && \
