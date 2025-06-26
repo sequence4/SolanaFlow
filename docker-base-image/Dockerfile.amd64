@@ -27,8 +27,8 @@ SHELL ["/bin/bash","-c"]
 #   3. Verify SHA256 so CI never runs tampered code.
 ###############################################################################
 ARG SOLANA_VERSION=v2.1.15      # Anchor ≥0.31 expects Solana ≥2.1.x
-ENV SOLANA_INSTALL_ORIGIN="https://release.solana.com/${SOLANA_VERSION}/install" \
-    SOLANA_INSTALL_MIRROR="https://raw.githubusercontent.com/solana-labs/solana/${SOLANA_VERSION}/install/solana-install-init.sh"
+ENV SOLANA_INSTALL_ORIGIN="https://release.anza.xyz/${SOLANA_VERSION}/install" \
++    SOLANA_INSTALL_MIRROR="https://raw.githubusercontent.com/anza-xyz/solana/${SOLANA_VERSION}/install/solana-install-init.sh"
 
 RUN set -euo pipefail; \
     install -d -m 0755 /usr/local/bin; \
