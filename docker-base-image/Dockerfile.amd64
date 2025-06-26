@@ -49,8 +49,9 @@ RUN set -euo pipefail; \
         --no-modify-path \
         --data-dir /usr/local/solana \
         "${SOLANA_VERSION}"; \
-    # expose the CLI suite on the global PATH
-    ln -sf /usr/local/solana/active_release/bin/solana* /usr/local/bin/; \
+    # expose the CLI suite **and** Cargo helpers (e.g. `cargo-build-sbf`) on the global PATH
+    ln -sf /usr/local/solana/active_release/bin/solana* /usr/local/bin/ && \
+    ln -sf /usr/local/solana/active_release/bin/cargo-*  /usr/local/bin/; \
     solana --version
 
 ENV PATH="/usr/local/bin:${PATH}"
@@ -68,7 +69,7 @@ ARG WEB_CACHE_BUSTER
 # use bash & fail-fast for every RUN in this stage
 SHELL ["/bin/bash","-c"]
 ENV AWS_REGION=${AWS_REGION} \
-    SCCACHE_REGION=${AWS_REGION} \
+    SCCACHE_REGION= \
     # keep all three Cargo bin dirs on PATH:
     #   • /usr/local/cargo/bin  – default in rust:* images
     #   • /root/.cargo/bin      – where rustup puts per-user installs
@@ -78,8 +79,8 @@ ENV AWS_REGION=${AWS_REGION} \
 # purge occasionally-corrupt llvm tool-chain cache
 RUN rm -rf /root/.cache/solana/platform-tools || true
 
-# remote compiler cache bucket only (wrapper will be set later)
-ENV SCCACHE_BUCKET=solanaflow-cache
+# disable remote S3 cache for image-builds; keep it purely local
+ENV SCCACHE_BUCKET=
 
 # ------------------------------------------------------------------
 # Install the *stable* Rust tool-chain up-front.  Doing this **before**
@@ -129,6 +130,8 @@ RUN set -euo pipefail; \
 
 # Activate sccache for every subsequent layer
 ENV RUSTC_WRAPPER=/usr/local/bin/sccache
+# keep compilation caching local; prevents any network look-ups
+ENV SCCACHE_DISABLE=1
 
 RUN solana --version && cargo --version && rustc --version && /usr/local/bin/anchor --version
 
