@@ -3,7 +3,7 @@
 #  amd64-only SolanaFlow base image — optimised for WSL / Intel/AMD
 #  · One-for-one copy of the arm64 Dockerfile, with arm64 hints removed
 #  · No qemu-static emulation
-#  · Solana CLI 1.18 installed globally in /usr/local/bin
+#  · Solana CLI 2.1 installed globally in /usr/local/bin
 # ─────────────────────────────────────────────────────────────────────────────
 
 ###############################################################################
@@ -26,7 +26,7 @@ SHELL ["/bin/bash","-c"]
 #   2. Fall back to GitHub raw if Cloudflare still throws 525/522.
 #   3. Verify SHA256 so CI never runs tampered code.
 ###############################################################################
-ARG SOLANA_VERSION=v1.18.13
+ARG SOLANA_VERSION=v2.1.15      # Anchor ≥0.31 expects Solana ≥2.1.x
 ENV SOLANA_INSTALL_ORIGIN="https://release.solana.com/${SOLANA_VERSION}/install" \
     SOLANA_INSTALL_MIRROR="https://raw.githubusercontent.com/solana-labs/solana/${SOLANA_VERSION}/install/solana-install-init.sh"
 
@@ -95,8 +95,8 @@ RUN rm -rf /root/.cache/solana/platform-tools || true
 RUN rustup set profile minimal && \
     rustup default stable
 
-# Anchor 0.31.2 (needs Solana ≥1.18) + minimal Node 20
-ARG ANCHOR_VERSION=0.31.1
+# Anchor 0.31.2 (works with Solana ≥2.1) + minimal Node 20
+ARG ANCHOR_VERSION=0.31.2
 RUN set -euo pipefail; \
     echo "Cache bust: ${WEB_CACHE_BUSTER}" ; \
     rustup component add rust-src ; \
@@ -144,13 +144,8 @@ RUN export CARGO_TARGET_DIR=/usr/src/target && \
     anchor init anchor-template --no-git --no-install && \
     # ------------------------------------------------------------------
     # The newly-generated workspace has **no** lock-file yet, so we
-    # create one explicitly.  With Anchor ≥0.31 the first lockfile that
-    # Cargo writes is version 4, which stable Cargo (Rust 1.87) cannot
-    # read – it errors with "lock file version 4 requires
-    # -Znext-lockfile-bump".
-    #
-    # Work-around: generate the lock-file, immediately down-rev the
-    # `version = "4"` header to `"3"`, then continue the build.
+    # create one explicitly.  Solana CLI 2.1 bundles Rust ≥1.78 so it
+    # understands lockfile-v4; no down-rev hack is needed.
     # ------------------------------------------------------------------
         ( cd anchor-template && \
       cargo generate-lockfile && \
@@ -164,12 +159,7 @@ RUN export CARGO_TARGET_DIR=/usr/src/target && \
 #  🎉  Warm-up finished – switch sccache *back on* (local-only).
 # ----------------------------------------------------------------------
 # ---- warm-up finished – re-enable local sccache ----------------------
-# ──────────────────────────────────────────────────────────────────
-# Force Cargo to emit the legacy v3 lock-file while we are still
-# pinned to Rust 1.87.  Without this, Cargo writes a v4 lock-file
-# which stable Cargo cannot read ("requires -Znext-lockfile-bump").
-# ──────────────────────────────────────────────────────────────────
-ENV CARGO_LOCKFILE_VERSION=3
+# (env var no longer needed – remove it)
 
 ENV RUSTC_WRAPPER=/usr/local/bin/sccache \
     SCCACHE_DISABLE=""
