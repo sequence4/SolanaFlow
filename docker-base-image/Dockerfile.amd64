@@ -142,7 +142,20 @@ RUN export CARGO_TARGET_DIR=/usr/src/target && \
     # compile warm-up *without* the sccache wrapper
     unset RUSTC_WRAPPER && \
     anchor init anchor-template --no-git --no-install && \
-    (cd anchor-template && anchor build) && \
+    # ------------------------------------------------------------------
+    # The newly-generated workspace has **no** lock-file yet, so we
+    # create one explicitly.  With Anchor ≥0.31 the first lockfile that
+    # Cargo writes is version 4, which stable Cargo (Rust 1.87) cannot
+    # read – it errors with "lock file version 4 requires
+    # -Znext-lockfile-bump".
+    #
+    # Work-around: generate the lock-file, immediately down-rev the
+    # `version = "4"` header to `"3"`, then continue the build.
+    # ------------------------------------------------------------------
+    ( cd anchor-template && \
+      cargo generate-lockfile --offline && \
+      sed -i 's/^version = \"4\"/version = \"3\"/' Cargo.lock && \
+      anchor build ) && \
     rm -rf anchor-template/node_modules && \
     mv anchor-template /usr/src/anchor-template && \
     rm -rf /usr/src/target/debug /usr/src/target/**/incremental && \
