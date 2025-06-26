@@ -142,12 +142,6 @@ RUN export CARGO_TARGET_DIR=/usr/src/target && \
     # compile warm-up *without* the sccache wrapper
     unset RUSTC_WRAPPER && \
     anchor init anchor-template --no-git --no-install && \
-    # ------------------------------------------------------------------
-    # Cargo.lock v4 needs the unstable flag; downgrade to v3 so the
-    # stable tool-chain inside the image can parse it.
-    # See <https://github.com/rust-lang/cargo/pull/12417> for details.
-    # ------------------------------------------------------------------
-    sed -i 's/^version = "4"/version = "3"/' anchor-template/Cargo.lock && \
     (cd anchor-template && anchor build) && \
     rm -rf anchor-template/node_modules && \
     mv anchor-template /usr/src/anchor-template && \
