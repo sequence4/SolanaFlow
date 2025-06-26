@@ -152,10 +152,9 @@ RUN export CARGO_TARGET_DIR=/usr/src/target && \
     # Work-around: generate the lock-file, immediately down-rev the
     # `version = "4"` header to `"3"`, then continue the build.
     # ------------------------------------------------------------------
-    ( cd anchor-template && \
-    cargo generate-lockfile && \
-    sed -i 's/^version = "4"/version = "3"/' Cargo.lock && \
-    anchor build ) && \
+        ( cd anchor-template && \
+      cargo generate-lockfile && \
+      anchor build ) && \
     rm -rf anchor-template/node_modules && \
     mv anchor-template /usr/src/anchor-template && \
     rm -rf /usr/src/target/debug /usr/src/target/**/incremental && \
@@ -165,6 +164,13 @@ RUN export CARGO_TARGET_DIR=/usr/src/target && \
 #  🎉  Warm-up finished – switch sccache *back on* (local-only).
 # ----------------------------------------------------------------------
 # ---- warm-up finished – re-enable local sccache ----------------------
+# ──────────────────────────────────────────────────────────────────
+# Force Cargo to emit the legacy v3 lock-file while we are still
+# pinned to Rust 1.87.  Without this, Cargo writes a v4 lock-file
+# which stable Cargo cannot read ("requires -Znext-lockfile-bump").
+# ──────────────────────────────────────────────────────────────────
+ENV CARGO_LOCKFILE_VERSION=3
+
 ENV RUSTC_WRAPPER=/usr/local/bin/sccache \
     SCCACHE_DISABLE=""
 
