@@ -65,7 +65,6 @@ ARG AWS_REGION                 # --build-arg AWS_REGION=eu-north-1
 ###############################################################################
 FROM bootstrap AS solana-toolchain
 ARG AWS_REGION
-ARG WEB_CACHE_BUSTER
 # use bash & fail-fast for every RUN in this stage
 SHELL ["/bin/bash","-c"]
 # ── sccache must be **local-only** while the image builds ───────────────
@@ -99,7 +98,6 @@ RUN rustup set profile minimal && \
 # Anchor 0.31.1 (works with Solana ≥2.1) + minimal Node 20
 ARG ANCHOR_VERSION=0.31.1
 RUN set -euo pipefail; \
-    echo "Cache bust: ${WEB_CACHE_BUSTER}" ; \
     rustup component add rust-src ; \
     # ------------------------------------------------------------------
     # Install full native tool-chain *first* so Cargo can compile Anchor,
@@ -198,6 +196,7 @@ RUN unset RUSTC_WRAPPER SCCACHE_BUCKET SCCACHE_REGION && \
 FROM --platform=linux/amd64 solana-toolchain AS builder
 ARG NODE_VERSION=v20.18.0
 ARG APP_ID=local
+ARG WEB_CACHE_BUSTER             # cache-buster now applies only to web build
 ENV HOME="/root"
 ENV NVM_DIR="/usr/local/nvm"
 ENV PATH="/usr/local/bin:/usr/local/cargo/bin:${PATH}"
@@ -206,6 +205,10 @@ ENV NEXT_TELEMETRY_DISABLED="1"
 ENV NEXT_SKIP_ESLINT="1"
 ENV NEXT_PRIVATE_STANDALONE="true"
 ENV APP_ID="${APP_ID}"
+
+# Touch the ARG so this stage rebuilds when WEB_CACHE_BUSTER changes,
+# without invalidating the solana-toolchain cache layers above.
+RUN echo "Web cache bust: ${WEB_CACHE_BUSTER}"
 
 # Node + Yarn
 RUN mkdir -p $NVM_DIR && curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash && \
