@@ -121,7 +121,7 @@ RUN set -euo pipefail; \
     # ------------------------------------------------------------------
     # Now build & install Anchor under /usr/local.
     # ------------------------------------------------------------------
-    cargo install --git https://github.com/coral-xyz/anchor.git \
+    cargo install --git https://github.com/solana-foundation/anchor.git \
                  --tag v${ANCHOR_VERSION} \
                  anchor-cli --locked --root /usr/local ; \
     /usr/local/bin/anchor --version ; \
