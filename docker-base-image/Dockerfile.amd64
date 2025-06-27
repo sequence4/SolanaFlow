@@ -9,7 +9,7 @@
 ###############################################################################
 # 0.  Bootstrap – Rust + Solana CLI (native amd64, zero qemu)
 ###############################################################################
-FROM --platform=linux/amd64 rust:1.87.0-slim-bullseye AS bootstrap
+FROM --platform=linux/amd64 rust:1.87.0-slim-bookworm AS bootstrap
 RUN apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         bash curl ca-certificates build-essential pkg-config libssl-dev libudev-dev gnupg \
