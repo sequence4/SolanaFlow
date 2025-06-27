@@ -95,8 +95,8 @@ RUN rm -rf /root/.cache/solana/platform-tools || true
 RUN rustup set profile minimal && \
     rustup default stable
 
-# Anchor 0.31.2 (works with Solana ≥2.1) + minimal Node 20
-ARG ANCHOR_VERSION=0.31.2
+# Anchor 0.31.1 (works with Solana ≥2.1) + minimal Node 20
+ARG ANCHOR_VERSION=0.31.1
 RUN set -euo pipefail; \
     echo "Cache bust: ${WEB_CACHE_BUSTER}" ; \
     rustup component add rust-src ; \
