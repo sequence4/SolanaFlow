@@ -251,6 +251,14 @@ WORKDIR /usr/share/solanaflow/web/.next/standalone
 COPY --from=solana-toolchain /usr/local/bin /usr/local/bin
 COPY --from=solana-toolchain /usr/local/cargo/bin /usr/local/cargo/bin
 COPY --from=solana-toolchain /usr/local/rustup /usr/local/rustup
+#──────────────────────────────────────────────────────────────
+# Solana CLI symlinks in /usr/local/bin actually point into
+# /usr/local/solana/active_release/bin/…                    ⇢
+# That whole directory must be present in the runtime layer,   
+# otherwise the symlinks are dangling and `solana` is "not
+# found" at runtime.                                          
+#──────────────────────────────────────────────────────────────
+COPY --from=solana-toolchain /usr/local/solana /usr/local/solana
 COPY --from=solana-toolchain /usr/src/anchor-template /usr/src/anchor-template
 
 COPY --from=builder /tmp/standalone /usr/share/solanaflow/web/.next/standalone
