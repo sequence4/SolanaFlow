@@ -76,11 +76,13 @@ ENV AWS_REGION=${AWS_REGION} \
     SCCACHE_BUCKET="" \
     SCCACHE_CACHE_TYPE="local" \
     SCCACHE_DISABLE="1" \
+    RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
     # keep all three Cargo bin dirs on PATH:
     #   • /usr/local/cargo/bin  – default in rust:* images
-    #   • /root/.cargo/bin      – where rustup puts per-user installs
+    #   • /usr/local/rustup     – system-wide rustup toolchain
     #   • /usr/local/bin        – system-wide convenience links
-    PATH="/usr/local/bin:/usr/local/cargo/bin:/root/.cargo/bin:${PATH}"
+    PATH="/usr/local/bin:/usr/local/cargo/bin:${PATH}"
 
 # purge occasionally-corrupt llvm tool-chain cache
 RUN rm -rf /root/.cache/solana/platform-tools || true
@@ -183,16 +185,16 @@ RUN cargo chef cook --release --recipe-path recipe.json
 FROM --platform=linux/amd64 solana-toolchain AS builder
 ARG NODE_VERSION=v20.18.0
 ARG APP_ID=local
-ENV HOME="/root" \
-    PATH="/usr/local/bin:${HOME}/.cargo/bin:${PATH}" \
-    NVM_DIR="${HOME}/.nvm" \
-    NEXT_TELEMETRY_DISABLED="1" \
-    NEXT_SKIP_ESLINT="1" \
-    NEXT_PRIVATE_STANDALONE="true" \
-    APP_ID="${APP_ID}"
+ENV HOME="/root"
+ENV NVM_DIR="/usr/local/nvm"
+ENV PATH="/usr/local/bin:/usr/local/cargo/bin:${PATH}"
+ENV NEXT_TELEMETRY_DISABLED="1"
+ENV NEXT_SKIP_ESLINT="1"
+ENV NEXT_PRIVATE_STANDALONE="true"
+ENV APP_ID="${APP_ID}"
 
 # Node + Yarn
-RUN curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash && \
+RUN mkdir -p $NVM_DIR && curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash && \
     . "$NVM_DIR/nvm.sh" && nvm install ${NODE_VERSION} && nvm alias default ${NODE_VERSION} && \
     if ! command -v yarn >/dev/null 2>&1 ; then npm i -g yarn@1 ; fi
 ENV PATH="${NVM_DIR}/versions/node/${NODE_VERSION}/bin:${PATH}"
@@ -224,21 +226,25 @@ RUN STANDALONE_ROOT=$(dirname "$(find /usr/share/solanaflow/web/.next -name serv
 FROM --platform=$BUILDPLATFORM ubuntu:22.04 AS runtime
 ARG NODE_VERSION=v20.18.0
 ARG APP_ID=local
-ENV PATH=/usr/local/bin:/root/.cargo/bin:$PATH \
-    HOSTNAME=0.0.0.0 NEXT_DISABLE_SWC=1 APP_ID=${APP_ID}
+ENV RUSTUP_HOME=/usr/local/rustup
+ENV CARGO_HOME=/usr/local/cargo
+ENV PATH=/usr/local/bin:/usr/local/cargo/bin:$PATH
+ENV HOSTNAME=0.0.0.0
+ENV NEXT_DISABLE_SWC=1
+ENV APP_ID=${APP_ID}
 
 WORKDIR /usr/share/solanaflow/web/.next/standalone
 COPY --from=solana-toolchain /usr/local/bin /usr/local/bin
-COPY --from=solana-toolchain /root/.cargo/bin /root/.cargo/bin
-COPY --from=solana-toolchain /root/.rustup /root/.rustup
+COPY --from=solana-toolchain /usr/local/cargo/bin /usr/local/cargo/bin
+COPY --from=solana-toolchain /usr/local/rustup /usr/local/rustup
 COPY --from=solana-toolchain /usr/src/anchor-template /usr/src/anchor-template
 
 COPY --from=builder /tmp/standalone /usr/share/solanaflow/web/.next/standalone
 COPY --from=builder /usr/share/solanaflow/web/.next/static /usr/share/solanaflow/web/.next/static
 COPY --from=builder /usr/share/solanaflow/web/public /usr/share/solanaflow/web/.next/standalone/public
 COPY --from=builder /usr/share/solanaflow/web /usr/share/solanaflow/web
-COPY --from=builder /root/.nvm/versions/node/${NODE_VERSION} /root/.nvm/versions/node/${NODE_VERSION}
-RUN ln -sf /root/.nvm/versions/node/${NODE_VERSION}/bin/* /usr/local/bin/
+COPY --from=builder ${NVM_DIR}/versions/node/${NODE_VERSION} /usr/local/nvm/versions/node/${NODE_VERSION}
+RUN ln -sf /usr/local/nvm/versions/node/${NODE_VERSION}/bin/* /usr/local/bin/
 
 RUN node -v && yarn -v && solana --version && /usr/local/bin/anchor --version && cargo --version
 
