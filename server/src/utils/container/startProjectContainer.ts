@@ -229,8 +229,10 @@ export async function startProjectContainer(
 }> {
   const name  = `userproj-${projId}-${Date.now()}`.slice(0, 63);        // 64-char limit
   // Use the tag only, let --pull=always refresh it
-  const image = process.env.SOLANAFLOW_BUILD_IMAGE ??
-              'ghcr.io/sequence4/solana-toolchain:runtime-latest';
+  // Fallback image when the caller doesn't set SOLANAFLOW_BUILD_IMAGE.
+  // Use the native amd64 build that contains the warmed SBF cache.
+  const image = process.env.SOLANAFLOW_BUILD_IMAGE
+              ?? 'ghcr.io/sequence4/solana-toolchain:runtime-latest-amd64';
 
   /** Toggle: `SF_DEV_SERVER=1` ⇒ start `next dev` instead of standalone build */
   const useDevServer = devMode || process.env.SF_DEV_SERVER === '1';
@@ -307,7 +309,12 @@ export async function startProjectContainer(
     // NEW: make sure the host has enough free space (≥ 3 GiB)
     ensureDockerSpace();
     
-    timed(`docker pull --platform linux/arm64 ${image}`, 'pull');
+    /* ------------------------------------------------------------------
+     * Pull the image for the platform selected above.  This guarantees
+     * that    SF_DOCKER_PLATFORM=linux/amd64    on WSL/Intel laptops
+     * actually fetches x86-64 layers and never falls back to QEMU. 
+     * ------------------------------------------------------------------ */
+    timed(`docker pull --platform ${targetPlatform} ${image}`, 'pull');
 
     // choose the public port deterministically so the UI link is stable
     const hostPort = process.env.SF_HOST_PORT
