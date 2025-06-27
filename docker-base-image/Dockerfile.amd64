@@ -73,7 +73,6 @@ SHELL ["/bin/bash","-c"]
 ENV AWS_REGION=${AWS_REGION} \
     # ---- force purely local cache during image build -----------------
     SCCACHE_REGION="" \
-    SCCACHE_BUCKET="" \
     SCCACHE_CACHE_TYPE="local" \
     SCCACHE_DISABLE="1" \
     RUSTUP_HOME=/usr/local/rustup \
@@ -163,8 +162,13 @@ RUN export CARGO_TARGET_DIR=/usr/src/target && \
 # ---- warm-up finished – re-enable local sccache ----------------------
 # (env var no longer needed – remove it)
 
+#  • keep cache type local
+#  • ensure bucket/region are blank so sccache never flips to S3
 ENV RUSTC_WRAPPER=/usr/local/bin/sccache \
-    SCCACHE_DISABLE=""
+    SCCACHE_DISABLE="" \
+    SCCACHE_CACHE_TYPE="local" \
+    SCCACHE_BUCKET="" \
+    SCCACHE_REGION=""
 
 ###############################################################################
 # 2.  Dependency cooker (cargo-chef)
@@ -172,12 +176,14 @@ ENV RUSTC_WRAPPER=/usr/local/bin/sccache \
 FROM solana-toolchain AS chef
 WORKDIR /app
 COPY docker-base-image/Cargo.toml docker-base-image/Cargo.lock docker-base-image/src/ ./
-RUN cargo chef prepare --recipe-path recipe.json
+RUN unset RUSTC_WRAPPER SCCACHE_BUCKET SCCACHE_REGION && \
+    SCCACHE_DISABLE=1 cargo chef prepare --recipe-path recipe.json
 
 FROM solana-toolchain AS cooker
 WORKDIR /app
 COPY --from=chef /app/recipe.json .
-RUN cargo chef cook --release --recipe-path recipe.json
+RUN unset RUSTC_WRAPPER SCCACHE_BUCKET SCCACHE_REGION && \
+    SCCACHE_DISABLE=1 cargo chef cook --release --recipe-path recipe.json
 
 ###############################################################################
 # 3.  Application build (native amd64)
@@ -243,7 +249,7 @@ COPY --from=builder /tmp/standalone /usr/share/solanaflow/web/.next/standalone
 COPY --from=builder /usr/share/solanaflow/web/.next/static /usr/share/solanaflow/web/.next/static
 COPY --from=builder /usr/share/solanaflow/web/public /usr/share/solanaflow/web/.next/standalone/public
 COPY --from=builder /usr/share/solanaflow/web /usr/share/solanaflow/web
-COPY --from=builder ${NVM_DIR}/versions/node/${NODE_VERSION} /usr/local/nvm/versions/node/${NODE_VERSION}
+COPY --from=builder /usr/local/nvm/versions/node/${NODE_VERSION} /usr/local/nvm/versions/node/${NODE_VERSION}
 RUN ln -sf /usr/local/nvm/versions/node/${NODE_VERSION}/bin/* /usr/local/bin/
 
 RUN node -v && yarn -v && solana --version && /usr/local/bin/anchor --version && cargo --version
