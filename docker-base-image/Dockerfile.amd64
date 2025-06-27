@@ -168,7 +168,14 @@ ENV RUSTC_WRAPPER=/usr/local/bin/sccache \
     SCCACHE_DISABLE="" \
     SCCACHE_CACHE_TYPE="local" \
     SCCACHE_BUCKET="" \
-    SCCACHE_REGION=""
+    SCCACHE_REGION="" \
+    \
+    ### --------  Low-RAM build flags (keep < 4 GB in WSL)  --------
+    # Two parallel code-gen processes and a single codegen-unit per
+    # crate dramatically reduce LLVM's peak memory without hurting
+    # throughput on laptops.                      (see docs below)
+    CARGO_BUILD_JOBS=2 \
+    RUSTFLAGS="-Ccodegen-units=1"
 
 ###############################################################################
 # 2.  Dependency cooker (cargo-chef)
@@ -194,6 +201,7 @@ ARG APP_ID=local
 ENV HOME="/root"
 ENV NVM_DIR="/usr/local/nvm"
 ENV PATH="/usr/local/bin:/usr/local/cargo/bin:${PATH}"
+ENV CARGO_BUILD_JOBS=2 RUSTFLAGS="-Ccodegen-units=1"
 ENV NEXT_TELEMETRY_DISABLED="1"
 ENV NEXT_SKIP_ESLINT="1"
 ENV NEXT_PRIVATE_STANDALONE="true"
