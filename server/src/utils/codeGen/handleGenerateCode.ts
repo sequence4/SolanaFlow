@@ -293,7 +293,10 @@ export const handleGenerateCode = async ({
         // ─── Restart Next.js dev server so it picks up next-themes, toast, etc.
         sendProgress({ stage: 'deps', message: 'Restarting Next.js server…' });
         await runCommand(
-          `docker exec ${workspace.containerName} bash -lc "pkill -f 'next dev' || true ; yarn --cwd web dev --turbo &"`,
+          `docker exec -w /usr/src/${workspace.rootPath} ` +
+          `${workspace.containerName} bash -lc "` +
+            `pkill -f 'next dev' || true ; ` +
+            `yarn --cwd web dev --turbo &"`,
           '.', projectId
         );
         sendProgress({ stage: 'deps', message: 'Dev server restarted' });
