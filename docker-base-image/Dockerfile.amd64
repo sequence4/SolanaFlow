@@ -195,6 +195,7 @@ RUN unset RUSTC_WRAPPER SCCACHE_BUCKET SCCACHE_REGION && \
 ###############################################################################
 FROM --platform=linux/amd64 solana-toolchain AS builder
 ARG NODE_VERSION=v20.18.0
+ARG YARN_LOCK_HASH
 ARG APP_ID=local
 ARG WEB_CACHE_BUSTER             # cache-buster now applies only to web build
 ENV HOME="/root"
@@ -221,9 +222,13 @@ COPY --from=cooker /app/target /app/target
 WORKDIR /app
 COPY docker-base-image/src/ ./src
 
-# Install web dependencies and build Next.js app
+# --------------------------------------------------------------------------
+# Install web dependencies (cached) and build Next.js app
+# The cache mount means subsequent builds take seconds instead of minutes.
+# --------------------------------------------------------------------------
 COPY web/package.json web/yarn.lock /usr/share/solanaflow/web/
-RUN mkdir -p /usr/share/solanaflow/web && \
+RUN --mount=type=cache,target=/usr/local/share/.cache/yarn/v6,sharing=locked \
+    mkdir -p /usr/share/solanaflow/web && \
     yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile --prefer-offline
 COPY web/ /usr/share/solanaflow/web
 RUN yarn --cwd /usr/share/solanaflow/web next build
