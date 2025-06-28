@@ -293,7 +293,7 @@ export const handleGenerateCode = async ({
         // ─── Restart Next.js dev server so it picks up next-themes, toast, etc.
         sendProgress({ stage: 'deps', message: 'Restarting Next.js server…' });
         await runCommand(
-          `docker exec ${workspace.containerName} bash -lc "pkill -f 'next dev' && cd ${containerWebDir} && yarn dev --turbo &"`,
+          `docker exec ${workspace.containerName} bash -lc "pkill -f 'next dev' || true ; yarn --cwd web dev --turbo &"`,
           '.', projectId
         );
         sendProgress({ stage: 'deps', message: 'Dev server restarted' });
@@ -358,11 +358,9 @@ EOF'`,
             if (process.env.SF_DEV_SERVER !== '1') {
               // 🟢 start the server **inside the container** so cwd is valid
               runCommandDetached(
-                `docker exec -w ${containerWebDir} ` +
-                `${workspace.containerName} bash -lc '` +
-                `node .next/standalone/server.js'`,
-                '.',                              // host cwd irrelevant
-                `next-serve-${projectId}`         // no extra options needed
+                `docker exec -w /usr/src/${workspace.rootPath} ` +
+                `${workspace.containerName} bash -lc 'yarn --cwd web dev --turbo'`,
+                '.', `next-dev-${projectId}`
               ).catch(console.error);
             }
           } catch (error) {
