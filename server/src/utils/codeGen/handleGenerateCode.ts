@@ -23,23 +23,13 @@ import {
   TOKEN_CREATED_SUCCESS_TSX,
   WALLET_TSX,
   THEME_TOGGLE_TSX,
-  UI_BUTTON_TSX,
-  UI_INPUT_TSX,
-  UI_LABEL_TSX,
   UTILS_TS,
   POSTCSS_CONFIG,
   NEXT_CONFIG_JS,
   THEME_PROVIDER_TSX,
-  USE_TOAST_TSX,
   walletProvider,
   solMintApp
 } from './uiTemplates';
-import {
-  CARD_TSX,
-  BADGE_TSX,
-  ALERT_TSX,
-  TOOLTIP_TSX
-} from "./uiTemplates";
 
 /** Extract all file paths from a file tree recursively. */
 function flattenPaths(tree: any[]): string[] {
@@ -213,29 +203,7 @@ export const handleGenerateCode = async ({
                     { name: "theme-toggle.tsx", path: "./web/src/components/theme-toggle.tsx", type: "file" as const, code: THEME_TOGGLE_TSX },
                     { name: "wallet.tsx", path: "./web/src/components/wallet.tsx", type: "file" as const, code: WALLET_TSX },
                     { name: "theme-provider.tsx", path: "./web/src/components/theme-provider.tsx", type: "file" as const, code: THEME_PROVIDER_TSX },
-                    { name: "SolMintApp.tsx", path: "./web/src/components/SolMintApp.tsx", type: "file" as const, code: solMintApp },
-                    {
-                      name: "ui",
-                      path: "./web/src/components/ui",
-                      type: "directory" as const,
-                      children: [
-                        { name: "button.tsx", path: "./web/src/components/ui/button.tsx", type: "file" as const, code: UI_BUTTON_TSX },
-                        { name: "input.tsx", path: "./web/src/components/ui/input.tsx", type: "file" as const, code: UI_INPUT_TSX },
-                        { name: "label.tsx", path: "./web/src/components/ui/label.tsx", type: "file" as const, code: UI_LABEL_TSX },
-                        { name: "card.tsx",    path: "./web/src/components/ui/card.tsx",    type: "file" as const, code: CARD_TSX },
-                        { name: "badge.tsx",   path: "./web/src/components/ui/badge.tsx",   type: "file" as const, code: BADGE_TSX },
-                        { name: "alert.tsx",   path: "./web/src/components/ui/alert.tsx",   type: "file" as const, code: ALERT_TSX },
-                        { name: "tooltip.tsx", path: "./web/src/components/ui/tooltip.tsx", type: "file" as const, code: TOOLTIP_TSX },
-                      ]
-                    }
-                  ]
-                },
-                {
-                  name: "hooks",
-                  path: "./web/src/hooks",
-                  type: "directory" as const,
-                  children: [
-                    { name: "use-toast.tsx", path: "./web/src/hooks/use-toast.tsx", type: "file" as const, code: USE_TOAST_TSX }
+                    { name: "SolMintApp.tsx", path: "./web/src/components/SolMintApp.tsx", type: "file" as const, code: solMintApp }
                   ]
                 },
                 {
