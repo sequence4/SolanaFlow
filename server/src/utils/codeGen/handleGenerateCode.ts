@@ -292,13 +292,23 @@ export const handleGenerateCode = async ({
 
         // ─── Restart Next.js dev server so it picks up next-themes, toast, etc.
         sendProgress({ stage: 'deps', message: 'Restarting Next.js server…' });
+
+        /* 1) stop any previous dev instance — ignore "not found" exit */
         await runCommand(
-          `docker exec -w /usr/src/${workspace.rootPath} ` +
-          `${workspace.containerName} bash -lc "` +
-            `pkill -f 'next dev' || true ; ` +
-            `yarn --cwd web dev --turbo &"`,
-          '.', projectId
+          `docker exec ${workspace.containerName} pkill -f 'next dev' || true`,
+          '.',
+          projectId,
         );
+
+        /* 2) launch a fresh dev server DETACHED so this task can finish cleanly.
+              We exec directly in web/ and drop the unused "--turbo" flag. */
+        runCommandDetached(
+          `docker exec -d -w /usr/src/${workspace.rootPath}/web ` +
+          `${workspace.containerName} yarn dev`,
+          '.',
+          `next-dev-${projectId}`,
+        ).catch(console.error);
+
         sendProgress({ stage: 'deps', message: 'Dev server restarted' });
 
         /* ──────────────────────────────────────────────────────────────────────── */
@@ -361,9 +371,10 @@ EOF'`,
             if (process.env.SF_DEV_SERVER !== '1') {
               // 🟢 start the server **inside the container** so cwd is valid
               runCommandDetached(
-                `docker exec -w /usr/src/${workspace.rootPath} ` +
-                `${workspace.containerName} bash -lc 'yarn --cwd web dev --turbo'`,
-                '.', `next-dev-${projectId}`
+                `docker exec -d -w /usr/src/${workspace.rootPath}/web ` +
+                `${workspace.containerName} yarn dev`,
+                '.',
+                `next-dev-${projectId}`,
               ).catch(console.error);
             }
           } catch (error) {
