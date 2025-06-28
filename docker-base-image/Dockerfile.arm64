@@ -145,29 +145,31 @@ RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing
     yarn --cwd /usr/share/solanaflow/web install \
          --frozen-lockfile --prefer-offline --check-files --ignore-scripts --production=false
 
+# Remove the build step - we'll run in dev mode
 # ── 2️⃣ build Next.js with a named SWC cache (re-used across builds) ────
-RUN --mount=type=cache,id=next-swc,target=/usr/share/solanaflow/web/.next/cache,sharing=shared \
-    yarn --cwd /usr/share/solanaflow/web next build
+# RUN --mount=type=cache,id=next-swc,target=/usr/share/solanaflow/web/.next/cache,sharing=shared \
+#     yarn --cwd /usr/share/solanaflow/web next build
 
 # Debug: show where Next placed the standalone output
-RUN echo 'Preview of .next layout:' && \
-    find /usr/share/solanaflow/web/.next -maxdepth 3 -type f | head -n 30
+# RUN echo 'Preview of .next layout:' && \
+#     find /usr/share/solanaflow/web/.next -maxdepth 3 -type f | head -n 30
 
+# Remove standalone copy - not needed for dev mode
 # ─────────────────────────────────────────────────────────────────────────────
-RUN STANDALONE_ROOT=$(dirname "$(find /usr/share/solanaflow/web/.next -name server.js -print -quit)") && \
-    test -n "$STANDALONE_ROOT" && echo "✔ Found standalone directory at $STANDALONE_ROOT" || \
-        (echo '❌  server.js (standalone) not found. Is output: "standalone" set?' && exit 1) && \
-    mkdir -p /tmp/standalone && \
-    cp -a "$STANDALONE_ROOT"/. /tmp/standalone && \
-    \
-    # add compiled Tailwind / JS chunks into the standalone tree ────────────── \
-    # In cached layers .next/static may be missing, so copy it only if present. \
-    if [ -d /usr/share/solanaflow/web/.next/static ]; then \
-        mkdir -p /tmp/standalone/.next && \
-        cp -a /usr/share/solanaflow/web/.next/static/. /tmp/standalone/.next/static/ ; \
-    else \
-        echo "⚠️  .next/static not found in this layer (cached build) – skipping copy" ; \
-    fi
+# RUN STANDALONE_ROOT=$(dirname "$(find /usr/share/solanaflow/web/.next -name server.js -print -quit)") && \
+#     test -n "$STANDALONE_ROOT" && echo "✔ Found standalone directory at $STANDALONE_ROOT" || \
+#         (echo '❌  server.js (standalone) not found. Is output: "standalone" set?' && exit 1) && \
+#     mkdir -p /tmp/standalone && \
+#     cp -a "$STANDALONE_ROOT"/. /tmp/standalone && \
+#     \
+#     # add compiled Tailwind / JS chunks into the standalone tree ────────────── \
+#     # In cached layers .next/static may be missing, so copy it only if present. \
+#     if [ -d /usr/share/solanaflow/web/.next/static ]; then \
+#         mkdir -p /tmp/standalone/.next && \
+#         cp -a /usr/share/solanaflow/web/.next/static/. /tmp/standalone/.next/static/ ; \
+#     else \
+#         echo "⚠️  .next/static not found in this layer (cached build) – skipping copy" ; \
+#     fi
 # ─────────────────────────────────────────────────────────────────────────────
 
 # create a separate stage for seeding the target volume
@@ -189,7 +191,7 @@ ENV PATH=/usr/local/bin:/root/.cargo/bin:$PATH \
     HOSTNAME=0.0.0.0 \
     NEXT_DISABLE_SWC=1 \
     APP_ID=${APP_ID}
-WORKDIR /usr/share/solanaflow/web/.next/standalone
+WORKDIR /usr/share/solanaflow/web
 
 # bring in binaries and web bundle
 COPY --from=solana-toolchain /usr/local/bin /usr/local/bin
@@ -197,30 +199,13 @@ COPY --from=solana-toolchain /root/.cargo/bin /root/.cargo/bin
 COPY --from=solana-toolchain /root/.rustup /root/.rustup
 # pre-built Anchor workspace skeleton (speeds up prepEnv thin-copy)
 COPY --from=solana-toolchain /usr/src/anchor-template /usr/src/anchor-template
-# ── web bundle ────────────────────────────────────────────────────────────────
-# Next 'standalone' output lives in:
-#   web/.next/standalone/…   (server code + _next/static)
-#   web/public/…             (static public assets)
 
-# ① server bundle — copy the complete standalone folder (already includes _next/static)
-COPY --from=builder /tmp/standalone \
-                    /usr/share/solanaflow/web/.next/standalone
-
-# also copy the project itself (src/, app/, idl/, …)
-COPY --from=builder /usr/share/solanaflow/web/public \
-                    /usr/share/solanaflow/web/.next/standalone/public
-
-COPY --from=builder /usr/share/solanaflow/web \
-                    /usr/share/solanaflow/web
-
-COPY --from=builder /usr/share/solanaflow/web/.next/static \
-                    /usr/share/solanaflow/web/.next/standalone/.next/static
+# Copy web files for development
+COPY --from=builder /usr/share/solanaflow/web /usr/share/solanaflow/web
 
 # copy the entire Node version dir (≈ 28 MB) – includes node, npm, corepack, etc.
 COPY --from=builder /root/.nvm/versions/node/v20.18.0 /root/.nvm/versions/node/v20.18.0
 RUN ln -sf /root/.nvm/versions/node/v20.18.0/bin/* /usr/local/bin/
-
-COPY --from=builder /usr/share/solanaflow/web/.next/static /usr/share/solanaflow/web/.next/static
 
 # sanity-check Yarn & Node
 RUN node -v && yarn -v      # should print 20.18.0 / 1.22.x
@@ -257,10 +242,15 @@ RUN ln -sf /bin/bash /bin/sh
 # from this point every RUN uses Bash automatically
 SHELL ["/bin/bash","-c"]
 
+# Clear Next.js build cache on container start (dev environment)
+COPY docker-base-image/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+
 # ────────────────────────────────────────────────────────────────
-# Runtime: serve from the standalone bundle so _next/static works
+# Runtime: serve from the web root for development
 # ────────────────────────────────────────────────────────────────
-WORKDIR /usr/share/solanaflow/web/.next/standalone
+WORKDIR /usr/share/solanaflow/web
 ENV PORT=3000
 EXPOSE 3000
-CMD ["node","server.js","-p","3000","-H","0.0.0.0"]
+CMD ["npx", "next", "dev", "-H", "0.0.0.0", "-p", "3000"]

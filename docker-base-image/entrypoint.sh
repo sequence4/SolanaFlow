@@ -1,5 +1,3 @@
 #!/bin/bash
-if [[ "${NODE_ENV}" = "development" ]]; then
-  rm -rf /usr/share/solanaflow/web/.next/cache
-fi
+rm -rf /usr/share/solanaflow/web/.next   # always start clean
 exec "$@" 
