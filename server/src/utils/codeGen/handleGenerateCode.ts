@@ -300,6 +300,14 @@ export const handleGenerateCode = async ({
           projectId,
         );
 
+        /* 2) start a fresh dev server, detach + pipe logs */
+        runCommandDetached(
+          `docker exec -d -w /usr/src/${workspace.rootPath}/web ` +
+          `${workspace.containerName} bash -lc 'yarn dev 2>&1'`,
+          '.',
+          `next-dev-${projectId}`,
+        ).catch(console.error);
+
         sendProgress({ stage: 'deps', message: 'Dev server restarted' });
 
         /* ──────────────────────────────────────────────────────────────────────── */
@@ -357,17 +365,6 @@ EOF'`,
               stage: 'next-build-done',
               message: 'Next.js build completed'
             });
-
-            // Only launch the Next.js server in container if not in dev mode
-            if (process.env.SF_DEV_SERVER !== '1') {
-              // 🟢 start the server **inside the container** so cwd is valid
-              runCommandDetached(
-                `docker exec -d -w /usr/src/${workspace.rootPath}/web ` +
-                `${workspace.containerName} bash -lc 'yarn dev 2>&1'`,
-                '.',
-                `next-dev-${projectId}`,
-              ).catch(console.error);
-            }
           } catch (error) {
             console.error('Error during Next.js build:', error);
             sendProgress({
