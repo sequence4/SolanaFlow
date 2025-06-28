@@ -36,9 +36,29 @@ function flattenPaths(tree: any[]): string[] {
 async function dirToFileTree(current: string, webRoot: string): Promise<FileTreeItem> {
   const entries = await fs.readdir(current, { withFileTypes: true });
 
-  const children: FileTreeItem[] = await Promise.all(
+  const children: (FileTreeItem | undefined)[] = await Promise.all(
     entries.map(async entry => {
       const abs = path.join(current, entry.name);
+      
+      /* ── skip heavy or irrelevant folders/files ── */
+      const SKIP = new Set([
+        'node_modules',
+        '.next',
+        '.turbo',
+        'out',
+        'dist',
+        '.vercel',
+        'coverage',
+        '.git',
+        '.vscode',
+        '.idea',
+        '.DS_Store',
+        '.yarn',          // yarn cache
+        '.pnpm-store'
+      ]);
+
+      if (SKIP.has(entry.name)) return undefined;   // short-circuit
+
       if (entry.isDirectory()) return dirToFileTree(abs, webRoot);   // recurse
 
       const code = await fs.readFile(abs, 'utf8');
@@ -56,7 +76,7 @@ async function dirToFileTree(current: string, webRoot: string): Promise<FileTree
     name: path.basename(current),
     path: relDir ? `./web/${relDir}` : './web',                      // root dir path
     type: 'directory',
-    children,
+    children: children.filter(Boolean) as FileTreeItem[],            // drop undefined entries
   };
 }
 
