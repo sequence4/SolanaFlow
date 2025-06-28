@@ -300,15 +300,6 @@ export const handleGenerateCode = async ({
           projectId,
         );
 
-        /* 2) launch a fresh dev server DETACHED so this task can finish cleanly.
-              We exec directly in web/ and drop the unused "--turbo" flag. */
-        runCommandDetached(
-          `docker exec -d -w /usr/src/${workspace.rootPath}/web ` +
-          `${workspace.containerName} yarn dev`,
-          '.',
-          `next-dev-${projectId}`,
-        ).catch(console.error);
-
         sendProgress({ stage: 'deps', message: 'Dev server restarted' });
 
         /* ──────────────────────────────────────────────────────────────────────── */
@@ -372,7 +363,7 @@ EOF'`,
               // 🟢 start the server **inside the container** so cwd is valid
               runCommandDetached(
                 `docker exec -d -w /usr/src/${workspace.rootPath}/web ` +
-                `${workspace.containerName} yarn dev`,
+                `${workspace.containerName} bash -lc 'yarn dev 2>&1'`,
                 '.',
                 `next-dev-${projectId}`,
               ).catch(console.error);
