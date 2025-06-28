@@ -40,24 +40,22 @@ async function dirToFileTree(current: string, webRoot: string): Promise<FileTree
     entries.map(async entry => {
       const abs = path.join(current, entry.name);
       
-      /* ── skip heavy or irrelevant folders/files ── */
-      const SKIP = new Set([
-        'node_modules',
-        '.next',
-        '.turbo',
-        'out',
-        'dist',
-        '.vercel',
-        'coverage',
-        '.git',
-        '.vscode',
-        '.idea',
-        '.DS_Store',
-        '.yarn',          // yarn cache
+      /* Skip heavyweight or build-generated directories.
+         NOTE: keep .yarn/, but drop its cache sub-folder. */
+      const SKIP_TOP = new Set([
+        'node_modules', '.next', '.turbo',
+        'out', 'dist', '.vercel', 'coverage',
+        '.git', '.vscode', '.idea', '.DS_Store',
         '.pnpm-store'
       ]);
-
-      if (SKIP.has(entry.name)) return undefined;   // short-circuit
+      if (SKIP_TOP.has(entry.name)) return undefined;
+      if (
+        entry.isDirectory() &&
+        path.basename(current) === '.yarn' &&
+        entry.name === 'cache'
+      ) {
+        return undefined;                    // skip .yarn/cache only
+      }
 
       if (entry.isDirectory()) return dirToFileTree(abs, webRoot);   // recurse
 
