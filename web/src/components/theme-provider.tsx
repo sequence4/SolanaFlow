@@ -22,9 +22,11 @@ type ThemeProviderProps = React.ComponentProps<typeof NextThemesProvider>;
  * </ThemeProvider>
  * ```
  */
-export default function ThemeProvider({
+export function ThemeProvider({
   children,
   ...props
 }: ThemeProviderProps) {
   return <NextThemesProvider {...props}>{children}</NextThemesProvider>;
 }
+
+export default ThemeProvider;
