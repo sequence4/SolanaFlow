@@ -254,6 +254,9 @@ export const handleGenerateCode = async ({
         sendProgress({ event: 'ui-complete', message: 'UI streaming finished' });
 
         /* ──────────────────────  Install JS deps inside the container  ────────────────────── */
+
+        const containerRootDir = `/usr/src/${workspace.rootPath}`;   // <── NEW
+
         {
           // STEP 0  ➜ regenerate yarn.lock so the upcoming frozen install never bails
           sendProgress({ stage: 'deps', message: 'Creating/refreshing yarn.lock in container…' });
@@ -262,10 +265,10 @@ export const handleGenerateCode = async ({
             'docker exec',
             // isolate Yarn's cache just like the main install
             '-e', 'YARN_CACHE_FOLDER=/tmp/yarn-cache',
-            '-w', containerWebDir,
+            '-w', containerRootDir,                              // run from repo root
             workspace.containerName,
-            // --lockfile-only writes yarn.lock without touching node_modules
-            'bash -lc "rm -rf \\$YARN_CACHE_FOLDER && mkdir -p \\$YARN_CACHE_FOLDER && yarn install --lockfile-only --network-timeout 600000"'
+            'bash -lc "rm -rf \\$YARN_CACHE_FOLDER && mkdir -p \\$YARN_CACHE_FOLDER && ' +
+              'yarn --cwd web install --lockfile-only --network-timeout 600000"' // ⬅ --cwd web
           ].join(' ');
 
           await runCommand(lockfileCmd, '.', projectId);
@@ -277,9 +280,10 @@ export const handleGenerateCode = async ({
             'docker exec',
             // isolate Yarn's cache so every dApp build starts clean
             '-e', 'YARN_CACHE_FOLDER=/tmp/yarn-cache',
-            '-w', containerWebDir,
+            '-w', containerRootDir,
             workspace.containerName,
-            'bash -lc "mkdir -p \\$YARN_CACHE_FOLDER && yarn install --prefer-offline --network-timeout 600000"'
+            'bash -lc "mkdir -p \\$YARN_CACHE_FOLDER && ' +
+              'yarn --cwd web install --prefer-offline --network-timeout 600000"'
           ].join(' ');
 
           await runCommand(installCmd, '.', projectId);
