@@ -16,7 +16,8 @@ import { randomUUID } from 'crypto';
 import path from "path";
 import { execSync } from 'child_process';
 import { attachFileContents } from "../fileUtils/attachFileContents";
-import fs from 'fs/promises';   // ⇐ promise-based FS API
+import fs from 'fs/promises';            // promise-based FS API
+import fsSync from 'fs';                 // for existsSync in helper
 
 /** Extract all file paths from a file tree recursively. */
 function flattenPaths(tree: any[]): string[] {
@@ -54,6 +55,25 @@ async function dirToFileTree(root: string): Promise<FileTreeItem> {
     type: 'directory',
     children,
   };
+}
+
+/**
+ * Walk up from cwd until we find a sibling `web/` directory.
+ * Guarantees we pass the *real* path, no matter where the server was launched.
+ */
+function findWebDir(): string {
+  let dir = process.cwd();
+  while (true) {
+    const candidate = path.join(dir, 'web');
+    if (fsSync.existsSync(candidate) && fsSync.statSync(candidate).isDirectory()) {
+      return candidate;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) {
+      throw new Error("Cannot locate top-level 'web' directory");
+    }
+    dir = parent;
+  }
 }
 
 /** Block until every task-id is in a final state. */
@@ -186,7 +206,7 @@ export const handleGenerateCode = async ({
         sendProgress({ stage: 'ui-gen', message: 'Streaming existing web/ files…' });
 
         const creatorId = userId;
-        const uiTree = await dirToFileTree(path.join(process.cwd(), 'web'));  // dynamic tree
+        const uiTree = await dirToFileTree(findWebDir());   // dynamic tree
 
         // Tell FE we're starting incremental UI push
         sendProgress({ stage: 'ui-stream', message: 'Streaming UI files…' });
