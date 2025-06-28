@@ -16,20 +16,7 @@ import { randomUUID } from 'crypto';
 import path from "path";
 import { execSync } from 'child_process';
 import { attachFileContents } from "../fileUtils/attachFileContents";
-import {
-  homePage,
-  rootLayout,
-  MINT_FORM_TSX,
-  TOKEN_CREATED_SUCCESS_TSX,
-  WALLET_TSX,
-  THEME_TOGGLE_TSX,
-  UTILS_TS,
-  POSTCSS_CONFIG,
-  NEXT_CONFIG_JS,
-  THEME_PROVIDER_TSX,
-  walletProvider,
-  solMintApp
-} from './uiTemplates';
+import fs from 'fs/promises';   // ⇐ promise-based FS API
 
 /** Extract all file paths from a file tree recursively. */
 function flattenPaths(tree: any[]): string[] {
@@ -39,6 +26,34 @@ function flattenPaths(tree: any[]): string[] {
     if (Array.isArray(n?.children)) out.push(...flattenPaths(n.children));
   }
   return out;
+}
+
+/**
+ * Recursively read every file under ./web and convert it into a FileTreeItem
+ */
+async function dirToFileTree(root: string): Promise<FileTreeItem> {
+  const entries = await fs.readdir(root, { withFileTypes: true });  // standard recursive walk
+  const children: FileTreeItem[] = await Promise.all(
+    entries.map(async entry => {
+      const abs = path.join(root, entry.name);
+      if (entry.isDirectory()) {
+        return await dirToFileTree(abs);            // recurse
+      }
+      const code = await fs.readFile(abs, 'utf8');  // read file content
+      return {
+        name: entry.name,
+        path: `./web/${path.relative('web', abs)}`,
+        type: 'file',
+        code,
+      };
+    }),
+  );
+  return {
+    name: path.basename(root),
+    path: `./web/${path.relative('web', root) || ''}`,
+    type: 'directory',
+    children,
+  };
 }
 
 /** Block until every task-id is in a final state. */
@@ -167,167 +182,11 @@ export const handleGenerateCode = async ({
                     existingFilePaths.has("./web/package.json") ||
                     existingFilePaths.has("web/package.json"));
 
-        /* ─────────────────────  A)  generate and write the UI FIRST  ───────────────────── */
-        sendProgress({ stage: 'ui-gen', message: 'Generating token-minting UI…' });
-        
-        // For streaming, use the userId as creatorId
+        /* ─────────────────────  A)  stream *existing* web/ directory  ───────────────────── */
+        sendProgress({ stage: 'ui-gen', message: 'Streaming existing web/ files…' });
+
         const creatorId = userId;
-        
-        // Define minimal UI tree structure
-        const uiTree = {
-          name: ".",
-          path: "./web",
-          type: "directory" as const,
-          children: [
-            {
-              name: "app",
-              path: "./web/app",
-              type: "directory" as const,
-              children: [
-                { name: "page.tsx", path: "./web/app/page.tsx", type: "file" as const, code: homePage },
-                { name: "layout.tsx", path: "./web/app/layout.tsx", type: "file" as const, code: rootLayout }
-              ]
-            },
-            {
-              name: "src",
-              path: "./web/src",
-              type: "directory" as const,
-              children: [
-                {
-                  name: "components",
-                  path: "./web/src/components",
-                  type: "directory" as const,
-                  children: [
-                    { name: "mint-form.tsx", path: "./web/src/components/mint-form.tsx", type: "file" as const, code: MINT_FORM_TSX },
-                    { name: "token-created-success.tsx", path: "./web/src/components/token-created-success.tsx", type: "file" as const, code: TOKEN_CREATED_SUCCESS_TSX },
-                    { name: "theme-toggle.tsx", path: "./web/src/components/theme-toggle.tsx", type: "file" as const, code: THEME_TOGGLE_TSX },
-                    { name: "wallet.tsx", path: "./web/src/components/wallet.tsx", type: "file" as const, code: WALLET_TSX },
-                    { name: "theme-provider.tsx", path: "./web/src/components/theme-provider.tsx", type: "file" as const, code: THEME_PROVIDER_TSX },
-                    { name: "SolMintApp.tsx", path: "./web/src/components/SolMintApp.tsx", type: "file" as const, code: solMintApp }
-                  ]
-                },
-                {
-                  name: "context",
-                  path: "./web/src/context",
-                  type: "directory" as const,
-                  children: [
-                    { name: "wallet-context-provider.tsx", path: "./web/src/context/wallet-context-provider.tsx", type: "file" as const, code: walletProvider }
-                  ]
-                },
-                {
-                  name: "lib",
-                  path: "./web/src/lib",
-                  type: "directory" as const,
-                  children: [
-                    { name: "utils.ts", path: "./web/src/lib/utils.ts", type: "file" as const, code: UTILS_TS }
-                  ]
-                }
-              ]
-            },
-            {  // --- fixed tsconfig for Next ↔ TS path aliases ---
-              name: "tsconfig.json",
-              path: "./web/tsconfig.json",
-              type: "file" as const,
-              code: `{
-  "compilerOptions": {
-    "module": "esnext",
-    "moduleResolution": "node",
-    "target": "es5",
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "strict": true,
-    "forceConsistentCasingInFileNames": true,
-    "noEmit": true,
-    "esModuleInterop": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "jsx": "preserve",
-    "incremental": true,
-    "plugins": [{ "name": "next" }],
-    "baseUrl": "src",
-    "paths": { "@/*": ["*"] }
-  },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
-}`
-            },
-            { // --- front-end deps so yarn install never misses anything ---
-              name: "package.json",
-              path: "./web/package.json",
-              type: "file" as const,
-              code: `{
-  "name": "solanaflow-web",
-  "version": "0.1.0",
-  "private": true,
-  "engines": { "node": ">=20.18.0" },
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
-  },
-  "dependencies": {
-    "@radix-ui/react-label": "^2.1.7",
-    "@radix-ui/react-popover": "^1.0.7",
-    "@radix-ui/react-slot": "^1.0.2",
-    "@radix-ui/react-tooltip": "^1.2.7",
-    "@reown/appkit": "^1.7.10",
-    "@msgpack/msgpack": "^3.0.0", 
-    "@solana/wallet-adapter-react": "^0.15.35",
-    "@solana/wallet-adapter-react-ui": "^0.9.35",
-    "@solana/wallet-adapter-wallets": "^0.19.26",
-    "@solana/web3.js": "^1.91.1",
-    "class-variance-authority": "^0.7.0",
-    "clsx": "^2.1.0",
-    "lucide-react": "^0.360.0",
-    "next": "14.2.0",
-    "next-themes": "^0.4.6",
-    "pino-pretty": "^10.3.0",
-    "react": "^18",
-    "react-dom": "^18",
-    "sonner": "^1.0.0",
-    "tailwind-merge": "^2.2.1",
-    "tailwind-variants": "^0.2.0",
-    "tailwindcss-animate": "^1.0.7"
-  },
-  "devDependencies": {
-    "@types/node": "^20",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
-    "@tailwindcss/postcss": "^4.1.10",
-    "autoprefixer": "^10.4.19",
-    "eslint": "^8",
-    "eslint-config-next": "14.2.0",
-    "postcss": "^8.4.35",
-    "tailwindcss": "^4.1.10",
-    "typescript": "^5"
-  }
-}`
-            },
-            { name: "postcss.config.js", path: "./web/postcss.config.js", type: "file" as const, code: POSTCSS_CONFIG },
-            {
-              name: "next.config.js",
-              path: "./web/next.config.js",
-              type: "file" as const,
-              code: NEXT_CONFIG_JS
-            },
-            {
-              name: ".yarnrc",
-              path: "./web/.yarnrc",
-              type: "file" as const,
-              code: "prefer-offline false\n"
-            },
-            {
-              name: "idl",
-              path: "./web/idl",
-              type: "directory" as const,
-              children: [
-                { name: "solanaflow_token.json", path: "./web/idl/solanaflow_token.json", type: "file" as const, code: "{}" }
-              ]
-            }
-          ]
-        } as FileTreeItem;
+        const uiTree = await dirToFileTree(path.join(process.cwd(), 'web'));  // dynamic tree
 
         // Tell FE we're starting incremental UI push
         sendProgress({ stage: 'ui-stream', message: 'Streaming UI files…' });
