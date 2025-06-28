@@ -30,28 +30,31 @@ function flattenPaths(tree: any[]): string[] {
 }
 
 /**
- * Recursively read every file under ./web and convert it into a FileTreeItem
+ * Recursively build a FileTreeItem from `webRoot`, always computing
+ * paths **relative to that same root**, no matter how deep we recurse.
  */
-async function dirToFileTree(root: string): Promise<FileTreeItem> {
-  const entries = await fs.readdir(root, { withFileTypes: true });  // standard recursive walk
+async function dirToFileTree(current: string, webRoot: string): Promise<FileTreeItem> {
+  const entries = await fs.readdir(current, { withFileTypes: true });
+
   const children: FileTreeItem[] = await Promise.all(
     entries.map(async entry => {
-      const abs = path.join(root, entry.name);
-      if (entry.isDirectory()) {
-        return await dirToFileTree(abs);            // recurse
-      }
-      const code = await fs.readFile(abs, 'utf8');  // read file content
+      const abs = path.join(current, entry.name);
+      if (entry.isDirectory()) return dirToFileTree(abs, webRoot);   // recurse
+
+      const code = await fs.readFile(abs, 'utf8');
       return {
         name: entry.name,
-        path: `./web/${path.relative('web', abs)}`,
+        path: `./web/${path.relative(webRoot, abs)}`,                // ← correct base
         type: 'file',
         code,
       };
-    }),
+    })
   );
+
+  const relDir = path.relative(webRoot, current);
   return {
-    name: path.basename(root),
-    path: `./web/${path.relative('web', root) || ''}`,
+    name: path.basename(current),
+    path: relDir ? `./web/${relDir}` : './web',                      // root dir path
     type: 'directory',
     children,
   };
@@ -205,8 +208,9 @@ export const handleGenerateCode = async ({
         /* ─────────────────────  A)  stream *existing* web/ directory  ───────────────────── */
         sendProgress({ stage: 'ui-gen', message: 'Streaming existing web/ files…' });
 
-        const creatorId = userId;
-        const uiTree = await dirToFileTree(findWebDir());   // dynamic tree
+        const webRootDir = findWebDir();
+        const creatorId   = userId;
+        const uiTree      = await dirToFileTree(webRootDir, webRootDir);     // dynamic tree
 
         // Tell FE we're starting incremental UI push
         sendProgress({ stage: 'ui-stream', message: 'Streaming UI files…' });
