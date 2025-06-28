@@ -392,7 +392,17 @@ export async function startProjectContainer(
 
     console.log("[startProjectContainer] RUN CMD:\n", runArgs.join(" "));
     timed(runArgs.join(" "), 'docker-run');
-    
+
+    // ─── ensure Yarn 1.x binary is available via Corepack ──────────────────
+    try {
+      timed(
+        `docker exec ${name} bash -lc "corepack enable && corepack prepare yarn@1.22.22 --activate"`,
+        'corepack-prepare'
+      );
+    } catch (e) {
+      console.warn('[startProjectContainer] corepack prepare failed:', e);
+    }
+
     const containerUrl = resolveContainerUrl(String(hostPort));
 
     console.log(
