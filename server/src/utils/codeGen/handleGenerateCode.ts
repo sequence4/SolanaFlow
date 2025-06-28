@@ -403,14 +403,14 @@ export const handleGenerateCode = async ({
 
           sendProgress({ stage: 'deps', message: 'yarn.lock updated; installing deps…' });
 
-          // STEP 1  ➜ existing frozen install (unchanged)
+          // second pass – real install but tolerant to the fresh lock-file
           const installCmd = [
             'docker exec',
             // isolate Yarn's cache so every dApp build starts clean
             '-e', 'YARN_CACHE_FOLDER=/tmp/yarn-cache',
             '-w', containerWebDir,
             workspace.containerName,
-            'bash -lc "mkdir -p \\$YARN_CACHE_FOLDER && yarn install --frozen-lockfile --network-timeout 600000"'
+            'bash -lc "mkdir -p \\$YARN_CACHE_FOLDER && yarn install --prefer-offline --network-timeout 600000"'
           ].join(' ');
 
           await runCommand(installCmd, '.', projectId);
