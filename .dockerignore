@@ -14,7 +14,7 @@ cache-seed/
 
 !web/.force-reinstall
 
-.yarn/*
+.yarn/cache/ 
 !.yarn/releases
 !.yarn/plugins
 !.yarn/patches
