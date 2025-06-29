@@ -1,23 +1,19 @@
-# ── keep build slim ────────────────────────────────
 *.log
 node_modules/
 target/
 cache-seed/
 
-# ── re-include the Next.js app & its public assets ─
-!web/                 # bring the whole web directory back in
+!web/
 !web/**
 
-# keep public folder (and any files it will hold)
 !web/public
-!web/public/**
+!web/public/** 
 
 !web/.force-reinstall
      
-# ---------- Yarn Zero-Install --------------------------------
-.yarn/cache/            # EXCLUDE heavy tar-balls (keep image slim)  <-- this line blocks cache only
-!.yarn                  # RE-include parent so negations below work
-!.yarn/releases/        # keep yarn-1.22.22.cjs wrapper
-!.yarn/plugins/
-!.yarn/patches/
-!.yarn/sdks/
+web/.yarn/cache/     
+!web/.yarn            
+!web/.yarn/releases/     
+!web/.yarn/plugins/
+!web/.yarn/patches/
+!web/.yarn/sdks/
