@@ -13,9 +13,11 @@ cache-seed/
 !web/public/**
 
 !web/.force-reinstall
-
-.yarn/cache/ 
-!.yarn/releases
-!.yarn/plugins
-!.yarn/patches
-!.yarn/sdks
+     
+# ---------- Yarn Zero-Install --------------------------------
+.yarn/cache/            # EXCLUDE heavy tar-balls (keep image slim)  <-- this line blocks cache only
+!.yarn                  # RE-include parent so negations below work
+!.yarn/releases/        # keep yarn-1.22.22.cjs wrapper
+!.yarn/plugins/
+!.yarn/patches/
+!.yarn/sdks/
