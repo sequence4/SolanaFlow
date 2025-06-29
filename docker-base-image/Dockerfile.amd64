@@ -264,7 +264,11 @@ COPY --from=builder /usr/share/solanaflow/web /usr/share/solanaflow/web
 COPY --from=builder /usr/local/nvm/versions/node/${NODE_VERSION} /usr/local/nvm/versions/node/${NODE_VERSION}
 RUN ln -sf /usr/local/nvm/versions/node/${NODE_VERSION}/bin/* /usr/local/bin/
 
-RUN node -v && yarn -v && solana --version && /usr/local/bin/anchor --version && cargo --version
+# ── Corepack → project-local Yarn wrapper no longer needed ─────────────
+RUN corepack enable \
+ && corepack prepare yarn@1.22.22 --activate \
+ && node -v && yarn -v \
+ && solana --version && /usr/local/bin/anchor --version && cargo --version
 
 RUN apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \

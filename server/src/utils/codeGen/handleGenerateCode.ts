@@ -257,6 +257,15 @@ export const handleGenerateCode = async ({
 
         const containerRootDir = `/usr/src/${workspace.rootPath}`;   // <── NEW
 
+        /* ── One-time Yarn bootstrap inside the running container ── */
+        await runCommand(
+          `docker exec ${workspace.containerName} bash -lc ` +
+          "'corepack enable && corepack prepare yarn@1.22.22 --activate && " +
+          "rm -f ${containerRootDir}/web/.yarnrc'",
+          '.',
+          projectId,
+        );
+
         {
           // STEP 0  ➜ regenerate yarn.lock so the upcoming frozen install never bails
           sendProgress({ stage: 'deps', message: 'Creating/refreshing yarn.lock in container…' });
