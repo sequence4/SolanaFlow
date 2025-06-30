@@ -30,6 +30,7 @@ services:
     networks: [web]
     environment:
       APP_ID: "${APP_ID:-demo}"       # exported in CI or your shell
+      APP_BASE_PATH: "/dapp/${APP_ID}"
 
     labels:
       - "traefik.enable=true"

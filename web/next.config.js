@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
-const APP_ID = process.env.APP_ID || 'local';          // ← NEW
+const APP_ID       = process.env.APP_ID       || 'local';
+// Derive the public prefix exactly once.
+const APP_BASE_PATH = process.env.APP_BASE_PATH || `/dapp/${APP_ID}`;
 
 const nextConfig = {
   /* --- mandatory for Docker test -f step --- */
@@ -17,8 +19,8 @@ const nextConfig = {
 
   /* ✨ tell Next.js every route lives under /dapp/<id>/ */
   /** Read at *build-time*  ➜  gets baked into server.js */
-  basePath: process.env.APP_BASE_PATH || "",
-  assetPrefix: process.env.APP_BASE_PATH || "",
+  basePath:   APP_BASE_PATH,
+  assetPrefix: APP_BASE_PATH,
 
   // relax frame restrictions so the SolanaFlow UI can embed it
   async headers() {

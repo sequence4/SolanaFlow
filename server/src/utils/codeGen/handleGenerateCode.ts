@@ -311,7 +311,9 @@ export const handleGenerateCode = async ({
 
         /* 2) start a fresh dev server, detach + pipe logs */
         runCommandDetached(
-          `docker exec -d -w /usr/src/${workspace.rootPath}/web ` +
+          `docker exec -d ` +
+          `-e APP_BASE_PATH=/dapp/$APP_ID ` +
+          `-w /usr/src/${workspace.rootPath}/web ` +
           `${workspace.containerName} bash -lc 'yarn dev 2>&1'`,
           '.',
           `next-dev-${projectId}`,
@@ -364,7 +366,7 @@ EOF'`,
               // force standalone output _inside_ the running container
               `docker exec \
     -e NEXT_PRIVATE_STANDALONE=true \
-    -e APP_BASE_PATH= \
+    -e APP_BASE_PATH=/dapp/$APP_ID \
     -w ${containerWebDir} \
     ${workspace.containerName} npm run build`,
               '.',
