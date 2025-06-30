@@ -260,11 +260,14 @@ export const handleGenerateCode = async ({
         /* ── One-time Yarn bootstrap inside the running container ── */
         await runCommand(
           `docker exec ${workspace.containerName} bash -lc ` +
-          "'corepack enable && " +
-          // 1️⃣ place the Yarn v1 binary exactly where Next.js expects it
-          "corepack prepare yarn@1.22.22 --activate -o ${containerRootDir}/web/.yarn/releases/yarn-1.22.22.cjs && " +
-          // 2️⃣ make sure project-local rc does not override PnP/etc.
-          "rm -f ${containerRootDir}/web/.yarnrc'",
+          "corepack enable && " +
+          // 1️⃣ download/activate Yarn v1 system-wide
+          "corepack prepare yarn@1.22.22 --activate && " +
+          // 2️⃣ vendor that binary where Next.js expects it
+          "mkdir -p ${containerRootDir}/web/.yarn/releases && " +
+          "ln -sf $(command -v yarn) ${containerRootDir}/web/.yarn/releases/yarn-1.22.22.cjs && " +
+          // 3️⃣ ensure no stray .yarnrc that could flip Yarn to PnP
+          "rm -f ${containerRootDir}/web/.yarnrc",
           '.',
           projectId,
         );
