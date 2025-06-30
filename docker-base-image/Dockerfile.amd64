@@ -270,6 +270,9 @@ RUN ln -sf /usr/local/nvm/versions/node/${NODE_VERSION}/bin/* /usr/local/bin/
 # ── Corepack → project-local Yarn wrapper no longer needed ─────────────
 RUN corepack enable \
  && corepack prepare yarn@1.22.22 --activate \
+ && mkdir -p /usr/share/solanaflow/web/.yarn/releases \
+ && ln -sf "$(command -v yarn)" \
+          /usr/share/solanaflow/web/.yarn/releases/yarn-1.22.22.cjs \
  && node -v && yarn -v \
  && solana --version && /usr/local/bin/anchor --version && cargo --version
 
