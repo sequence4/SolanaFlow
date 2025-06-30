@@ -35,16 +35,16 @@ services:
       - "traefik.enable=true"
 
       # Router: match everything under /dapp/<id>/ …
-      - "traefik.http.routers.dapp-$${APP_ID}.rule=PathPrefix(`/dapp/$${APP_ID}`)"
-      - "traefik.http.routers.dapp-$${APP_ID}.entrypoints=web,websecure"
+      - "traefik.http.routers.dapp-${APP_ID}.rule=PathPrefix(`/dapp/${APP_ID}`)"
+      - "traefik.http.routers.dapp-${APP_ID}.entrypoints=web,websecure"
 
       # Middleware: strip the prefix before proxying
-      - "traefik.http.routers.dapp-$${APP_ID}.middlewares=strip-$${APP_ID}"
-      - "traefik.http.middlewares.strip-$${APP_ID}.stripprefix.prefixes=/dapp/$${APP_ID}"
+      - "traefik.http.routers.dapp-${APP_ID}.middlewares=strip-${APP_ID}"
+      - "traefik.http.middlewares.strip-${APP_ID}.stripprefix.prefixes=/dapp/${APP_ID}"
 
       # Service: forward to port 3000 in the container
-      - "traefik.http.routers.dapp-$${APP_ID}.service=dapp-$${APP_ID}"
-      - "traefik.http.services.dapp-$${APP_ID}.loadbalancer.server.port=3000"
+      - "traefik.http.routers.dapp-${APP_ID}.service=dapp-${APP_ID}"
+      - "traefik.http.services.dapp-${APP_ID}.loadbalancer.server.port=3000"
 
 networks:
   web:
