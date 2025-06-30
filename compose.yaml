@@ -43,7 +43,7 @@ services:
       - "traefik.http.middlewares.strip-${APP_ID}.stripprefix.prefixes=/dapp/${APP_ID}"
 
       # Service: forward to port 3000 in the container
-      - "traefik.http.routers.dapp-${APP_ID}.service=dapp-${APP_ID}"
+      - "traefik.http.routers.dapp-${APP_ID}.service=dapp"
       - "traefik.http.services.dapp-${APP_ID}.loadbalancer.server.port=3000"
 
 networks:
