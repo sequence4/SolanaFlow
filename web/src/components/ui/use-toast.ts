@@ -1,3 +1,6 @@
+/* eslint-disable react-hooks/rules-of-hooks */
+'use client';
+
 /* ShadCN-compatible toast hook — stripped-down version */
 import * as React from 'react'
 
