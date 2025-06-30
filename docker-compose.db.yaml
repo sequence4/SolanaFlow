@@ -1,0 +1,15 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB:     solanaflow_pg
+      POSTGRES_USER:   postgres
+      POSTGRES_PASSWORD: JNQ3hpz8yet-ubk-nja
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+volumes:
+  dbdata:
