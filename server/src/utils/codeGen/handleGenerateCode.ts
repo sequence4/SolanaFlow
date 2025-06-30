@@ -259,8 +259,9 @@ export const handleGenerateCode = async ({
 
         /* ── One-time Yarn bootstrap inside the running container ── */
         await runCommand(
-          `docker exec ${workspace.containerName} bash -lc ` +
-          "rm -f ${containerRootDir}/web/.yarnrc",    // ensure no stray .yarnrc that could flip Yarn to PnP
+          // run *inside* the container -- single-quoted so the whole command is
+          // evaluated by bash there, and `${containerRootDir}` expands correctly
+          `docker exec ${workspace.containerName} bash -lc 'rm -f ${containerRootDir}/web/.yarnrc'`,
           '.',
           projectId,
         );
