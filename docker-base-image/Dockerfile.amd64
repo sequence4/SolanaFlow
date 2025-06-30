@@ -234,8 +234,11 @@ COPY web/ /usr/share/solanaflow/web
 
 ###############################################################################
 # 4.  Runtime – slim image with CLI + built app
+# NOTE: Hard-pin to amd64 so the base layer always matches the Node binary
+# copied in from the builder stage, regardless of the host that triggers
+# the build. This prevents "exec format error" at container start-up.
 ###############################################################################
-FROM --platform=$BUILDPLATFORM ubuntu:22.04 AS runtime
+FROM --platform=linux/amd64 ubuntu:22.04 AS runtime
 ARG NODE_VERSION=v20.18.0
 ARG APP_ID=local
 ENV RUSTUP_HOME=/usr/local/rustup

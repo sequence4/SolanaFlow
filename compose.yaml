@@ -19,8 +19,14 @@ services:
     networks: [web]
 
   dapp:
-    image: ghcr.io/sequence4/solana-toolchain:runtime-latest
-    platform: linux/arm64
+    # Build or pull the x86-64 image and ensure Compose runs it on amd64.
+    image: ghcr.io/sequence4/solana-toolchain:runtime-latest-amd64
+    platform: linux/amd64
+    # If you also build locally, add a build block pinned to amd64:
+    # build:
+    #   context: .
+    #   dockerfile: docker-base-image/Dockerfile.amd64
+    #   platform: linux/amd64
     networks: [web]
     environment:
       APP_ID: "${APP_ID:-demo}"       # exported in CI or your shell
