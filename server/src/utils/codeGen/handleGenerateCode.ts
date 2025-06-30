@@ -296,6 +296,14 @@ export const handleGenerateCode = async ({
           ].join(' ');
 
           await runCommand(installCmd, '.', projectId);
+
+          /* ensure shadcn preset is always available */
+          await runCommand(
+            `docker exec ${workspace.containerName} bash -lc "cd ${containerRootDir}/web && npx shadcn-ui@latest init --yes"`,
+            '.',
+            projectId
+          );
+
           sendProgress({ stage: 'deps', message: 'JS dependencies installed' });
         }
 

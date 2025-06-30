@@ -115,4 +115,14 @@
 
 .animate-fade-in {
   animation: fadeInUp 0.3s ease-out;
+}
+
+/* ↓ add design-tokens shadcn utilities rely on */
+:root{
+  --border:214 32% 91%;
+  --ring:215 20% 65%;
+}
+.dark{
+  --border:214 32% 27%;
+  --ring:215 20% 35%;
 } 
