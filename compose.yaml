@@ -1,7 +1,7 @@
 services:
   traefik:
     image: traefik:v3.4
-    platform: linux/arm64          # remove after publishing an amd64 tag
+    platform: linux/amd64          # remove after publishing an amd64 tag
     command:
       - "--core.defaultRuleSyntax=v2"
       - "--api.insecure=true"      # ⚠ disable in production
@@ -20,7 +20,7 @@ services:
 
   dapp:
     # Build or pull the x86-64 image and ensure Compose runs it on amd64.
-    image: traefik:v3.4
+    image: ghcr.io/sequence4/solana-toolchain:runtime-latest-amd64
     platform: linux/amd64
     # If you also build locally, add a build block pinned to amd64:
     # build:
