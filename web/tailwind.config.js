@@ -8,13 +8,12 @@
 */
 
 const { fontFamily } = require("tailwindcss/defaultTheme");
-const shadcnPreset   = require("@shadcn/ui/preset");   // ⬅ load native preset
+const { createPreset } = require("tailwindcss-shadcn-ui"); // ⬅ official preset
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  /* shadcn/ui supplies its own base tokens & utilities (e.g. `border-border`).
-     Loading the preset means we no longer need to hand-maintain the colour map. */
-  presets: [shadcnPreset],
+  /* shadcn preset exposes the colour tokens & utilities (`border-border`, …) */
+  presets: [createPreset()],
   darkMode: ["class", "class"],
   content: [
     "./app/**/*.{js,ts,jsx,tsx}",
