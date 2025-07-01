@@ -8,7 +8,7 @@
 */
 
 const { fontFamily } = require("tailwindcss/defaultTheme");
-const { createPreset } = require("tailwindcss-shadcn-ui/preset"); // ⬅ official preset
+const { createPreset } = require("tailwindcss-shadcn-ui"); // ⬅ official preset
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
@@ -90,8 +90,8 @@ module.exports = {
   },
   /* shadcn-ui plugin must be loaded via its explicit helper */
   plugins: [
-    require("tailwindcss-animate"),
-    require("tailwindcss-shadcn-ui/plugin")
+    //require("tailwindcss-animate"),
+    //require("tailwindcss-shadcn-ui/plugin")
   ],
   safelist: [
     "scale-[1.02]", "blur-3xl",
