@@ -305,12 +305,12 @@ export const handleGenerateCode = async ({
 
           await runCommand(installCmd, '.', projectId);
 
-          /* ensure shadcn preset is always available */
-          await runCommand(
-            `docker exec ${workspace.containerName} bash -lc "cd ${containerRootDir}/web && npx shadcn-ui@latest init --yes"`,
-            '.',
-            projectId
-          );
+          /* shadcn-ui CLI init REMOVED
+             Reason: `npx shadcn-ui init` overwrites tailwind.config.js and
+             globals.css every run, re-introducing the
+             `tailwindcss-shadcn-ui/preset` import that crashes Tailwind
+             (see GitHub issues #878, #2030, #1086). The preset is already
+             provided via package.json, so nothing else is required. */
 
           sendProgress({ stage: 'deps', message: 'JS dependencies installed' });
         }
