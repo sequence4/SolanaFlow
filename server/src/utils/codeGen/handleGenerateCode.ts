@@ -214,8 +214,16 @@ export const handleGenerateCode = async ({
         const existingFilePaths = new Set<string>(flattenPaths(initialTree));
         
         // --- force-overwrite critical config files (handles "./" prefix) ----
-        for (const f of ["web/package.json", "./web/package.json",
-                         "web/tsconfig.json", "./web/tsconfig.json"]) {
+        for (const f of [
+          "web/package.json",               "./web/package.json",
+          "web/tsconfig.json",              "./web/tsconfig.json",
+          // always refresh Tailwind + toast hooks so local fixes reach the container
+          "web/tailwind.config.js",         "./web/tailwind.config.js",
+          "web/src/components/ui/use-toast.ts",
+          "./web/src/components/ui/use-toast.ts",
+          "web/src/components/ui/toaster.tsx",
+          "./web/src/components/ui/toaster.tsx",
+        ]) {
           existingFilePaths.delete(f);
         }
         
