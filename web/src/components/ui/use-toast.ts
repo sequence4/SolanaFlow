@@ -1,8 +1,6 @@
-'use client';
 /* eslint-disable react-hooks/exhaustive-deps */
-
-/* ShadCN-compatible toast hook — stripped-down version */
-import * as React from 'react'
+"use client";
+import * as React from "react";
 
 type ToastEntry = {
   id: string
@@ -27,4 +25,4 @@ export function useToast() {
 }
 
 /* Re-export ShadCN provider/view if you need it elsewhere */
-export { ToastProvider, ToastViewport } from '@radix-ui/react-toast' 
+export { ToastProvider, ToastViewport } from "@radix-ui/react-toast" 

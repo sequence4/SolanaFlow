@@ -317,17 +317,9 @@ export const handleGenerateCode = async ({
           projectId,
         );
 
-        /* 2) start a fresh dev server, detach + pipe logs */
-        runCommandDetached(
-          `docker exec -d ` +
-          `-e APP_BASE_PATH=/dapp/$APP_ID ` +
-          `-w /usr/src/${workspace.rootPath}/web ` +
-          `${workspace.containerName} bash -lc 'yarn dev 2>&1'`,
-          '.',
-          `next-dev-${projectId}`,
-        ).catch(console.error);
-
-        sendProgress({ stage: 'deps', message: 'Dev server restarted' });
+        /* 2) ⭐ NEW: rely on the container CMD to launch Next.js once.
+               Duplicate dev-servers caused EADDRINUSE on port 3000. */
+        sendProgress({ stage: 'deps', message: 'Dev server will start via CMD' });
 
         /* ──────────────────────────────────────────────────────────────────────── */
 

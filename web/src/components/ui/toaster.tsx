@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-'use client';
+"use client";        /* ensure the file stays a client component */
 
 import { useToast } from '@/components/ui/use-toast'
 import {

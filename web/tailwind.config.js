@@ -8,7 +8,7 @@
 */
 
 const { fontFamily } = require("tailwindcss/defaultTheme");
-const { createPreset } = require("tailwindcss-shadcn-ui"); // ⬅ official preset
+const { createPreset } = require("tailwindcss-shadcn-ui/preset"); // ⬅ official preset
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
@@ -30,6 +30,37 @@ module.exports = {
   		}
   	},
   	extend: {
+      /* --- shadcn design-tokens so utilities like border-border work --- */
+      colors: {
+        border:       "hsl(var(--border))",
+        input:        "hsl(var(--input))",
+        ring:         "hsl(var(--ring))",
+        background:   "hsl(var(--background))",
+        foreground:   "hsl(var(--foreground))",
+        primary: {
+          DEFAULT:    "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        secondary: {
+          DEFAULT:    "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        muted: {
+          DEFAULT:    "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT:    "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        destructive: {
+          DEFAULT:    "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+      },
   		fontFamily: {
   			sans: ["var(--font-sans)", ...fontFamily.sans]
   		},
@@ -57,7 +88,11 @@ module.exports = {
   		}
   	}
   },
-  plugins: [require("tailwindcss-animate"), require("tailwindcss-shadcn-ui")],
+  /* shadcn-ui plugin must be loaded via its explicit helper */
+  plugins: [
+    require("tailwindcss-animate"),
+    require("tailwindcss-shadcn-ui/plugin")
+  ],
   safelist: [
     "scale-[1.02]", "blur-3xl",
     "bg-gradient-to-r", "from-blue-500", "to-purple-500",
