@@ -8,7 +8,7 @@
 */
 
 const { fontFamily } = require("tailwindcss/defaultTheme");
-const { createPreset } = require("tailwindcss-shadcn-ui/preset"); // ⬅ official preset
+const { createPreset } = require("tailwindcss-shadcn-ui"); // ⬅ official preset
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
