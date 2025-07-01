@@ -1,5 +1,5 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 'use client';
+/* eslint-disable react-hooks/exhaustive-deps */
 
 /* ShadCN-compatible toast hook — stripped-down version */
 import * as React from 'react'
