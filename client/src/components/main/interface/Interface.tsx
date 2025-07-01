@@ -95,7 +95,7 @@ const Interface = () => {
     }, [isLocalDev, projectId, containerUrl]);
 
     return (
-      <div className="relative w-full h-full">
+      <div className="flex flex-col w-full h-full">
         {/* ───── top toolbar – always visible ───── */}
         <div className="flex items-center justify-between p-2 bg-[#0F1119] border-b border-[#1F2937]">
           <div className="flex items-center space-x-2">
@@ -155,12 +155,14 @@ const Interface = () => {
         </div>
 
         {/* ───── main panel ───── */}
-        <div className="flex-1 w-full">
+        {/* flex-child grows to fill the rest of the column */}
+        <div className="flex-1 w-full h-full">
           {activeUrl ? (
             <iframe
-              key={activeUrl} // force reload on change
+              key={activeUrl}
               src={activeUrl}
-              style={{ width: "100%", height: "100%", border: "none" }}
+              className="w-full h-full"
+              style={{ border: "none" }}
               allow="clipboard-read; clipboard-write"
               sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
               title="Ephemeral Container"
