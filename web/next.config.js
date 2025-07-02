@@ -1,13 +1,11 @@
 /** @type {import('next').NextConfig} */
 const APP_ID       = process.env.APP_ID       || 'local';
-// Derive the public prefix exactly once.
-const APP_BASE_PATH = process.env.APP_BASE_PATH || `/dapp/${APP_ID}`;
+// Derive the public prefix exactly once from the current APP_ID
+const APP_BASE_PATH = `/dapp/${APP_ID}`;
 
 const nextConfig = {
-  /* --- mandatory for Docker test -f step --- */
   output: 'standalone',
 
-  /* --- wallet adapter must be transpiled --- */
   transpilePackages: [
     '@solana/wallet-adapter-base',
     '@solana/wallet-adapter-react',
@@ -17,12 +15,9 @@ const nextConfig = {
     '@solana/wallet-adapter-solflare',
   ],
 
-  /* ✨ tell Next.js every route lives under /dapp/<id>/ */
-  /** Read at *build-time*  ➜  gets baked into server.js */
   basePath:   APP_BASE_PATH,
   assetPrefix: APP_BASE_PATH,
 
-  // relax frame restrictions so the SolanaFlow UI can embed it
   async headers() {
     return [
       {
