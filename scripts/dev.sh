@@ -14,7 +14,7 @@ export APP_BASE_PATH="/dapp/${APP_ID}"
 export FORCE_REMOTE_DOCKER=0
 
 # ─── Docker stack ───────────────────────────────────
-unset DOCKER_HOST                          # always talk to local daemon
+unset DOCKER_HOST DOCKER_TLS_VERIFY DOCKER_CERT_PATH DOCKER_CLI_EXPERIMENTAL
 
 docker compose              \
   -f compose.yaml           \
