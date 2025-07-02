@@ -1,18 +1,24 @@
-# scripts/run_local_migrations.sh
 #!/usr/bin/env bash
 set -euo pipefail
 
-DB_URL=${DATABASE_URL:-"postgres://postgres:JNQ3hpz8yet-ubk-nja@localhost:5432/solanaflow_pg"}
+# --- SETTINGS ---------------------------------------------------------------
+COMPOSE_FILE="docker-compose.db.yaml"   # compose file to target
+SERVICE="db"                            # service name inside the YAML
+DB="solanaflow_pg"                      # database name
+USER="postgres"                         # DB superuser
 
 FILES=(
   "migration/schema.sql"
   "migrations/20240614_add_container_name.sql"
   "db/migrations/20250615_add_task_type.sql"
 )
+# ---------------------------------------------------------------------------
 
 for f in "${FILES[@]}"; do
   echo "🔹  Running ${f}"
-  psql "$DB_URL" -v ON_ERROR_STOP=1 -f "$f"
+  # stream the file over STDIN; -f - tells psql to read from STDIN
+  docker compose -f "$COMPOSE_FILE" exec -T "$SERVICE" \
+    psql -U "$USER" -d "$DB" -v ON_ERROR_STOP=1 -f - < "$f"
 done
 
 echo "✅  All migrations applied"
