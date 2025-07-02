@@ -11,6 +11,7 @@ out/
 *.tsbuildinfo
 nohup.out
 
+.env
 .env* 
 !.env.example 
 !landing/.env.test 

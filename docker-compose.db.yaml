@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_DB:     solanaflow_pg
       POSTGRES_USER:   postgres
-      POSTGRES_PASSWORD: JNQ3hpz8yet-ubk-nja
+      POSTGRES_PASSWORD: ${PG_PASSWORD:?err}
     volumes:
       - dbdata:/var/lib/postgresql/data
 volumes:
