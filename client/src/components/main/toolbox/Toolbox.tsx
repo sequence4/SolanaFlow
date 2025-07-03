@@ -47,6 +47,9 @@ const WALLET_TOAST_ID = 'wallet-not-connected';
 /** Memo-friendly helpers */
 const NEED_BUILD_TOAST_ID = 'need-build';   // prevents duplicates
 
+// Flag indicating development server mode (only true in SF_DEV_SERVER=1)
+const IS_DEV_SERVER = process.env.NEXT_PUBLIC_SF_DEV_SERVER === '1';
+
 
 
 export const Toolbox = () => {
@@ -62,6 +65,8 @@ export const Toolbox = () => {
     const inputRef = useRef<HTMLInputElement>(null);
     const nodeItemsRef = useRef<any>(null);
     const esRef = useRef<ReturnType<typeof deployPipeline> | null>(null);
+    const containerURLRef = useRef<string | null>(null);
+    const pollingCancelledRef = useRef<boolean>(false);
     const [artifactUrl, setArtifactUrl] = useState<string | null>(null);
     const taskLogs = useTaskLogs();
     
@@ -168,7 +173,41 @@ export const Toolbox = () => {
               setActiveTab('code');
             }
             
-            if (msg.stage === "build" && msg.status === "completed") {
+            if (msg.containerUrl) {
+              console.log(`[BUILD] Received container URL: ${msg.containerUrl}`);
+              containerURLRef.current = msg.containerUrl;
+              setProjectContext(prev => ({ ...prev, containerUrl: msg.containerUrl }));
+            }
+            
+            if (IS_DEV_SERVER && (msg.stage === "ui-complete" || msg.event === "ui-complete")) {
+              // Only auto-open Interface tab in dev mode when UI build is complete
+              pollingCancelledRef.current = false;
+              const containerUrl = containerURLRef.current;
+              if (containerUrl) {
+                const checkReady = (attempt: number = 1) => {
+                  const controller = new AbortController();
+                  const timeoutId = setTimeout(() => controller.abort(), 2000);
+                  fetch(containerUrl, { method: 'GET', mode: 'no-cors', signal: controller.signal }).then(() => {
+                    clearTimeout(timeoutId);
+                    console.log('[BUILD] dApp interface is now reachable (HTTP 200)');
+                    setActiveTab('interface');
+                  }).catch(() => {
+                    clearTimeout(timeoutId);
+                    if (attempt < 60 && !pollingCancelledRef.current) {
+                      setTimeout(() => checkReady(attempt + 1), 1000);
+                    } else {
+                      console.warn('[BUILD] Interface not reachable after 60 attempts');
+                    }
+                  });
+                };
+                checkReady();
+              } else {
+                console.warn('[BUILD] No container URL available to poll interface readiness');
+              }
+            }
+            
+            if (msg.stage === "done" || msg.stage === "build-done") {
+              pollingCancelledRef.current = true;
               setIsBuilding(false);
               esRef.current?.close();
               eventBus.emit("build-complete");
