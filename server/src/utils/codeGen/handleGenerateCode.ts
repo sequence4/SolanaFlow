@@ -145,6 +145,8 @@ export const handleGenerateCode = async ({
   sendProgress,
   userId,
 }: Args): Promise<{ sentinelId: string }> => {   
+    /* Dev-mode flag set by dev.sh or CI: container already runs `next dev` */
+    const isDevServer = process.env.SF_DEV_SERVER === '1';
     console.log('[GEN] projectId   =', projectId);
     console.log('[GEN] userId      =', userId);
     console.log('[GEN] workspace   =', workspace);
@@ -318,31 +320,34 @@ export const handleGenerateCode = async ({
         // ─── Restart Next.js dev server so it picks up next-themes, toast, etc.
         sendProgress({ stage: 'deps', message: 'Restarting Next.js server…' });
 
-        /* 1) stop any previous dev instance — ignore "not found" exit */
+        /* 1️⃣  Kill ONLY the stand-alone server; keep `next dev` alive.      */
         await runCommand(
-          `docker exec ${workspace.containerName} pkill -f 'next dev' || true`,
+          `docker exec ${workspace.containerName} pkill -f '.next/standalone/server.js' || true`,
           '.',
           projectId,
         );
 
-        /* 2) ⭐ NEW: rely on the container CMD to launch Next.js once.
-               Duplicate dev-servers caused EADDRINUSE on port 3000. */
-        sendProgress({ stage: 'deps', message: 'Dev server will start via CMD' });
+        /* 2️⃣  If we are *not* in dev mode, container CMD will start server.js
+                once the build finishes.  When in dev mode no restart needed. */
+        sendProgress({
+          stage: 'deps',
+          message: isDevServer
+            ? 'Dev server detected – no restart needed'
+            : 'Dev server will start via CMD'
+        });
 
         /* ──────────────────────────────────────────────────────────────────────── */
 
-        /* Always rebuild so that every freshly-generated page (e.g.
-           web/app/page.tsx) is bundled into the standalone server, even
-           when SF_DEV_SERVER=1.  Skipping the build causes 404s because
-           the new routes are absent from .next/standalone. */
-        sendProgress({
-          stage: 'next-build',
-          message: 'Running Next.js build to process Tailwind CSS…'
-        });
-        try {
-          // Force-write the tsconfig.json file to ensure it has the correct configuration
-          await runCommand(
-            `docker exec ${workspace.containerName} bash -lc 'cat > ${containerWebDir}/tsconfig.json <<EOF
+        /* ────────────────── 3️⃣  Build *only* in standalone mode ──────────── */
+        if (!isDevServer) {
+          sendProgress({
+            stage: 'next-build',
+            message: 'Running Next.js build to process Tailwind CSS…'
+          });
+          try {
+            // Force-write the tsconfig.json file to ensure it has the correct configuration
+            await runCommand(
+              `docker exec ${workspace.containerName} bash -lc 'cat > ${containerWebDir}/tsconfig.json <<EOF
 {
   "compilerOptions": {
     "module": "esnext",
@@ -367,32 +372,33 @@ export const handleGenerateCode = async ({
   "exclude": ["node_modules"]
 }
 EOF'`,
-            '.', 
-            projectId
-          );
-          
-          await runCommand(
-            // force standalone output _inside_ the running container
-            `docker exec \
--e NEXT_PRIVATE_STANDALONE=true \
--e APP_BASE_PATH=/dapp/$APP_ID \
--w ${containerWebDir} \
-${workspace.containerName} npm run build`,
-            '.',
-            projectId
-          );
-          sendProgress({
-            stage: 'next-build-done',
-            message: 'Next.js build completed'
-          });
-        } catch (error) {
-          console.error('Error during Next.js build:', error);
-          sendProgress({
-            stage: 'next-build-failed',
-            message: 'Next.js build failed'
-          });
-        }
-        /* ── unconditional rebuild finished ── */
+              '.', 
+              projectId
+            );
+            
+            await runCommand(
+              // force standalone output _inside_ the running container
+              `docker exec \
+ -e NEXT_PRIVATE_STANDALONE=true \
+ -e APP_BASE_PATH=/dapp/$APP_ID \
+ -w ${containerWebDir} \
+ ${workspace.containerName} npm run build`,
+              '.',
+              projectId
+            );
+            sendProgress({
+              stage: 'next-build-done',
+              message: 'Next.js build completed'
+            });
+          } catch (error) {
+            console.error('Error during Next.js build:', error);
+            sendProgress({
+              stage: 'next-build-failed',
+              message: 'Next.js build failed'
+            });
+          }
+        } // ← closes "if (!isDevServer)"
+        /* ── dev-mode skip: build/restart not required ── */
 
         /* runtime server already started by docker run → nothing to do */
 
