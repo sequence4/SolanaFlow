@@ -4,12 +4,15 @@ import '@/styles/interface/interfaceStyle.css';
 import ProjectContext from "@/context/project/ProjectContext";
 import { projectApi } from '@/api/projectApi';
 import { Loader2, RefreshCw, ExternalLink } from "lucide-react";
+import UxContext from "@/context/ux/UxContext";
 
 const Interface = () => {
     const { projectContext, setProjectContext } = useContext(ProjectContext);
+    const { activeTab } = useContext(UxContext);
     const { id: projectId, containerUrl } = projectContext;
     
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [iframeKey, setIframeKey]   = useState(0);    // forces remount
     // manual override typed by the user
     const [manualUrl, setManualUrl] = useState<string>("");
 
@@ -30,13 +33,15 @@ const Interface = () => {
             const { containerUrl: updatedContainerUrl } = await projectApi.fetchContainerUrl(projectId);
             
             if (updatedContainerUrl) {
-                const updatedContext = {
-                    ...projectContext,
-                    containerUrl: updatedContainerUrl
-                };
-                
-                setProjectContext(updatedContext);
-                console.log(`Container URL refreshed: ${updatedContainerUrl}`);
+                if (updatedContainerUrl !== projectContext.containerUrl) {
+                    // new URL → update context ⟶ iframe reloads automatically
+                    setProjectContext({ ...projectContext, containerUrl: updatedContainerUrl });
+                    console.log(`Container URL refreshed: ${updatedContainerUrl}`);
+                } else {
+                    // same URL → force iframe reload
+                    setIframeKey(prev => prev + 1);
+                    console.log("Container URL unchanged – iframe reloading");
+                }
             } else {
                 console.warn("No containerUrl found after refresh attempt");
             }
@@ -57,7 +62,7 @@ const Interface = () => {
 
     /* ───────── periodic health-check ───────── */
     useEffect(() => {
-        if (!projectId) return;
+        if (!projectId || activeTab !== "interface") return;
 
         const id = setInterval(async () => {
             try {
@@ -72,7 +77,7 @@ const Interface = () => {
         }, 30_000);            // every 30 s
 
         return () => clearInterval(id);
-    }, [projectId, containerUrl, projectContext, setProjectContext]);
+    }, [projectId, containerUrl, projectContext, setProjectContext, activeTab]);
 
     // Reset any manual override when the backend pushes a fresh containerUrl
     useEffect(() => { setManualUrl(""); }, [containerUrl]);
@@ -159,7 +164,7 @@ const Interface = () => {
         <div className="flex-1 w-full h-full">
           {activeUrl ? (
             <iframe
-              key={activeUrl}
+              key={`${iframeKey}-${activeUrl}`}
               src={activeUrl}
               className="w-full h-full"
               style={{ border: "none" }}
