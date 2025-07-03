@@ -16,10 +16,8 @@ module.exports = {
   presets: [createPreset()],
   darkMode: ["class", "class"],
   content: [
-    "./app/**/*.{js,ts,jsx,tsx}",
-    "./pages/**/*.{js,ts,jsx,tsx}",
-    "./components/**/*.{js,ts,jsx,tsx}",
-    "./src/**/*.{js,ts,jsx,tsx}",
+    "./app/**/*.{ts,tsx}",
+    "./src/components/**/*.{ts,tsx}",
   ],
   theme: {
   	container: {
@@ -90,8 +88,7 @@ module.exports = {
   },
   /* shadcn-ui plugin must be loaded via its explicit helper */
   plugins: [
-    //require("tailwindcss-animate"),
-    //require("tailwindcss-shadcn-ui/plugin")
+    require("tailwindcss-animate")
   ],
   safelist: [
     "scale-[1.02]", "blur-3xl",

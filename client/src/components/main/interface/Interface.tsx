@@ -103,7 +103,7 @@ const Interface = () => {
       <div className="flex flex-col w-full h-full">
         {/* ───── top toolbar – always visible ───── */}
         <div className="flex items-center justify-between p-2 bg-[#0F1119] border-b border-[#1F2937]">
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 flex-1">
             {/* status dot – green when we have a URL, red otherwise  */}
             <div
               className={`h-3 w-3 rounded-full ${
@@ -111,7 +111,7 @@ const Interface = () => {
               }`}
             />
             {/* editable address bar */}
-            <div className="relative">
+            <div className="relative flex-1 mr-4">
               {/* small "pencil" overlay – just a visual cue */}
               <svg
                 viewBox="0 0 24 24"
@@ -127,7 +127,7 @@ const Interface = () => {
                 value={activeUrl}
                 onChange={(e) => setManualUrl(e.target.value.trim())}
                 placeholder="Paste or type a URL…"
-                className="bg-transparent pl-1 pr-6 w-72 truncate font-mono text-sm text-gray-300 focus:outline-none border-b border-transparent focus:border-gray-500"
+                className="bg-transparent pl-1 pr-6 w-full truncate font-mono text-sm text-gray-300 focus:outline-none border-b border-transparent focus:border-gray-500"
               />
             </div>
           </div>

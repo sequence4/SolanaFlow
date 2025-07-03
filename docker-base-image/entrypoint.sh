@@ -1,3 +1,4 @@
 #!/bin/bash
-rm -rf /usr/share/solanaflow/web/.next   # always start clean
+# keep the incremental cache – Turbo/SWC will invalidate stale chunks
+# (wipe manually only when you hit a corrupted build)
 exec "$@" 

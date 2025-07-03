@@ -268,6 +268,7 @@ export async function startProjectContainer(
   const vTargetBuild = 'solanaflow-cargo-target';
   const vSccache     = 'solanaflow-sccache';
   const vYarnCache   = 'solanaflow-yarn-cache';      // NEW – keeps registry tarballs
+  const vNextCache   = 'solanaflow-next-cache';
 
   try {
     process.env.DOCKER_CLI_DEBUG = process.env.DOCKER_CLI_DEBUG ?? '1'; // show HTTP calls
@@ -339,6 +340,7 @@ export async function startProjectContainer(
       '-v', `${vSccache}:/opt/sccache`,
       '-v', `${vTargetBuild}:/usr/src/target`,
       '-v', `${vYarnCache}:/usr/local/share/.cache/yarn/v6`,
+      '-v', `${vNextCache}:/usr/src/${rootPath}/web/.next`,
       // Mount host project directory into the container at the correct path
       '-v', `${hostProjectDir}:/usr/src/${rootPath}`,
       '-e', 'CARGO_TARGET_DIR=/usr/src/target',
@@ -374,6 +376,7 @@ export async function startProjectContainer(
         `"if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
         `cp -R /usr/share/solanaflow/web/* /usr/src/${rootPath}/web/; fi; ` +
         `cd /usr/src/${rootPath}/web && ` +
+        `export NEXT_DISABLE_REACT_REFRESH=\${NEXT_DISABLE_REACT_REFRESH:-0}; ` +
         `npx next dev -H 0.0.0.0 -p ${INTERNAL_PORT} & ` +
         `pid=$!; trap 'kill $pid' TERM INT; wait $pid"`
       );
