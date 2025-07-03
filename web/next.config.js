@@ -26,8 +26,7 @@ const nextConfig = {
           { key: 'X-Frame-Options', value: 'ALLOWALL' },
           {
             key: 'Content-Security-Policy',
-            value:
-              "frame-ancestors *; default-src * 'unsafe-inline' blob: data:;",
+            value: `frame-ancestors *; default-src * 'unsafe-inline'${process.env.NODE_ENV === 'production' ? '' : " 'unsafe-eval'"} blob: data:;`,
           },
         ],
       },
