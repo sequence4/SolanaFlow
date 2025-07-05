@@ -313,8 +313,14 @@ set -euo pipefail
 
 cd /usr/src/${rootPath}
 
+## --- Solana-specific Rust tool-chain --------------------------------
+export RUSTUP_TOOLCHAIN=solana
+rustup target add sbf-solana-solana --toolchain "$RUSTUP_TOOLCHAIN"
+rustup component add llvm-tools-preview --toolchain "$RUSTUP_TOOLCHAIN"
+command -v rust-lld >/dev/null || { echo "rust-lld missing"; exit 13; }
+
 echo "===== Running anchor build ====="
-export RUSTFLAGS="-Ccodegen-units=1 -Clinker-plugin-lto -Clto=thin -Cpanic=abort -Copt-level=z"
+# Leave RUSTFLAGS to Anchor – it injects the right settings for SBF v2
 anchor build -- --jobs 1
 
 # ── determine the correct target directory and find the first .so file ──
