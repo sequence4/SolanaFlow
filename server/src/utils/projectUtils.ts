@@ -314,10 +314,7 @@ set -euo pipefail
 cd /usr/src/${rootPath}
 
 ## --- Solana-specific Rust tool-chain --------------------------------
-export RUSTUP_TOOLCHAIN=solana
-rustup target add sbf-solana-solana --toolchain "$RUSTUP_TOOLCHAIN"
-rustup component add llvm-tools-preview --toolchain "$RUSTUP_TOOLCHAIN"
-command -v rust-lld >/dev/null || { echo "rust-lld missing"; exit 13; }
+/tmp/prepare-solana-toolchain.sh   # ← call helper copied in a few lines below
 
 echo "===== Running anchor build ====="
 # Leave RUSTFLAGS to Anchor – it injects the right settings for SBF v2
@@ -350,6 +347,23 @@ echo "BUILD_SUCCESS: $SO_PATH"
       try {
         await updateTaskStatus(sanitizedTaskId, 'doing', 'Anchor build in progress...');
         
+        console.log(`[BUILD] Copying helper + build script into container…`);
+        // helper first (idempotent overwrite)
+        await runCommand(
+          `docker cp scripts/prepare-solana-toolchain.sh ${containerName}:/tmp/prepare-solana-toolchain.sh`,
+          '.',
+          sanitizedTaskId,
+          { skipSuccessUpdate: true }
+        );
+
+        console.log(`[BUILD] Making helper script executable...`);
+        await runCommand(
+          `docker exec ${containerName} chmod +x /tmp/prepare-solana-toolchain.sh`,
+          '.',
+          sanitizedTaskId,
+          { skipSuccessUpdate: true }
+        );
+
         console.log(`[BUILD] Copying build script to container ${containerName}...`);
         await runCommand(
           `docker cp ${buildScriptPath} ${containerName}:/tmp/build.sh`,
@@ -736,7 +750,14 @@ export const startAnchorTestTask = async (
       
       const rootPath = await getProjectRootPath(projectId);
       
-      await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && anchor test"`, '.', taskId);
+      const testCmd=`
+        docker exec ${containerName} bash -c '
+          cd /usr/src/${rootPath} &&
+          /tmp/prepare-solana-toolchain.sh &&
+          anchor test -- --jobs 1
+        '
+      `;
+      await runCommand(testCmd.trim(), '.', taskId);
     } catch (error: any) {
       await updateTaskStatus(sanitizedTaskId, 'failed', `Error: ${error.message}`);
     }
