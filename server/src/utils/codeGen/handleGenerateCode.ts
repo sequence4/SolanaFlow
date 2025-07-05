@@ -147,6 +147,7 @@ export const handleGenerateCode = async ({
 }: Args): Promise<{ sentinelId: string }> => {   
     /* Dev-mode flag set by dev.sh or CI: container already runs `next dev` */
     const isDevServer = process.env.SF_DEV_SERVER === '1';
+
     console.log('[GEN] projectId   =', projectId);
     console.log('[GEN] userId      =', userId);
     console.log('[GEN] workspace   =', workspace);

@@ -89,6 +89,7 @@ export async function runDeployPipeline({
       status: "active",
       message: "Generating Anchor code…"
     });
+    sendProgress({ stage: "code-gen", message: "Generating Anchor code…" });
     const { sentinelId } =
           await handleGenerateCode({ projectId, graph, workspace, sendProgress, userId });
 
