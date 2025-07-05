@@ -349,8 +349,12 @@ echo "BUILD_SUCCESS: $SO_PATH"
         
         console.log(`[BUILD] Copying helper + build script into container…`);
         // helper first (idempotent overwrite)
+        const helperScript = path.resolve(
+          __dirname,
+          '../../../scripts/prepare-solana-toolchain.sh'
+        );
         await runCommand(
-          `docker cp scripts/prepare-solana-toolchain.sh ${containerName}:/tmp/prepare-solana-toolchain.sh`,
+          `docker cp ${helperScript} ${containerName}:/tmp/prepare-solana-toolchain.sh`,
           '.',
           sanitizedTaskId,
           { skipSuccessUpdate: true }
