@@ -363,7 +363,7 @@ echo "BUILD_SUCCESS: $SO_PATH"
           sanitizedTaskId,
           { skipSuccessUpdate: true }
         );
-
+        
         console.log(`[BUILD] Copying build script to container ${containerName}...`);
         await runCommand(
           `docker cp ${buildScriptPath} ${containerName}:/tmp/build.sh`,

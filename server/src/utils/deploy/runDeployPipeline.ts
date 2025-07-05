@@ -9,7 +9,9 @@ import { markContainerForCleanup } from "../container/cleanupQueue";
 import {
   startAnchorBuildTask,
   getBuildArtifactTask,
-  runCommand
+  runCommand,
+  startAnchorInitTask,
+  startSetClusterTask,
 } from "../projectUtils";
 import { waitForTaskCompletion } from "../taskUtils";
 import path from "path";
@@ -41,6 +43,14 @@ interface PipelineArgs {
   /** When true, run the container in dev mode with hot-reload */
   devMode?: boolean;
 }
+
+const STAGES: StageKey[] = [
+  'generate-code',
+  'amend-idl',
+  'anchor-build',   // NEW – compile after IDL fix‑up
+  'anchor-deploy',
+  'anchor-test',
+];
 
 export async function runDeployPipeline({
   projectId,
@@ -225,4 +235,40 @@ export async function runDeployPipeline({
       console.log(`[pipeline] queued ${workspace.containerName} for later cleanup`);
     }
   }
+}
+
+// Add TypeScript type for StageKey
+type StageKey = 'generate-code' | 'amend-idl' | 'anchor-build' | 'anchor-deploy' | 'anchor-test';
+
+// Helper function to queue the next stage in the pipeline
+async function queueNextStage(ctx: { projectId: string; userId: string }, nextStage: StageKey): Promise<void> {
+  console.log(`[PIPELINE] Queueing next stage: ${nextStage}`);
+  
+  // Implementation depends on how stages are queued in your system
+  // This is a placeholder based on the context provided
+  switch (nextStage) {
+    case 'amend-idl':
+      // Logic to queue amend-idl stage
+      break;
+    case 'anchor-build':
+      await startAnchorBuildTask(ctx.projectId, ctx.userId);
+      break;
+    case 'anchor-deploy':
+      // Logic to queue anchor-deploy stage
+      break;
+    case 'anchor-test':
+      // Logic to queue anchor-test stage
+      break;
+    default:
+      break;
+  }
+}
+
+// Handle the amend-idl stage
+async function handleAmendIdlStage(ctx: { projectId: string; userId: string }): Promise<void> {
+  console.log(`[PIPELINE] Handling amend-idl stage`);
+  // Logic for amend-idl stage
+  
+  // queue the freshly‑added build stage
+  await queueNextStage(ctx, 'anchor-build');
 }
