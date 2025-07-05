@@ -87,9 +87,12 @@ export function runDeployPipelineWithLogs(
     }
 
     if (msg.containerUrl) {
-      console.log(`[deployPipeline] Received containerUrl: ${msg.containerUrl}`);
-      taskLogs.addSystemLog(`🌐 Container URL: ${msg.containerUrl}`);
-      setProjectContext(prev => ({ ...prev, containerUrl: msg.containerUrl }));
+      const fullUrl = msg.containerUrl.includes("/dapp/")
+        ? msg.containerUrl
+        : `${msg.containerUrl.replace(/\/$/, "")}/dapp/${projectContext.id}`;
+      console.log(`[deployPipeline] Received containerUrl: ${fullUrl}`);
+      taskLogs.addSystemLog(`🌐 Container URL: ${fullUrl}`);
+      setProjectContext(prev => ({ ...prev, containerUrl: fullUrl }));
     }
 
     if (msg.artifact) {

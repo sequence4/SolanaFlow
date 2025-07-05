@@ -8,20 +8,26 @@ import { handleGenerateCode } from "../codeGen/handleGenerateCode";
 import { markContainerForCleanup } from "../container/cleanupQueue";
 import {
   startAnchorBuildTask,
-  startAnchorDeployTask,
   getBuildArtifactTask,
   runCommand
 } from "../projectUtils";
-import { waitForTaskCompletion, getTaskById } from "../taskUtils";
-import { deriveProgramId } from "../../utils/deriveProgramId";
+import { waitForTaskCompletion } from "../taskUtils";
 import path from "path";
 import { attachFileContents } from "../fileUtils/attachFileContents";
-import { v4 as uuidv4 } from "uuid";
+
+// ─── unified progress payload ────────────────────────────
+interface ProgressEvent {
+  stage : "environment" | "code-gen" | "build" | "error";
+  status: "active" | "completed" | "error";
+  message: string;
+  pct?: number;
+  [k: string]: unknown;           // allow artefact / containerUrl etc.
+}
+// ──────────────────────────────────────────────────────────────
 
 // TODO: chunk really large fileTree payloads (> ~16 MB) – Chrome drops giant SSE frames.
 
 const MAX_BUILD_MINUTES = Number(process.env.MAX_BUILD_MINUTES) || 15;
-const MAX_DEPLOY_MINUTES = Number(process.env.MAX_DEPLOY_MINUTES) || 6;
 
 interface PipelineArgs {
   projectId: string;
@@ -31,6 +37,9 @@ interface PipelineArgs {
 
   /** When true, the program was already deployed by a wallet-signed tx */
   walletSigned?: boolean;
+  
+  /** When true, run the container in dev mode with hot-reload */
+  devMode?: boolean;
 }
 
 export async function runDeployPipeline({
@@ -39,24 +48,47 @@ export async function runDeployPipeline({
   graph,
   sendProgress,
   walletSigned = false,
+  devMode = false,
 }: PipelineArgs): Promise<void> {
-  sendProgress({ stage: "environment", message: "Preparing your build environment…" });
+  sendProgress(<ProgressEvent>{
+    stage: "environment",
+    status: "active",
+    message: "Preparing your build environment…"
+  });
 
   // declare outside try so `finally` can see it
   let workspace: WorkspaceHandle | null = null;
 
   try {
-    workspace = await prepEnv(projectId, userId);
+    workspace = await prepEnv(projectId, userId, devMode);
 
+    sendProgress(<ProgressEvent>{
+      stage: 'environment',
+      status: 'active',
+      message: 'Pulling tool-chain image…'    // new granular step
+    });
+    
     // emit the container URL so the UI can tune in
-    sendProgress({
-      stage: "container-ready",
-      containerUrl: workspace.containerUrl,
-      message: "Container is up"
+    sendProgress(<ProgressEvent>{
+      stage: 'environment',
+      status: 'active',
+      message: 'Image pulled — starting container…'
+    });
+
+    sendProgress(<ProgressEvent>{
+      stage: "environment",
+      status: "completed",
+      message: "Container is up",
+      containerUrl: workspace.containerUrl
     });
  
     
     // 2 ─ code generation ─────────────────────────────────────────────────
+    sendProgress(<ProgressEvent>{
+      stage: "code-gen",
+      status: "active",
+      message: "Generating Anchor code…"
+    });
     sendProgress({ stage: "code-gen", message: "Generating Anchor code…" });
     const { sentinelId } =
           await handleGenerateCode({ projectId, graph, workspace, sendProgress, userId });
@@ -67,8 +99,19 @@ export async function runDeployPipeline({
     // wait until all src + UI files are on disk
     // allow up to 3 min for large repos (90 × 2 s)
     await waitForTaskCompletion(sentinelId, 90, 2_000);
+
+    // ✅ code-gen really is done now
+    sendProgress(<ProgressEvent>{
+      stage   : "code-gen",
+      status  : "completed",
+      message : "Code generation complete"
+    });
     
-    sendProgress({ stage: "build-started", message: "Building program…" });
+    sendProgress(<ProgressEvent>{
+      stage: "build",
+      status: "active",
+      message: "Building program…"
+    });
     const buildTask = await startAnchorBuildTask(projectId, userId);
     
     // Compute retry count based on configured build timeout
@@ -77,7 +120,8 @@ export async function runDeployPipeline({
     
     // Check build status and bail early if not successful
     const buildStatus = await waitForTaskCompletion(buildTask, buildRetries, 2_000);
-    if (buildStatus !== 'succeed' && buildStatus !== 'finished') {
+    const OK_STATUSES = ['succeed', 'finished', 'warning']; // Anchor warns but succeeds
+    if (!OK_STATUSES.includes(buildStatus)) {
       throw new Error(`Build task ended with status: ${buildStatus}`);
     }
     
@@ -93,8 +137,9 @@ export async function runDeployPipeline({
           m.getProjectRootPath(projectId)
         ));
 
-      sendProgress({
-        stage: "link-so",
+      sendProgress(<ProgressEvent>{
+        stage: "build",
+        status: "active",
         message: "Linking target/deploy → /usr/src/target/deploy"
       });
 
@@ -120,12 +165,19 @@ export async function runDeployPipeline({
     /* 3b ─ fetch artefact ------------------------------------------------ */
     console.log("[PIPELINE] 📦 fetching artefact (.so) from container");
     const { base64So } = await getBuildArtifactTask(projectId);
+    if (!base64So) {
+      throw new Error('Anchor built with warnings but produced no .so – check build log');
+    }
     console.log("[PIPELINE] 📦 artefact length:", base64So.length);
     
     /* ---------------------------------------------------------------- *
      * 3c ─ build finished → gather file-tree with eager code
      * ---------------------------------------------------------------- */
-    sendProgress({ stage: "file-tree-start", message: "Collecting project files…" });
+    sendProgress(<ProgressEvent>{
+      stage: "build",
+      status: "active",
+      message: "Collecting project files…"
+    });
 
     // (1) build the raw tree via the existing utility
     const rootPath = workspace.rootPath ?? (
@@ -149,140 +201,21 @@ export async function runDeployPipeline({
     const fileTree = rawTree;  // now populated
 
     /* finally emit build-done with artefact + file tree */
-    sendProgress({
-      stage   : "build-done",
+    sendProgress(<ProgressEvent>{
+      stage   : "build",
+      status  : "completed",
       message : "Build finished",
       artifact: base64So,
-      fileTree                       // <= NEW
+      fileTree
     });
 
-    /* 4 ─ deploy --------------------------------------------------------- */
-    let programId: string | undefined;
-    
-    if (!walletSigned) {
-      sendProgress({ stage: "deploy", message: "Deploying / upgrading…" });
-
-      // Calculate deployment timeout from env (default 6 minutes)
-      const deployMinutes = MAX_DEPLOY_MINUTES;
-      const deployTimeoutMs = deployMinutes * 60_000;
-      
-      // Convert timeout ms to retry count (2-second interval)
-      const deployRetries = Math.ceil(deployTimeoutMs / 2_000);
-
-      // Launch the async deploy task inside the container
-      const deployTask = await startAnchorDeployTask(
-        projectId,
-        userId
-      );
-
-      // Allow up to specified minutes for Devnet transaction retries
-      const deployStatus = await waitForTaskCompletion(deployTask, deployRetries, 2_000);
-      if (deployStatus !== 'succeed' && deployStatus !== 'finished') {
-        throw new Error(`Deployment task failed with status: ${deployStatus}`);
-      }
-
-      // Retrieve the task's JSON result
-      const { status, result } = await getTaskById(deployTask);
-      
-      if (status !== 'succeed' && status !== 'finished') {
-        throw new Error(`Deployment task failed with status: ${status}`);
-      }
-      
-      if (!result) {
-        throw new Error("Deployment task finished without a result");
-      }
-      
-      try {
-        const parsed = JSON.parse(result) as 
-          | { status: "success"; programId: string }
-          | Record<string, unknown>;
-          
-        if (parsed.status === "success" && typeof parsed.programId === "string") {
-          programId = parsed.programId;
-        }
-      } catch { /* ignore malformed JSON; handled below */ }
-
-      if (!programId) {
-        throw new Error("Deployment task finished without a valid Program ID");
-      }
-    } else {
-      sendProgress({
-        stage   : "deploy-skipped",
-        message : "Wallet-signed deploy detected – skipping Anchor deploy step"
-      });
-      
-      // For wallet-signed deployments, extract programId from graph if available
-      const graphWithConfig = graph as unknown as { deployConfig?: { programId?: string } };
-      if (graphWithConfig.deployConfig?.programId) {
-        programId = graphWithConfig.deployConfig.programId;
-      }
-      
-      // If no programId is available, derive it deterministically
-      if (!programId) {
-        programId = deriveProgramId(projectId).toBase58();
-      }
-    }
-
-    // Copy the Anchor-generated IDL to the frontend idl directory
-    if (programId) {
-      sendProgress({
-        stage: "copy-idl",
-        message: "Saving Anchor IDL for frontend..."
-      });
-
-      try {
-        // Find the program name from the file tree
-        const rootPath = workspace.rootPath ?? (
-          await import("../fileUtils").then(m => m.getProjectRootPath(projectId))
-        );
-
-        // Default program name (same as in handleGenerateCode)
-        const programName = 'my_program'; // Using the same default as in handleGenerateCode
-
-        // Generate a task ID for running commands
-        const idlTaskId = uuidv4();
-
-        // NOTE: no leading \n, use ';' instead of '&&' after `then`
-        const copyIdlCmd =
-          "set -e; " +
-          `cd /usr/src/${rootPath}; ` +
-          "mkdir -p idl; " +
-          `if [ -f target/idl/${programName}.json ]; then ` +
-          // update .metadata.address in-place with jq (no temp file needed)
-          `jq --arg addr '${programId}' '.metadata.address = \\$addr' ` +
-          `target/idl/${programName}.json > idl/solanaflow_token.json; ` +
-          `echo 'IDL copied to idl/solanaflow_token.json'; ` +
-          "else " +
-          `echo '{}' > idl/solanaflow_token.json; ` +
-          `echo 'IDL placeholder generated'; ` +
-          "fi";
-
-        await runCommand(
-          `docker exec ${workspace.containerName} bash -c "${copyIdlCmd}"`,
-          ".",
-          idlTaskId,
-          { skipSuccessUpdate: true }
-        );
-
-        console.log(`[DEPLOY] IDL copied to idl/solanaflow_token.json for program ${programId}`);
-      } catch (error) {
-        console.error("[DEPLOY] IDL copy failed for program", programId, error);
-        // Non-fatal error, continue with deployment
-      }
-    }
-
-    // Only include programId in the completion event if we have one
-    const completionEvent: Record<string, unknown> = {
-      stage: "done",
-      message: "Deployment complete"
-    };
-    
-    if (programId) {
-      completionEvent.programId = programId;
-    }
-
-    sendProgress(completionEvent);
-
+  } catch (err) {
+    sendProgress(<ProgressEvent>{
+      stage: "error",
+      status: "error",
+      message: err instanceof Error ? err.message : String(err)
+    });
+    throw err;
   } finally {
     /* ----------------------------------------------------------------
      * Queue container for later cleanup instead of immediate deletion

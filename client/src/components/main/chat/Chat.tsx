@@ -42,6 +42,7 @@ import {
   Trash2
 } from "lucide-react";
 import MarkdownRenderer from '@/components/main/code/markdown/MarkdownRenderer';
+import ChatChecklistBubble from './ChatChecklistBubble';
 
 export interface AIMessageType {
   text: string;
@@ -49,7 +50,8 @@ export interface AIMessageType {
   files?: FileTreeItemType[];
   timestamp?: Date;
   status?: 'sending' | 'sent' | 'error';
-  isLogLine?: boolean;       
+  isLogLine?: boolean;
+  isChecklist?: boolean;
 }
 
 const Chat: React.FC = () => {
@@ -115,12 +117,34 @@ const Chat: React.FC = () => {
     // ───────────────────────────────────────────────────────────────────────────
     useEffect(() => {
         if (!systemLogs?.length) return;
+        
+        // Suppress log spam while building
+        if (taskLogs.isBuilding || messages.some(m => m.isChecklist)) {
+          setLastLogIndex(systemLogs.length); // swallow logs
+          return;
+        }
 
         // Grab the slice we have not injected yet
         const fresh = systemLogs.slice(lastLogIndex);
 
-        if (fresh.length) {
-            const logMessages: AIMessageType[] = fresh.map(line => ({
+        /* 🔽 skip the environment / progress status lines we don't want in chat */
+        const IGNORE_PREFIXES = [
+          "Preparing your build environment",
+          "Container is up",
+          "Container URL",
+          "Generating Anchor code",
+          "Code generation complete",
+          "Building program",
+          "Linking target/deploy",
+          "Collecting project files"
+        ];
+
+        const visible = fresh.filter(
+          line => !IGNORE_PREFIXES.some(p => line.startsWith(p))
+        );
+
+        if (visible.length) {
+            const logMessages: AIMessageType[] = visible.map(line => ({
                 text: line,
                 sender: 'ai',           // show as if the assistant "thinks out loud"
                 timestamp: new Date(),
@@ -133,7 +157,27 @@ const Chat: React.FC = () => {
             // Ensure scroll sticks to bottom
             scrollToBottom();
         }
-    }, [systemLogs, lastLogIndex]);
+    }, [systemLogs, lastLogIndex, taskLogs.isBuilding, messages]);
+
+    // ———————————————————————————————
+    //  Inject a friendly AI note once the build completes
+    // ———————————————————————————————
+    useEffect(() => {
+        const onComplete = () => {
+            setMessages(prev => [
+                ...prev,
+                {
+                    text: "✅ Build finished successfully! Let me know what you'd like to do next.",
+                    sender: "ai",
+                    timestamp: new Date(),
+                    status: "sent"
+                }
+            ]);
+            taskLogs.setSuppressToast(false);      // re-enable normal task-log toasts
+        };
+        eventBus.on("build-complete", onComplete);
+        return () => eventBus.off("build-complete", onComplete);
+    }, [taskLogs]);
 
     const fetchFileContent = async (projectId: string, filePath: string): Promise<string> => {
         try {
@@ -152,6 +196,8 @@ const Chat: React.FC = () => {
         console.log('Wallet public key:', publicKey?.toBase58() || 'Not connected');
     }, [connected, publicKey]);
 
+
+
     const sendMessage = async () => {
         const trimmed = input.trim().toLowerCase();
         if (trimmed === 'build') {
@@ -161,10 +207,11 @@ const Chat: React.FC = () => {
           // 2) forward build command globally
           eventBus.emit('chat-build-command');
 
-          // 3) still echo the user message in the thread
+          // 3) insert checklist bubble before returning
           setMessages(prev => [
             ...prev,
-            { text: input, sender: 'user', timestamp: new Date(), status: 'sent' }
+            { text: input, sender: 'user', timestamp: new Date(), status: 'sent' },
+            { text: "", sender: 'ai', isChecklist: true, timestamp: new Date(), status: 'sent' }
           ]);
           setInput('');
           return;                             // stop normal AI flow
@@ -328,7 +375,7 @@ const Chat: React.FC = () => {
 
     return (
         <div
-            className={`flex flex-col w-[25%] ${isExpanded ? "fixed inset-4 z-50" : "h-full"} transition-all duration-300 ease-in-out`}
+            className={`flex flex-col w-[32%] ${isExpanded ? "fixed inset-4 z-50" : "h-full"} transition-all duration-300 ease-in-out`}
         >
             <div className="flex flex-col h-full bg-[#0e0e12] overflow-hidden border border-[#232329] shadow-2xl">
                 {/* Header */}
@@ -405,7 +452,9 @@ const Chat: React.FC = () => {
                                                     </div>
                                                 )}
                                                 <div className="leading-relaxed">
-                                                    <MarkdownRenderer content={message.text} />
+                                                    {message.isChecklist
+                                                        ? <ChatChecklistBubble />
+                                                        : <MarkdownRenderer content={message.text} />}
                                                 </div>
                                             </div>
                                         </div>

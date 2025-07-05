@@ -8,6 +8,35 @@ interface RentedContainer {
   port: number;
 }
 
+/**
+ * Adds Traefik labels to an existing container
+ * @param container - Container name
+ * @param projectId - Project ID to use for routing
+ */
+function addTraefikLabels(container: string, projectId: string): void {
+  try {
+    console.log(`[rentContainerFromPool] Adding Traefik labels to container ${container} for project ${projectId}`);
+    
+    // Update container with labels without restarting it
+    execSync(
+      `docker container update \
+        --env-add APP_ID=${projectId} \
+        --label-add traefik.enable=true \
+        --label-add 'traefik.http.routers.dapp-${projectId}.rule=PathPrefix(\`/dapp/${projectId}\`)' \
+        --label-add traefik.http.routers.dapp-${projectId}.entrypoints=web,websecure \
+        --label-add traefik.http.routers.dapp-${projectId}.middlewares=strip-${projectId} \
+        --label-add 'traefik.http.middlewares.strip-${projectId}.stripprefix.prefixes=/dapp/${projectId}' \
+        --label-add traefik.http.routers.dapp-${projectId}.service=dapp-${projectId} \
+        --label-add traefik.http.services.dapp-${projectId}.loadbalancer.server.port=3000 \
+        ${container}`,
+      { stdio: 'ignore' }
+    );
+  } catch (err) {
+    console.error(`[rentContainerFromPool] Failed to add Traefik labels to container ${container}:`, err);
+    // Continue despite errors - the container is still usable even without labels
+  }
+}
+
 export async function rentContainerFromPool(): Promise<RentedContainer | null> {
   const client = await pool.connect();
   try {
@@ -66,21 +95,18 @@ export async function rentContainerFromPool(): Promise<RentedContainer | null> {
 
     const url = await resolveContainerUrl(name);
     
-    // Persist the random host-port (needed so the same donor is not re-selected)
-    const hostPort = Number(url.split(':').pop());
-    if (hostPort === 0) {
-      throw new Error(
-        `[rent] container ${name} started without a published 3000/tcp port`
-      );
-    }
-    if (!Number.isNaN(hostPort)) {
-      await pool.query(
-        'UPDATE warm_container_pool SET port = $2 WHERE name = $1',
-        [name, hostPort]
-      );
-    }
+    // Extract project ID from container name (format: userproj-{projId}-{timestamp})
+    const projectIdMatch = name.match(/^userproj-([^-]+)-/);
+    const projectId = projectIdMatch ? projectIdMatch[1] : 'default';
     
-    return { name, url, port: hostPort };
+    // Add Traefik labels to the container
+    addTraefikLabels(name, projectId);
+
+    const resolved = await resolveContainerUrl(name);     // 0.0.0.0:31000
+    const [resHost, resPort] = resolved.split(':');
+    const host = process.env.PUBLIC_HOSTNAME ?? resHost;
+    // Include the PathPrefix so the front-end can load it directly
+    return { name, url: `http://${host}:${resPort}/dapp/${projectId}`, port: Number(resPort) };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

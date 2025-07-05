@@ -1,7 +1,0 @@
-[package]
-name    = "docker_base_image"
-version = "0.0.0"
-edition = "2021"
-publish = false   
-
-[dependencies]  

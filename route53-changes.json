@@ -1,0 +1,16 @@
+{
+  "Comment": "Upsert wildcard record for SolanaFlow demo",
+  "Changes": [
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "*.demo.yourdomain.com",
+        "Type": "A",
+        "TTL": 300,
+        "ResourceRecords": [
+          { "Value": "51.21.236.4" }
+        ]
+      }
+    }
+  ]
+}

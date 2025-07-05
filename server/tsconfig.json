@@ -29,7 +29,8 @@
     },
 
     /* ---------- ambient types ---------- */
-    "typeRoots": ["node_modules/@types", "tests/types"]
+    /* --- ensure Node's ambient types are available --- */
+    "types": ["node"]
   },
 
   "include": [

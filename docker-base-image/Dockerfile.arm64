@@ -15,6 +15,13 @@ ENV AWS_REGION=${AWS_REGION} \
     SCCACHE_REGION=${AWS_REGION}
 LABEL stage=toolchain
 
+# ────────────────────────────────────────────────────────────────
+# Work-around for sporadic "Failed to unpack llvm/bin/lld" when the
+# Solana platform-tools cache gets corrupted. Purge it before we
+# pre-warm the BPF/SBF tool-chain so every fresh build starts clean.
+RUN rm -rf /root/.cache/solana/platform-tools || true
+# ────────────────────────────────────────────────────────────────
+
 # hot-fix so cargo-install-all.sh can find the CLI artefact
 RUN [ -d /solana-src ] && ln -sf /opt/target /solana-src/target || true
 
@@ -24,6 +31,8 @@ ENV SCCACHE_BUCKET=solanaflow-cache \
 
 # add Anchor CLI + minimal Node once (not in the base image yet)
 RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
+    --mount=type=cache,id=cargo-registry,target=/root/.cargo/registry,sharing=locked \
+    --mount=type=cache,id=cargo-git,target=/root/.cargo/git,sharing=locked \
     --mount=type=cache,id=sccache,target=/opt/sccache,sharing=locked \
     --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked \
@@ -32,7 +41,7 @@ RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
  && cargo install cargo-chef --version 0.1.64    --locked \
  && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
  && apt-get update -qq \
- && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs curl \
  && apt-get clean && rm -rf /var/lib/apt/lists/* \
  && strip /usr/local/bin/solana*
 
@@ -42,6 +51,8 @@ RUN rustup set profile minimal && rustup default stable
 # warm the BPF / SBF cache once so first user build is instant
 WORKDIR /tmp
 RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
+    --mount=type=cache,id=cargo-registry,target=/root/.cargo/registry,sharing=locked \
+    --mount=type=cache,id=cargo-git,target=/root/.cargo/git,sharing=locked \
     --mount=type=cache,id=sccache,target=/opt/sccache,sharing=locked \
     export CARGO_TARGET_DIR=/usr/src/target && \
     anchor init anchor-template --no-git --no-install \
@@ -50,8 +61,10 @@ RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
  && rm -rf /usr/src/anchor-template \
  && mv anchor-template /usr/src/anchor-template \
  && rm -rf /tmp/* \
- && mkdir -p /cache-seed \
- && cp -a /usr/src/target /cache-seed/target
+# drop huge host-side artefacts — we only need the BPF release output
+&& rm -rf /usr/src/target/debug /usr/src/target/**/incremental \
+&& mkdir -p /cache-seed \
+&& cp -a /usr/src/target/deploy /cache-seed/target
 
 # quick smoke-test
 RUN solana --version && cargo --version && rustc --version && anchor --version
@@ -62,7 +75,10 @@ RUN solana --version && cargo --version && rustc --version && anchor --version
 FROM solana-toolchain AS chef
 WORKDIR /app
 COPY docker-base-image/Cargo.toml docker-base-image/Cargo.lock docker-base-image/src/ ./
-RUN cargo chef prepare --recipe-path recipe.json
+RUN --mount=type=cache,id=cargo-registry,target=/root/.cargo/registry,sharing=locked \
+    --mount=type=cache,id=cargo-git,target=/root/.cargo/git,sharing=locked \
+    --mount=type=cache,id=sccache,target=/opt/sccache,sharing=locked \
+    cargo chef prepare --recipe-path recipe.json
 
 FROM solana-toolchain AS cooker
 WORKDIR /app
@@ -78,10 +94,16 @@ RUN --mount=type=secret,id=aws,target=/root/.aws/credentials \
 ###############################################################################
 FROM --platform=linux/arm64 solana-toolchain AS builder
 ARG NODE_VERSION=v20.18.0
+# Add APP_ID build argument with default value
+ARG APP_ID=local
 ENV HOME=/root
 ENV PATH=/usr/local/bin:$HOME/.cargo/bin:$PATH
 ENV NVM_DIR=$HOME/.nvm
+# bump this in CI to invalidate only the web-copy layer ───────────────
+ARG WEB_CACHE_BUSTER=initial
 ENV PATH="$NVM_DIR/versions/node/${NODE_VERSION}/bin:$PATH"
+# Expose APP_ID as environment variable for Next.js build
+ENV APP_ID=${APP_ID}
 
 # reuse compiled dependencies
 COPY --from=cooker /app/target /app/target
@@ -97,20 +119,62 @@ RUN . "$NVM_DIR/nvm.sh" \
  && nvm alias default ${NODE_VERSION} \
  && if ! command -v yarn >/dev/null 2>&1 ; then npm i -g yarn@1 ; fi
 
-ENV NEXT_TELEMETRY_DISABLED=1 NEXT_SKIP_ESLINT=1
-# --- Force Next 14 + to emit the standalone bundle ---------------------------
-ENV NEXT_PRIVATE_STANDALONE=true
-# copy the web/ directory that already exists in the repo
-COPY web/ /usr/share/solanaflow/web
+ENV NEXT_TELEMETRY_DISABLED=1 NEXT_SKIP_ESLINT=1 NEXT_PRIVATE_STANDALONE=true
 
-# install deps and build once
+# ---------- bake node_modules once (cacheable) ----------
+RUN mkdir -p /usr/share/solanaflow/web
+COPY web/package.json web/yarn.lock /usr/share/solanaflow/web/
+# 🔔 If the backend touched this stamp we must throw away the yarn layer
+COPY web/.force-reinstall /usr/share/solanaflow/web/
+RUN rm -f /usr/share/solanaflow/web/.force-reinstall || true
+# Install **all** deps so `next build` has its tool-chain.
 RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing=locked \
-    yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile \
- && yarn --cwd /usr/share/solanaflow/web build \
- && yarn cache clean --all || true
+    yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile --prefer-offline
+# --------------------------------------------------------
 
-# sanity-check: make sure the stand-alone entry exists
-RUN test -f /usr/share/solanaflow/web/.next/standalone/server.js
+# web source – includes .force-reinstall if present
+COPY web/ /usr/share/solanaflow/web
+# Optional marker file – always succeeds because it's committed to git
+COPY web/.force-reinstall /usr/share/solanaflow/web/.force-reinstall
+# bump this from the CLI to bust the build cache whenever web/ changes
+ARG NEXT_BUILD_CACHE_BUSTER
+RUN mkdir -p /usr/share/solanaflow/web/public
+
+# ── 1️⃣ verify deps without re-downloading ──────────────────────────────
+RUN --mount=type=cache,id=yarn-cache,target=/usr/local/share/.cache/yarn,sharing=locked \
+    yarn --cwd /usr/share/solanaflow/web install \
+         --frozen-lockfile --prefer-offline --check-files --ignore-scripts --production=false
+
+# Remove the build step - we'll run in dev mode
+# ── 2️⃣ build Next.js with a named SWC cache (re-used across builds) ────
+# RUN --mount=type=cache,id=next-swc,target=/usr/share/solanaflow/web/.next/cache,sharing=shared \
+#     yarn --cwd /usr/share/solanaflow/web next build
+
+# Debug: show where Next placed the standalone output
+# RUN echo 'Preview of .next layout:' && \
+#     find /usr/share/solanaflow/web/.next -maxdepth 3 -type f | head -n 30
+
+# Remove standalone copy - not needed for dev mode
+# ─────────────────────────────────────────────────────────────────────────────
+# RUN STANDALONE_ROOT=$(dirname "$(find /usr/share/solanaflow/web/.next -name server.js -print -quit)") && \
+#     test -n "$STANDALONE_ROOT" && echo "✔ Found standalone directory at $STANDALONE_ROOT" || \
+#         (echo '❌  server.js (standalone) not found. Is output: "standalone" set?' && exit 1) && \
+#     mkdir -p /tmp/standalone && \
+#     cp -a "$STANDALONE_ROOT"/. /tmp/standalone && \
+#     \
+#     # add compiled Tailwind / JS chunks into the standalone tree ────────────── \
+#     # In cached layers .next/static may be missing, so copy it only if present. \
+#     if [ -d /usr/share/solanaflow/web/.next/static ]; then \
+#         mkdir -p /tmp/standalone/.next && \
+#         cp -a /usr/share/solanaflow/web/.next/static/. /tmp/standalone/.next/static/ ; \
+#     else \
+#         echo "⚠️  .next/static not found in this layer (cached build) – skipping copy" ; \
+#     fi
+# ─────────────────────────────────────────────────────────────────────────────
+
+# create a separate stage for seeding the target volume
+FROM solana-toolchain AS seed-target
+COPY --from=solana-toolchain /cache-seed/target /target-seed
 
 ###############################################################################
 # 4.  Runtime – slim image with CLI + built app
@@ -120,39 +184,24 @@ RUN test -f /usr/share/solanaflow/web/.next/standalone/server.js
 #   · yarn in /usr/local/bin is just a shim that calls ../lib/cli
 #   · therefore we MUST also copy /usr/local/lib/node_modules/yarn
 # ────────────────────────────────────────────────────────────────
-FROM ubuntu:22.04 AS runtime
+FROM --platform=$BUILDPLATFORM ubuntu:22.04 AS runtime
+# Add APP_ID build argument with default value
+ARG APP_ID=local
 ENV PATH=/usr/local/bin:/root/.cargo/bin:$PATH \
     HOSTNAME=0.0.0.0 \
-    NEXT_DISABLE_SWC=1
+    NEXT_DISABLE_SWC=1 \
+    APP_ID=${APP_ID}
 WORKDIR /usr/share/solanaflow/web
 
 # bring in binaries and web bundle
 COPY --from=solana-toolchain /usr/local/bin /usr/local/bin
 COPY --from=solana-toolchain /root/.cargo/bin /root/.cargo/bin
 COPY --from=solana-toolchain /root/.rustup /root/.rustup
-# ── web bundle ────────────────────────────────────────────────────────────────
-# Next 'standalone' output lives in:
-#   web/.next/standalone/…   (server code)
-#   web/.next/static/…       (css/js chunks, fonts, images…)
-#   web/public/…             (static public assets)
-
-## ① server code — unchanged
-COPY --from=builder /usr/share/solanaflow/web/.next/standalone \
-    /usr/share/solanaflow/web/.next/standalone
-
-# copy .next/static (always there)
-COPY --from=builder /usr/share/solanaflow/web/.next/static \
-                    /usr/share/solanaflow/web/.next/standalone/.next/static
-
-# copy public assets only when present
-RUN if [ -d /usr/share/solanaflow/web/public ]; then \
-       cp -R /usr/share/solanaflow/web/public \
-             /usr/share/solanaflow/web/.next/standalone/public ; \
-    fi
-
-# also copy the project itself (src/, app/, idl/, …)
-COPY --from=builder /usr/share/solanaflow/web                  /usr/share/solanaflow/web
+# pre-built Anchor workspace skeleton (speeds up prepEnv thin-copy)
 COPY --from=solana-toolchain /usr/src/anchor-template /usr/src/anchor-template
+
+# Copy web files for development
+COPY --from=builder /usr/share/solanaflow/web /usr/share/solanaflow/web
 
 # copy the entire Node version dir (≈ 28 MB) – includes node, npm, corepack, etc.
 COPY --from=builder /root/.nvm/versions/node/v20.18.0 /root/.nvm/versions/node/v20.18.0
@@ -179,7 +228,8 @@ RUN apt-get update -qq && \
         libssl-dev \
         binutils \
         ca-certificates \
-        jq && \
+        jq \
+        curl && \
     update-ca-certificates && \
     # make sure /usr/bin/cc exists
     ln -sf "$(command -v gcc || command -v clang)" /usr/bin/cc && \
@@ -192,11 +242,15 @@ RUN ln -sf /bin/bash /bin/sh
 # from this point every RUN uses Bash automatically
 SHELL ["/bin/bash","-c"]
 
-EXPOSE 3000
-# Entrypoint - run from the web root so that "_next/static" & "public" resolve
-WORKDIR /usr/share/solanaflow/web
-CMD ["node", ".next/standalone/server.js"]
+# Clear Next.js build cache on container start (dev environment)
+COPY docker-base-image/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
-# create a separate stage for seeding the target volume
-FROM solana-toolchain AS seed-target
-COPY --from=solana-toolchain /cache-seed/target /target-seed
+# ────────────────────────────────────────────────────────────────
+# Runtime: serve from the web root for development
+# ────────────────────────────────────────────────────────────────
+WORKDIR /usr/share/solanaflow/web
+ENV PORT=3000
+EXPOSE 3000
+CMD ["npx", "next", "dev", "-H", "0.0.0.0", "-p", "3000"]

@@ -1,32 +1,37 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {
-  /* --- mandatory for Docker test -f step --- */
-  output: 'standalone',                     
+const APP_ID       = process.env.APP_ID       || 'local';
+// Derive the public prefix exactly once from the current APP_ID
+const APP_BASE_PATH = `/dapp/${APP_ID}`;
 
-  /* --- wallet adapter must be transpiled --- */
+const nextConfig = {
+  output: 'standalone',
+
   transpilePackages: [
+    '@solana/wallet-adapter-base',
     '@solana/wallet-adapter-react',
     '@solana/wallet-adapter-react-ui',
-    '@solana/wallet-adapter-base',
-    'next-themes',
+    '@solana/wallet-adapter-wallets',
+    '@solana/wallet-adapter-phantom',
+    '@solana/wallet-adapter-solflare',
   ],
 
-  // relax frame restrictions so the SolanaFlow UI can embed it
+  basePath:   APP_BASE_PATH,
+  assetPrefix: APP_BASE_PATH,
+
   async headers() {
     return [
       {
-        source: "/:path*",
+        source: '/:path*',
         headers: [
-          { key: "X-Frame-Options", value: "ALLOWALL" },
+          { key: 'X-Frame-Options', value: 'ALLOWALL' },
           {
-            key: "Content-Security-Policy",
-            // allow *your* app to be shown in any origin that loads it
-            value: "frame-ancestors *; default-src * 'unsafe-inline' blob: data:;",
+            key: 'Content-Security-Policy',
+            value: `frame-ancestors *; default-src * 'unsafe-inline'${process.env.NODE_ENV === 'production' ? '' : " 'unsafe-eval'"} blob: data:;`,
           },
         ],
       },
     ];
   },
 };
-module.exports = nextConfig;
 
+module.exports = nextConfig;

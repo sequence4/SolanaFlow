@@ -1,16 +1,41 @@
-export const ROOT_LAYOUT_TSX = `"use client";
+export const rootLayout = `import type React from "react";
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
+import "@solana/wallet-adapter-react-ui/styles.css"; // wallet-adapter preset
+import ThemeProvider from "@/components/theme-provider";
+import { ToastProvider } from "@/hooks/use-toast";
+import { WalletContextProvider } from "@/components/wallet-context-provider";
 
-import "../src/globals.css";
-import { WalletConnectionProvider } from "../src/context/WalletConnectionProvider";
+const inter = Inter({ subsets: ["latin"] });
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export const metadata: Metadata = {
+  title: "SolMint - Solana Token Minting dApp",
+  description: "A beautiful Solana dApp for minting SPL tokens",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="en" className="light" suppressHydrationWarning>
-      <body className="min-h-screen bg-background font-sans antialiased">
-        <WalletConnectionProvider>
-          {children}
-        </WalletConnectionProvider>
+    <html lang="en" suppressHydrationWarning>
+      <body className={inter.className}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <WalletContextProvider>
+            <ToastProvider>
+              {children}
+            </ToastProvider>
+          </WalletContextProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
-}`;
+}
+`;

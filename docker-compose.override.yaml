@@ -1,0 +1,11 @@
+services:
+  dapp:
+    build:
+      context: .
+      dockerfile: docker-base-image/Dockerfile.dood
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock     # Docker-outside-of-Docker
+    environment:
+      DOCKER_HOST: unix:///var/run/docker.sock        # talk to host daemon
+      DOCKER_CONTEXT: default                         # bypass desktop-linux
+      APP_ID: dev                                     # silence Compose warnings 

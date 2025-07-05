@@ -314,7 +314,8 @@ set -euo pipefail
 cd /usr/src/${rootPath}
 
 echo "===== Running anchor build ====="
-anchor build
+export RUSTFLAGS="-Ccodegen-units=1 -Clinker-plugin-lto -Clto=thin -Cpanic=abort -Copt-level=z"
+anchor build -- --jobs 1
 
 # ── determine the correct target directory and find the first .so file ──
 SO_DIR="\${CARGO_TARGET_DIR:-target}/deploy"
@@ -359,12 +360,12 @@ echo "BUILD_SUCCESS: $SO_PATH"
           { skipSuccessUpdate: true }
         );
         
-        console.log(`[BUILD] Executing build script in container ${containerName}...`);
-        const buildOutput = await runCommand(
+        console.log(`[BUILD] Executing build script in container ${containerName} (stream)…`);
+        const buildOutput = await runSpawn(
           `docker exec ${containerName} /bin/bash /tmp/build.sh`,
           '.',
           sanitizedTaskId,
-          { skipSuccessUpdate: true }
+          { sendProgress: d => console.log('[ANCHOR_BUILD]', (d as any).message?.trim() ?? '') }
         );
         
         // look for the *first* .so produced under the correct target directory
@@ -384,11 +385,12 @@ echo "BUILD_SUCCESS: $SO_PATH"
         if (soFileCheck.includes('BUILD_SUCCESS')) {
           console.log("[BUILD] ✔️  anchor build finished & .so produced");
           await updateTaskStatus(sanitizedTaskId, 'succeed', `Build completed successfully. .so file was created.`);
-        } else {
+        } else if (soFileCheck.includes('BUILD_FAILURE')) {
           const fullBuildError = `[BUILD] ❌  Build finished but no .so was created.\n\nBuild output:\n${buildOutput}`;
           console.error(fullBuildError);
           await updateTaskStatus(sanitizedTaskId, 'failed', fullBuildError);
         }
+        // no 'else' – runSpawn already set 'warning' when appropriate
       } catch (buildError: any) {
         console.error(`[BUILD] Anchor build failed with error: ${buildError.message}`);
         await updateTaskStatus(
@@ -805,16 +807,39 @@ export const startInstallPackagesTask = async (
       
       const rootPath = await getProjectRootPath(projectId);
       
-      await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && npm install @coral-xyz/anchor"`, '.', taskId);
-      await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && npm install @solana/web3.js"`, '.', taskId);
-      await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && npm install @solana/spl-token"`, '.', taskId);
-      await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && npm install fs"`, '.', taskId);
+      // Instead of direct npm install, we add the packages to package.json
+      // and touch a stamp file that will force a rebuild on next Docker build
+      
+      // Add standard packages
+      const standardPackages = [
+        '@coral-xyz/anchor',
+        '@solana/web3.js',
+        '@solana/spl-token',
+        'fs'
+      ];
+      
+      for (const pkg of standardPackages) {
+        // ① write the dep into package.json (npm pkg set keeps formatting)
+        // npm pkg set requires the whole arg in one quoted string; avoid slash-escaping hell
+        const addDeps = `npm pkg set "dependencies.${pkg}@latest"`;
+        // ② touch a stamp file – the Dockerfile COPY line already invalidates on it
+        const stampPath = `/usr/src/${rootPath}/.force-reinstall`;
+        const cmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && ${addDeps} && date > ${stampPath}"`;
+        await runCommand(cmd, '.', taskId);
+      }
 
+      // Add custom packages
       if (_packages) {
-        for (const _package of _packages) {
-          await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && npm install ${_package}"`, '.', taskId);
+        for (const pkg of _packages) {
+          // npm pkg set requires the whole arg in one quoted string; avoid slash-escaping hell
+          const addDeps = `npm pkg set "dependencies.${pkg}@latest"`;
+          const stampPath = `/usr/src/${rootPath}/.force-reinstall`;
+          const cmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && ${addDeps} && date > ${stampPath}"`;
+          await runCommand(cmd, '.', taskId);
         }
       }
+      
+      await updateTaskStatus(taskId, 'succeed', 'Dependencies added to package.json. They will be installed on next container rebuild.');
     } catch (error: any) {
       await updateTaskStatus(taskId, 'failed', `Error: ${error.message}`);
     }
@@ -860,22 +885,28 @@ export const startInstallNodeDependenciesTask = async (
       
       console.log(`Found container ${containerName} for project ${projectId}`);
       
-      await updateTaskStatus(taskId, 'doing', `Installing ${packages.join(', ')} in ${targetDir}...`);
-      console.log(`Installing packages: ${packages.join(', ')} for project ${projectId} in ${targetDir}`);
-      
-      const installCommand = `npm install ${packages.join(' ')}`;
-      console.log(`Install command: ${installCommand}`);
+      await updateTaskStatus(taskId, 'doing', `Adding ${packages.join(', ')} to package.json in ${targetDir}...`);
+      console.log(`Adding packages to package.json: ${packages.join(', ')} for project ${projectId} in ${targetDir}`);
       
       try {
-        const dockerInstallCmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath}/${targetDir} && ${installCommand}"`;
-        console.log(`Executing in container: ${dockerInstallCmd}`);
+        // Instead of direct npm install, add each package to package.json
+        for (const pkg of packages) {
+          // ① write the dep into package.json (npm pkg set keeps formatting)
+          // npm pkg set requires the whole arg in one quoted string; avoid slash-escaping hell
+          const addDeps = `npm pkg set "dependencies.${pkg}@latest"`;
+          // ② touch a stamp file – the Dockerfile COPY line already invalidates on it
+          const stampPath = `/usr/src/${rootPath}/.force-reinstall`;
+          // CRA lives under /app, Next.js under /web; respect caller's targetDir
+          const subDir = targetDir === 'app' ? 'web' : targetDir;   // <- tweak if you use CRA elsewhere
+          const cmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath}/${subDir} && ${addDeps} && date > ${stampPath}"`;
+          await runCommand(cmd, '.', taskId);
+        }
         
-        await runCommand(dockerInstallCmd, '.', taskId);
-        console.log(`Successfully installed packages in container ${containerName} (${targetDir})`);
-        await updateTaskStatus(taskId, 'succeed', `Successfully installed dependencies in container ${containerName} (${targetDir})`);
+        console.log(`Successfully added packages to package.json in ${containerName} (${targetDir})`);
+        await updateTaskStatus(taskId, 'succeed', `Dependencies added to package.json in ${targetDir}. They will be installed on next container rebuild.`);
       } catch (error: any) {
-        console.error(`Failed to install packages in container. Error:`, error);
-        await updateTaskStatus(taskId, 'failed', `Error installing dependencies: ${error.message}`);
+        console.error(`Failed to add packages to package.json. Error:`, error);
+        await updateTaskStatus(taskId, 'failed', `Error adding dependencies to package.json: ${error.message}`);
       }
     } catch (error: any) {
       console.error(`Error in startInstallNodeDependenciesTask:`, error);
@@ -1017,7 +1048,7 @@ export const closeProjectContainer = async (
 
 export async function getContainerName(projectId: string): Promise<string | null> {
   const result = await pool.query(
-    'SELECT container_name FROM solanaproject WHERE id = $1',
+    'SELECT "container_name" FROM solanaproject WHERE id = $1',
     [projectId]
   );
   if (!result.rows.length || !result.rows[0].container_name) {

@@ -1,5 +1,70 @@
+/**
+ * SF_HOST_PORT — bind container port 3000 to this host port.
+ * Default: 31000.  Useful for local dev so the browser URL is always predictable.
+ */
 import { execSync } from 'child_process';
 import pool from 'src/config/database';
+import { format } from 'node:util';
+import os from 'os';
+import fs from 'fs';
+import path from 'path';
+import { getProjectRootPath } from 'src/utils/fileUtils';
+
+/* ───────── timing helper ────────
+ * If you only need to *see* the output, use inherit=true.
+ * If you also need to *capture* the output (inspect / port),
+ * call with inherit = false (default) so execSync returns a Buffer. */
+function timed(
+  cmd: string,
+  label: string = cmd.split(' ')[1],
+  inherit: boolean = true,          // <-- default keeps logs on screen
+): Buffer {
+  console.time(`[${label}]`);
+  const out = inherit
+    ? (execSync(cmd, { stdio: 'inherit' }), Buffer.from('')) // nothing to return
+    :  execSync(cmd);                                        // capture stdout
+  console.timeEnd(`[${label}]`);
+  return out;
+}
+
+// ─── container ports ─────────────────────────────────────────
+const INTERNAL_PORT = 3000;          // inside container
+const MIN_PORT = 31000, MAX_PORT = 32767;
+
+/** Host side HTTP port.  
+ *  • If SF_HOST_PORT is set → use that.  
+ *  • Otherwise fall back to the old auto-picker.               */
+const DEFAULT_HOST_PORT = 31000;
+
+function pickFreePort(): number {
+  for (let p = MIN_PORT; p <= MAX_PORT; p++) {
+    try {
+      if (!execSync(`docker ps --filter publish=${p} --format '{{.ID}}'`)
+            .toString().trim()) return p;          // free
+    } catch { /* ignore, keep scanning */ }
+  }
+  throw new Error('NO_FREE_PORT');
+}
+
+function getDockerHostIP(): string {
+  const dh = process.env.DOCKER_HOST;
+  if (!dh) return 'localhost';
+  try {
+    const u = new URL(dh);
+    return u.hostname || 'localhost';
+  } catch {
+    return 'localhost';
+  }
+}
+
+function portInUse(port: string): boolean {
+  try {
+    return !!execSync(`docker ps --filter publish=${port} --format '{{.ID}}'`)
+             .toString().trim();
+  } catch {                       // treat any error as "port free"
+    return false;
+  }
+}
 
 /**
  * Checks if the Docker server version supports the --pull=always flag (added in 23.0.0)
@@ -47,17 +112,56 @@ function sizeOptSupported(): boolean {
 }
 
 /**
+ * Returns true when the Docker daemon is overlay2 on an XFS filesystem
+ * mounted with the `pquota` option (the only case where `--storage-opt size=`
+ * is accepted). Falls back to false on any error.
+ */
+function isRemoteDocker(): boolean {
+  const h = process.env.DOCKER_HOST ?? "";
+  const remote = h.startsWith("ssh://") || h.startsWith("tcp://");
+  const forced = !!process.env.DOCKER_HOST && process.env.FORCE_REMOTE_DOCKER === "1";
+  /* quick trace so we see what the server really received */
+  console.debug("[docker] DOCKER_HOST =", h || "<unset>",
+                "| FORCE_REMOTE_DOCKER =", process.env.FORCE_REMOTE_DOCKER);
+  return remote || forced;
+}
+
+/**
+ * Returns the Docker daemon's root directory path.
+ * Falls back to '/var/lib/docker' if unable to determine.
+ */
+function getDockerRoot(): string {
+  try {
+    return execSync(
+      'docker info --format "{{.DockerRootDir}}"',
+      { encoding: 'utf8' }
+    ).trim() || '/var/lib/docker';
+  } catch { 
+    return '/var/lib/docker'; 
+  }
+}
+
+/**
  * Returns free bytes left on the partition that backs /var/lib/docker.
  * Falls back to Number.MAX_SAFE_INTEGER on any failure so we never block.
  */
 function getDockerFreeBytes(): number {
   try {
+    const rootDir = getDockerRoot();
+    // Check if rootDir exists before running df
+    if (process.platform !== 'linux' ||
+        !execSync(`test -d "${rootDir}" && echo "exists"`, { encoding: "utf8" }).includes("exists")) {
+      console.warn(`[getDockerFreeBytes] Docker root '${rootDir}' not found, skipping probe`);
+      return Number.MAX_SAFE_INTEGER;  // Skip probe if rootDir doesn't exist
+    }
+    
     const out = execSync(
-      "df -B1 /var/lib/docker | tail -1 | awk '{print $4}'",
+      `df -B1 ${rootDir} | tail -1 | awk '{print $4}'`,
       { encoding: "utf8" }
     ).trim();
     return Number(out || 0);
-  } catch {
+  } catch (e) {
+    console.warn("[getDockerFreeBytes] probe failed:", e);
     return Number.MAX_SAFE_INTEGER;
   }
 }
@@ -68,12 +172,26 @@ function getDockerFreeBytes(): number {
  * Throws 'LOW_DOCKER_SPACE' if the space is still insufficient.
  */
 function ensureDockerSpace(minBytes = 3 * 1024 * 1024 * 1024): void {
-  if (getDockerFreeBytes() >= minBytes) return;
+  /* Skip entirely for remote builds or when the dev forces it */
+  if (isRemoteDocker()) {
+    console.warn("[startProjectContainer] remote Docker detected – "
+               + "disk-space probe skipped");
+    return;
+  }
 
-  console.warn(
-    `[startProjectContainer] Low Docker disk (<${minBytes} bytes). ` +
-    "Running docker system prune -af --volumes …"
-  );
+  const free = getDockerFreeBytes();
+
+  /* If the probe failed (MAX_SAFE_INTEGER) we treat it as "unknown" and skip. */
+  if (free === Number.MAX_SAFE_INTEGER) {
+    console.warn("[startProjectContainer] Unable to measure Docker disk – "
+               + "skipping space guard");
+    return;
+  }
+
+  if (free >= minBytes) return;
+
+  console.warn(`[startProjectContainer] Low Docker disk (<${minBytes} bytes). `
+             + "Running docker system prune -af --volumes …");
   try {
     execSync("docker system prune -af --volumes", { stdio: "inherit" });
   } catch (e) {
@@ -85,57 +203,218 @@ function ensureDockerSpace(minBytes = 3 * 1024 * 1024 * 1024): void {
 }
 
 /**
+ * Resolves the container URL using the appropriate host and port
+ */
+export function resolveContainerUrl(port: string) {
+  const fqdn = process.env.PUBLIC_FQDN;          // e.g. demo.solanaflow.xyz
+  if (fqdn) return `http://${fqdn}:${port}`;
+  // fall back to EC2 public hostname if set through env
+  const host = process.env.PUBLIC_HOSTNAME ?? process.env.EC2_PUBLIC_IP;
+  return `http://${host ?? 'localhost'}:${port}`;
+}
+
+/**
  * Starts a new Docker container for a project
  * 
  * @param projId - The project ID
- * @returns The name of the created container
+ * @param devMode - Whether to run in development mode with hot-reload
+ * @returns The container details including name and URL
  */
-export async function startProjectContainer(projId: string): Promise<string> {
+export async function startProjectContainer(
+  projId: string,
+  devMode = false,
+): Promise<{
+  containerName: string;
+  containerUrl: string;
+}> {
   const name  = `userproj-${projId}-${Date.now()}`.slice(0, 63);        // 64-char limit
   // Use the tag only, let --pull=always refresh it
-  const image = process.env.SOLANAFLOW_BUILD_IMAGE ?? 
-              'ghcr.io/sequence4/solana-toolchain:runtime-latest';
+  // Fallback image when the caller doesn't set SOLANAFLOW_BUILD_IMAGE.
+  // Use the native amd64 build that contains the warmed SBF cache.
+  const image = process.env.SOLANAFLOW_BUILD_IMAGE
+              ?? 'ghcr.io/sequence4/solana-toolchain:runtime-latest-amd64';
+
+  /** Toggle: `SF_DEV_SERVER=1` ⇒ start `next dev` instead of standalone build */
+  const useDevServer = devMode || process.env.SF_DEV_SERVER === '1';
+  
+  // Determine project root path and ensure host directory exists for mounting
+  const rootPath = await getProjectRootPath(projId);
+  const hostRoot = process.env.ROOT_FOLDER;
+  if (!hostRoot) {
+    throw new Error('ROOT_FOLDER environment not set – cannot locate project directory');
+  }
+  const hostProjectDir = path.join(hostRoot, rootPath);
+  if (!fs.existsSync(hostProjectDir)) {
+    fs.mkdirSync(hostProjectDir, { recursive: true });
+  }
+  const hostWebDir = path.join(hostProjectDir, 'web');
+  if (!fs.existsSync(hostWebDir)) {
+    fs.mkdirSync(hostWebDir, { recursive: true });
+  }
   
   const withPullAlways = pullAlwaysAllowed(image);
               
+  // ── pick architecture: env override > host default
+  const hostArch = execSync('docker info --format "{{.Architecture}}"')
+                  .toString().trim();                       // "x86_64" | "aarch64"
+
+  const targetPlatform =
+    process.env.SF_DOCKER_PLATFORM            // explicit override
+    ?? (hostArch === 'x86_64' ? 'linux/amd64' // EC2/Intel boxes
+                              : 'linux/arm64'); // Apple Silicon, Graviton, …
+  
   // 📦 three isolated caches
   const vCargo       = 'solanaflow-cargo-registry';
   const vTargetBuild = 'solanaflow-cargo-target';
   const vSccache     = 'solanaflow-sccache';
+  const vYarnCache   = 'solanaflow-yarn-cache';      // NEW – keeps registry tarballs
+  const vNextCache   = 'solanaflow-next-cache';
 
   try {
-    /* 1 ─ ensure image is present & host-arch-compatible */
-    execSync(`docker pull --platform linux/arm64 ${image}`, { stdio: 'inherit' });
+    process.env.DOCKER_CLI_DEBUG = process.env.DOCKER_CLI_DEBUG ?? '1'; // show HTTP calls
+    
+    // ── pin to immutable digest and then re-tag it so `docker run` will work
+    let imageRef = image;
+    try {
+      let digest = '';
+      try {
+        const buf = timed(
+          `docker inspect -f "{{index .RepoDigests 0}}" ${image}`,
+          'inspect',
+          /* inherit? */ false,          // capture instead of inherit
+        );
+        digest = buf ? buf.toString().trim() : '';
+        if (digest) {
+          console.log('[startProjectContainer] pulled digest:', digest);
+          execSync(`docker tag ${digest} ${image}`, { stdio: 'inherit' });
+          imageRef = image;          // pinned
+        }
+      } catch (e) {
+        console.warn('[startProjectContainer] no digest found – using tag only');
+        imageRef = image;            // safe fallback
+      }
+    } catch (e) {
+      console.warn("[startProjectContainer] digest tagging failed; using tag:", e);
+      imageRef = image;
+    }
+
+    /* 1b ─ ensure the traefik network exists on the remote host */
+    try {
+      execSync('docker network inspect traefik', { stdio: 'ignore' });
+    } catch {
+      console.warn('[startProjectContainer] creating missing "traefik" network');
+      timed('docker network create traefik --driver bridge', 'net-create');
+    }
 
     /* 2 ─ run container with explicit platform, project label & random host-port */
     // NEW: make sure the host has enough free space (≥ 3 GiB)
     ensureDockerSpace();
+    
+    /* ------------------------------------------------------------------
+     * Pull the image for the platform selected above.  This guarantees
+     * that    SF_DOCKER_PLATFORM=linux/amd64    on WSL/Intel laptops
+     * actually fetches x86-64 layers and never falls back to QEMU. 
+     * ------------------------------------------------------------------ */
+    timed(`docker pull --platform ${targetPlatform} ${image}`, 'pull');
 
+    // choose the public port deterministically so the UI link is stable
+    const hostPort = process.env.SF_HOST_PORT
+      ? Number(process.env.SF_HOST_PORT) 
+      : pickFreePort();               // ← fallback for legacy callers
+
+    if (portInUse(String(hostPort))) {
+      throw new Error(`[startProjectContainer] requested hostPort ${hostPort} already in use`);
+    }
+    
     const runArgs: string[] = [
-      'docker', 'run', 
-      ...(withPullAlways ? ['--pull=always'] : []),
-      '-d',
-      '--platform', 'linux/arm64',
+      'docker', 'run',
+      ...(withPullAlways ? ['--pull=always'] : []),     // refresh tag (Docker ≥ 23)
+      '-d',                                            // detached – let pipeline continue
+      '--user', '0:0',                                 // 🔸 run container as root (fixes mkdir EACCES)
+      '--platform', targetPlatform,                    // dynamic arch selection
       '--name', name,
       '--label', `solanaflow.project=${projId}`,
-      // attach 20 GiB quota only when overlay2 + xfs +pquota
-      ...(sizeOptSupported() ? ['--storage-opt', 'size=20G'] : []),
+      '--restart', 'unless-stopped',
+      ...(sizeOptSupported() ? ['--storage-opt', 'size=20G'] : []),  // guard FS quota
       '-v', `${vCargo}:/root/.cargo`,
       '-v', `${vSccache}:/opt/sccache`,
       '-v', `${vTargetBuild}:/usr/src/target`,
+      '-v', `${vYarnCache}:/usr/local/share/.cache/yarn/v6`,
+      '-v', `${vNextCache}:/usr/src/${rootPath}/web/.next`,
+      // Mount host project directory into the container at the correct path
+      '-v', `${hostProjectDir}:/usr/src/${rootPath}`,
       '-e', 'CARGO_TARGET_DIR=/usr/src/target',
       '-e', 'HOSTNAME=0.0.0.0',
-      // publish container port 3000 → random host port
-      '-p', '0:3000',
-      image,
-      'bash', '-lc',
-      '"node /usr/share/solanaflow/web/.next/standalone/server.js -H 0.0.0.0 & pid=$!; trap \\"kill $pid\\" TERM INT; wait $pid"'
+      '-e', 'CARGO_BUILD_JOBS=1',
+      '-e', 'RUSTC_WRAPPER=sccache',
+      '-e', 'YARN_CACHE_FOLDER=/usr/local/share/.cache/yarn/v6',
+      // RUSTFLAGS is exported in /tmp/build.sh; keep it *out* of docker run to avoid quoting issues
+      '-e', `APP_ID=${projId}`,
+      '-e', `APP_BASE_PATH=/dapp/${projId}`,
+      '-e', `SF_DEV_SERVER=${useDevServer ? '1' : ''}`,
+      '-e', 'COREPACK_ENABLE_STRICT=0',           // ← allow Yarn inside "web/"
+      '--label=traefik.enable=true',
+      `--label='traefik.http.routers.dapp-${projId}.rule=PathPrefix(\`/dapp/${projId}\`)'`,
+      `--label=traefik.http.routers.dapp-${projId}.entrypoints=web,websecure`,
+      `--label='traefik.http.routers.dapp-${projId}.middlewares=strip-${projId}'`,
+      `--label='traefik.http.middlewares.strip-${projId}.stripprefix.prefixes=/dapp/${projId}'`,
+      `--label=traefik.http.routers.dapp-${projId}.service=dapp-${projId}`,
+      `--label=traefik.http.services.dapp-${projId}.loadbalancer.server.port=${INTERNAL_PORT}`,
+      `--label=traefik.http.services.dapp-${projId}.loadbalancer.healthcheck.timeout=30s`,
+      // pin to one SG-approved port so the UI link is always stable
+      '-p', `${hostPort}:${INTERNAL_PORT}`,
+      // Set working directory to the project's web folder
+      '-w', `/usr/src/${rootPath}/web`,
+      imageRef,
     ];
 
-    console.log('[startProjectContainer] RUN CMD:\n', runArgs.join(' '));
-    execSync(runArgs.join(' '), { stdio: 'inherit' });
+    // Add the appropriate command based on dev vs production mode
+    if (useDevServer) {
+      runArgs.push(
+        'bash', '-lc',
+        // Copy base Next.js app if needed, then start dev server with hot-reload
+        `"if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
+        `cp -R /usr/share/solanaflow/web/* /usr/src/${rootPath}/web/; fi; ` +
+        `cd /usr/src/${rootPath}/web && ` +
+        `export NEXT_DISABLE_REACT_REFRESH=\${NEXT_DISABLE_REACT_REFRESH:-0}; ` +
+        `npx next dev -H 0.0.0.0 -p ${INTERNAL_PORT} & ` +
+        `pid=$!; trap 'kill $pid' TERM INT; wait $pid"`
+      );
+    } else {
+      runArgs.push(
+        'bash', '-lc',
+        // Copy base Next.js app if needed, then run standalone server
+        `"if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
+        `cp -R /usr/share/solanaflow/web/* /usr/src/${rootPath}/web/; fi; ` +
+        `cd /usr/src/${rootPath}/web && ` +
+        `until [ -d .next ]; do sleep 1; done && ` +
+        `node .next/standalone/server.js -H 0.0.0.0 -p ${INTERNAL_PORT} & ` +
+        `pid=$!; trap 'kill $pid' TERM INT; wait $pid"`
+      );
+    }
 
-    return name;
+    console.log("[startProjectContainer] RUN CMD:\n", runArgs.join(" "));
+    timed(runArgs.join(" "), 'docker-run');
+
+    // ─── ensure Yarn 1.x binary is available via Corepack ──────────────────
+    try {
+      timed(
+        `docker exec ${name} bash -lc "corepack enable && corepack prepare yarn@1.22.22 --activate"`,
+        'corepack-prepare'
+      );
+    } catch (e) {
+      console.warn('[startProjectContainer] corepack prepare failed:', e);
+    }
+
+    const containerUrl = resolveContainerUrl(String(hostPort));
+
+    console.log(
+      `[startProjectContainer] ➜  ${containerUrl}`,
+    );
+    return {
+      containerName: name,
+      containerUrl
+    };
   } catch (err: any) {
     /* ---------- quarantine on failure ---------- */
     const reason = err.stderr?.toString() || err.message || 'unknown';

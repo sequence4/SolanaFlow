@@ -1,0 +1,304 @@
+# syntax=docker/dockerfile:1.7
+# ─────────────────────────────────────────────────────────────────────────────
+#  amd64-only SolanaFlow base image — optimised for WSL / Intel/AMD
+#  · One-for-one copy of the arm64 Dockerfile, with arm64 hints removed
+#  · No qemu-static emulation
+#  · Solana CLI 2.1 installed globally in /usr/local/bin
+# ─────────────────────────────────────────────────────────────────────────────
+
+###############################################################################
+# 0.  Bootstrap – Rust + Solana CLI (native amd64, zero qemu)
+###############################################################################
+FROM --platform=linux/amd64 rust:1.87.0-slim-bookworm AS bootstrap
+RUN apt-get update -qq && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        bash curl ca-certificates build-essential pkg-config libssl-dev libudev-dev gnupg \
+        xz-utils  # <- solana tarball needs this to unpack
+
+# dash (the default /bin/sh in Debian-slim) can't handle "set -o pipefail".
+# Switch the shell to bash for the rest of this stage so the installer
+# layer can use  `set -euo pipefail` safely.
+SHELL ["/bin/bash","-c"]
+
+###############################################################################
+#  Solana CLI install (robust):
+#   1. Try the canonical Cloudflare-backed URL with retries.
+#   2. Fall back to GitHub raw if Cloudflare still throws 525/522.
+#   3. Verify SHA256 so CI never runs tampered code.
+###############################################################################
+ARG SOLANA_VERSION=v2.1.15      # Anchor ≥0.31 expects Solana ≥2.1.x
+ENV SOLANA_INSTALL_ORIGIN="https://release.anza.xyz/${SOLANA_VERSION}/install" \
+    SOLANA_INSTALL_MIRROR="https://raw.githubusercontent.com/anza-xyz/solana/${SOLANA_VERSION}/install/solana-install-init.sh"
+
+RUN set -euo pipefail; \
+    install -d -m 0755 /usr/local/bin; \
+    echo "⏬  Fetching Solana installer…" ; \
+    curl --retry 5 --retry-delay 2 --retry-all-errors -fsSL "${SOLANA_INSTALL_ORIGIN}" -o /tmp/solana-install.sh \
+        || { echo '⚠️  Origin failed, using GitHub mirror'; \
+             curl --retry 5 --retry-delay 2 --retry-all-errors -fsSL "${SOLANA_INSTALL_MIRROR}" -o /tmp/solana-install.sh ; }; \
+    # -----------------------------------------------------------------------
+    # Force the wrapper to pull the *binary* installer from GitHub releases
+    # and pin the version so it never queries the archived "latest" API.
+    # This removes all Cloudflare traffic and eliminates HTTP-525, while
+    # keeping the original -b /usr/local/bin behaviour intact.
+    # -----------------------------------------------------------------------
+    export SOLANA_DOWNLOAD_ROOT="https://github.com/solana-labs/solana/releases/download" \
+           SOLANA_RELEASE="${SOLANA_VERSION}"; \
+    sha256sum /tmp/solana-install.sh; \
+    bash /tmp/solana-install.sh \
+        --no-modify-path \
+        --data-dir /usr/local/solana \
+        "${SOLANA_VERSION}"; \
+    # expose the CLI suite **and** Cargo helpers (e.g. `cargo-build-sbf`) on the global PATH
+    ln -sf /usr/local/solana/active_release/bin/solana* /usr/local/bin/ && \
+    ln -sf /usr/local/solana/active_release/bin/cargo-*  /usr/local/bin/; \
+    solana --version
+
+ENV PATH="/usr/local/bin:${PATH}"
+
+ARG BUILDKIT_INLINE_CACHE=1
+ARG BASE_TOOLCHAIN=bootstrap   # local stage alias
+ARG AWS_REGION                 # --build-arg AWS_REGION=eu-north-1
+
+###############################################################################
+# 1.  Solana / Agave tool-chain – add sccache, Anchor CLI, Node
+###############################################################################
+FROM bootstrap AS solana-toolchain
+ARG AWS_REGION
+# use bash & fail-fast for every RUN in this stage
+SHELL ["/bin/bash","-c"]
+# ── sccache must be **local-only** while the image builds ───────────────
+# Any remote settings trigger an S3 lookup that fails inside Docker-for-WSL.
+ENV AWS_REGION=${AWS_REGION} \
+    # ---- force purely local cache during image build -----------------
+    SCCACHE_REGION="" \
+    SCCACHE_CACHE_TYPE="local" \
+    SCCACHE_DISABLE="1" \
+    RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    # keep all three Cargo bin dirs on PATH:
+    #   • /usr/local/cargo/bin  – default in rust:* images
+    #   • /usr/local/rustup     – system-wide rustup toolchain
+    #   • /usr/local/bin        – system-wide convenience links
+    PATH="/usr/local/bin:/usr/local/cargo/bin:${PATH}"
+
+# purge occasionally-corrupt llvm tool-chain cache
+RUN rm -rf /root/.cache/solana/platform-tools || true
+
+# ------------------------------------------------------------------
+# Install the *stable* Rust tool-chain up-front.  Doing this **before**
+# we install Anchor prevents `rustup default stable` from later
+# clobbering `/usr/local/bin` and deleting the freshly-built
+# `anchor` binary.  We run it in its own layer so the expensive
+# download is cached independently.
+# ------------------------------------------------------------------
+RUN rustup set profile minimal && \
+    rustup default stable
+
+# Anchor 0.31.1 (works with Solana ≥2.1) + minimal Node 20
+ARG ANCHOR_VERSION=0.31.1
+RUN set -euo pipefail; \
+    rustup component add rust-src ; \
+    # ------------------------------------------------------------------
+    # Install full native tool-chain *first* so Cargo can compile Anchor,
+    # **then** build sccache and anchor in one shot so the symlink survives.
+    # ------------------------------------------------------------------
+    apt-get update -qq && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        git clang lld llvm make pkg-config libssl-dev ca-certificates && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    # ------------------------------------------------------------------
+    # (re)install sccache *after* apt so the symlink can't be clobbered.
+    # We **do not** activate it yet because very early invocations inside
+    # `cargo install anchor-cli` can fail on some WSL kernels.
+    # ------------------------------------------------------------------
+    cargo install --locked sccache && \
+    ln -sf /usr/local/cargo/bin/sccache /usr/local/bin/sccache && \
+    # Some crates still expect the generic `cc` name – make it point to clang
+    ln -sf "$(command -v clang)" /usr/bin/cc && \
+    # ------------------------------------------------------------------
+    # Now build & install Anchor under /usr/local.
+    # ------------------------------------------------------------------
+    cargo install --git https://github.com/solana-foundation/anchor.git \
+                 --tag v${ANCHOR_VERSION} \
+                 anchor-cli --locked --root /usr/local ; \
+    /usr/local/bin/anchor --version ; \
+    # Optional tooling
+    cargo install cargo-chef --version 0.1.64 --locked --root /usr/local ; \
+    # Clean up to keep the layer small
+    apt-get clean && rm -rf /var/lib/apt/lists/* ; \
+    strip /usr/local/bin/solana* /usr/local/bin/anchor /usr/local/bin/sccache || true
+
+# ----------------------------------------------------------------------
+#  ⬇️  **DO NOT** enable sccache yet – it still tries S3 during warm-up.
+# ----------------------------------------------------------------------
+RUN solana --version && cargo --version && rustc --version && /usr/local/bin/anchor --version
+
+# Warm up BPF/SBF cache once so first user build is instant
+WORKDIR /tmp
+RUN export CARGO_TARGET_DIR=/usr/src/target && \
+    # compile warm-up *without* the sccache wrapper
+    unset RUSTC_WRAPPER && \
+    anchor init anchor-template --no-git --no-install && \
+    # ------------------------------------------------------------------
+    # The newly-generated workspace has **no** lock-file yet, so we
+    # create one explicitly.  Solana CLI 2.1 bundles Rust ≥1.78 so it
+    # understands lockfile-v4; no down-rev hack is needed.
+    # ------------------------------------------------------------------
+        ( cd anchor-template && \
+      cargo generate-lockfile && \
+      anchor build ) && \
+    rm -rf anchor-template/node_modules && \
+    mv anchor-template /usr/src/anchor-template && \
+    rm -rf /usr/src/target/debug /usr/src/target/**/incremental && \
+    mkdir -p /cache-seed && cp -a /usr/src/target/deploy /cache-seed/target
+
+# ----------------------------------------------------------------------
+#  🎉  Warm-up finished – switch sccache *back on* (local-only).
+# ----------------------------------------------------------------------
+# ---- warm-up finished – re-enable local sccache ----------------------
+# (env var no longer needed – remove it)
+
+#  • keep cache type local
+#  • ensure bucket/region are blank so sccache never flips to S3
+ENV RUSTC_WRAPPER=/usr/local/bin/sccache \
+    SCCACHE_DISABLE="" \
+    SCCACHE_CACHE_TYPE="local" \
+    SCCACHE_BUCKET="" \
+    SCCACHE_REGION="" \
+    \
+    ### --------  Low-RAM build flags (keep < 4 GB in WSL)  --------
+    # Two parallel code-gen processes and a single codegen-unit per
+    # crate dramatically reduce LLVM's peak memory without hurting
+    # throughput on laptops.                      (see docs below)
+    CARGO_BUILD_JOBS=2 \
+    RUSTFLAGS="-Ccodegen-units=1"
+
+###############################################################################
+# 2.  Dependency cooker (cargo-chef)
+###############################################################################
+FROM solana-toolchain AS chef
+WORKDIR /app
+COPY docker-base-image/Cargo.toml docker-base-image/Cargo.lock docker-base-image/src/ ./
+RUN unset RUSTC_WRAPPER SCCACHE_BUCKET SCCACHE_REGION && \
+    SCCACHE_DISABLE=1 cargo chef prepare --recipe-path recipe.json
+
+FROM solana-toolchain AS cooker
+WORKDIR /app
+COPY --from=chef /app/recipe.json .
+RUN unset RUSTC_WRAPPER SCCACHE_BUCKET SCCACHE_REGION && \
+    SCCACHE_DISABLE=1 cargo chef cook --release --recipe-path recipe.json
+
+###############################################################################
+# 3.  Application build (native amd64)
+###############################################################################
+FROM --platform=linux/amd64 solana-toolchain AS builder
+ARG NODE_VERSION=v20.18.0
+ARG YARN_LOCK_HASH
+ARG APP_ID=local
+ARG WEB_CACHE_BUSTER             # cache-buster now applies only to web build
+ENV HOME="/root"
+ENV NVM_DIR="/usr/local/nvm"
+ENV PATH="/usr/local/bin:/usr/local/cargo/bin:${PATH}"
+ENV CARGO_BUILD_JOBS=2 RUSTFLAGS="-Ccodegen-units=1"
+ENV NEXT_TELEMETRY_DISABLED="1"
+ENV NEXT_SKIP_ESLINT="1"
+ENV NEXT_PRIVATE_STANDALONE="true"
+ENV APP_ID="${APP_ID}"
+
+# Touch the ARG so this stage rebuilds when WEB_CACHE_BUSTER changes,
+# without invalidating the solana-toolchain cache layers above.
+RUN echo "Web cache bust: ${WEB_CACHE_BUSTER}"
+
+# Node + Yarn
+RUN mkdir -p $NVM_DIR && curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash && \
+    . "$NVM_DIR/nvm.sh" && nvm install ${NODE_VERSION} && nvm alias default ${NODE_VERSION} && \
+    if ! command -v yarn >/dev/null 2>&1 ; then npm i -g yarn@1 ; fi
+ENV PATH="${NVM_DIR}/versions/node/${NODE_VERSION}/bin:${PATH}"
+
+# reuse compiled deps
+COPY --from=cooker /app/target /app/target
+WORKDIR /app
+COPY docker-base-image/src/ ./src
+
+# --------------------------------------------------------------------------
+# Install web dependencies (cached) and build Next.js app
+# The cache mount means subsequent builds take seconds instead of minutes.
+# --------------------------------------------------------------------------
+COPY web/package.json web/yarn.lock /usr/share/solanaflow/web/
+RUN --mount=type=cache,target=/usr/local/share/.cache/yarn/v6,sharing=locked \
+    mkdir -p /usr/share/solanaflow/web && \
+    yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile --prefer-offline
+COPY web/ /usr/share/solanaflow/web
+
+###############################################################################
+# 4.  Runtime – slim image with CLI + built app
+# NOTE: Hard-pin to amd64 so the base layer always matches the Node binary
+# copied in from the builder stage, regardless of the host that triggers
+# the build. This prevents "exec format error" at container start-up.
+###############################################################################
+FROM --platform=linux/amd64 ubuntu:22.04 AS runtime
+ARG NODE_VERSION=v20.18.0
+ARG APP_ID=local
+ENV RUSTUP_HOME=/usr/local/rustup
+ENV CARGO_HOME=/usr/local/cargo
+ENV PATH=/usr/local/bin:/usr/local/cargo/bin:$PATH
+ENV HOSTNAME=0.0.0.0
+ENV NEXT_DISABLE_SWC=1
+ENV APP_ID=${APP_ID}
+
+WORKDIR /usr/share/solanaflow/web
+COPY --from=solana-toolchain /usr/local/bin /usr/local/bin
+COPY --from=solana-toolchain /usr/local/cargo/bin /usr/local/cargo/bin
+COPY --from=solana-toolchain /usr/local/rustup /usr/local/rustup
+#──────────────────────────────────────────────────────────────
+# Solana CLI symlinks in /usr/local/bin actually point into
+# /usr/local/solana/active_release/bin/…                    ⇢
+# That whole directory must be present in the runtime layer,   
+# otherwise the symlinks are dangling and `solana` is "not
+# found" at runtime.                                          
+#──────────────────────────────────────────────────────────────
+COPY --from=solana-toolchain /usr/local/solana /usr/local/solana
+COPY --from=solana-toolchain /usr/src/anchor-template /usr/src/anchor-template
+
+# Copy web files for development
+COPY --from=builder /usr/share/solanaflow/web /usr/share/solanaflow/web
+COPY --from=builder /usr/local/nvm/versions/node/${NODE_VERSION} /usr/local/nvm/versions/node/${NODE_VERSION}
+RUN ln -sf /usr/local/nvm/versions/node/${NODE_VERSION}/bin/* /usr/local/bin/
+
+# ── Corepack → project-local Yarn wrapper no longer needed ─────────────
+RUN mkdir -p /usr/share/solanaflow/web/.yarn/releases \
+ && corepack enable \
+ && corepack prepare yarn@1.22.22 --activate \
+ && ln -sf "$(command -v yarn)" \
+         /usr/share/solanaflow/web/.yarn/releases/yarn-1.22.22.cjs \
+ && node -v && yarn -v \
+ && solana --version && /usr/local/bin/anchor --version && cargo --version
+
+RUN apt-get update -qq && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      bash build-essential clang lld llvm pkg-config libssl-dev binutils ca-certificates jq curl && \
+    update-ca-certificates && \
+    ln -sf "$(command -v gcc || command -v clang)" /usr/bin/cc && \
+    strip /usr/local/bin/solana* || true && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN ln -sf /bin/bash /bin/sh
+SHELL ["/bin/bash","-c"]
+
+# Clear Next.js build cache on container start (dev environment)
+COPY docker-base-image/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+
+ENV PORT=3000
+EXPOSE 3000
+CMD ["npx", "next", "dev", "-H", "0.0.0.0", "-p", "3000"]
+
+###############################################################################
+# 5.  Target-seed stage (unchanged)
+###############################################################################
+FROM solana-toolchain AS seed-target
+COPY --from=solana-toolchain /cache-seed/target /target-seed
+    

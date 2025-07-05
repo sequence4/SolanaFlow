@@ -1,17 +1,35 @@
 // server/src/utils/codeGen/uiTemplates/walletProvider.ts
-export const WALLET_CONNECTION_PROVIDER_TSX = `"use client";
+export const walletProvider = `\
+"use client";
 
-import { FC, ReactNode, useMemo } from "react";
-import { ConnectionProvider, WalletProvider } from "@solana/wallet-adapter-react";
+import { type FC, type ReactNode, useMemo } from "react";
+import {
+  ConnectionProvider,
+  WalletProvider,
+} from "@solana/wallet-adapter-react";
+import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
-import { PhantomWalletAdapter } from "@solana/wallet-adapter-wallets";
+import {
+  PhantomWalletAdapter,
+  SolflareWalletAdapter,
+} from "@solana/wallet-adapter-wallets";
 import { clusterApiUrl } from "@solana/web3.js";
 
-interface Props { children: ReactNode }
+import "@solana/wallet-adapter-react-ui/styles.css";
 
-const WalletConnectionProvider: FC<Props> = ({ children }) => {
-  const endpoint = process.env.NEXT_PUBLIC_SOL_RPC_URL ?? clusterApiUrl("devnet");
-  const wallets  = useMemo(() => [new PhantomWalletAdapter()], []);
+interface WalletContextProviderProps {
+  children: ReactNode;
+}
+
+export const WalletContextProvider: FC<WalletContextProviderProps> = ({
+  children,
+}) => {
+  const network = WalletAdapterNetwork.Devnet;
+  const endpoint = useMemo(() => clusterApiUrl(network), [network]);
+  const wallets = useMemo(
+    () => [new PhantomWalletAdapter(), new SolflareWalletAdapter()],
+    []
+  );
 
   return (
     <ConnectionProvider endpoint={endpoint}>
@@ -20,6 +38,4 @@ const WalletConnectionProvider: FC<Props> = ({ children }) => {
       </WalletProvider>
     </ConnectionProvider>
   );
-};
-
-export default WalletConnectionProvider;`;
+};`;

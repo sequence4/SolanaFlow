@@ -1,5 +1,19 @@
-# keep build slim
 *.log
 node_modules/
 target/
 cache-seed/
+
+!web/
+!web/**
+
+!web/public
+!web/public/** 
+
+!web/.force-reinstall
+     
+web/.yarn/cache/     
+!web/.yarn            
+!web/.yarn/releases/     
+!web/.yarn/plugins/
+!web/.yarn/patches/
+!web/.yarn/sdks/

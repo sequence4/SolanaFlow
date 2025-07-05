@@ -11,6 +11,7 @@ out/
 *.tsbuildinfo
 nohup.out
 
+.env
 .env* 
 !.env.example 
 !landing/.env.test 
@@ -40,3 +41,11 @@ landing/.env.production
 landing-prod.tgz
 solanaflow-landing
 build.log
+/.env*
+
+.yarn/*
+!.yarn/releases
+!.yarn/plugins
+!.yarn/patches
+!.yarn/sdks
+!.yarn/versions

@@ -10,6 +10,12 @@ import axios from 'axios';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL!;   // we *expect* it
 
+/* ensure every URL we store ends in `/dapp/<projectId>`  */
+const withDappPath = (url: string | undefined, projectId: string): string => {
+  if (!url) return "";
+  return url.includes("/dapp/") ? url : `${url.replace(/\/$/, "")}/dapp/${projectId}`;
+};
+
 export const projectApi = {
 
   runCommand: async (
@@ -126,11 +132,11 @@ export const projectApi = {
       console.log(`[DEBUG_API] getProjectDetails - Raw API response data:`, response.data);
       
       if (response.data.project.container_url) {
-        console.log(`[DEBUG_API] getProjectDetails - Found container_url: "${response.data.project.container_url}"`);
-        response.data.project.containerUrl = response.data.project.container_url;
+        const raw = response.data.project.container_url;
+        response.data.project.containerUrl = withDappPath(raw, projectId);
         delete response.data.project.container_url;
       } else if (response.data.project.containerUrl) {
-        console.log(`[DEBUG_API] getProjectDetails - containerUrl already exists: "${response.data.project.containerUrl}"`);
+        response.data.project.containerUrl = withDappPath(response.data.project.containerUrl, projectId);
       } else {
         console.log(`[DEBUG_API] getProjectDetails - No container_url or containerUrl found in response`);
       }
@@ -317,7 +323,9 @@ export const projectApi = {
       console.log(`[DEBUG_API] fetchContainerUrl - Fetching container URL for project: ${projectId}`);
       const response = await api.get(`/projects/${projectId}/container-url`);
       console.log(`[DEBUG_API] fetchContainerUrl - Response:`, response.data);
-      return response.data;
+      const raw  = response.data.containerUrl || response.data.container_url;
+      const full = withDappPath(raw, projectId);
+      return { containerUrl: full };
     } catch (error) {
       console.error('[DEBUG_API] Error fetching container URL:', error);
       throw error;

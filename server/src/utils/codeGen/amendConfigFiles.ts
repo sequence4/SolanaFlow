@@ -159,6 +159,14 @@ async function patchProgramCargoToml(
   console.log(`[AMEND] Loaded ${cargoPath} bytes:`, cargoSrc.length);
   
   let cargoLines = cargoSrc.split('\n');
+  
+  // ── purge exact-duplicate feature lines (caused by prior builds) ──
+  cargoLines = cargoLines.filter((ln, idx, arr) => {
+    if (!ln.trim().startsWith('anchor-debug')) return true;
+    // keep only the *first* anchor-debug line
+    return arr.findIndex(l => l.trim() === ln.trim()) === idx;
+  });
+  
   const idlBuildFeatureLine = 'idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]';
   const defaultFeaturesLine = 'default   = []';
   
@@ -248,11 +256,12 @@ async function patchProgramCargoToml(
     }
     
     // Add any missing Anchor helper features
-    const featureSection = cargoLines.slice(featuresStart + 1, featuresEnd);
-    const missingFeatures = anchorHelperFeatures.filter(feature => {
-      const featureName = feature.split('=')[0].trim();
-      return !featureSection.some(line => line.trim().startsWith(`${featureName} =`) || 
-                                        line.trim().startsWith(`${featureName}=`));
+    const featureSection = cargoLines.slice(featuresStart + 1, featuresEnd)
+                       .map(l => l.trim().split('=')[0].trim());
+    
+    const missingFeatures = anchorHelperFeatures.filter(f => {
+      const name = f.split('=')[0].trim();
+      return !featureSection.includes(name);
     });
     
     if (missingFeatures.length > 0) {
@@ -622,8 +631,8 @@ export const amendConfigFiles = async (
   const programPaths = await listGeneratedPrograms(projectId, userId);
   for (const p of programPaths) {
     const cargoPath = `${p}/Cargo.toml`;
-    const result = await patchProgramCargoToml(projectId, cargoPath, userId);
-    cargoPatches.push({ path: cargoPath, status: result.status, taskId: result.taskId });
+    const res = await patchProgramCargoToml(projectId, cargoPath, userId);
+    cargoPatches.push({ path: cargoPath, status: res.status, taskId: res.taskId });
   }
 
   /* ------------------------------------------------------------------ */

@@ -1,5 +1,4 @@
 import { refreshWorkspaceTree } from './refreshWorkspaceTree';
-import { genUi } from './genUi';
 import { Graph } from '../../types/graph';
 import type { WorkspaceHandle } from '../deploy/prepEnv';
 import { amendConfigFiles } from './amendConfigFiles';
@@ -15,23 +14,10 @@ import { FileTreeItem } from '../../types/FileTreeItem';
 import { runCommand, runCommandDetached } from "../projectUtils";
 import { randomUUID } from 'crypto';
 import path from "path";
+import { execSync } from 'child_process';
 import { attachFileContents } from "../fileUtils/attachFileContents";
-import {
-  HOME_PAGE_TSX,
-  ROOT_LAYOUT_TSX,
-  MINT_FORM_TSX,
-  TOKEN_CREATED_SUCCESS_TSX,
-  WALLET_TSX,
-  THEME_TOGGLE_TSX,
-  UI_BUTTON_TSX,
-  UI_INPUT_TSX,
-  UI_LABEL_TSX,
-  UTILS_TS,
-  GLOBALS_CSS,
-  TAILWIND_CONFIG,
-  POSTCSS_CONFIG,
-  WALLET_CONNECTION_PROVIDER_TSX
-} from './uiTemplates';
+import fs from 'fs/promises';            // promise-based FS API
+import fsSync from 'fs';                 // for existsSync in helper
 
 /** Extract all file paths from a file tree recursively. */
 function flattenPaths(tree: any[]): string[] {
@@ -41,6 +27,74 @@ function flattenPaths(tree: any[]): string[] {
     if (Array.isArray(n?.children)) out.push(...flattenPaths(n.children));
   }
   return out;
+}
+
+/**
+ * Recursively build a FileTreeItem from `webRoot`, always computing
+ * paths **relative to that same root**, no matter how deep we recurse.
+ */
+async function dirToFileTree(current: string, webRoot: string): Promise<FileTreeItem> {
+  const entries = await fs.readdir(current, { withFileTypes: true });
+
+  const children: (FileTreeItem | undefined)[] = await Promise.all(
+    entries.map(async entry => {
+      const abs = path.join(current, entry.name);
+      
+      /* Skip heavyweight or build-generated directories.
+         NOTE: keep .yarn/, but drop its cache sub-folder. */
+      const SKIP_TOP = new Set([
+        'node_modules', '.next', '.turbo',
+        'out', 'dist', '.vercel', 'coverage',
+        '.git', '.vscode', '.idea', '.DS_Store',
+        '.pnpm-store'
+      ]);
+      if (SKIP_TOP.has(entry.name)) return undefined;
+      if (
+        entry.isDirectory() &&
+        path.basename(current) === '.yarn' &&
+        entry.name === 'cache'
+      ) {
+        return undefined;                    // skip .yarn/cache only
+      }
+
+      if (entry.isDirectory()) return dirToFileTree(abs, webRoot);   // recurse
+
+      const code = await fs.readFile(abs, 'utf8');
+      return {
+        name: entry.name,
+        path: `./web/${path.relative(webRoot, abs)}`,                // ← correct base
+        type: 'file',
+        code,
+      };
+    })
+  );
+
+  const relDir = path.relative(webRoot, current);
+  return {
+    name: path.basename(current),
+    path: relDir ? `./web/${relDir}` : './web',                      // root dir path
+    type: 'directory',
+    children: children.filter(Boolean) as FileTreeItem[],            // drop undefined entries
+  };
+}
+
+/**
+ * Walk up from cwd until we find a sibling `web/` directory.
+ * Guarantees we pass the *real* path, no matter where the server was launched.
+ */
+function findWebDir(): string {
+  let dir = process.cwd();
+  while (true) {
+    const candidate = path.join(dir, 'web');
+    if (fsSync.existsSync(candidate) && fsSync.statSync(candidate).isDirectory()) {
+      return candidate;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) {
+      throw new Error("Cannot locate top-level 'web' directory");
+    }
+    dir = parent;
+  }
 }
 
 /** Block until every task-id is in a final state. */
@@ -76,40 +130,6 @@ const emitFileWritten = (sendProgress: (data: unknown) => void): ((path: string,
   });
 };
 
-/** Write the token-minting UI tree, wait for all tasks, attach contents, and
- *  send a progress event.  MUST be called *before* Rust generation so the
- *  user sees the preview immediately.
- */
-async function writeUiFirst(
-  uiRoot   : FileTreeItem,
-  projectId: string,
-  existing : Set<string>,
-  workspace: WorkspaceHandle,
-  sendProgress: (d: unknown) => void,
-) {
-  // 1) schedule writes
-  const uiTaskIds = await insertSrcFiles(uiRoot, projectId, existing, null, emitFileWritten(sendProgress));
-
-  // 2) let the caller know we're starting UI writes
-  sendProgress({ stage: 'ui-write', message: 'Writing UI files…' });
-
-  // 3) wait for every task to finish (same timeouts you use elsewhere)
-  for (const tId of uiTaskIds) {
-    await waitForTaskCompletion(tId, 90, 2_000);
-  }
-
-  // 4) attach the written contents for the file-tree panel
-  const absRoot  = path.join(process.env.ROOT_FOLDER!, workspace.rootPath);
-  await attachFileContents([uiRoot], absRoot, workspace.containerName);
-
-  // 5) tell the FE the preview is ready
-  sendProgress({
-    stage: 'ui-ready',
-    message: 'UI code written – preview available',
-    fileTree: [uiRoot],
-  });
-}
-
 interface Args {
   projectId: string;
   graph: Graph;
@@ -125,6 +145,9 @@ export const handleGenerateCode = async ({
   sendProgress,
   userId,
 }: Args): Promise<{ sentinelId: string }> => {   
+    /* Dev-mode flag set by dev.sh or CI: container already runs `next dev` */
+    const isDevServer = process.env.SF_DEV_SERVER === '1';
+
     console.log('[GEN] projectId   =', projectId);
     console.log('[GEN] userId      =', userId);
     console.log('[GEN] workspace   =', workspace);
@@ -132,6 +155,12 @@ export const handleGenerateCode = async ({
     //console.log('[GEN] first node  =', graph.nodes[0]);
     
     try {
+        // --------------------------------------------------------------------
+        // All container-side UI work must happen in the SAME bind-mounted tree
+        // that startProjectContainer exposes at /usr/src/<rootPath>/web.
+        // --------------------------------------------------------------------
+        const containerWebDir = `/usr/src/${workspace.rootPath}/web`;
+
         if (graph.nodes.length === 0) throw new Error('No nodes found');
         let functionCode = null;
 
@@ -159,8 +188,6 @@ export const handleGenerateCode = async ({
         else console.log('No valid function code found in nodes');
 
         console.log('DEBUG handleGenerateCode functionCode:', functionCode);
-
-        //const frontendTaskId = await genUi(nodes);   // possible skip this step if not working correctly (save til end) 
         
         sendProgress({ stage: 'file-tree', message: 'Refreshing file tree…' });
         const fileTreeTaskIds = await refreshWorkspaceTree(projectId, userId);
@@ -188,104 +215,193 @@ export const handleGenerateCode = async ({
         
         // Gather existing paths so insertSrcFiles can decide create vs update
         const existingFilePaths = new Set<string>(flattenPaths(initialTree));
+        
+        // --- force-overwrite critical config files (handles "./" prefix) ----
+        for (const f of [
+          "web/package.json",               "./web/package.json",
+          "web/tsconfig.json",              "./web/tsconfig.json",
+          // always refresh Tailwind + toast hooks so local fixes reach the container
+          "web/tailwind.config.js",         "./web/tailwind.config.js",
+          "web/src/components/ui/use-toast.ts",
+          "./web/src/components/ui/use-toast.ts",
+          "web/src/components/ui/toaster.tsx",
+          "./web/src/components/ui/toaster.tsx",
+        ]) {
+          existingFilePaths.delete(f);
+        }
+        
+        console.log("[GEN] after delete, has package.json?",
+                    existingFilePaths.has("./web/package.json") ||
+                    existingFilePaths.has("web/package.json"));
 
-        /* ─────────────────────  A)  generate and write the UI FIRST  ───────────────────── */
-        sendProgress({ stage: 'ui-gen', message: 'Generating token-minting UI…' });
-        
-        // For streaming, use the userId as creatorId
-        const creatorId = userId;
-        
-        // Build the UI file tree
-        const uiTree = {
-          name: ".",
-          path: "./web",
-          type: "directory" as const,
-          children: [
-            {
-              name: "app",
-              path: "./web/app",
-              type: "directory" as const,
-              children: [
-                { name: "page.tsx", path: "./web/app/page.tsx", type: "file" as const, code: HOME_PAGE_TSX },
-                { name: "layout.tsx", path: "./web/app/layout.tsx", type: "file" as const, code: ROOT_LAYOUT_TSX }
-              ]
-            },
-            {
-              name: "src",
-              path: "./web/src",
-              type: "directory" as const,
-              children: [
-                {
-                  name: "components",
-                  path: "./web/src/components",
-                  type: "directory" as const,
-                  children: [
-                    { name: "mint-form.tsx", path: "./web/src/components/mint-form.tsx", type: "file" as const, code: MINT_FORM_TSX },
-                    { name: "token-created-success.tsx", path: "./web/src/components/token-created-success.tsx", type: "file" as const, code: TOKEN_CREATED_SUCCESS_TSX },
-                    { name: "theme-toggle.tsx", path: "./web/src/components/theme-toggle.tsx", type: "file" as const, code: THEME_TOGGLE_TSX },
-                    { name: "wallet.tsx", path: "./web/src/components/wallet.tsx", type: "file" as const, code: WALLET_TSX },
-                    {
-                      name: "ui",
-                      path: "./web/src/components/ui",
-                      type: "directory" as const,
-                      children: [
-                        { name: "button.tsx", path: "./web/src/components/ui/button.tsx", type: "file" as const, code: UI_BUTTON_TSX },
-                        { name: "input.tsx", path: "./web/src/components/ui/input.tsx", type: "file" as const, code: UI_INPUT_TSX },
-                        { name: "label.tsx", path: "./web/src/components/ui/label.tsx", type: "file" as const, code: UI_LABEL_TSX }
-                      ]
-                    }
-                  ]
-                },
-                {
-                  name: "context",
-                  path: "./web/src/context",
-                  type: "directory" as const,
-                  children: [
-                    { name: "WalletConnectionProvider.tsx", path: "./web/src/context/WalletConnectionProvider.tsx", type: "file" as const, code: WALLET_CONNECTION_PROVIDER_TSX }
-                  ]
-                },
-                {
-                  name: "lib",
-                  path: "./web/src/lib",
-                  type: "directory" as const,
-                  children: [
-                    { name: "utils.ts", path: "./web/src/lib/utils.ts", type: "file" as const, code: UTILS_TS }
-                  ]
-                },
-                { name: "globals.css", path: "./web/src/globals.css", type: "file" as const, code: GLOBALS_CSS }
-              ]
-            },
-            { name: "tailwind.config.js", path: "./web/tailwind.config.js", type: "file" as const, code: TAILWIND_CONFIG },
-            { name: "postcss.config.js", path: "./web/postcss.config.js", type: "file" as const, code: POSTCSS_CONFIG },
-            {
-              name: "idl",
-              path: "./web/idl",
-              type: "directory" as const,
-              children: [
-                { name: "solanaflow_token.json", path: "./web/idl/solanaflow_token.json", type: "file" as const, code: "{}" }
-              ]
-            }
-          ]
-        } as FileTreeItem;
+        /* ─────────────────────  A)  stream *existing* web/ directory  ───────────────────── */
+        sendProgress({ stage: 'ui-gen', message: 'Streaming existing web/ files…' });
+
+        const webRootDir = findWebDir();
+        const creatorId   = userId;
+        const uiTree      = await dirToFileTree(webRootDir, webRootDir);     // dynamic tree
 
         // Tell FE we're starting incremental UI push
         sendProgress({ stage: 'ui-stream', message: 'Streaming UI files…' });
 
-        await insertSrcFiles(
+        // ─── write UI files and WAIT until every task finishes ────────────────
+        const uiWriteTaskIds = await insertSrcFiles(
           uiTree,
           projectId,
           existingFilePaths,
           creatorId,
-          (path, code) => sendProgress({ event: 'file-written', path, content: code }),
+          (path, code) => {
+            sendProgress({ event: 'file-written', path, content: code });
+            if (path.endsWith('tsconfig.json'))
+              console.log('[GEN] wrote tsconfig', code.slice(0, 40));
+          },
         );
 
-        // All UI files done
+        // block until every UI-write task is complete
+        for (const id of uiWriteTaskIds) {
+          await waitForTaskCompletion(id, 90, 2_000);
+        }
+
         sendProgress({ event: 'ui-complete', message: 'UI streaming finished' });
 
+        /* ──────────────────────  Install JS deps inside the container  ────────────────────── */
+
+        const containerRootDir = `/usr/src/${workspace.rootPath}`;   // <── NEW
+
+        /* ── One-time Yarn bootstrap inside the running container ── */
+        await runCommand(
+          // run *inside* the container -- single-quoted so the whole command is
+          // evaluated by bash there, and `${containerRootDir}` expands correctly
+          `docker exec ${workspace.containerName} bash -lc 'rm -f ${containerRootDir}/web/.yarnrc'`,
+          '.',
+          projectId,
+        );
+
+        {
+          // STEP 0  ➜ regenerate yarn.lock so the upcoming frozen install never bails
+          sendProgress({ stage: 'deps', message: 'Creating/refreshing yarn.lock in container…' });
+
+          const lockfileCmd = [
+            'docker exec',
+            // isolate Yarn's cache just like the main install
+            '-e', 'YARN_CACHE_FOLDER=/tmp/yarn-cache',
+            '-w', containerRootDir,                              // run from repo root
+            workspace.containerName,
+            'bash -lc "rm -rf \\$YARN_CACHE_FOLDER && mkdir -p \\$YARN_CACHE_FOLDER && ' +
+              'yarn --cwd web install --lockfile-only --network-timeout 600000"' // ⬅ --cwd web
+          ].join(' ');
+
+          await runCommand(lockfileCmd, '.', projectId);
+
+          sendProgress({ stage: 'deps', message: 'yarn.lock updated; installing deps…' });
+
+          // second pass – real install but tolerant to the fresh lock-file
+          const installCmd = [
+            'docker exec',
+            // isolate Yarn's cache so every dApp build starts clean
+            '-e', 'YARN_CACHE_FOLDER=/tmp/yarn-cache',
+            '-w', containerRootDir,
+            workspace.containerName,
+            'bash -lc "mkdir -p \\$YARN_CACHE_FOLDER && ' +
+              'yarn --cwd web install --prefer-offline --network-timeout 600000"'
+          ].join(' ');
+
+          await runCommand(installCmd, '.', projectId);
+
+          /* shadcn-ui CLI init REMOVED
+             Reason: `npx shadcn-ui init` overwrites tailwind.config.js and
+             globals.css every run, re-introducing the
+             `tailwindcss-shadcn-ui/preset` import that crashes Tailwind
+             (see GitHub issues #878, #2030, #1086). The preset is already
+             provided via package.json, so nothing else is required. */
+
+          sendProgress({ stage: 'deps', message: 'JS dependencies installed' });
+        }
+
+        // ─── Restart Next.js dev server so it picks up next-themes, toast, etc.
+        sendProgress({ stage: 'deps', message: 'Restarting Next.js server…' });
+
+        /* 1️⃣  Kill ONLY the stand-alone server; keep `next dev` alive.      */
+        await runCommand(
+          `docker exec ${workspace.containerName} pkill -f '.next/standalone/server.js' || true`,
+          '.',
+          projectId,
+        );
+
+        /* 2️⃣  If we are *not* in dev mode, container CMD will start server.js
+                once the build finishes.  When in dev mode no restart needed. */
         sendProgress({
-          stage: 'next-build-skipped',
-          message: 'Skipped Next.js rebuild – bundle already baked during image build'
+          stage: 'deps',
+          message: isDevServer
+            ? 'Dev server detected – no restart needed'
+            : 'Dev server will start via CMD'
         });
+
+        /* ──────────────────────────────────────────────────────────────────────── */
+
+        /* ────────────────── 3️⃣  Build *only* in standalone mode ──────────── */
+        if (!isDevServer) {
+          sendProgress({
+            stage: 'next-build',
+            message: 'Running Next.js build to process Tailwind CSS…'
+          });
+          try {
+            // Force-write the tsconfig.json file to ensure it has the correct configuration
+            await runCommand(
+              `docker exec ${workspace.containerName} bash -lc 'cat > ${containerWebDir}/tsconfig.json <<EOF
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "node",
+    "target": "es5",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [{ "name": "next" }],
+    "baseUrl": "src",
+    "paths": { "@/*": ["*"] }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}
+EOF'`,
+              '.', 
+              projectId
+            );
+            
+            await runCommand(
+              // force standalone output _inside_ the running container
+              `docker exec \
+ -e NEXT_PRIVATE_STANDALONE=true \
+ -e APP_BASE_PATH=/dapp/$APP_ID \
+ -w ${containerWebDir} \
+ ${workspace.containerName} npm run build`,
+              '.',
+              projectId
+            );
+            sendProgress({
+              stage: 'next-build-done',
+              message: 'Next.js build completed'
+            });
+          } catch (error) {
+            console.error('Error during Next.js build:', error);
+            sendProgress({
+              stage: 'next-build-failed',
+              message: 'Next.js build failed'
+            });
+          }
+        } // ← closes "if (!isDevServer)"
+        /* ── dev-mode skip: build/restart not required ── */
+
+        /* runtime server already started by docker run → nothing to do */
 
         // ───────────────────────── write graph-derived Rust sources ──────────────
         // For now, assume a basic program structure exists or will be created
@@ -364,31 +480,10 @@ export const handleGenerateCode = async ({
           workspace,
           sendProgress,
         );
-        // no extra progress needed here – ui-ready already fired
-        sendProgress({ stage: "src-gen-done", message: "Rust sources ready" });
 
-        // ++++++++++++++++ ② NEW – generate dApp UI ++++++++++++++++
-        const dAppUiTree = genUi("SolanaFlow Token")[0];  // Get the first item from the array
-        await insertSrcFiles(
-          dAppUiTree,
-          projectId,
-          existingFilePaths,
-          creatorId,
-          // stream every written file immediately
-          (path, content) => sendProgress({ event: "file-written", path, content })
-        );
-        // tell frontend UI files are done
+        sendProgress({ stage: "src-gen-done", message: "Rust sources ready" });
         sendProgress({ stage: "ui-complete" });
 
-        // 🟢 start the server **inside the container** so cwd is valid
-        runCommandDetached(
-          `docker exec -w /usr/share/solanaflow/web ` +
-          `${workspace.containerName} bash -lc '` +
-          `node .next/standalone/server.js'`,
-          '.',                              // host cwd irrelevant
-          `next-serve-${projectId}`         // no extra options needed
-        ).catch(console.error);
-        // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
         // ─────────── Run static lint on Cargo manifests before amending ───────────
         console.log('[GEN] Running static Cargo.toml linter...');

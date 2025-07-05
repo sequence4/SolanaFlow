@@ -35,6 +35,7 @@ function getWorkspaceFreeBytes(container: string): number {
 export async function prepEnv(
   projectId: string,
   userId: string,
+  devMode = false,
 ): Promise<WorkspaceHandle> {
   const res = await pool.query<{
     root_path: string;
@@ -76,11 +77,12 @@ export async function prepEnv(
   } else {
     // cold-start fallback: spin up a brand-new workspace
     try {
-      containerName = await startProjectContainer(projectId);
+      const container = await startProjectContainer(projectId, devMode);
+      containerName = container.containerName;
       if (!containerName) {
         throw new Error('No warm containers available and cold-start disabled');
       }
-      containerUrl = await resolveContainerUrl(containerName);
+      containerUrl = container.containerUrl;
     } catch (err: any) {
       console.error('[prepEnv] Cold-start failed:', err.message);
       throw new Error(`Container creation failed: ${err.message}`);
@@ -172,42 +174,54 @@ export async function prepEnv(
       const probeTaskId = uuidv4();
       
       // 1) show container status
+      console.time('[probe-status]');
       const psOutput = await runCommand(
         `docker ps --filter "name=${containerName}" --format "{{.Names}}|{{.Status}}"`,
         '.',
         probeTaskId,
         { skipSuccessUpdate: true }
       );
+      console.timeEnd('[probe-status]');
       console.log(`[ENV] container ${containerName} status:`, psOutput.trim());
 
       // 2) check solana / anchor versions inside
+      console.time('[probe-solana]');
       const solanaVer = await runCommand(
         `docker exec ${containerName} solana --version`,
         '.',
         probeTaskId,
         { skipSuccessUpdate: true }
       );
+      console.timeEnd('[probe-solana]');
+      
+      console.time('[probe-anchor]');
       const anchorVer = await runCommand(
         `docker exec ${containerName} anchor --version`,
         '.',
         probeTaskId,
         { skipSuccessUpdate: true }
       );
+      console.timeEnd('[probe-anchor]');
       console.log('[ENV] solana:', solanaVer.trim(), '| anchor:', anchorVer.trim());
 
       // 3) quick rust+cargo sanity
+      console.time('[probe-rustc]');
       const rustcVer = await runCommand(
         `docker exec ${containerName} rustc --version`,
         '.',
         probeTaskId,
         { skipSuccessUpdate: true }
       );
+      console.timeEnd('[probe-rustc]');
+      
+      console.time('[probe-cargo]');
       const cargoVer = await runCommand(
         `docker exec ${containerName} cargo --version`,
         '.',
         probeTaskId,
         { skipSuccessUpdate: true }
       );
+      console.timeEnd('[probe-cargo]');
       console.log('[ENV] rustc:', rustcVer.trim(), '| cargo:', cargoVer.trim());
     } catch (probeErr) {
       console.warn('[ENV] health-probe failed:', probeErr);

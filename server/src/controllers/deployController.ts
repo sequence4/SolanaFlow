@@ -14,9 +14,10 @@ export async function deployPipeline(
   res: Response,
   next: NextFunction,
 ) {
-  const { id }    = req.params;
+  const { id } = req.params;
   const { graph, walletSigned: requestWalletSigned } = req.body;
-  const userId    = (req.user as { id?: string } | undefined)?.id; // keep optional-chaining safe
+  const { devMode } = req.body as { devMode?: boolean };
+  const userId = (req.user as { id?: string } | undefined)?.id; // keep optional-chaining safe
   const walletSigned = requestWalletSigned === true;
 
   console.log(`[API] Deploy pipeline called for project: ${id}, userId: ${userId}`);
@@ -65,7 +66,8 @@ export async function deployPipeline(
       userId, 
       graph, 
       sendProgress: send,
-      walletSigned
+      walletSigned,
+      devMode: !!devMode
     });
 
     // let the client know we're done, then close the SSE stream

@@ -1,0 +1,9 @@
+# Stage 0 – original Solana tool-chain runtime
+FROM ghcr.io/sequence4/solana-toolchain:runtime-latest-amd64 AS base
+
+# Stage 1 – pull the official Docker CLI (no daemon)                                  
+FROM docker:26-cli AS dockercli
+
+# Final – combine: keep the Solana runtime and copy in the CLI binary
+FROM base
+COPY --from=dockercli /usr/local/bin/docker /usr/local/bin/docker
