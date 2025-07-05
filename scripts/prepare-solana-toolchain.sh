@@ -15,3 +15,4 @@ command -v rust-lld >/dev/null || {
 }
 
 echo "✅ Solana tool‑chain ready ($(rustc -V))" 
+

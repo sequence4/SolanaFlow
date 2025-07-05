@@ -495,14 +495,13 @@ EOF'`,
             sendProgress({ stage: "lint-failed", message: `Manifest validation failed: ${String(err)}` }),
           );
 
-        // same pattern for amendConfigFiles — *do not await*
-        amendConfigFiles(projectId, userId)
-          .then(({ anchorTaskId }) =>
-            sendProgress({ stage: "amend-done", anchorTaskId, message: "[handleGenerateCode] Amend done" }),
-          )
-          .catch(err =>
-            sendProgress({ stage: "amend-failed", message: String(err) }),
-          );
+        // Amend config files **first** so IDL changes are in place for the build.
+        const { anchorTaskId } = await amendConfigFiles(projectId, userId);
+        await sendProgress({
+          stage: "amend-done",
+          anchorTaskId,
+          message: "[handleGenerateCode] Amend done",
+        });
 
         // ─────────── Debug: dump container tree ───────────
         const dumpTaskId = await createTask(
