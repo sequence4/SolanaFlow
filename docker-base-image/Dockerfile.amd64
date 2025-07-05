@@ -105,7 +105,8 @@ RUN set -euo pipefail; \
     # ------------------------------------------------------------------
     apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        git clang lld llvm make pkg-config libssl-dev ca-certificates && \
+        # use Solana's linker, not Debian's generic one
+        git clang llvm make pkg-config libssl-dev ca-certificates && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
     # ------------------------------------------------------------------
@@ -153,6 +154,14 @@ RUN export CARGO_TARGET_DIR=/usr/src/target && \
     mv anchor-template /usr/src/anchor-template && \
     rm -rf /usr/src/target/debug /usr/src/target/**/incremental && \
     mkdir -p /cache-seed && cp -a /usr/src/target/deploy /cache-seed/target
+
+# ────────────────────────────────────────────────────────────────
+# Ensure Solana's SBF‑compatible linker is the one Cargo finds.
+# The warm‑up above downloaded it to:
+#   /root/.cache/solana/v1.43/platform-tools/llvm/bin/rust-lld
+# Symlink it into /usr/local/bin so it shadows Debian's `lld`.
+# ────────────────────────────────────────────────────────────────
+RUN ln -sf /root/.cache/solana/v1.43/platform-tools/llvm/bin/rust-lld /usr/local/bin/rust-lld
 
 # ----------------------------------------------------------------------
 #  🎉  Warm-up finished – switch sccache *back on* (local-only).
@@ -278,7 +287,7 @@ RUN mkdir -p /usr/share/solanaflow/web/.yarn/releases \
 
 RUN apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      bash build-essential clang lld llvm pkg-config libssl-dev binutils ca-certificates jq curl && \
+      bash build-essential clang llvm pkg-config libssl-dev binutils ca-certificates jq curl && \
     update-ca-certificates && \
     ln -sf "$(command -v gcc || command -v clang)" /usr/bin/cc && \
     strip /usr/local/bin/solana* || true && \
