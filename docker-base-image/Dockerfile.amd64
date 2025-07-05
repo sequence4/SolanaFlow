@@ -159,17 +159,7 @@ RUN export CARGO_TARGET_DIR=/usr/src/target && \
     rm -rf /usr/src/target/debug /usr/src/target/**/incremental && \
     mkdir -p /cache-seed && cp -a /usr/src/target/deploy /cache-seed/target
 
-# ────────────────────────────────────────────────────────────────
-# Ensure the **Solana‑patched** `rust-lld` wins PATH resolution.
-# The exact cache directory changes with every Solana release,
-# so locate it dynamically and drop a stable symlink in /usr/local/bin.
-# ────────────────────────────────────────────────────────────────
-RUN set -e; \
-    RUST_LLD_PATH="$(find /root/.cache/solana -type f -path '*/llvm/bin/rust-lld' | head -n1)"; \
-    if [ -z "${RUST_LLD_PATH}" ]; then \
-        echo '❌  rust-lld not found in Solana cache' >&2; exit 1; \
-    fi; \
-    ln -sf "${RUST_LLD_PATH}" /usr/local/bin/rust-lld
+
 
 # ----------------------------------------------------------------------
 #  🎉  Warm-up finished – switch sccache *back on* (local-only).
