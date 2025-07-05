@@ -92,8 +92,12 @@ RUN rm -rf /root/.cache/solana/platform-tools || true
 # `anchor` binary.  We run it in its own layer so the expensive
 # download is cached independently.
 # ------------------------------------------------------------------
+#  ▸ make sure the Rust "llvm‑tools‑preview" component is present so
+#    `rust-lld` is always available for native tests and non‑SBF builds
+# ------------------------------------------------------------------
 RUN rustup set profile minimal && \
-    rustup default stable
+    rustup default stable && \
+    rustup component add llvm-tools-preview
 
 # Anchor 0.31.1 (works with Solana ≥2.1) + minimal Node 20
 ARG ANCHOR_VERSION=0.31.1
@@ -156,12 +160,16 @@ RUN export CARGO_TARGET_DIR=/usr/src/target && \
     mkdir -p /cache-seed && cp -a /usr/src/target/deploy /cache-seed/target
 
 # ────────────────────────────────────────────────────────────────
-# Ensure Solana's SBF‑compatible linker is the one Cargo finds.
-# The warm‑up above downloaded it to:
-#   /root/.cache/solana/v1.43/platform-tools/llvm/bin/rust-lld
-# Symlink it into /usr/local/bin so it shadows Debian's `lld`.
+# Ensure the **Solana‑patched** `rust-lld` wins PATH resolution.
+# The exact cache directory changes with every Solana release,
+# so locate it dynamically and drop a stable symlink in /usr/local/bin.
 # ────────────────────────────────────────────────────────────────
-RUN ln -sf /root/.cache/solana/v1.43/platform-tools/llvm/bin/rust-lld /usr/local/bin/rust-lld
+RUN set -e; \
+    RUST_LLD_PATH="$(find /root/.cache/solana -type f -path '*/llvm/bin/rust-lld' | head -n1)"; \
+    if [ -z "${RUST_LLD_PATH}" ]; then \
+        echo '❌  rust-lld not found in Solana cache' >&2; exit 1; \
+    fi; \
+    ln -sf "${RUST_LLD_PATH}" /usr/local/bin/rust-lld
 
 # ----------------------------------------------------------------------
 #  🎉  Warm-up finished – switch sccache *back on* (local-only).
