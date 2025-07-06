@@ -313,8 +313,7 @@ set -euo pipefail
 
 cd /usr/src/${rootPath}
 
-echo "===== Running anchor build ====="
-export RUSTFLAGS="-Ccodegen-units=1 -Clinker-plugin-lto -Clto=thin -Cpanic=abort -Copt-level=z"
+# build the Anchor workspace
 anchor build -- --jobs 1
 
 # ── determine the correct target directory and find the first .so file ──
@@ -424,8 +423,8 @@ export const startAnchorDeployTask = async (
   const sanitizedTaskId = taskId.trim().replace(/,$/, '');
   
   if (ephemeralPubkey === 'SIGNED') {
-    console.log('[BUILD] signed-tx path – skipping container key copy');
-    await updateTaskStatus(sanitizedTaskId, 'succeed', 'Signed tx already broadcast by frontend');
+    console.log('[DEPLOY] signed-tx path – skipping container key copy and awaiting frontend deployment');
+    await updateTaskStatus(sanitizedTaskId, 'doing', 'Waiting for signed transaction from wallet...');
     return sanitizedTaskId;
   }
 
@@ -730,7 +729,13 @@ export const startAnchorTestTask = async (
       
       const rootPath = await getProjectRootPath(projectId);
       
-      await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && anchor test"`, '.', taskId);
+      const testCmd=`
+        docker exec ${containerName} bash -c '
+          cd /usr/src/${rootPath} &&
+          anchor test -- --jobs 1
+        '
+      `;
+      await runCommand(testCmd.trim(), '.', taskId);
     } catch (error: any) {
       await updateTaskStatus(sanitizedTaskId, 'failed', `Error: ${error.message}`);
     }

@@ -252,6 +252,24 @@ export async function startProjectContainer(
     fs.mkdirSync(hostWebDir, { recursive: true });
   }
   
+  // Inject Program ID into container environment if it exists for this project
+  let programIdEnv: string[] = [];
+  try {
+    const res = await pool.query('SELECT details FROM solanaproject WHERE id = $1', [projId]);
+    if (res.rows.length > 0) {
+      const detailsData = res.rows[0].details;
+      const detailsObj = (typeof detailsData === 'object' && detailsData !== null)
+        ? detailsData
+        : JSON.parse(detailsData || '{}');
+      if (detailsObj.programId) {
+        programIdEnv = ['-e', `PROGRAM_ID=${detailsObj.programId}`, '-e', `NEXT_PUBLIC_PROGRAM_ID=${detailsObj.programId}`];
+        console.log(`[startProjectContainer] Found Program ID ${detailsObj.programId} – adding to container env`);
+      }
+    }
+  } catch (err) {
+    console.error('[startProjectContainer] Could not fetch program ID:', err);
+  }
+  
   const withPullAlways = pullAlwaysAllowed(image);
               
   // ── pick architecture: env override > host default
@@ -353,6 +371,7 @@ export async function startProjectContainer(
       '-e', `APP_BASE_PATH=/dapp/${projId}`,
       '-e', `SF_DEV_SERVER=${useDevServer ? '1' : ''}`,
       '-e', 'COREPACK_ENABLE_STRICT=0',           // ← allow Yarn inside "web/"
+      ...programIdEnv,
       '--label=traefik.enable=true',
       `--label='traefik.http.routers.dapp-${projId}.rule=PathPrefix(\`/dapp/${projId}\`)'`,
       `--label=traefik.http.routers.dapp-${projId}.entrypoints=web,websecure`,
@@ -374,7 +393,7 @@ export async function startProjectContainer(
         'bash', '-lc',
         // Copy base Next.js app if needed, then start dev server with hot-reload
         `"if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
-        `cp -R /usr/share/solanaflow/web/* /usr/src/${rootPath}/web/; fi; ` +
+        `cp -a /usr/share/solanaflow/web/. /usr/src/${rootPath}/web/; fi; ` +
         `cd /usr/src/${rootPath}/web && ` +
         `export NEXT_DISABLE_REACT_REFRESH=\${NEXT_DISABLE_REACT_REFRESH:-0}; ` +
         `npx next dev -H 0.0.0.0 -p ${INTERNAL_PORT} & ` +
@@ -385,7 +404,7 @@ export async function startProjectContainer(
         'bash', '-lc',
         // Copy base Next.js app if needed, then run standalone server
         `"if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
-        `cp -R /usr/share/solanaflow/web/* /usr/src/${rootPath}/web/; fi; ` +
+        `cp -a /usr/share/solanaflow/web/. /usr/src/${rootPath}/web/; fi; ` +
         `cd /usr/src/${rootPath}/web && ` +
         `until [ -d .next ]; do sleep 1; done && ` +
         `node .next/standalone/server.js -H 0.0.0.0 -p ${INTERNAL_PORT} & ` +

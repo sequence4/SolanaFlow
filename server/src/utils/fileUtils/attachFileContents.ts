@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { FileNode } from "../fileUtils";
 import { readFileFromContainer } from "../docker/readFileFromContainer";
+import { createTask, updateTaskStatus } from "../taskUtils";
 
 /** RegExp that rejects typical non-text assets. */
 const BIN_PATTERN = /\.(png|jpe?g|gif|ico|wasm|so|ttf|woff2?)$/i;
@@ -39,7 +40,43 @@ export async function attachFileContents(
       const relRoot     = path.relative(rootFolder, absRoot);   // keeps nested dirs
       const dockerPath  = `/usr/src/${relRoot}/${node.path}`;
 
+      // Skip paths we know are enormous & irrelevant
+      const IGNORE = [/\/\.next\//, /\/node_modules\//, /\/\.yarn\/releases\//];
+      if (IGNORE.some(rx => rx.test(dockerPath))) {
+        console.log(`[attachFileContents] Skipped heavyweight path ${dockerPath}`);
+        continue;
+      }
+
       node.content = await readFileFromContainer(containerName, dockerPath);
     }
+  }
+}
+
+/**
+ * Reads a file directly from the container and stores it in the database.
+ * Used for copying build artifacts from the container to the host.
+ */
+export async function readContainerFile(
+  containerName: string,
+  path: string,
+  projectId: string,
+  userId: string
+): Promise<void> {
+  const taskId = await createTask('Read Container File', userId, projectId);
+  
+  // Skip paths we know are enormous & irrelevant
+  const IGNORE = [/\/\.next\//, /\/node_modules\//, /\/\.yarn\/releases\//];
+  if (IGNORE.some(rx => rx.test(path))) {
+    console.log(`[readContainerFile] Skipped heavyweight path ${path}`);
+    await updateTaskStatus(taskId, 'succeed', 'skipped');
+    return;
+  }
+
+  try {
+    const contents = await readFileFromContainer(containerName, path);
+    await updateTaskStatus(taskId, 'succeed', contents);
+  } catch (error: any) {
+    console.error(`[readContainerFile] Error reading ${path} from container:`, error);
+    await updateTaskStatus(taskId, 'failed', `Error reading file: ${error.message || String(error)}`);
   }
 } 

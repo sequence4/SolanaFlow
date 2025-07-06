@@ -167,11 +167,13 @@ async function patchProgramCargoToml(
     return arr.findIndex(l => l.trim() === ln.trim()) === idx;
   });
   
-  const idlBuildFeatureLine = 'idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]';
+  const idlBuildFeatureLine = 'idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "anchor-spl/token_2022"]';
   const defaultFeaturesLine = 'default   = []';
   
   /* ───────── 1. ensure anchor-spl in [dependencies] ───────── */
-  const splDepLine = 'anchor-spl = "0.31.1"';           // pin to same version as CLI
+  // disable default features (Token‑2022) everywhere
+  const splDepLine =
+    'anchor-spl = { version = "0.31.1", default-features = false, features = ["token", "associated_token", "token_2022"] }';
 
   /* find (or create) the [dependencies] block */
   let depStart = cargoLines.findIndex(l => l.trim() === '[dependencies]');
@@ -182,9 +184,13 @@ async function patchProgramCargoToml(
     for (let i = depStart + 1; i < cargoLines.length; i++) {
       if (/^\[.*\]/.test(cargoLines[i].trim())) { depEnd = i; break; }
     }
-    const hasSpl = cargoLines
-      .slice(depStart + 1, depEnd)
-      .some(l => l.trim().startsWith('anchor-spl'));
+    let hasSpl = false;
+    for (let i = depStart + 1; i < depEnd; i++) {
+      if (cargoLines[i].trim().startsWith('anchor-spl')) {
+        hasSpl = true;
+        cargoLines[i] = splDepLine;            // normalise format
+      }
+    }
     if (!hasSpl) cargoLines.splice(depEnd, 0, splDepLine);
   }
   

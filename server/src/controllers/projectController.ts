@@ -17,13 +17,15 @@ import {
   runCommand,
   startInstallNodeDependenciesTask,
   compileTs,
+  broadcastSignedTx,
 } from '../utils/projectUtils';
 import path from 'path';
 import { APP_CONFIG } from '../config/appConfig';
 import fs from 'fs';
 import { Keypair } from '@solana/web3.js';
-import { waitForTaskCompletion } from '../utils/taskUtils';
+import { waitForTaskCompletion, updateTaskStatus } from '../utils/taskUtils';
 import { createProject as createProjectDb } from '../utils/project/createProject';
+import { catchAsync } from '../utils/catchAsync';
 
 export const runCommandController = async (
   req: Request,
@@ -47,8 +49,9 @@ export const runCommandController = async (
       command,
       cwd,
       taskId,
-      output
+      output,
     });
+    return;
   } catch (error) {
     return next(error);
   }
@@ -508,28 +511,32 @@ export const getBuildArtifact = async (
 
 export const createEphemeralKeypair = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { secretKey } = req.body ?? {};
-    const ephem = secretKey
-        ? Keypair.fromSecretKey(Uint8Array.from(secretKey))
-        : Keypair.generate();
+    // Generate a new keypair
+    const ephem = Keypair.generate();
     const pubkey = ephem.publicKey.toBase58();
-
-    const walletPath = path.join(
-        APP_CONFIG.WALLETS_FOLDER,
-        `${pubkey}.json`
-    );
-    fs.writeFileSync(walletPath, JSON.stringify(Array.from(ephem.secretKey)), { mode: 0o600 });
     
-    // optional but useful – detect typos early
-    await runCommand(
-      `solana-keygen pubkey ${walletPath} | grep -q ${pubkey}`,
-      '.', 'verify-ephem', { skipSuccessUpdate: true }
-    ); // exits 1 if mismatch
-
-    res.status(200).json({ ephemeralPubkey: pubkey });
-  } catch (err) {
-    console.error('Error creating ephemeral keypair:', err);
-    return next(new AppError('Failed to create ephemeral keypair', 500));
+    // Save the keypair to the wallets folder
+    const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${pubkey}.json`);
+    fs.writeFileSync(walletPath, JSON.stringify(Array.from(ephem.secretKey)));
+    
+    /* ---------------------------------------------------------
+     * Self-verify the keypair without relying on solana-keygen.
+     * If the derived pubkey doesn't round-trip, throw.
+     * --------------------------------------------------------*/
+    const derived = Keypair
+      .fromSecretKey(ephem.secretKey)
+      .publicKey.toBase58();
+    if (derived !== pubkey) {
+      throw new Error('Keypair self-verification failed');
+    }
+    
+    res.status(200).json({
+      message: 'Ephemeral keypair created successfully',
+      pubkey
+    });
+  } catch (error) {
+    console.error('Error creating ephemeral keypair:', error);
+    next(new AppError('Failed to create ephemeral keypair', 500));
   }
 };
 
@@ -602,7 +609,17 @@ export const deployProjectEphemeral = async (
     return next(new AppError('Ephemeral public key is required', 400));
   }
 
-  // Validate the ephemeral public key
+  // If using Phantom (signed transaction path), skip container deploy and await relay
+  if (ephemeralPubkey === 'SIGNED') {
+    console.log(`[DEPLOY_EPHEMERAL] 'SIGNED' flag received – expecting front-end to handle deployment`);
+    const taskId = await startAnchorDeployTask(id, userId, 'SIGNED');
+    res.status(200).json({
+      message: 'Awaiting signed transaction from wallet',
+      taskId: taskId,
+    });
+  }
+  
+  // Validate the ephemeral key format for provided pubkey
   try {
     console.log(`[DEPLOY_EPHEMERAL] Validating ephemeral key format`);
     // Check if the key is in the expected format
@@ -672,9 +689,26 @@ export const deployProjectEphemeral = async (
           );
           
           if (taskQuery.rows.length > 0 && taskQuery.rows[0].result) {
-            const programId = taskQuery.rows[0].result;
-            console.log(`[DEPLOY_EPHEMERAL] Task result: '${programId}'`);            
-            console.log(`[DEPLOY_EPHEMERAL] Valid program ID confirmed: ${programId}`);
+            let programId: string | null = null;
+            try {
+              const resultObj = JSON.parse(taskQuery.rows[0].result);
+              programId = resultObj.programId;
+            } catch (e) {
+              console.error('[DEPLOY_EPHEMERAL] Failed to parse task result JSON:', e);
+            }
+            if (programId) {
+              console.log(`[DEPLOY_EPHEMERAL] Valid program ID confirmed: ${programId}`);
+              // Store the Program ID in project details for future use
+              await client.query(
+                `UPDATE solanaproject
+                   SET details = COALESCE(details::jsonb, '{}'::jsonb) || $1::jsonb,
+                       last_updated = $2
+                 WHERE id = $3`,
+                [JSON.stringify({ programId }), new Date(), id],
+              );
+            } else {
+              console.log(`[DEPLOY_EPHEMERAL] WARNING: Task completed but no Program ID found in result`);
+            }
           } else {
             console.log(`[DEPLOY_EPHEMERAL] WARNING: Task completed but returned null or empty result`);
           }
@@ -973,3 +1007,51 @@ export const listProjects = async (
     next(err);
   }
 };
+
+export const relaySignedTx = async (req: Request, res: Response, next: NextFunction) => {
+  const { id } = req.params;
+  const userId = req.user?.id;
+  const orgId = req.user?.org_id;
+  const { encodedTx, programId, taskId } = req.body;
+  if (!userId || !orgId) {
+    next(new AppError('User information not found', 400));
+    return;
+  }
+  if (!encodedTx || !programId || !taskId) {
+    next(new AppError('Missing encodedTx, programId, or taskId', 400));
+    return;
+  }
+  try {
+    // Broadcast the signed transaction to Devnet
+    const txSignature = await broadcastSignedTx(id, encodedTx);
+    // Persist the Program ID in the project's details
+    const client = await pool.connect();
+    try {
+      await client.query(
+        `UPDATE solanaproject
+           SET details = COALESCE(details::jsonb, '{}'::jsonb) || $1::jsonb,
+               last_updated  = $2
+         WHERE id = $3`,
+        [JSON.stringify({ programId }), new Date(), id],
+      );
+    } finally {
+      client.release();
+    }
+    // Mark the deploy task as succeeded with the program ID
+    const resultJson = JSON.stringify({ status: 'success', programId });
+    await updateTaskStatus(taskId, 'succeed', resultJson);
+    console.log(`[RELAY_SIGNED_TX] Program ${programId} deployed successfully for project ${id}`);
+    res.status(200).json({ signature: txSignature, programId });
+    return;
+  } catch (error: any) {
+    console.error('[RELAY_SIGNED_TX] Failed to broadcast signed transaction:', error);
+    if (taskId) {
+      // Mark task as failed if broadcast fails
+      await updateTaskStatus(taskId, 'failed', `Broadcast failed: ${error.message}`);
+    }
+    next(new AppError('Failed to relay signed transaction', 500));
+    return;
+  }
+};
+
+export const relaySignedTxHandler = catchAsync(relaySignedTx);

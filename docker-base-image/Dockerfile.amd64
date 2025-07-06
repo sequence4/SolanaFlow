@@ -50,8 +50,9 @@ RUN set -euo pipefail; \
         --data-dir /usr/local/solana \
         "${SOLANA_VERSION}"; \
     # expose the CLI suite **and** Cargo helpers (e.g. `cargo-build-sbf`) on the global PATH
-    ln -sf /usr/local/solana/active_release/bin/solana* /usr/local/bin/ && \
-    ln -sf /usr/local/solana/active_release/bin/cargo-*  /usr/local/bin/; \
+    # Link everything in the SDK directory to prevent future breakage if tools are renamed again
+    ln -sf /usr/local/solana/active_release/bin/* /usr/local/bin/ && \
+    ln -sf /usr/local/solana/install/active_release/bin/* /usr/local/bin/; \
     solana --version
 
 ENV PATH="/usr/local/bin:${PATH}"
@@ -65,6 +66,8 @@ ARG AWS_REGION                 # --build-arg AWS_REGION=eu-north-1
 ###############################################################################
 FROM bootstrap AS solana-toolchain
 ARG AWS_REGION
+# keep the CLI version string so we can call `solana-install init $SOLANA_VERSION`
+ARG SOLANA_VERSION
 # use bash & fail-fast for every RUN in this stage
 SHELL ["/bin/bash","-c"]
 # ── sccache must be **local-only** while the image builds ───────────────
@@ -80,54 +83,56 @@ ENV AWS_REGION=${AWS_REGION} \
     #   • /usr/local/cargo/bin  – default in rust:* images
     #   • /usr/local/rustup     – system-wide rustup toolchain
     #   • /usr/local/bin        – system-wide convenience links
-    PATH="/usr/local/bin:/usr/local/cargo/bin:${PATH}"
+    PATH="/usr/local/bin:/usr/local/cargo/bin:${PATH}" \
+    # Agave ≥2.0 moved the SDK to "sbf/dependencies/platform‑tools"
+    BPF_RUST="/usr/local/solana/active_release/bin/sdk/sbf/dependencies/platform-tools/rust"
 
 # purge occasionally-corrupt llvm tool-chain cache
-RUN rm -rf /root/.cache/solana/platform-tools || true
+RUN rm -rf /root/.cache/solana || true
 
 # ------------------------------------------------------------------
-# Install the *stable* Rust tool-chain up-front.  Doing this **before**
-# we install Anchor prevents `rustup default stable` from later
-# clobbering `/usr/local/bin` and deleting the freshly-built
-# `anchor` binary.  We run it in its own layer so the expensive
-# download is cached independently.
+# 1️⃣ Download & unpack the Solana **BPF tool‑chain** so the Rust fork exists
+#     (use the *same* data‑dir as the bootstrap stage so $BPF_RUST is valid)
+# 2️⃣ Register that fork with rustup under the names `bpf` and `solana`
 # ------------------------------------------------------------------
-RUN rustup set profile minimal && \
-    rustup default stable
+RUN set -euo pipefail; \
+    agave-install init \
+        --no-modify-path \
+        --data-dir /usr/local/solana \
+        "${SOLANA_VERSION:-stable}"; \
+    # Force download and installation of Solana platform tools using a dummy project
+    cargo init /tmp/dummy && \
+    cargo build-sbf --force-tools-install --manifest-path /tmp/dummy/Cargo.toml && \
+    rm -rf /tmp/dummy; \
+    rustup set profile minimal && \
+    rustup default stable && \
+    rustup component add llvm-tools-preview && \
+    # Register the fork multiple times so both old (+bpf) and new (+sbf) Cargo helpers work
+    rustup toolchain link bpf    "$BPF_RUST" && \
+    rustup toolchain link sbf    "$BPF_RUST" && \
+    rustup toolchain link solana "$BPF_RUST"
+
+# Solana CLI (+ BPF SDK) is installed in *bootstrap* already; the
+# runtime helper added ~45 s cold‑start so we drop it entirely.
 
 # Anchor 0.31.1 (works with Solana ≥2.1) + minimal Node 20
 ARG ANCHOR_VERSION=0.31.1
 RUN set -euo pipefail; \
-    rustup component add rust-src ; \
-    # ------------------------------------------------------------------
-    # Install full native tool-chain *first* so Cargo can compile Anchor,
-    # **then** build sccache and anchor in one shot so the symlink survives.
-    # ------------------------------------------------------------------
+    rustup component add rust-src && \
     apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         git clang lld llvm make pkg-config libssl-dev ca-certificates && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
-    # ------------------------------------------------------------------
-    # (re)install sccache *after* apt so the symlink can't be clobbered.
-    # We **do not** activate it yet because very early invocations inside
-    # `cargo install anchor-cli` can fail on some WSL kernels.
-    # ------------------------------------------------------------------
     cargo install --locked sccache && \
     ln -sf /usr/local/cargo/bin/sccache /usr/local/bin/sccache && \
-    # Some crates still expect the generic `cc` name – make it point to clang
     ln -sf "$(command -v clang)" /usr/bin/cc && \
-    # ------------------------------------------------------------------
-    # Now build & install Anchor under /usr/local.
-    # ------------------------------------------------------------------
     cargo install --git https://github.com/solana-foundation/anchor.git \
                  --tag v${ANCHOR_VERSION} \
-                 anchor-cli --locked --root /usr/local ; \
-    /usr/local/bin/anchor --version ; \
-    # Optional tooling
-    cargo install cargo-chef --version 0.1.64 --locked --root /usr/local ; \
-    # Clean up to keep the layer small
-    apt-get clean && rm -rf /var/lib/apt/lists/* ; \
+                 anchor-cli --locked --root /usr/local && \
+    /usr/local/bin/anchor --version && \
+    cargo install cargo-chef --version 0.1.64 --locked --root /usr/local && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* && \
     strip /usr/local/bin/solana* /usr/local/bin/anchor /usr/local/bin/sccache || true
 
 # ----------------------------------------------------------------------
@@ -153,6 +158,7 @@ RUN export CARGO_TARGET_DIR=/usr/src/target && \
     mv anchor-template /usr/src/anchor-template && \
     rm -rf /usr/src/target/debug /usr/src/target/**/incremental && \
     mkdir -p /cache-seed && cp -a /usr/src/target/deploy /cache-seed/target
+
 
 # ----------------------------------------------------------------------
 #  🎉  Warm-up finished – switch sccache *back on* (local-only).
@@ -278,7 +284,7 @@ RUN mkdir -p /usr/share/solanaflow/web/.yarn/releases \
 
 RUN apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      bash build-essential clang lld llvm pkg-config libssl-dev binutils ca-certificates jq curl && \
+      bash build-essential clang llvm pkg-config libssl-dev binutils ca-certificates jq curl && \
     update-ca-certificates && \
     ln -sf "$(command -v gcc || command -v clang)" /usr/bin/cc && \
     strip /usr/local/bin/solana* || true && \

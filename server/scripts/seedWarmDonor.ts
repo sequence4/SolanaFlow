@@ -16,9 +16,12 @@ import pool from '../src/config/database';   // module-alias takes care of "@/�
  * Run with:  pnpm seed:warm
  */
 async function main() {
-  const image =
-    process.env.SOLANAFLOW_BUILD_IMAGE ??
-    "ghcr.io/sequence4/solana-toolchain:runtime-latest";
+  const hostArch = execSync('docker info --format "{{.Architecture}}"', { encoding: "utf8" }).trim();
+  const platform = hostArch === "x86_64" ? "linux/amd64" : "linux/arm64";
+  const defaultImage = hostArch === "x86_64"
+    ? "ghcr.io/sequence4/solana-toolchain:runtime-latest-amd64"
+    : "ghcr.io/sequence4/solana-toolchain:runtime-latest-arm64";
+  const image = process.env.SOLANAFLOW_BUILD_IMAGE ?? defaultImage;
 
   const dbUrl = process.env.DATABASE_URL;
   if (!dbUrl) {
@@ -30,13 +33,13 @@ async function main() {
   console.log(`[seed] creating donor ${name} from ${image}`);
 
   // pull once so the command fails fast if the tag is wrong
-  execSync(`docker pull --platform linux/arm64 ${image}`, { stdio: "inherit" });
+  execSync(`docker pull --platform ${platform} ${image}`, { stdio: "inherit" });
 
   // run detached, map 3000 → random host-port
   execSync(
     [
       "docker run -d",
-      "--platform linux/arm64",
+      `--platform ${platform}`,
       `--name ${name}`,
       '--label solanaflow.pool=free',
       "-p 0:3000", // <<< ★ key change – publish 3000/tcp
