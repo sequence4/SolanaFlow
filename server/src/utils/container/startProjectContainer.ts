@@ -374,7 +374,7 @@ export async function startProjectContainer(
         'bash', '-lc',
         // Copy base Next.js app if needed, then start dev server with hot-reload
         `"if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
-        `cp -R /usr/share/solanaflow/web/* /usr/src/${rootPath}/web/; fi; ` +
+        `cp -a /usr/share/solanaflow/web/. /usr/src/${rootPath}/web/; fi; ` +
         `cd /usr/src/${rootPath}/web && ` +
         `export NEXT_DISABLE_REACT_REFRESH=\${NEXT_DISABLE_REACT_REFRESH:-0}; ` +
         `npx next dev -H 0.0.0.0 -p ${INTERNAL_PORT} & ` +
@@ -385,7 +385,7 @@ export async function startProjectContainer(
         'bash', '-lc',
         // Copy base Next.js app if needed, then run standalone server
         `"if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
-        `cp -R /usr/share/solanaflow/web/* /usr/src/${rootPath}/web/; fi; ` +
+        `cp -a /usr/share/solanaflow/web/. /usr/src/${rootPath}/web/; fi; ` +
         `cd /usr/src/${rootPath}/web && ` +
         `until [ -d .next ]; do sleep 1; done && ` +
         `node .next/standalone/server.js -H 0.0.0.0 -p ${INTERNAL_PORT} & ` +

@@ -80,28 +80,18 @@ ENV AWS_REGION=${AWS_REGION} \
     #   • /usr/local/cargo/bin  – default in rust:* images
     #   • /usr/local/rustup     – system-wide rustup toolchain
     #   • /usr/local/bin        – system-wide convenience links
-    PATH="/usr/local/bin:/usr/local/cargo/bin:${PATH}"
+    PATH="/usr/local/bin:/usr/local/cargo/bin:${PATH}" \
+    BPF_RUST="/usr/local/solana/active_release/bin/sdk/bpf/dependencies/bpf-tools/rust"
 
 # purge occasionally-corrupt llvm tool-chain cache
 RUN rm -rf /root/.cache/solana/platform-tools || true
 
 # Install the stable Rust toolchain up-front (minimal profile) for caching
 RUN rustup set profile minimal && \
-    rustup default stable
-
-# ------------------------------------------------------------------
-# Install the *stable* Rust tool-chain up-front.  Doing this **before**
-# we install Anchor prevents `rustup default stable` from later
-# clobbering `/usr/local/bin` and deleting the freshly-built
-# `anchor` binary.  We run it in its own layer so the expensive
-# download is cached independently.
-# ------------------------------------------------------------------
-#  ▸ make sure the Rust "llvm‑tools‑preview" component is present so
-#    `rust-lld` is always available for native tests and non‑SBF builds
-# ------------------------------------------------------------------
-RUN rustup set profile minimal && \
     rustup default stable && \
-    rustup component add llvm-tools-preview
+    rustup component add llvm-tools-preview && \
+    rustup toolchain link bpf $BPF_RUST && \
+    rustup toolchain link solana $BPF_RUST   # legacy alias for older scripts
 
 # Anchor 0.31.1 (works with Solana ≥2.1) + minimal Node 20
 ARG ANCHOR_VERSION=0.31.1
@@ -146,7 +136,6 @@ RUN export CARGO_TARGET_DIR=/usr/src/target && \
     mv anchor-template /usr/src/anchor-template && \
     rm -rf /usr/src/target/debug /usr/src/target/**/incremental && \
     mkdir -p /cache-seed && cp -a /usr/src/target/deploy /cache-seed/target
-
 
 
 # ----------------------------------------------------------------------
