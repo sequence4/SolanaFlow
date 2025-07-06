@@ -16,6 +16,7 @@ import {
 import { waitForTaskCompletion } from "../taskUtils";
 import path from "path";
 import { attachFileContents } from "../fileUtils/attachFileContents";
+import { builderImage } from './builderImage';
 
 // ─── unified progress payload ────────────────────────────
 interface ProgressEvent {
