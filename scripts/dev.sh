@@ -14,6 +14,21 @@ export APP_BASE_PATH="/dapp/${APP_ID}"
 export FORCE_REMOTE_DOCKER=0
 export SF_DEV_SERVER=1
 
+# ─── Clear stale Windows → WSL port-proxy rules ────────────────────────────────
+# When Windows leaves a v4-to-v4 port-proxy entry after the previous run,
+# the next "localhost" request can hang until you `wsl --shutdown`.  Deleting the
+# proxy rules for the ports we're about to bind avoids that pain.
+#
+# • Edit PORTPROXY_PORTS if your stacks use different ports.
+# • Runs best-effort: ignores errors and carries on if netsh isn't present.
+#
+PORTPROXY_PORTS="${PORTPROXY_PORTS:-3000 4000 5173}"
+for p in $PORTPROXY_PORTS; do
+  powershell.exe -NoProfile -NonInteractive -Command \
+    "netsh interface portproxy delete v4tov4 listenport=$p listenaddress=0.0.0.0" \
+    >/dev/null 2>&1 || true
+done
+
 # ─── Docker stack ───────────────────────────────────
 unset DOCKER_HOST DOCKER_TLS_VERIFY DOCKER_CERT_PATH DOCKER_CLI_EXPERIMENTAL
 
@@ -36,7 +51,7 @@ docker compose              \
 echo "${GHCR_PAT:-unset}" | \
   docker login ghcr.io -u "${GHCR_USER:-unset}" --password-stdin 2>/dev/null || true
 
-# ─── Kill any lingering dev processes so we don’t double-spawn ───
+# ─── Kill any lingering dev processes so we don't double-spawn ───
 pkill -f 'src/app.ts'  2>/dev/null || true
 pkill -f 'next dev'    2>/dev/null || true
 
