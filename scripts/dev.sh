@@ -29,18 +29,38 @@ for p in $PORTPROXY_PORTS; do
     >/dev/null 2>&1 || true
 done
 
-# ─── Ensure Docker CLI is reachable ──────────────────────────────
-# On some WSL systems the /usr/local/bin/docker symlink breaks and
-# any call returns "Input/output error" (EIO).
-# We test `docker info`; if it fails we alias to the Windows
-# `docker.exe`, which works inside WSL as long as Docker Desktop
-# is running.
+# ─── Ensure Docker daemon & CLI are usable ───────────────────────
+# 1) If `docker info` works → nothing to do.
+# 2) Otherwise try to start the Windows service that backs Docker Desktop.
+# 3) If the UNIX shim is busted, fall back to the real docker.exe binary.
+# 4) Wait up to 30 s; bail if the engine never comes up.
+
 if ! docker info >/dev/null 2>&1; then
-  echo "🐳  Docker CLI unreachable; falling back to docker.exe…"
-  if command -v docker.exe >/dev/null 2>&1; then
-    alias docker=docker.exe        # only for this script's session
-  else
-    echo "❌  Neither docker nor docker.exe is available. Is Docker Desktop running?"
+  echo "🐳  Docker daemon not responding — attempting auto-start…"
+
+  # Start Docker Desktop's service (no error if already running)
+  powershell.exe -NoProfile -NonInteractive -Command \
+    "Start-Service -Name com.docker.service" \
+    >/dev/null 2>&1 || true   # 📚 MS docs & user reports
+
+  # If the shim at /usr/local/bin/docker is an EIO symlink, alias real docker.exe
+  DOCKER_WIN="/mnt/c/Program Files/Docker/Docker/resources/bin/docker.exe"  # default path
+  if [ -x "$DOCKER_WIN" ]; then
+    alias docker="$DOCKER_WIN"
+  fi
+
+  # Wait up to 30 s for the daemon
+  for _ in {1..30}; do
+    if docker info >/dev/null 2>&1; then
+      echo "✅  Docker daemon is up."
+      break
+    fi
+    sleep 1
+  done
+
+  # Fail gracefully if still dead
+  if ! docker info >/dev/null 2>&1; then
+    echo "❌  Docker still unavailable. Please open Docker Desktop manually."
     exit 1
   fi
 fi
