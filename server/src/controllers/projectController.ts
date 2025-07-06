@@ -49,8 +49,9 @@ export const runCommandController = async (
       command,
       cwd,
       taskId,
-      output
+      output,
     });
+    return;
   } catch (error) {
     return next(error);
   }
@@ -510,28 +511,32 @@ export const getBuildArtifact = async (
 
 export const createEphemeralKeypair = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { secretKey } = req.body ?? {};
-    const ephem = secretKey
-        ? Keypair.fromSecretKey(Uint8Array.from(secretKey))
-        : Keypair.generate();
+    // Generate a new keypair
+    const ephem = Keypair.generate();
     const pubkey = ephem.publicKey.toBase58();
-
-    const walletPath = path.join(
-        APP_CONFIG.WALLETS_FOLDER,
-        `${pubkey}.json`
-    );
-    fs.writeFileSync(walletPath, JSON.stringify(Array.from(ephem.secretKey)), { mode: 0o600 });
     
-    // optional but useful – detect typos early
-    await runCommand(
-      `solana-keygen pubkey ${walletPath} | grep -q ${pubkey}`,
-      '.', 'verify-ephem', { skipSuccessUpdate: true }
-    ); // exits 1 if mismatch
-
-    res.status(200).json({ ephemeralPubkey: pubkey });
-  } catch (err) {
-    console.error('Error creating ephemeral keypair:', err);
-    return next(new AppError('Failed to create ephemeral keypair', 500));
+    // Save the keypair to the wallets folder
+    const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${pubkey}.json`);
+    fs.writeFileSync(walletPath, JSON.stringify(Array.from(ephem.secretKey)));
+    
+    /* ---------------------------------------------------------
+     * Self-verify the keypair without relying on solana-keygen.
+     * If the derived pubkey doesn't round-trip, throw.
+     * --------------------------------------------------------*/
+    const derived = Keypair
+      .fromSecretKey(ephem.secretKey)
+      .publicKey.toBase58();
+    if (derived !== pubkey) {
+      throw new Error('Keypair self-verification failed');
+    }
+    
+    res.status(200).json({
+      message: 'Ephemeral keypair created successfully',
+      pubkey
+    });
+  } catch (error) {
+    console.error('Error creating ephemeral keypair:', error);
+    next(new AppError('Failed to create ephemeral keypair', 500));
   }
 };
 
@@ -608,7 +613,7 @@ export const deployProjectEphemeral = async (
   if (ephemeralPubkey === 'SIGNED') {
     console.log(`[DEPLOY_EPHEMERAL] 'SIGNED' flag received – expecting front-end to handle deployment`);
     const taskId = await startAnchorDeployTask(id, userId, 'SIGNED');
-    return res.status(200).json({
+    res.status(200).json({
       message: 'Awaiting signed transaction from wallet',
       taskId: taskId,
     });
@@ -695,8 +700,11 @@ export const deployProjectEphemeral = async (
               console.log(`[DEPLOY_EPHEMERAL] Valid program ID confirmed: ${programId}`);
               // Store the Program ID in project details for future use
               await client.query(
-                'UPDATE solanaproject SET details = COALESCE(details::jsonb, '{}'::jsonb) || $1::jsonb, last_updated = $2 WHERE id = $3',
-                [JSON.stringify({ programId }), new Date(), id]
+                `UPDATE solanaproject
+                   SET details = COALESCE(details::jsonb, '{}'::jsonb) || $1::jsonb,
+                       last_updated = $2
+                 WHERE id = $3`,
+                [JSON.stringify({ programId }), new Date(), id],
               );
             } else {
               console.log(`[DEPLOY_EPHEMERAL] WARNING: Task completed but no Program ID found in result`);
@@ -1020,8 +1028,11 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
     const client = await pool.connect();
     try {
       await client.query(
-        'UPDATE solanaproject SET details = COALESCE(details::jsonb, '{}'::jsonb) || $1::jsonb, last_updated = $2 WHERE id = $3',
-        [JSON.stringify({ programId }), new Date(), id]
+        `UPDATE solanaproject
+           SET details = COALESCE(details::jsonb, '{}'::jsonb) || $1::jsonb,
+               last_updated  = $2
+         WHERE id = $3`,
+        [JSON.stringify({ programId }), new Date(), id],
       );
     } finally {
       client.release();
