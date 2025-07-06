@@ -50,10 +50,9 @@ RUN set -euo pipefail; \
         --data-dir /usr/local/solana \
         "${SOLANA_VERSION}"; \
     # expose the CLI suite **and** Cargo helpers (e.g. `cargo-build-sbf`) on the global PATH
-    # CLI binaries live in two sibling dirs; link both so every command is on PATH
-    ln -sf /usr/local/solana/active_release/bin/{solana*,agave*} /usr/local/bin/ && \
-    ln -sf /usr/local/solana/active_release/bin/cargo-*          /usr/local/bin/ && \
-    ln -sf /usr/local/solana/install/active_release/bin/{solana*,agave*} /usr/local/bin/; \
+    # Link everything in the SDK directory to prevent future breakage if tools are renamed again
+    ln -sf /usr/local/solana/active_release/bin/* /usr/local/bin/ && \
+    ln -sf /usr/local/solana/install/active_release/bin/* /usr/local/bin/; \
     solana --version
 
 ENV PATH="/usr/local/bin:${PATH}"
@@ -85,7 +84,8 @@ ENV AWS_REGION=${AWS_REGION} \
     #   • /usr/local/rustup     – system-wide rustup toolchain
     #   • /usr/local/bin        – system-wide convenience links
     PATH="/usr/local/bin:/usr/local/cargo/bin:${PATH}" \
-    BPF_RUST="/usr/local/solana/active_release/bin/sdk/bpf/dependencies/bpf-tools/rust"
+    # Agave ≥2.0 moved the SDK to "sbf/dependencies/platform‑tools"
+    BPF_RUST="/usr/local/solana/active_release/bin/sdk/sbf/dependencies/platform-tools/rust"
 
 # purge occasionally-corrupt llvm tool-chain cache
 RUN rm -rf /root/.cache/solana/platform-tools || true
@@ -104,8 +104,10 @@ RUN set -euo pipefail; \
     rustup set profile minimal && \
     rustup default stable && \
     rustup component add llvm-tools-preview && \
+    # Register the fork multiple times so both old (+bpf) and new (+sbf) Cargo helpers work
     rustup toolchain link bpf    "$BPF_RUST" && \
-    rustup toolchain link solana "$BPF_RUST"   # legacy alias for older scripts
+    rustup toolchain link sbf    "$BPF_RUST" && \
+    rustup toolchain link solana "$BPF_RUST"
 
 # Anchor 0.31.1 (works with Solana ≥2.1) + minimal Node 20
 ARG ANCHOR_VERSION=0.31.1
