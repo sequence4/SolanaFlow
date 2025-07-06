@@ -3,11 +3,24 @@
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
+# Make sure TLS roots & a recent curl exist inside the build container
+# ---------------------------------------------------------------------------
+if command -v apt-get >/dev/null 2>&1; then
+  echo "⏳  Installing ca-certificates…"
+  apt-get update -qq
+  DEBIAN_FRONTEND=noninteractive \
+    apt-get install -y --no-install-recommends ca-certificates curl
+  update-ca-certificates
+fi
+
+# ---------------------------------------------------------------------------
 # NEW: install Solana CLI → grab its pre‑built Rust‑BPF tool‑chain
 # ---------------------------------------------------------------------------
 
-# 1. Install the latest Solana CLI (quiet, non‑interactive)
-curl -sSfL https://release.solana.com/stable/install | bash -s -- -y
+# 1. Install the latest Solana CLI (quiet, non‑interactive, retry TLS hiccups)
+curl --retry 5 --retry-delay 2 --retry-connrefused \
+     --fail --location --proto '=https' --tlsv1.2 \
+     https://release.solana.com/stable/install | bash -s -- -y
 # make the CLI visible for the rest of the script
 export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
 
