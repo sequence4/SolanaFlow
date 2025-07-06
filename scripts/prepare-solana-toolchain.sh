@@ -19,7 +19,7 @@ fi
 
 # 1. Install the latest Solana CLI (quiet, non‑interactive, retry TLS hiccups)
 curl --retry 5 --retry-delay 2 --retry-connrefused \
-     --fail --location --proto '=https' --tlsv1.2 \
+     --fail --location --proto '=https' --tlsv1.2 --http1.1 \
      https://release.solana.com/stable/install | bash -s -- -y
 # make the CLI visible for the rest of the script
 export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
