@@ -9,7 +9,7 @@ if command -v apt-get >/dev/null 2>&1; then
   echo "⏳  Installing ca-certificates…"
   apt-get update -qq
   DEBIAN_FRONTEND=noninteractive \
-    apt-get install -y --no-install-recommends ca-certificates curl
+    apt-get install -y --no-install-recommends ca-certificates curl wget
   update-ca-certificates
 fi
 
@@ -17,10 +17,26 @@ fi
 # NEW: install Solana CLI → grab its pre‑built Rust‑BPF tool‑chain
 # ---------------------------------------------------------------------------
 
-# 1. Install the latest Solana CLI (quiet, non‑interactive, retry TLS hiccups)
-curl --retry 5 --retry-delay 2 --retry-connrefused \
-     --fail --location --proto '=https' --tlsv1.2 --http1.1 \
-     https://release.solana.com/stable/install | bash -s -- -y
+# 1. Download & run Solana installer
+#    * Prefer wget (GnuTLS avoids the OpenSSL EOF bug).
+#    * Fall back to curl with --tlsv1.2 --no-alpn if wget is not present.
+set +e
+if command -v wget >/dev/null 2>&1; then
+  wget -qO- --https-only --secure-protocol=TLSv1_2 \
+       --retry-connrefused --waitretry=2 --tries=5 \
+       https://release.solana.com/stable/install | bash -s -- -y
+  EXIT_CODE=$?
+else
+  curl --retry 5 --retry-delay 2 --retry-connrefused \
+       --fail --location --proto '=https' --tlsv1.2 --no-alpn \
+       https://release.solana.com/stable/install | bash -s -- -y
+  EXIT_CODE=$?
+fi
+set -e
+if [ $EXIT_CODE -ne 0 ]; then
+  echo "❌  Failed to download Solana CLI (curl/wget exit $EXIT_CODE)" >&2
+  exit $EXIT_CODE
+fi
 # make the CLI visible for the rest of the script
 export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
 
