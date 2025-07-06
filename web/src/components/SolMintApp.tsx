@@ -13,12 +13,15 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
 import { Copy, ExternalLink, Info, Moon, Sun, Loader2 } from "lucide-react"
 import { useTheme } from "next-themes"
+import * as anchor from "@project-serum/anchor"
+import { PublicKey, Keypair } from "@solana/web3.js"
+import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } from "@solana/spl-token"
 
 export default function SolMintApp() {
-  const { publicKey, connected } = useWallet()
+  const { publicKey, connected, signTransaction, signAllTransactions } = useWallet()
   const { theme, setTheme } = useTheme()
 
-  const { toast } = useToast();
+  const { toast } = useToast()
 
   // Form states
   const [initMintForm, setInitMintForm] = useState({
@@ -49,6 +52,9 @@ export default function SolMintApp() {
 
   const PROGRAM_ID = process.env.NEXT_PUBLIC_PROGRAM_ID || "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 
+  // State to store the created mint's public key for later use
+  const [mintPubKey, setMintPubKey] = useState<PublicKey | null>(null)
+
   const shortenAddress = (address: string) => {
     return `${address.slice(0, 4)}...${address.slice(-4)}`
   }
@@ -66,15 +72,59 @@ export default function SolMintApp() {
     setErrors((prev) => ({ ...prev, initMint: "" }))
 
     try {
-      // Simulate transaction
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-      const mockTxId = "5j7s8K9mN2pQ3rT4uV6wX7yZ8aB1cD2eF3gH4iJ5kL6mN7oP8qR9sT0uV1wX2yZ3"
-      setSuccessTx((prev) => ({ ...prev, initMint: mockTxId }))
+      if (!publicKey || !connected) throw new Error("Wallet not connected")
+      // Set up Anchor provider and program
+      const connection = new anchor.web3.Connection(anchor.web3.clusterApiUrl("devnet"), "confirmed")
+      const anchorWallet = {
+        publicKey: publicKey,
+        signTransaction: signTransaction!,
+        signAllTransactions: signAllTransactions!,
+      }
+      const provider = new anchor.AnchorProvider(connection, anchorWallet as anchor.Wallet, anchor.AnchorProvider.defaultOptions())
+      anchor.setProvider(provider)
+      const programIdKey = new PublicKey(PROGRAM_ID)
+      const idl = await anchor.Program.fetchIdl(programIdKey, provider)
+      if (!idl) throw new Error("Failed to fetch IDL for program")
+      const program = new anchor.Program(idl, programIdKey, provider)
+      // Determine mint authority (use wallet if none provided)
+      const mintAuthorityPubkey = initMintForm.mintAuthority
+        ? new PublicKey(initMintForm.mintAuthority)
+        : publicKey
+      // Warn if freeze authority is provided (not supported by program)
+      if (initMintForm.freezeAuthority.trim()) {
+        toast({
+          title: "Note",
+          description: "Freeze authority is not supported and will be set to none.",
+        })
+      }
+      // Generate a new Keypair for the token mint account
+      const mintAccount = Keypair.generate()
+      // Call initialize_mint instruction on the Anchor program
+      const txSig = await program.rpc.initializeMint(
+        {
+          decimals: initMintForm.decimals,
+          mintAuthority: mintAuthorityPubkey,
+        },
+        {
+          accounts: {
+            payer: publicKey,
+            tokenMint: mintAccount.publicKey,
+            systemProgram: anchor.web3.SystemProgram.programId,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+          },
+          signers: [mintAccount],
+        }
+      )
+      // Save mint public key for use in mintToken step
+      setMintPubKey(mintAccount.publicKey)
+      setSuccessTx((prev) => ({ ...prev, initMint: txSig }))
       toast({
         title: "Mint Initialized!",
         description: "Your token mint has been successfully created.",
       })
     } catch (error) {
+      console.error("InitializeMint error:", error)
       setErrors((prev) => ({ ...prev, initMint: "Failed to initialize mint. Please try again." }))
       toast({
         title: "Error",
@@ -91,16 +141,67 @@ export default function SolMintApp() {
     setErrors((prev) => ({ ...prev, mintToken: "" }))
 
     try {
-      // Simulate transaction
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-      const mockTxId = "8k9L0mN1oP2qR3sT4uV5wX6yZ7aB8cD9eF0gH1iJ2kL3mN4oP5qR6sT7uV8wX9yZ"
-      setSuccessTx((prev) => ({ ...prev, mintToken: mockTxId }))
+      if (!publicKey || !connected) throw new Error("Wallet not connected")
+      if (!mintPubKey) throw new Error("Mint not initialized")
+      // Set up Anchor provider and program (reuse connection and wallet)
+      const connection = new anchor.web3.Connection(anchor.web3.clusterApiUrl("devnet"), "confirmed")
+      const anchorWallet = {
+        publicKey: publicKey,
+        signTransaction: signTransaction!,
+        signAllTransactions: signAllTransactions!,
+      }
+      const provider = new anchor.AnchorProvider(connection, anchorWallet as anchor.Wallet, anchor.AnchorProvider.defaultOptions())
+      anchor.setProvider(provider)
+      const programIdKey = new PublicKey(PROGRAM_ID)
+      const idl = await anchor.Program.fetchIdl(programIdKey, provider)
+      if (!idl) throw new Error("Failed to fetch IDL for program")
+      const program = new anchor.Program(idl, programIdKey, provider)
+      // Mint authority must match the one set during initialization
+      const mintAuthorityPubkey = initMintForm.mintAuthority
+        ? new PublicKey(initMintForm.mintAuthority)
+        : publicKey
+      if (!publicKey.equals(mintAuthorityPubkey)) {
+        throw new Error("Current wallet is not the mint authority")
+      }
+      // Parse destination address and get/create associated token account
+      const destinationPubkey = new PublicKey(mintTokenForm.destination)
+      const ata = await getAssociatedTokenAddress(mintPubKey, destinationPubkey)
+      const ataInfo = await connection.getAccountInfo(ata)
+      const instructions: anchor.web3.TransactionInstruction[] = []
+      if (!ataInfo) {
+        instructions.push(
+          createAssociatedTokenAccountInstruction(publicKey, ata, destinationPubkey, mintPubKey)
+        )
+      }
+      // Call mint_to instruction on the Anchor program
+      const amountBN = new anchor.BN(mintTokenForm.amount)
+      const txSig = await program.rpc.mintTo(
+        {
+          amount: amountBN,
+        },
+        {
+          accounts: {
+            mintAuthority: publicKey,
+            tokenMint: mintPubKey,
+            destinationTokenAccount: ata,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          },
+          instructions: instructions,
+        }
+      )
+      setSuccessTx((prev) => ({ ...prev, mintToken: txSig }))
       toast({
         title: "Tokens Minted!",
         description: `Successfully minted ${mintTokenForm.amount} tokens.`,
       })
     } catch (error) {
-      setErrors((prev) => ({ ...prev, mintToken: "Failed to mint tokens. Please try again." }))
+      console.error("MintToken error:", error)
+      setErrors((prev) => ({
+        ...prev,
+        mintToken: error.message.includes("Mint not initialized")
+          ? "Please initialize a mint first."
+          : "Failed to mint tokens. Please try again.",
+      }))
       toast({
         title: "Error",
         description: "Failed to mint tokens",
