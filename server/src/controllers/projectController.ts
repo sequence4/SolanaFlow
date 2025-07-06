@@ -17,13 +17,15 @@ import {
   runCommand,
   startInstallNodeDependenciesTask,
   compileTs,
+  broadcastSignedTx,
 } from '../utils/projectUtils';
 import path from 'path';
 import { APP_CONFIG } from '../config/appConfig';
 import fs from 'fs';
 import { Keypair } from '@solana/web3.js';
-import { waitForTaskCompletion } from '../utils/taskUtils';
+import { waitForTaskCompletion, updateTaskStatus } from '../utils/taskUtils';
 import { createProject as createProjectDb } from '../utils/project/createProject';
+import { catchAsync } from '../utils/catchAsync';
 
 export const runCommandController = async (
   req: Request,
@@ -1004,10 +1006,12 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
   const orgId = req.user?.org_id;
   const { encodedTx, programId, taskId } = req.body;
   if (!userId || !orgId) {
-    return next(new AppError('User information not found', 400));
+    next(new AppError('User information not found', 400));
+    return;
   }
   if (!encodedTx || !programId || !taskId) {
-    return next(new AppError('Missing encodedTx, programId, or taskId', 400));
+    next(new AppError('Missing encodedTx, programId, or taskId', 400));
+    return;
   }
   try {
     // Broadcast the signed transaction to Devnet
@@ -1026,13 +1030,17 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
     const resultJson = JSON.stringify({ status: 'success', programId });
     await updateTaskStatus(taskId, 'succeed', resultJson);
     console.log(`[RELAY_SIGNED_TX] Program ${programId} deployed successfully for project ${id}`);
-    return res.status(200).json({ signature: txSignature, programId });
+    res.status(200).json({ signature: txSignature, programId });
+    return;
   } catch (error: any) {
     console.error('[RELAY_SIGNED_TX] Failed to broadcast signed transaction:', error);
     if (taskId) {
       // Mark task as failed if broadcast fails
       await updateTaskStatus(taskId, 'failed', `Broadcast failed: ${error.message}`);
     }
-    return next(new AppError('Failed to relay signed transaction', 500));
+    next(new AppError('Failed to relay signed transaction', 500));
+    return;
   }
 };
+
+export const relaySignedTxHandler = catchAsync(relaySignedTx);
