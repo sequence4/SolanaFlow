@@ -29,6 +29,22 @@ for p in $PORTPROXY_PORTS; do
     >/dev/null 2>&1 || true
 done
 
+# ─── Ensure Docker CLI is reachable ──────────────────────────────
+# On some WSL systems the /usr/local/bin/docker symlink breaks and
+# any call returns "Input/output error" (EIO).
+# We test `docker info`; if it fails we alias to the Windows
+# `docker.exe`, which works inside WSL as long as Docker Desktop
+# is running.
+if ! docker info >/dev/null 2>&1; then
+  echo "🐳  Docker CLI unreachable; falling back to docker.exe…"
+  if command -v docker.exe >/dev/null 2>&1; then
+    alias docker=docker.exe        # only for this script's session
+  else
+    echo "❌  Neither docker nor docker.exe is available. Is Docker Desktop running?"
+    exit 1
+  fi
+fi
+
 # ─── Docker stack ───────────────────────────────────
 unset DOCKER_HOST DOCKER_TLS_VERIFY DOCKER_CERT_PATH DOCKER_CLI_EXPERIMENTAL
 
