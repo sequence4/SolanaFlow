@@ -50,8 +50,10 @@ RUN set -euo pipefail; \
         --data-dir /usr/local/solana \
         "${SOLANA_VERSION}"; \
     # expose the CLI suite **and** Cargo helpers (e.g. `cargo-build-sbf`) on the global PATH
-    ln -sf /usr/local/solana/active_release/bin/solana* /usr/local/bin/ && \
-    ln -sf /usr/local/solana/active_release/bin/cargo-*  /usr/local/bin/; \
+    # CLI binaries live in two sibling dirs; link both so every command is on PATH
+    ln -sf /usr/local/solana/active_release/bin/solana*          /usr/local/bin/ && \
+    ln -sf /usr/local/solana/active_release/bin/cargo-*           /usr/local/bin/ && \
+    ln -sf /usr/local/solana/install/active_release/bin/solana*   /usr/local/bin/; \
     solana --version
 
 ENV PATH="/usr/local/bin:${PATH}"
