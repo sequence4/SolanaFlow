@@ -51,9 +51,9 @@ RUN set -euo pipefail; \
         "${SOLANA_VERSION}"; \
     # expose the CLI suite **and** Cargo helpers (e.g. `cargo-build-sbf`) on the global PATH
     # CLI binaries live in two sibling dirs; link both so every command is on PATH
-    ln -sf /usr/local/solana/active_release/bin/solana*          /usr/local/bin/ && \
-    ln -sf /usr/local/solana/active_release/bin/cargo-*           /usr/local/bin/ && \
-    ln -sf /usr/local/solana/install/active_release/bin/solana*   /usr/local/bin/; \
+    ln -sf /usr/local/solana/active_release/bin/{solana*,agave*} /usr/local/bin/ && \
+    ln -sf /usr/local/solana/active_release/bin/cargo-*          /usr/local/bin/ && \
+    ln -sf /usr/local/solana/install/active_release/bin/{solana*,agave*} /usr/local/bin/; \
     solana --version
 
 ENV PATH="/usr/local/bin:${PATH}"
@@ -96,7 +96,7 @@ RUN rm -rf /root/.cache/solana/platform-tools || true
 # 2️⃣ Register that fork with rustup under the names `bpf` and `solana`
 # ------------------------------------------------------------------
 RUN set -euo pipefail; \
-    solana-install init \
+    agave-install init \
         --no-modify-path \
         --data-dir /usr/local/solana \
         "${SOLANA_VERSION:-stable}"; \
