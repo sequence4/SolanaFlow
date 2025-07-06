@@ -85,6 +85,10 @@ ENV AWS_REGION=${AWS_REGION} \
 # purge occasionally-corrupt llvm tool-chain cache
 RUN rm -rf /root/.cache/solana/platform-tools || true
 
+# Install the stable Rust toolchain up-front (minimal profile) for caching
+RUN rustup set profile minimal && \
+    rustup default stable
+
 # ------------------------------------------------------------------
 # Install the *stable* Rust tool-chain up-front.  Doing this **before**
 # we install Anchor prevents `rustup default stable` from later
@@ -102,37 +106,21 @@ RUN rustup set profile minimal && \
 # Anchor 0.31.1 (works with Solana ≥2.1) + minimal Node 20
 ARG ANCHOR_VERSION=0.31.1
 RUN set -euo pipefail; \
-    rustup component add rust-src ; \
-    # ------------------------------------------------------------------
-    # Install full native tool-chain *first* so Cargo can compile Anchor,
-    # **then** build sccache and anchor in one shot so the symlink survives.
-    # ------------------------------------------------------------------
+    rustup component add rust-src && \
     apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        # use Solana's linker, not Debian's generic one
-        git clang llvm make pkg-config libssl-dev ca-certificates && \
+        git clang lld llvm make pkg-config libssl-dev ca-certificates && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
-    # ------------------------------------------------------------------
-    # (re)install sccache *after* apt so the symlink can't be clobbered.
-    # We **do not** activate it yet because very early invocations inside
-    # `cargo install anchor-cli` can fail on some WSL kernels.
-    # ------------------------------------------------------------------
     cargo install --locked sccache && \
     ln -sf /usr/local/cargo/bin/sccache /usr/local/bin/sccache && \
-    # Some crates still expect the generic `cc` name – make it point to clang
     ln -sf "$(command -v clang)" /usr/bin/cc && \
-    # ------------------------------------------------------------------
-    # Now build & install Anchor under /usr/local.
-    # ------------------------------------------------------------------
     cargo install --git https://github.com/solana-foundation/anchor.git \
                  --tag v${ANCHOR_VERSION} \
-                 anchor-cli --locked --root /usr/local ; \
-    /usr/local/bin/anchor --version ; \
-    # Optional tooling
-    cargo install cargo-chef --version 0.1.64 --locked --root /usr/local ; \
-    # Clean up to keep the layer small
-    apt-get clean && rm -rf /var/lib/apt/lists/* ; \
+                 anchor-cli --locked --root /usr/local && \
+    /usr/local/bin/anchor --version && \
+    cargo install cargo-chef --version 0.1.64 --locked --root /usr/local && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* && \
     strip /usr/local/bin/solana* /usr/local/bin/anchor /usr/local/bin/sccache || true
 
 # ----------------------------------------------------------------------
