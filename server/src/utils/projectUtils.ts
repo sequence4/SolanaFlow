@@ -423,8 +423,8 @@ export const startAnchorDeployTask = async (
   const sanitizedTaskId = taskId.trim().replace(/,$/, '');
   
   if (ephemeralPubkey === 'SIGNED') {
-    console.log('[BUILD] signed-tx path – skipping container key copy');
-    await updateTaskStatus(sanitizedTaskId, 'succeed', 'Signed tx already broadcast by frontend');
+    console.log('[DEPLOY] signed-tx path – skipping container key copy and awaiting frontend deployment');
+    await updateTaskStatus(sanitizedTaskId, 'doing', 'Waiting for signed transaction from wallet...');
     return sanitizedTaskId;
   }
 
