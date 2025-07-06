@@ -65,6 +65,8 @@ ARG AWS_REGION                 # --build-arg AWS_REGION=eu-north-1
 ###############################################################################
 FROM bootstrap AS solana-toolchain
 ARG AWS_REGION
+# keep the CLI version string so we can call `solana-install init $SOLANA_VERSION`
+ARG SOLANA_VERSION
 # use bash & fail-fast for every RUN in this stage
 SHELL ["/bin/bash","-c"]
 # ── sccache must be **local-only** while the image builds ───────────────
@@ -86,12 +88,18 @@ ENV AWS_REGION=${AWS_REGION} \
 # purge occasionally-corrupt llvm tool-chain cache
 RUN rm -rf /root/.cache/solana/platform-tools || true
 
-# Install the stable Rust toolchain up-front (minimal profile) for caching
-RUN rustup set profile minimal && \
+# ------------------------------------------------------------------
+# 1️⃣ Download & unpack the Solana **BPF tool‑chain** so the Rust fork exists
+# 2️⃣ Register that fork with rustup under the names `bpf` and `solana`
+# ------------------------------------------------------------------
+RUN set -euo pipefail; \
+    solana-install init "${SOLANA_VERSION:-stable}"; \
+    \
+    rustup set profile minimal && \
     rustup default stable && \
     rustup component add llvm-tools-preview && \
-    rustup toolchain link bpf $BPF_RUST && \
-    rustup toolchain link solana $BPF_RUST   # legacy alias for older scripts
+    rustup toolchain link bpf    "$BPF_RUST" && \
+    rustup toolchain link solana "$BPF_RUST"   # legacy alias for older scripts
 
 # Anchor 0.31.1 (works with Solana ≥2.1) + minimal Node 20
 ARG ANCHOR_VERSION=0.31.1
