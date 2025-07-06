@@ -88,7 +88,7 @@ ENV AWS_REGION=${AWS_REGION} \
     BPF_RUST="/usr/local/solana/active_release/bin/sdk/sbf/dependencies/platform-tools/rust"
 
 # purge occasionally-corrupt llvm tool-chain cache
-RUN rm -rf /root/.cache/solana/platform-tools || true
+RUN rm -rf /root/.cache/solana || true
 
 # ------------------------------------------------------------------
 # 1️⃣ Download & unpack the Solana **BPF tool‑chain** so the Rust fork exists
@@ -100,7 +100,10 @@ RUN set -euo pipefail; \
         --no-modify-path \
         --data-dir /usr/local/solana \
         "${SOLANA_VERSION:-stable}"; \
-    cargo build-sbf --force-tools-install || true; \
+    # Force download and installation of Solana platform tools using a dummy project
+    cargo init /tmp/dummy && \
+    cargo build-sbf --force-tools-install --manifest-path /tmp/dummy/Cargo.toml && \
+    rm -rf /tmp/dummy; \
     rustup set profile minimal && \
     rustup default stable && \
     rustup component add llvm-tools-preview && \
