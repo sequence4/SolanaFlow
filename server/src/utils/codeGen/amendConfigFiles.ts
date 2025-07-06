@@ -167,13 +167,13 @@ async function patchProgramCargoToml(
     return arr.findIndex(l => l.trim() === ln.trim()) === idx;
   });
   
-  const idlBuildFeatureLine = 'idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]';
+  const idlBuildFeatureLine = 'idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "anchor-spl/token_2022"]';
   const defaultFeaturesLine = 'default   = []';
   
   /* ───────── 1. ensure anchor-spl in [dependencies] ───────── */
   // disable default features (Token‑2022) everywhere
   const splDepLine =
-    'anchor-spl = { version = "0.31.1", default-features = false, features = ["token", "associated_token"] }';
+    'anchor-spl = { version = "0.31.1", default-features = false, features = ["token", "associated_token", "token_2022"] }';
 
   /* find (or create) the [dependencies] block */
   let depStart = cargoLines.findIndex(l => l.trim() === '[dependencies]');

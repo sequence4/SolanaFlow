@@ -16,6 +16,7 @@ import {
 import { waitForTaskCompletion } from "../taskUtils";
 import path from "path";
 import { attachFileContents } from "../fileUtils/attachFileContents";
+import { readContainerFile } from "../fileUtils/attachFileContents";
 import { builderImage } from './builderImage';
 
 // ─── unified progress payload ────────────────────────────
@@ -203,6 +204,16 @@ export async function runDeployPipeline({
       throw new Error("ROOT_FOLDER env var not set");
     }
     const absRoot = path.join(rootBase, rootPath);
+    
+    // (4)  Copy **only the artefacts we actually need**:
+    //      ▸   compiled .so & .idl  under  /usr/src/target/deploy
+    //      ▸   Anchor.toml  (for network + IDs)
+    //      Anything else (node_modules, .next, yarn releases) is skipped
+    //      to keep the tar stream < 5 MB and avoid ENOBUFS.
+    // ------------------------------------------------------------------
+    await readContainerFile(workspace.containerName, '/usr/src/target/deploy', projectId, userId);
+    await readContainerFile(workspace.containerName, '/usr/src/Anchor.toml', projectId, userId);
+    
     await attachFileContents(rawTree, absRoot, workspace.containerName);
     const fileTree = rawTree;  // now populated
 

@@ -9,6 +9,6 @@ crate-type = ["cdylib", "lib"]
 
 [dependencies]
 anchor-lang = "0.31.1"
-anchor-spl = { version = "0.31.1", default-features = false, features = ["token", "associated_token"] }
+anchor-spl = { version = "0.31.1", default-features = false, features = ["token", "associated_token", "token_2022"] }
 `,
 }; 

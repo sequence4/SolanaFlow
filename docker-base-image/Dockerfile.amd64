@@ -112,6 +112,9 @@ RUN set -euo pipefail; \
     rustup toolchain link sbf    "$BPF_RUST" && \
     rustup toolchain link solana "$BPF_RUST"
 
+# Solana CLI (+ BPF SDK) is installed in *bootstrap* already; the
+# runtime helper added ~45 s cold‑start so we drop it entirely.
+
 # Anchor 0.31.1 (works with Solana ≥2.1) + minimal Node 20
 ARG ANCHOR_VERSION=0.31.1
 RUN set -euo pipefail; \

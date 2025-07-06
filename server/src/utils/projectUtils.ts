@@ -313,11 +313,7 @@ set -euo pipefail
 
 cd /usr/src/${rootPath}
 
-## --- Solana-specific Rust tool-chain --------------------------------
-/tmp/prepare-solana-toolchain.sh   # ← call helper copied in a few lines below
-
-echo "===== Running anchor build ====="
-# Leave RUSTFLAGS to Anchor – it injects the right settings for SBF v2
+# build the Anchor workspace
 anchor build -- --jobs 1
 
 # ── determine the correct target directory and find the first .so file ──
@@ -346,27 +342,6 @@ echo "BUILD_SUCCESS: $SO_PATH"
       
       try {
         await updateTaskStatus(sanitizedTaskId, 'doing', 'Anchor build in progress...');
-        
-        console.log(`[BUILD] Copying helper + build script into container…`);
-        // helper first (idempotent overwrite)
-        const helperScript = path.resolve(
-          __dirname,
-          '../../../scripts/prepare-solana-toolchain.sh'
-        );
-        await runCommand(
-          `docker cp ${helperScript} ${containerName}:/tmp/prepare-solana-toolchain.sh`,
-          '.',
-          sanitizedTaskId,
-          { skipSuccessUpdate: true }
-        );
-
-        console.log(`[BUILD] Making helper script executable...`);
-        await runCommand(
-          `docker exec ${containerName} chmod +x /tmp/prepare-solana-toolchain.sh`,
-          '.',
-          sanitizedTaskId,
-          { skipSuccessUpdate: true }
-        );
         
         console.log(`[BUILD] Copying build script to container ${containerName}...`);
         await runCommand(
@@ -757,7 +732,6 @@ export const startAnchorTestTask = async (
       const testCmd=`
         docker exec ${containerName} bash -c '
           cd /usr/src/${rootPath} &&
-          /tmp/prepare-solana-toolchain.sh &&
           anchor test -- --jobs 1
         '
       `;

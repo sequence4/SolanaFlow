@@ -3,6 +3,8 @@ import concat from "concat-stream";      // already in package.json
 import docker from './dockerClient';
 import * as tar from 'tar-stream';
 
+const MAX_BUFFER = 128 * 1024 * 1024; // 128 MB – ample for artefact tar
+
 /**
  * Reads a UTF-8 text file from a running container *without* spawning a shell.
  * @param containerName – the workspace container's name
@@ -52,7 +54,7 @@ export async function readFileFromContainer(
     const safePath = filePath.replace(/'/g, "'\\''"); // bash-quote '
     return execSync(
       `docker exec ${containerName} bash -c "cat '${safePath}'"`,
-      { encoding: "utf8" }
+      { encoding: "utf8", maxBuffer: MAX_BUFFER }
     );
   } catch (execErr) {
     throw new Error(
