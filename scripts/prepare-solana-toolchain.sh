@@ -22,12 +22,12 @@ fi
 #    * Fall back to curl with --tlsv1.2 --no-alpn if wget is not present.
 set +e
 if command -v wget >/dev/null 2>&1; then
-  wget -qO- --https-only --secure-protocol=TLSv1_2 \
+  wget -qO- --inet4-only --https-only --secure-protocol=TLSv1_2 \
        --retry-connrefused --waitretry=2 --tries=5 \
        https://release.solana.com/stable/install | bash -s -- -y
   EXIT_CODE=$?
 else
-  curl --retry 5 --retry-delay 2 --retry-connrefused \
+  curl -4 --retry 5 --retry-delay 2 --retry-connrefused \
        --fail --location --proto '=https' --tlsv1.2 --no-alpn \
        https://release.solana.com/stable/install | bash -s -- -y
   EXIT_CODE=$?
