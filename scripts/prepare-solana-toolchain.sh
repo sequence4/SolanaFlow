@@ -2,23 +2,32 @@
 # scripts/prepare-solana-toolchain.sh
 set -euo pipefail
 
-# Link the stable toolchain as "solana" for Anchor compatibility
-RUSTUP_HOME=$(rustup show home)
-TOOLCHAIN_DIR=$(rustup default | cut -d ' ' -f1)
-if ! rustup toolchain list | grep -q '^solana'; then
-    rustup toolchain link solana "$RUSTUP_HOME/toolchains/$TOOLCHAIN_DIR"
+# ---------------------------------------------------------------------------
+# NEW: install Solana CLI → grab its pre‑built Rust‑BPF tool‑chain
+# ---------------------------------------------------------------------------
+
+# 1. Install the latest Solana CLI (quiet, non‑interactive)
+curl -sSfL https://release.solana.com/stable/install | bash -s -- -y
+# make the CLI visible for the rest of the script
+export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+
+# 2. Locate the Rust tool‑chain that ships with the BPF SDK
+SOLANA_VER=$(solana --version | awk '{print $2}')
+BPF_RUST_DIR="$HOME/.local/share/solana/install/releases/${SOLANA_VER}/solana-release/bin/sdk/bpf/dependencies/bpf-tools/rust"
+
+# 3. Link it into rustup so that `cargo +bpf` (and older `+solana`) just work
+if [ -d "$BPF_RUST_DIR" ]; then
+  rustup toolchain link bpf "$BPF_RUST_DIR"
+  if ! rustup toolchain list | grep -q '^solana'; then
+      rustup toolchain link solana "$BPF_RUST_DIR"
+  fi
+else
+  echo "❌  Could not locate Solana BPF Rust at $BPF_RUST_DIR" >&2
+  exit 1
 fi
-export RUSTUP_TOOLCHAIN=solana
 
-# Ensure the correct target & linker components exist
-rustup target add bpfel-unknown-unknown   --toolchain stable
-rustup target add sbf-solana-solana       --toolchain stable
-rustup component add llvm-tools-preview   --toolchain stable
-
-# Fail fast if the linker is still missing
-command -v rust-lld >/dev/null || {
-  echo "❌ rust-lld not found after component install"; exit 13;
-}
+# 4. Keep host‑stable as default (Anchor always overrides with +bpf anyway)
+rustup default stable
 
 echo "✅ Solana tool‑chain ready ($(rustc -V))" 
 
