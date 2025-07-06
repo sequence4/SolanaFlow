@@ -90,10 +90,14 @@ RUN rm -rf /root/.cache/solana/platform-tools || true
 
 # ------------------------------------------------------------------
 # 1️⃣ Download & unpack the Solana **BPF tool‑chain** so the Rust fork exists
+#     (use the *same* data‑dir as the bootstrap stage so $BPF_RUST is valid)
 # 2️⃣ Register that fork with rustup under the names `bpf` and `solana`
 # ------------------------------------------------------------------
 RUN set -euo pipefail; \
-    solana-install init "${SOLANA_VERSION:-stable}"; \
+    solana-install init \
+        --no-modify-path \
+        --data-dir /usr/local/solana \
+        "${SOLANA_VERSION:-stable}"; \
     \
     rustup set profile minimal && \
     rustup default stable && \
