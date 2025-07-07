@@ -17,6 +17,8 @@ import * as anchor from "@project-serum/anchor"
 import { PublicKey, Keypair } from "@solana/web3.js"
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } from "@solana/spl-token"
 
+const { BN } = anchor
+
 export default function SolMintApp() {
   const { publicKey, connected, signTransaction, signAllTransactions } = useWallet()
   const { theme, setTheme } = useTheme()
@@ -99,23 +101,19 @@ export default function SolMintApp() {
       }
       // Generate a new Keypair for the token mint account
       const mintAccount = Keypair.generate()
-      // Call initialize_mint instruction on the Anchor program
-      const txSig = await program.rpc.initializeMint(
-        {
-          decimals: initMintForm.decimals,
-          mintAuthority: mintAuthorityPubkey,
-        },
-        {
-          accounts: {
-            payer: publicKey,
-            tokenMint: mintAccount.publicKey,
-            systemProgram: anchor.web3.SystemProgram.programId,
-            tokenProgram: TOKEN_PROGRAM_ID,
-            rent: anchor.web3.SYSVAR_RENT_PUBKEY,
-          },
-          signers: [mintAccount],
-        }
-      )
+      // Call initialize_mint instruction on the Anchor program using fluent methods API
+      const txSig = await program.methods
+        .initializeMint(initMintForm.decimals, mintAuthorityPubkey)
+        .accounts({
+          payer: publicKey,
+          tokenMint: mintAccount.publicKey,
+          systemProgram: anchor.web3.SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+        })
+        .signers([mintAccount])
+        .rpc()
+      
       // Save mint public key for use in mintToken step
       setMintPubKey(mintAccount.publicKey)
       setSuccessTx((prev) => ({ ...prev, initMint: txSig }))
@@ -167,28 +165,25 @@ export default function SolMintApp() {
       const destinationPubkey = new PublicKey(mintTokenForm.destination)
       const ata = await getAssociatedTokenAddress(mintPubKey, destinationPubkey)
       const ataInfo = await connection.getAccountInfo(ata)
-      const instructions: anchor.web3.TransactionInstruction[] = []
+      const preIx: anchor.web3.TransactionInstruction[] = []
       if (!ataInfo) {
-        instructions.push(
+        preIx.push(
           createAssociatedTokenAccountInstruction(publicKey, ata, destinationPubkey, mintPubKey)
         )
       }
-      // Call mint_to instruction on the Anchor program
-      const amountBN = new anchor.BN(mintTokenForm.amount)
-      const txSig = await program.rpc.mintTo(
-        {
-          amount: amountBN,
-        },
-        {
-          accounts: {
-            mintAuthority: publicKey,
-            tokenMint: mintPubKey,
-            destinationTokenAccount: ata,
-            tokenProgram: TOKEN_PROGRAM_ID,
-          },
-          instructions: instructions,
-        }
-      )
+      // Call mint_to instruction on the Anchor program using fluent methods API
+      const amountBN = new BN(mintTokenForm.amount)
+      const txSig = await program.methods
+        .mintTo(amountBN)
+        .accounts({
+          mintAuthority: publicKey,
+          tokenMint: mintPubKey,
+          destinationTokenAccount: ata,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .preInstructions(preIx)
+        .rpc()
+      
       setSuccessTx((prev) => ({ ...prev, mintToken: txSig }))
       toast({
         title: "Tokens Minted!",
@@ -198,7 +193,7 @@ export default function SolMintApp() {
       console.error("MintToken error:", error)
       setErrors((prev) => ({
         ...prev,
-        mintToken: error.message.includes("Mint not initialized")
+        mintToken: (error as Error).message.includes("Mint not initialized")
           ? "Please initialize a mint first."
           : "Failed to mint tokens. Please try again.",
       }))
