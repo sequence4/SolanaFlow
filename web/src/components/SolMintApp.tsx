@@ -13,13 +13,12 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
 import { Copy, ExternalLink, Info, Moon, Sun, Loader2 } from "lucide-react"
 import { useTheme } from "next-themes"
-import * as anchor from "@project-serum/anchor"
+import * as anchor from "@coral-xyz/anchor"
 import { PublicKey, Keypair, SystemProgram, Transaction } from "@solana/web3.js"
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } from "@solana/spl-token"
-import { 
+import {
   PROGRAM_ID as METADATA_PROGRAM_ID,
-  createCreateMetadataAccountV3Instruction,
-  DataV2
+  createCreateMetadataAccountV3Instruction
 } from "@metaplex-foundation/mpl-token-metadata"
 
 const { BN } = anchor
@@ -159,7 +158,7 @@ export default function SolMintApp() {
       const programIdKey = new PublicKey(PROGRAM_ID)
       const idl = await anchor.Program.fetchIdl(programIdKey, provider)
       if (!idl) throw new Error("Failed to fetch IDL for program")
-      const program = new anchor.Program(idl, programIdKey, provider)
+      const program = new anchor.Program(idl, provider, programIdKey)
       // Determine mint authority (use wallet if none provided)
       const mintAuthorityPubkey = initMintForm.mintAuthority
         ? new PublicKey(initMintForm.mintAuthority)
@@ -262,7 +261,7 @@ export default function SolMintApp() {
       const programIdKey = new PublicKey(PROGRAM_ID)
       const idl = await anchor.Program.fetchIdl(programIdKey, provider)
       if (!idl) throw new Error("Failed to fetch IDL for program")
-      const program = new anchor.Program(idl, programIdKey, provider)
+      const program = new anchor.Program(idl, provider, programIdKey)
       // Mint authority must match the one set during initialization
       const mintAuthorityPubkey = initMintForm.mintAuthority
         ? new PublicKey(initMintForm.mintAuthority)

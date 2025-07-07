@@ -13,7 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
 import { Copy, ExternalLink, Info, Moon, Sun, Loader2 } from "lucide-react"
 import { useTheme } from "next-themes"
-import * as anchor from "@project-serum/anchor"
+import * as anchor from "@coral-xyz/anchor"
 import { PublicKey, Keypair } from "@solana/web3.js"
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } from "@solana/spl-token"
 
@@ -84,7 +84,7 @@ export default function SolMintApp() {
       const programIdKey = new PublicKey(PROGRAM_ID)
       const idl = await anchor.Program.fetchIdl(programIdKey, provider)
       if (!idl) throw new Error("Failed to fetch IDL")
-      const program = new anchor.Program(idl, programIdKey, provider)
+      const program = new anchor.Program(idl, provider, programIdKey)
       const mintAuthorityPubkey = initMintForm.mintAuthority
         ? new PublicKey(initMintForm.mintAuthority)
         : publicKey
@@ -143,7 +143,7 @@ export default function SolMintApp() {
       const programIdKey = new PublicKey(PROGRAM_ID)
       const idl = await anchor.Program.fetchIdl(programIdKey, provider)
       if (!idl) throw new Error("Failed to fetch IDL")
-      const program = new anchor.Program(idl, programIdKey, provider)
+      const program = new anchor.Program(idl, provider, programIdKey)
       const mintAuthorityPubkey = initMintForm.mintAuthority
         ? new PublicKey(initMintForm.mintAuthority)
         : publicKey
