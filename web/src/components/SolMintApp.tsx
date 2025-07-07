@@ -158,7 +158,7 @@ export default function SolMintApp() {
       const programIdKey = new PublicKey(PROGRAM_ID)
       const idl = await anchor.Program.fetchIdl(programIdKey, provider)
       if (!idl) throw new Error("Failed to fetch IDL for program")
-      const program = new anchor.Program(idl, provider, programIdKey)
+      const program = new anchor.Program(idl, provider)
       // Determine mint authority (use wallet if none provided)
       const mintAuthorityPubkey = initMintForm.mintAuthority
         ? new PublicKey(initMintForm.mintAuthority)
@@ -261,7 +261,7 @@ export default function SolMintApp() {
       const programIdKey = new PublicKey(PROGRAM_ID)
       const idl = await anchor.Program.fetchIdl(programIdKey, provider)
       if (!idl) throw new Error("Failed to fetch IDL for program")
-      const program = new anchor.Program(idl, provider, programIdKey)
+      const program = new anchor.Program(idl, provider)
       // Mint authority must match the one set during initialization
       const mintAuthorityPubkey = initMintForm.mintAuthority
         ? new PublicKey(initMintForm.mintAuthority)
