@@ -1,10 +1,10 @@
 import React, { useContext, useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import '@/styles/interface/interfaceStyle.css';
-import ProjectContext from "@/context/project/ProjectContext";
+import ProjectContext from "@context/project/ProjectContext";
 import { projectApi } from '@/api/projectApi';
 import { Loader2, RefreshCw, ExternalLink } from "lucide-react";
-import UxContext from "@/context/ux/UxContext";
+import UxContext from "@context/ux/UxContext";
 import { useWallet } from "@solana/wallet-adapter-react";
 
 const Interface = () => {
