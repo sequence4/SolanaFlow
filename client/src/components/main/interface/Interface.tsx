@@ -6,6 +6,7 @@ import { projectApi } from '@/api/projectApi';
 import { Loader2, RefreshCw, ExternalLink } from "lucide-react";
 import UxContext from "@/context/ux/UxContext";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { enablePhantomWalletExtension } from "phantom-iframe-connector";
 
 const Interface = () => {
     const { projectContext, setProjectContext } = useContext(ProjectContext);
@@ -31,6 +32,19 @@ const Interface = () => {
 
     // helper: pick manual first, then backend, otherwise blank
     const activeUrl = manualUrl || containerUrl || "";
+
+    /* ───────── Enable Phantom wallet extension in iframe ───────── */
+    useEffect(() => {
+        if (activeUrl) {
+            try {
+                const url = new URL(activeUrl);
+                enablePhantomWalletExtension({ iframeOrigin: url.origin });
+                console.log("[Interface] Phantom injection enabled for origin:", url.origin);
+            } catch (error) {
+                console.error("Error enabling Phantom in iframe:", error);
+            }
+        }
+    }, [activeUrl]);
 
     /* ───────── parent ⇒ iframe : push wallet once connected ───────── */
     useEffect(() => {

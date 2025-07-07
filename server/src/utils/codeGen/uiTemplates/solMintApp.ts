@@ -1,6 +1,6 @@
 export const solMintApp = `"use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui"
 import { useWallet } from "@solana/wallet-adapter-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,8 +14,12 @@ import { useToast } from "@/hooks/use-toast"
 import { Copy, ExternalLink, Info, Moon, Sun, Loader2 } from "lucide-react"
 import { useTheme } from "next-themes"
 import * as anchor from "@coral-xyz/anchor"
-import { PublicKey, Keypair } from "@solana/web3.js"
+import { PublicKey, Keypair, SystemProgram, Transaction } from "@solana/web3.js"
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } from "@solana/spl-token"
+import {
+  PROGRAM_ID as METADATA_PROGRAM_ID,
+  createCreateMetadataAccountV3Instruction
+} from "@metaplex-foundation/mpl-token-metadata"
 
 const { BN } = anchor
 
@@ -24,11 +28,49 @@ export default function SolMintApp() {
   const { theme, setTheme } = useTheme()
   const { toast } = useToast()
 
+  /* ---------- runtime helpers ---------- */
+  const isBrowser    = typeof window !== "undefined";
+  const isStandalone = isBrowser && window.parent === window;   // running top‑level, *not* inside iframe
+
+  /* ───────── wallet info coming from the parent window ───────── */
+  const [parentWallet, setParentWallet] =
+    useState<{ connected: boolean; publicKey: string | null }>({
+      connected: false,
+      publicKey: null
+    });
+
+  useEffect(() => {
+    if (!isBrowser) return;                       // guard during SSR
+    function handleParentMsg(event: MessageEvent) {
+      const { type, publicKey: pk } = event.data || {};
+      if (type === "WALLET_CONNECTED" && pk) {
+        setParentWallet({ connected: true, publicKey: pk });
+        /* auto‑prefill mint authority if user didn't type anything */
+        setInitMintForm(prev =>
+          prev.mintAuthority ? prev : { ...prev, mintAuthority: pk }
+        );
+      }
+    }
+    window.addEventListener("message", handleParentMsg);
+    /* ask parent for wallet on boot */
+    if (!isStandalone)
+      window.parent.postMessage({ type: "REQUEST_WALLET_CONNECT" }, "*");
+    return () => window.removeEventListener("message", handleParentMsg);
+  }, [isBrowser, isStandalone]);
+
+  /* helper flags that work with either in‑iframe extension _or_ parent bridge */
+  const walletReady = connected || parentWallet.connected;
+  const walletPubKey = connected && publicKey ? publicKey.toString() : parentWallet.publicKey;
+
   // Form states
   const [initMintForm, setInitMintForm] = useState({
     decimals: 9,
     mintAuthority: "",
     freezeAuthority: "",
+    name: "",
+    symbol: "",
+    uri: "",
+    createMetadata: true,
   })
 
   const [mintTokenForm, setMintTokenForm] = useState({
@@ -44,15 +86,18 @@ export default function SolMintApp() {
   const [successTx, setSuccessTx] = useState({
     initMint: "",
     mintToken: "",
+    metadata: "",
   })
 
   const [errors, setErrors] = useState({
     initMint: "",
     mintToken: "",
+    metadata: "",
   })
 
   const PROGRAM_ID = process.env.NEXT_PUBLIC_PROGRAM_ID || "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 
+  // State to store the created mint's public key for later use
   const [mintPubKey, setMintPubKey] = useState<PublicKey | null>(null)
 
   const shortenAddress = (address: string) => {
@@ -67,34 +112,100 @@ export default function SolMintApp() {
     })
   }
 
+  const createMetadataAccount = async (
+    connection: anchor.web3.Connection,
+    mintKey: PublicKey,
+    mintAuthorityKey: PublicKey,
+    payerKey: PublicKey,
+    name: string,
+    symbol: string,
+    uri: string
+  ) => {
+    try {
+      // Derive the metadata account PDA
+      const [metadataAccount] = PublicKey.findProgramAddressSync(
+        [Buffer.from("metadata"), METADATA_PROGRAM_ID.toBuffer(), mintKey.toBuffer()],
+        METADATA_PROGRAM_ID
+      )
+      
+      // Create the metadata instruction
+      const metadataInstruction = createCreateMetadataAccountV3Instruction(
+        {
+          metadata: metadataAccount,
+          mint: mintKey,
+          mintAuthority: mintAuthorityKey,
+          payer: payerKey,
+          updateAuthority: mintAuthorityKey,
+        },
+        {
+          createMetadataAccountArgsV3: {
+            data: {
+              name,
+              symbol,
+              uri,
+              sellerFeeBasisPoints: 0,
+              creators: null,
+              collection: null,
+              uses: null,
+            },
+            isMutable: true,
+            collectionDetails: null,
+          },
+        }
+      )
+
+      // Create and send the transaction
+      const transaction = new Transaction().add(metadataInstruction)
+      transaction.feePayer = payerKey
+      const { blockhash } = await connection.getLatestBlockhash()
+      transaction.recentBlockhash = blockhash
+
+      if (!signTransaction) throw new Error("Wallet does not support signing")
+      const signedTx = await signTransaction(transaction)
+      const txId = await connection.sendRawTransaction(signedTx.serialize())
+      await connection.confirmTransaction(txId)
+      
+      return { txId, metadataAccount }
+    } catch (error) {
+      console.error("Error creating metadata account:", error)
+      throw error
+    }
+  }
+
   const handleInitializeMint = async () => {
     setLoading((prev) => ({ ...prev, initMint: true }))
-    setErrors((prev) => ({ ...prev, initMint: "" }))
+    setErrors((prev) => ({ ...prev, initMint: "", metadata: "" }))
+    setSuccessTx((prev) => ({ ...prev, metadata: "" }))
 
     try {
       if (!publicKey || !connected) throw new Error("Wallet not connected")
+      // Set up Anchor provider and program
       const connection = new anchor.web3.Connection(anchor.web3.clusterApiUrl("devnet"), "confirmed")
       const anchorWallet = {
         publicKey: publicKey,
-        signTransaction: signTransaction,
-        signAllTransactions: signAllTransactions,
+        signTransaction: signTransaction!,
+        signAllTransactions: signAllTransactions!,
       }
       const provider = new anchor.AnchorProvider(connection, anchorWallet as anchor.Wallet, anchor.AnchorProvider.defaultOptions())
       anchor.setProvider(provider)
       const programIdKey = new PublicKey(PROGRAM_ID)
       const idl = await anchor.Program.fetchIdl(programIdKey, provider)
-      if (!idl) throw new Error("Failed to fetch IDL")
+      if (!idl) throw new Error("Failed to fetch IDL for program")
       const program = new anchor.Program(idl, provider)
+      // Determine mint authority (use wallet if none provided)
       const mintAuthorityPubkey = initMintForm.mintAuthority
         ? new PublicKey(initMintForm.mintAuthority)
         : publicKey
+      // Warn if freeze authority is provided (not supported by program)
       if (initMintForm.freezeAuthority.trim()) {
         toast({
           title: "Note",
           description: "Freeze authority is not supported and will be set to none.",
         })
       }
+      // Generate a new Keypair for the token mint account
       const mintAccount = Keypair.generate()
+      // Call initialize_mint instruction on the Anchor program using fluent methods API
       const txSig = await program.methods
         .initializeMint(initMintForm.decimals, mintAuthorityPubkey)
         .accounts({
@@ -107,13 +218,52 @@ export default function SolMintApp() {
         .signers([mintAccount])
         .rpc()
       
+      // Save mint public key for use in mintToken step
       setMintPubKey(mintAccount.publicKey)
       setSuccessTx((prev) => ({ ...prev, initMint: txSig }))
       toast({
         title: "Mint Initialized!",
         description: "Your token mint has been successfully created.",
       })
+
+      // Create metadata if requested and fields are provided
+      if (
+        initMintForm.createMetadata && 
+        initMintForm.name.trim() && 
+        initMintForm.symbol.trim() && 
+        initMintForm.uri.trim()
+      ) {
+        try {
+          const { txId, metadataAccount } = await createMetadataAccount(
+            connection,
+            mintAccount.publicKey,
+            mintAuthorityPubkey,
+            publicKey,
+            initMintForm.name.trim(),
+            initMintForm.symbol.trim(),
+            initMintForm.uri.trim()
+          )
+          
+          setSuccessTx((prev) => ({ ...prev, metadata: txId }))
+          toast({
+            title: "Metadata Created!",
+            description: "Token metadata has been successfully created.",
+          })
+        } catch (error) {
+          console.error("Metadata creation error:", error)
+          setErrors((prev) => ({ 
+            ...prev, 
+            metadata: "Failed to create metadata. Mint was created successfully, but metadata creation failed." 
+          }))
+          toast({
+            title: "Metadata Error",
+            description: "Failed to create token metadata",
+            variant: "destructive",
+          })
+        }
+      }
     } catch (error) {
+      console.error("InitializeMint error:", error)
       setErrors((prev) => ({ ...prev, initMint: "Failed to initialize mint. Please try again." }))
       toast({
         title: "Error",
@@ -132,31 +282,37 @@ export default function SolMintApp() {
     try {
       if (!publicKey || !connected) throw new Error("Wallet not connected")
       if (!mintPubKey) throw new Error("Mint not initialized")
+      // Set up Anchor provider and program (reuse connection and wallet)
       const connection = new anchor.web3.Connection(anchor.web3.clusterApiUrl("devnet"), "confirmed")
       const anchorWallet = {
         publicKey: publicKey,
-        signTransaction: signTransaction,
-        signAllTransactions: signAllTransactions,
+        signTransaction: signTransaction!,
+        signAllTransactions: signAllTransactions!,
       }
       const provider = new anchor.AnchorProvider(connection, anchorWallet as anchor.Wallet, anchor.AnchorProvider.defaultOptions())
       anchor.setProvider(provider)
       const programIdKey = new PublicKey(PROGRAM_ID)
       const idl = await anchor.Program.fetchIdl(programIdKey, provider)
-      if (!idl) throw new Error("Failed to fetch IDL")
+      if (!idl) throw new Error("Failed to fetch IDL for program")
       const program = new anchor.Program(idl, provider)
+      // Mint authority must match the one set during initialization
       const mintAuthorityPubkey = initMintForm.mintAuthority
         ? new PublicKey(initMintForm.mintAuthority)
         : publicKey
       if (!publicKey.equals(mintAuthorityPubkey)) {
         throw new Error("Current wallet is not the mint authority")
       }
+      // Parse destination address and get/create associated token account
       const destinationPubkey = new PublicKey(mintTokenForm.destination)
       const ata = await getAssociatedTokenAddress(mintPubKey, destinationPubkey)
       const ataInfo = await connection.getAccountInfo(ata)
       const preIx: anchor.web3.TransactionInstruction[] = []
       if (!ataInfo) {
-        preIx.push(createAssociatedTokenAccountInstruction(publicKey, ata, destinationPubkey, mintPubKey))
+        preIx.push(
+          createAssociatedTokenAccountInstruction(publicKey, ata, destinationPubkey, mintPubKey)
+        )
       }
+      // Call mint_to instruction on the Anchor program using fluent methods API
       const amountBN = new BN(mintTokenForm.amount)
       const txSig = await program.methods
         .mintTo(amountBN)
@@ -175,6 +331,7 @@ export default function SolMintApp() {
         description: \`Successfully minted \${mintTokenForm.amount} tokens.\`,
       })
     } catch (error) {
+      console.error("MintToken error:", error)
       setErrors((prev) => ({
         ...prev,
         mintToken: (error as Error).message.includes("Mint not initialized")
@@ -228,19 +385,32 @@ export default function SolMintApp() {
                 <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
               </Button>
 
+              {/* wallet UI: standalone ↔ iframe bridge */}
+              {isStandalone ? (
               <div className="wallet-adapter-button-container">
                 <WalletMultiButton className="!bg-gradient-to-r !from-blue-500 !to-purple-500 hover:!from-blue-600 hover:!to-purple-600 !rounded-full !px-6 !py-2 !text-white !font-medium !transition-all !duration-300 hover:!scale-105 !shadow-lg" />
               </div>
+              ) : (
+                <Button
+                  onClick={() =>
+                    isBrowser &&
+                    window.parent.postMessage({ type: "REQUEST_WALLET_CONNECT" }, "*")
+                  }
+                  className="bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-full px-6 py-2"
+                >
+                  {walletReady ? "Wallet Connected" : "Connect Wallet"}
+                </Button>
+              )}
 
-              {connected && publicKey && (
+              {walletReady && walletPubKey && (
                 <Badge variant="secondary" className="font-mono">
-                  {shortenAddress(publicKey.toString())}
+                  {shortenAddress(walletPubKey)}
                 </Badge>
               )}
             </div>
           </div>
 
-          {!connected && (
+          {!walletReady && (
             <Alert className="mb-8 border-blue-200 bg-blue-50/50">
               <Info className="h-4 w-4" />
               <AlertDescription>Please connect your wallet to start minting tokens.</AlertDescription>
@@ -281,7 +451,7 @@ export default function SolMintApp() {
                       setInitMintForm((prev) => ({ ...prev, decimals: Number.parseInt(e.target.value) || 0 }))
                     }
                     className="rounded-xl border-blue-200 focus:border-blue-400 focus:ring-blue-400/20"
-                    disabled={!connected}
+                    disabled={!walletReady}
                   />
                 </div>
 
@@ -295,7 +465,7 @@ export default function SolMintApp() {
                     value={initMintForm.mintAuthority}
                     onChange={(e) => setInitMintForm((prev) => ({ ...prev, mintAuthority: e.target.value }))}
                     className="rounded-xl border-blue-200 focus:border-blue-400 focus:ring-blue-400/20 font-mono text-sm"
-                    disabled={!connected}
+                    disabled={!walletReady}
                   />
                 </div>
 
@@ -309,8 +479,89 @@ export default function SolMintApp() {
                     value={initMintForm.freezeAuthority}
                     onChange={(e) => setInitMintForm((prev) => ({ ...prev, freezeAuthority: e.target.value }))}
                     className="rounded-xl border-blue-200 focus:border-blue-400 focus:ring-blue-400/20 font-mono text-sm"
-                    disabled={!connected}
+                    disabled={!walletReady}
                   />
+                </div>
+
+                {/* Metadata fields */}
+                <div className="pt-4 border-t border-gray-100">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Label htmlFor="createMetadata" className="text-sm font-medium cursor-pointer">
+                      Create Token Metadata
+                    </Label>
+                    <input
+                      id="createMetadata"
+                      type="checkbox"
+                      checked={initMintForm.createMetadata}
+                      onChange={(e) => setInitMintForm((prev) => ({ ...prev, createMetadata: e.target.checked }))}
+                      className="rounded border-blue-200 text-blue-500 focus:ring-blue-400/20"
+                    />
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="w-4 h-4 text-gray-400" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Create on-chain metadata for your token (name, symbol, URI)</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+
+                  {initMintForm.createMetadata && (
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="tokenName" className="text-sm font-medium">
+                          Token Name
+                        </Label>
+                        <Input
+                          id="tokenName"
+                          placeholder="Enter token name"
+                          value={initMintForm.name}
+                          onChange={(e) => setInitMintForm((prev) => ({ ...prev, name: e.target.value }))}
+                          className="rounded-xl border-blue-200 focus:border-blue-400 focus:ring-blue-400/20"
+                          disabled={!walletReady}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="tokenSymbol" className="text-sm font-medium">
+                          Token Symbol
+                        </Label>
+                        <Input
+                          id="tokenSymbol"
+                          placeholder="Enter token symbol (max 10 chars)"
+                          value={initMintForm.symbol}
+                          onChange={(e) => setInitMintForm((prev) => ({ ...prev, symbol: e.target.value.toUpperCase().slice(0, 10) }))}
+                          className="rounded-xl border-blue-200 focus:border-blue-400 focus:ring-blue-400/20"
+                          disabled={!walletReady}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="tokenUri" className="text-sm font-medium">
+                          Token URI
+                        </Label>
+                        <Input
+                          id="tokenUri"
+                          placeholder="Enter metadata URI (JSON)"
+                          value={initMintForm.uri}
+                          onChange={(e) => setInitMintForm((prev) => ({ ...prev, uri: e.target.value }))}
+                          className="rounded-xl border-blue-200 focus:border-blue-400 focus:ring-blue-400/20"
+                          disabled={!walletReady}
+                        />
+                        <p className="text-xs text-gray-500">
+                          URI should point to a JSON file following the{" "}
+                          <a
+                            href="https://docs.metaplex.com/programs/token-metadata/token-standard"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-500 hover:underline"
+                          >
+                            Metaplex standard
+                          </a>
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {errors.initMint && (
@@ -319,9 +570,15 @@ export default function SolMintApp() {
                   </Alert>
                 )}
 
+                {errors.metadata && (
+                  <Alert variant="destructive" className="rounded-xl">
+                    <AlertDescription>{errors.metadata}</AlertDescription>
+                  </Alert>
+                )}
+
                 <Button
                   onClick={handleInitializeMint}
-                  disabled={!connected || loading.initMint}
+                  disabled={!walletReady || loading.initMint}
                   className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl py-6 font-medium transition-all duration-300 hover:scale-105 shadow-lg"
                 >
                   {loading.initMint ? (
@@ -341,6 +598,16 @@ export default function SolMintApp() {
                       View on Explorer
                     </Badge>
                     <span className="text-sm text-green-700 font-mono">{shortenAddress(successTx.initMint)}</span>
+                  </div>
+                )}
+
+                {successTx.metadata && (
+                  <div className="flex items-center gap-2 p-3 bg-green-50 rounded-xl border border-green-200">
+                    <Badge className="bg-gradient-to-r from-blue-500 to-purple-500 text-white">
+                      <ExternalLink className="w-3 h-3 mr-1" />
+                      View Metadata TX
+                    </Badge>
+                    <span className="text-sm text-green-700 font-mono">{shortenAddress(successTx.metadata)}</span>
                   </div>
                 )}
               </CardContent>
@@ -363,7 +630,7 @@ export default function SolMintApp() {
                     value={mintTokenForm.destination}
                     onChange={(e) => setMintTokenForm((prev) => ({ ...prev, destination: e.target.value }))}
                     className="rounded-xl border-blue-200 focus:border-blue-400 focus:ring-blue-400/20 font-mono text-sm"
-                    disabled={!connected}
+                    disabled={!walletReady}
                   />
                 </div>
 
@@ -388,7 +655,7 @@ export default function SolMintApp() {
                     value={mintTokenForm.amount}
                     onChange={(e) => setMintTokenForm((prev) => ({ ...prev, amount: e.target.value }))}
                     className="rounded-xl border-blue-200 focus:border-blue-400 focus:ring-blue-400/20"
-                    disabled={!connected}
+                    disabled={!walletReady}
                   />
                 </div>
 
@@ -400,7 +667,7 @@ export default function SolMintApp() {
 
                 <Button
                   onClick={handleMintToken}
-                  disabled={!connected || loading.mintToken || !mintTokenForm.destination || !mintTokenForm.amount}
+                  disabled={!walletReady || loading.mintToken || !mintTokenForm.destination || !mintTokenForm.amount}
                   className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl py-6 font-medium transition-all duration-300 hover:scale-105 shadow-lg"
                 >
                   {loading.mintToken ? (
