@@ -14,8 +14,13 @@ import { useToast } from "@/hooks/use-toast"
 import { Copy, ExternalLink, Info, Moon, Sun, Loader2 } from "lucide-react"
 import { useTheme } from "next-themes"
 import * as anchor from "@project-serum/anchor"
-import { PublicKey, Keypair } from "@solana/web3.js"
+import { PublicKey, Keypair, SystemProgram, Transaction } from "@solana/web3.js"
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } from "@solana/spl-token"
+import { 
+  PROGRAM_ID as METADATA_PROGRAM_ID,
+  createCreateMetadataAccountV3Instruction,
+  DataV2
+} from "@metaplex-foundation/mpl-token-metadata"
 
 const { BN } = anchor
 
@@ -30,6 +35,10 @@ export default function SolMintApp() {
     decimals: 9,
     mintAuthority: "",
     freezeAuthority: "",
+    name: "",
+    symbol: "",
+    uri: "",
+    createMetadata: true,
   })
 
   const [mintTokenForm, setMintTokenForm] = useState({
@@ -45,11 +54,13 @@ export default function SolMintApp() {
   const [successTx, setSuccessTx] = useState({
     initMint: "",
     mintToken: "",
+    metadata: "",
   })
 
   const [errors, setErrors] = useState({
     initMint: "",
     mintToken: "",
+    metadata: "",
   })
 
   const PROGRAM_ID = process.env.NEXT_PUBLIC_PROGRAM_ID || "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
@@ -69,9 +80,70 @@ export default function SolMintApp() {
     })
   }
 
+  const createMetadataAccount = async (
+    connection: anchor.web3.Connection,
+    mintKey: PublicKey,
+    mintAuthorityKey: PublicKey,
+    payerKey: PublicKey,
+    name: string,
+    symbol: string,
+    uri: string
+  ) => {
+    try {
+      // Derive the metadata account PDA
+      const [metadataAccount] = PublicKey.findProgramAddressSync(
+        [Buffer.from("metadata"), METADATA_PROGRAM_ID.toBuffer(), mintKey.toBuffer()],
+        METADATA_PROGRAM_ID
+      )
+      
+      // Create the metadata instruction
+      const metadataInstruction = createCreateMetadataAccountV3Instruction(
+        {
+          metadata: metadataAccount,
+          mint: mintKey,
+          mintAuthority: mintAuthorityKey,
+          payer: payerKey,
+          updateAuthority: mintAuthorityKey,
+        },
+        {
+          createMetadataAccountArgsV3: {
+            data: {
+              name,
+              symbol,
+              uri,
+              sellerFeeBasisPoints: 0,
+              creators: null,
+              collection: null,
+              uses: null,
+            },
+            isMutable: true,
+            collectionDetails: null,
+          },
+        }
+      )
+
+      // Create and send the transaction
+      const transaction = new Transaction().add(metadataInstruction)
+      transaction.feePayer = payerKey
+      const { blockhash } = await connection.getLatestBlockhash()
+      transaction.recentBlockhash = blockhash
+
+      if (!signTransaction) throw new Error("Wallet does not support signing")
+      const signedTx = await signTransaction(transaction)
+      const txId = await connection.sendRawTransaction(signedTx.serialize())
+      await connection.confirmTransaction(txId)
+      
+      return { txId, metadataAccount }
+    } catch (error) {
+      console.error("Error creating metadata account:", error)
+      throw error
+    }
+  }
+
   const handleInitializeMint = async () => {
     setLoading((prev) => ({ ...prev, initMint: true }))
-    setErrors((prev) => ({ ...prev, initMint: "" }))
+    setErrors((prev) => ({ ...prev, initMint: "", metadata: "" }))
+    setSuccessTx((prev) => ({ ...prev, metadata: "" }))
 
     try {
       if (!publicKey || !connected) throw new Error("Wallet not connected")
@@ -121,6 +193,43 @@ export default function SolMintApp() {
         title: "Mint Initialized!",
         description: "Your token mint has been successfully created.",
       })
+
+      // Create metadata if requested and fields are provided
+      if (
+        initMintForm.createMetadata && 
+        initMintForm.name.trim() && 
+        initMintForm.symbol.trim() && 
+        initMintForm.uri.trim()
+      ) {
+        try {
+          const { txId, metadataAccount } = await createMetadataAccount(
+            connection,
+            mintAccount.publicKey,
+            mintAuthorityPubkey,
+            publicKey,
+            initMintForm.name.trim(),
+            initMintForm.symbol.trim(),
+            initMintForm.uri.trim()
+          )
+          
+          setSuccessTx((prev) => ({ ...prev, metadata: txId }))
+          toast({
+            title: "Metadata Created!",
+            description: "Token metadata has been successfully created.",
+          })
+        } catch (error) {
+          console.error("Metadata creation error:", error)
+          setErrors((prev) => ({ 
+            ...prev, 
+            metadata: "Failed to create metadata. Mint was created successfully, but metadata creation failed." 
+          }))
+          toast({
+            title: "Metadata Error",
+            description: "Failed to create token metadata",
+            variant: "destructive",
+          })
+        }
+      }
     } catch (error) {
       console.error("InitializeMint error:", error)
       setErrors((prev) => ({ ...prev, initMint: "Failed to initialize mint. Please try again." }))
@@ -329,9 +438,96 @@ export default function SolMintApp() {
                   />
                 </div>
 
+                {/* Metadata fields */}
+                <div className="pt-4 border-t border-gray-100">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Label htmlFor="createMetadata" className="text-sm font-medium cursor-pointer">
+                      Create Token Metadata
+                    </Label>
+                    <input
+                      id="createMetadata"
+                      type="checkbox"
+                      checked={initMintForm.createMetadata}
+                      onChange={(e) => setInitMintForm((prev) => ({ ...prev, createMetadata: e.target.checked }))}
+                      className="rounded border-blue-200 text-blue-500 focus:ring-blue-400/20"
+                    />
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="w-4 h-4 text-gray-400" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Create on-chain metadata for your token (name, symbol, URI)</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+
+                  {initMintForm.createMetadata && (
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="tokenName" className="text-sm font-medium">
+                          Token Name
+                        </Label>
+                        <Input
+                          id="tokenName"
+                          placeholder="Enter token name"
+                          value={initMintForm.name}
+                          onChange={(e) => setInitMintForm((prev) => ({ ...prev, name: e.target.value }))}
+                          className="rounded-xl border-blue-200 focus:border-blue-400 focus:ring-blue-400/20"
+                          disabled={!connected}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="tokenSymbol" className="text-sm font-medium">
+                          Token Symbol
+                        </Label>
+                        <Input
+                          id="tokenSymbol"
+                          placeholder="Enter token symbol (max 10 chars)"
+                          value={initMintForm.symbol}
+                          onChange={(e) => setInitMintForm((prev) => ({ ...prev, symbol: e.target.value.toUpperCase().slice(0, 10) }))}
+                          className="rounded-xl border-blue-200 focus:border-blue-400 focus:ring-blue-400/20"
+                          disabled={!connected}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="tokenUri" className="text-sm font-medium">
+                          Token URI
+                        </Label>
+                        <Input
+                          id="tokenUri"
+                          placeholder="Enter metadata URI (JSON)"
+                          value={initMintForm.uri}
+                          onChange={(e) => setInitMintForm((prev) => ({ ...prev, uri: e.target.value }))}
+                          className="rounded-xl border-blue-200 focus:border-blue-400 focus:ring-blue-400/20"
+                          disabled={!connected}
+                        />
+                        <p className="text-xs text-gray-500">
+                          URI should point to a JSON file following the{" "}
+                          <a
+                            href="https://docs.metaplex.com/programs/token-metadata/token-standard"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-500 hover:underline"
+                          >
+                            Metaplex standard
+                          </a>
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {errors.initMint && (
                   <Alert variant="destructive" className="rounded-xl">
                     <AlertDescription>{errors.initMint}</AlertDescription>
+                  </Alert>
+                )}
+
+                {errors.metadata && (
+                  <Alert variant="destructive" className="rounded-xl">
+                    <AlertDescription>{errors.metadata}</AlertDescription>
                   </Alert>
                 )}
 
@@ -357,6 +553,16 @@ export default function SolMintApp() {
                       View on Explorer
                     </Badge>
                     <span className="text-sm text-green-700 font-mono">{shortenAddress(successTx.initMint)}</span>
+                  </div>
+                )}
+
+                {successTx.metadata && (
+                  <div className="flex items-center gap-2 p-3 bg-green-50 rounded-xl border border-green-200">
+                    <Badge className="bg-gradient-to-r from-blue-500 to-purple-500 text-white">
+                      <ExternalLink className="w-3 h-3 mr-1" />
+                      View Metadata TX
+                    </Badge>
+                    <span className="text-sm text-green-700 font-mono">{shortenAddress(successTx.metadata)}</span>
                   </div>
                 )}
               </CardContent>
