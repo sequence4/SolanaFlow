@@ -385,22 +385,11 @@ export default function SolMintApp() {
                 <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
               </Button>
 
-              {/* wallet UI: standalone ↔ iframe bridge */}
-              {isStandalone ? (
-                <div className="wallet-adapter-button-container">
-                  <WalletMultiButton className="!bg-gradient-to-r !from-blue-500 !to-purple-500 hover:!from-blue-600 hover:!to-purple-600 !rounded-full !px-6 !py-2 !text-white !font-medium !transition-all !duration-300 hover:!scale-105 !shadow-lg" />
-                </div>
-              ) : (
-                <Button
-                  onClick={() =>
-                    isBrowser &&
-                    window.parent.postMessage({ type: "REQUEST_WALLET_CONNECT" }, "*")
-                  }
-                  className="bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-full px-6 py-2"
-                >
-                  {walletReady ? "Wallet Connected" : "Connect Wallet"}
-                </Button>
-              )}
+              {/* always render the genuine WalletMultiButton so the click
+                  counts as a real user-gesture inside the iframe */}
+              <div className="wallet-adapter-button-container">
+                <WalletMultiButton className="!bg-gradient-to-r !from-blue-500 !to-purple-500 hover:!from-blue-600 hover:!to-purple-600 !rounded-full !px-6 !py-2 !text-white !font-medium !transition-all !duration-300 hover:!scale-105 !shadow-lg" />
+              </div>
 
               {walletReady && walletPubKey && (
                 <Badge variant="secondary" className="font-mono">
