@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui"
 import { useWallet } from "@solana/wallet-adapter-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -28,6 +28,29 @@ export default function SolMintApp() {
   const { theme, setTheme } = useTheme()
 
   const { toast } = useToast()
+
+  /* ───────── wallet info coming from the parent window ───────── */
+  const [parentWallet, setParentWallet] = useState<{connected:boolean; publicKey:string|null}>({connected:false, publicKey:null});
+
+  useEffect(() => {
+    function handleParentMsg(event: MessageEvent) {
+      const { type, publicKey: pk } = event.data || {};
+      if (type === "WALLET_CONNECTED" && pk) {
+        setParentWallet({ connected: true, publicKey: pk });
+        /* auto‑prefill mint authority if user didn't type anything */
+        setInitMintForm(prev => prev.mintAuthority ? prev : {...prev, mintAuthority: pk});
+      }
+    }
+    window.addEventListener("message", handleParentMsg);
+    /* ask parent for wallet on boot */
+    if (window.parent !== window)
+      window.parent.postMessage({ type: "REQUEST_WALLET_CONNECT" }, "*");
+    return () => window.removeEventListener("message", handleParentMsg);
+  }, []);
+
+  /* helper flags that work with either in‑iframe extension _or_ parent bridge */
+  const walletReady = connected || parentWallet.connected;
+  const walletPubKey = connected && publicKey ? publicKey.toString() : parentWallet.publicKey;
 
   // Form states
   const [initMintForm, setInitMintForm] = useState({
@@ -352,19 +375,29 @@ export default function SolMintApp() {
                 <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
               </Button>
 
-              <div className="wallet-adapter-button-container">
-                <WalletMultiButton className="!bg-gradient-to-r !from-blue-500 !to-purple-500 hover:!from-blue-600 hover:!to-purple-600 !rounded-full !px-6 !py-2 !text-white !font-medium !transition-all !duration-300 hover:!scale-105 !shadow-lg" />
-              </div>
+              {/* use wallet adapter when running standalone; otherwise provide bridge button */}
+              {window.parent === window ? (
+                <div className="wallet-adapter-button-container">
+                  <WalletMultiButton className="!bg-gradient-to-r !from-blue-500 !to-purple-500 hover:!from-blue-600 hover:!to-purple-600 !rounded-full !px-6 !py-2 !text-white !font-medium !transition-all !duration-300 hover:!scale-105 !shadow-lg" />
+                </div>
+              ) : (
+                <Button
+                  onClick={() => window.parent.postMessage({ type:"REQUEST_WALLET_CONNECT" }, "*")}
+                  className="bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-full px-6 py-2"
+                >
+                  {walletReady ? "Wallet Connected" : "Connect Wallet"}
+                </Button>
+              )}
 
-              {connected && publicKey && (
+              {walletReady && walletPubKey && (
                 <Badge variant="secondary" className="font-mono">
-                  {shortenAddress(publicKey.toString())}
+                  {shortenAddress(walletPubKey)}
                 </Badge>
               )}
             </div>
           </div>
 
-          {!connected && (
+          {!walletReady && (
             <Alert className="mb-8 border-blue-200 bg-blue-50/50">
               <Info className="h-4 w-4" />
               <AlertDescription>Please connect your wallet to start minting tokens.</AlertDescription>
@@ -405,7 +438,7 @@ export default function SolMintApp() {
                       setInitMintForm((prev) => ({ ...prev, decimals: Number.parseInt(e.target.value) || 0 }))
                     }
                     className="rounded-xl border-blue-200 focus:border-blue-400 focus:ring-blue-400/20"
-                    disabled={!connected}
+                    disabled={!walletReady}
                   />
                 </div>
 
@@ -419,7 +452,7 @@ export default function SolMintApp() {
                     value={initMintForm.mintAuthority}
                     onChange={(e) => setInitMintForm((prev) => ({ ...prev, mintAuthority: e.target.value }))}
                     className="rounded-xl border-blue-200 focus:border-blue-400 focus:ring-blue-400/20 font-mono text-sm"
-                    disabled={!connected}
+                    disabled={!walletReady}
                   />
                 </div>
 
@@ -433,7 +466,7 @@ export default function SolMintApp() {
                     value={initMintForm.freezeAuthority}
                     onChange={(e) => setInitMintForm((prev) => ({ ...prev, freezeAuthority: e.target.value }))}
                     className="rounded-xl border-blue-200 focus:border-blue-400 focus:ring-blue-400/20 font-mono text-sm"
-                    disabled={!connected}
+                    disabled={!walletReady}
                   />
                 </div>
 
@@ -472,7 +505,7 @@ export default function SolMintApp() {
                           value={initMintForm.name}
                           onChange={(e) => setInitMintForm((prev) => ({ ...prev, name: e.target.value }))}
                           className="rounded-xl border-blue-200 focus:border-blue-400 focus:ring-blue-400/20"
-                          disabled={!connected}
+                          disabled={!walletReady}
                         />
                       </div>
 
@@ -486,7 +519,7 @@ export default function SolMintApp() {
                           value={initMintForm.symbol}
                           onChange={(e) => setInitMintForm((prev) => ({ ...prev, symbol: e.target.value.toUpperCase().slice(0, 10) }))}
                           className="rounded-xl border-blue-200 focus:border-blue-400 focus:ring-blue-400/20"
-                          disabled={!connected}
+                          disabled={!walletReady}
                         />
                       </div>
 
@@ -500,7 +533,7 @@ export default function SolMintApp() {
                           value={initMintForm.uri}
                           onChange={(e) => setInitMintForm((prev) => ({ ...prev, uri: e.target.value }))}
                           className="rounded-xl border-blue-200 focus:border-blue-400 focus:ring-blue-400/20"
-                          disabled={!connected}
+                          disabled={!walletReady}
                         />
                         <p className="text-xs text-gray-500">
                           URI should point to a JSON file following the{" "}
@@ -532,7 +565,7 @@ export default function SolMintApp() {
 
                 <Button
                   onClick={handleInitializeMint}
-                  disabled={!connected || loading.initMint}
+                  disabled={!walletReady || loading.initMint}
                   className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl py-6 font-medium transition-all duration-300 hover:scale-105 shadow-lg"
                 >
                   {loading.initMint ? (
@@ -584,7 +617,7 @@ export default function SolMintApp() {
                     value={mintTokenForm.destination}
                     onChange={(e) => setMintTokenForm((prev) => ({ ...prev, destination: e.target.value }))}
                     className="rounded-xl border-blue-200 focus:border-blue-400 focus:ring-blue-400/20 font-mono text-sm"
-                    disabled={!connected}
+                    disabled={!walletReady}
                   />
                 </div>
 
@@ -609,7 +642,7 @@ export default function SolMintApp() {
                     value={mintTokenForm.amount}
                     onChange={(e) => setMintTokenForm((prev) => ({ ...prev, amount: e.target.value }))}
                     className="rounded-xl border-blue-200 focus:border-blue-400 focus:ring-blue-400/20"
-                    disabled={!connected}
+                    disabled={!walletReady}
                   />
                 </div>
 
@@ -621,7 +654,7 @@ export default function SolMintApp() {
 
                 <Button
                   onClick={handleMintToken}
-                  disabled={!connected || loading.mintToken || !mintTokenForm.destination || !mintTokenForm.amount}
+                  disabled={!walletReady || loading.mintToken || !mintTokenForm.destination || !mintTokenForm.amount}
                   className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl py-6 font-medium transition-all duration-300 hover:scale-105 shadow-lg"
                 >
                   {loading.mintToken ? (
