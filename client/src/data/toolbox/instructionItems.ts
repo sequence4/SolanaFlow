@@ -23,7 +23,7 @@ import { mintToCheckedFlow } from "../nodes/onChain/instructions/spl-token-progr
 import { syncNativeFlow } from "../nodes/onChain/instructions/spl-token-program/syncNative/syncNativeFlow";
 import { thawAccountFlow } from "../nodes/onChain/instructions/spl-token-program/thawAccount/thawAccountFlow";
 import { transferCheckedFlow } from "../nodes/onChain/instructions/spl-token-program/transferChecked/transferCheckedFlow";
-import { uiAmountToAmountFlow } from "../nodes/onChain/instructions/spl-token-program/uiAmountToAmount/uiAmountToAmountFlow";
+import { uiAmountToAmountFlow } from "../nodes/onChain/instructions/spl-token-program/uiAmountToAmount/uiAmountToAmountFlow"; 
 import { createMetadataFlow } from "../nodes/onChain/instructions/metaplex-token-metadata/createMetadata/createMetadataFlow";
 
 export const groupedInstructions = [

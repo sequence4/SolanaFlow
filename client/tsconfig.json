@@ -21,6 +21,7 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
+      "@context/*": ["./src/context/*"],
       "react": ["./node_modules/@types/react"]
     }
   },

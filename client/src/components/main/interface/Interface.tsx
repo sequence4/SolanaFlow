@@ -1,15 +1,22 @@
-import React, { useContext, useState, useEffect } from 'react';
+import React, { useContext, useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import '@/styles/interface/interfaceStyle.css';
 import ProjectContext from "@/context/project/ProjectContext";
 import { projectApi } from '@/api/projectApi';
 import { Loader2, RefreshCw, ExternalLink } from "lucide-react";
 import UxContext from "@/context/ux/UxContext";
+import { useWallet } from "@solana/wallet-adapter-react";
 
 const Interface = () => {
     const { projectContext, setProjectContext } = useContext(ProjectContext);
     const { activeTab } = useContext(UxContext);
     const { id: projectId, containerUrl } = projectContext;
+    
+    /* ── wallet from the host app ── */
+    const { publicKey, connected, connect } = useWallet();
+
+    /* iframe handle so we can postMessage downwards */
+    const iframeRef = useRef<HTMLIFrameElement>(null);
     
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [iframeKey, setIframeKey]   = useState(0);    // forces remount
@@ -24,6 +31,29 @@ const Interface = () => {
 
     // helper: pick manual first, then backend, otherwise blank
     const activeUrl = manualUrl || containerUrl || "";
+
+    /* ───────── parent ⇒ iframe : push wallet once connected ───────── */
+    useEffect(() => {
+        if (!iframeRef.current?.contentWindow) return;
+        if (connected && publicKey) {
+            iframeRef.current.contentWindow.postMessage(
+                { type: "WALLET_CONNECTED", publicKey: publicKey.toString() },
+                "*"                                       // use stricter origin in prod
+            );
+        }
+    }, [connected, publicKey]);
+
+    /* ───────── iframe ⇒ parent : handle connect requests ───────── */
+    useEffect(() => {
+        function handleIframeMsg(event: MessageEvent) {
+            if (event.source !== iframeRef.current?.contentWindow) return;  // only our iframe
+            if (event.data?.type === "REQUEST_WALLET_CONNECT") {
+                if (!connected) connect();
+            }
+        }
+        window.addEventListener("message", handleIframeMsg);
+        return () => window.removeEventListener("message", handleIframeMsg);
+    }, [connected, connect]);
 
     const handleRefreshContainerUrl = async () => {
         if (!projectId || isRefreshing) return;
@@ -164,6 +194,7 @@ const Interface = () => {
         <div className="flex-1 w-full h-full">
           {activeUrl ? (
             <iframe
+              ref={iframeRef}
               key={`${iframeKey}-${activeUrl}`}
               src={activeUrl}
               className="w-full h-full"
