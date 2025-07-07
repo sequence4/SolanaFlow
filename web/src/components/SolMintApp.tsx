@@ -26,27 +26,37 @@ const { BN } = anchor
 export default function SolMintApp() {
   const { publicKey, connected, signTransaction, signAllTransactions } = useWallet()
   const { theme, setTheme } = useTheme()
-
   const { toast } = useToast()
 
+  /* ---------- runtime helpers ---------- */
+  const isBrowser    = typeof window !== "undefined";
+  const isStandalone = isBrowser && window.parent === window;   // running top‑level, *not* inside iframe
+
   /* ───────── wallet info coming from the parent window ───────── */
-  const [parentWallet, setParentWallet] = useState<{connected:boolean; publicKey:string|null}>({connected:false, publicKey:null});
+  const [parentWallet, setParentWallet] =
+    useState<{ connected: boolean; publicKey: string | null }>({
+      connected: false,
+      publicKey: null
+    });
 
   useEffect(() => {
+    if (!isBrowser) return;                       // guard during SSR
     function handleParentMsg(event: MessageEvent) {
       const { type, publicKey: pk } = event.data || {};
       if (type === "WALLET_CONNECTED" && pk) {
         setParentWallet({ connected: true, publicKey: pk });
         /* auto‑prefill mint authority if user didn't type anything */
-        setInitMintForm(prev => prev.mintAuthority ? prev : {...prev, mintAuthority: pk});
+        setInitMintForm(prev =>
+          prev.mintAuthority ? prev : { ...prev, mintAuthority: pk }
+        );
       }
     }
     window.addEventListener("message", handleParentMsg);
     /* ask parent for wallet on boot */
-    if (window.parent !== window)
+    if (!isStandalone)
       window.parent.postMessage({ type: "REQUEST_WALLET_CONNECT" }, "*");
     return () => window.removeEventListener("message", handleParentMsg);
-  }, []);
+  }, [isBrowser, isStandalone]);
 
   /* helper flags that work with either in‑iframe extension _or_ parent bridge */
   const walletReady = connected || parentWallet.connected;
@@ -375,14 +385,17 @@ export default function SolMintApp() {
                 <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
               </Button>
 
-              {/* use wallet adapter when running standalone; otherwise provide bridge button */}
-              {window.parent === window ? (
+              {/* wallet UI: standalone ↔ iframe bridge */}
+              {isStandalone ? (
                 <div className="wallet-adapter-button-container">
                   <WalletMultiButton className="!bg-gradient-to-r !from-blue-500 !to-purple-500 hover:!from-blue-600 hover:!to-purple-600 !rounded-full !px-6 !py-2 !text-white !font-medium !transition-all !duration-300 hover:!scale-105 !shadow-lg" />
                 </div>
               ) : (
                 <Button
-                  onClick={() => window.parent.postMessage({ type:"REQUEST_WALLET_CONNECT" }, "*")}
+                  onClick={() =>
+                    isBrowser &&
+                    window.parent.postMessage({ type: "REQUEST_WALLET_CONNECT" }, "*")
+                  }
                   className="bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-full px-6 py-2"
                 >
                   {walletReady ? "Wallet Connected" : "Connect Wallet"}
