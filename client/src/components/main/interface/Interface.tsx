@@ -199,7 +199,7 @@ const Interface = () => {
                         ref={iframeRef}
                         key={`${iframeKey}-${activeUrl}`}
                         src={activeUrl}
-                        className="w-full h-full"
+                        className="w-full h-full overflow-y-auto"
                         style={{ border: "none" }}
                         allow="clipboard-read; clipboard-write"
                         sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-popups-to-escape-sandbox"
