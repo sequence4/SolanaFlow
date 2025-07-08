@@ -65,6 +65,8 @@ export async function runDeployPipeline({
 
   // declare outside try so `finally` can see it
   let workspace: WorkspaceHandle | null = null;
+  // Keep-alive interval for SSE connection
+  let keepAliveInterval: NodeJS.Timeout | null = null;
 
   try {
     workspace = await prepEnv(projectId, userId, devMode);
@@ -88,6 +90,12 @@ export async function runDeployPipeline({
       message: "Container is up",
       containerUrl: workspace.containerUrl
     });
+    
+    // Start a keep-alive ping to prevent SSE connection from timing out
+    keepAliveInterval = setInterval(() => {
+      console.log("[PIPELINE] Sending keep-alive ping");
+      sendProgress({ stage: "ping" });
+    }, 15000); // Send ping every 15 seconds
  
     
     // 2 ─ code generation ─────────────────────────────────────────────────
@@ -294,6 +302,12 @@ export async function runDeployPipeline({
     if (workspace) {
       await markContainerForCleanup(projectId, workspace.containerName);
       console.log(`[pipeline] queued ${workspace.containerName} for later cleanup`);
+    }
+    
+    // Clear keep-alive interval
+    if (keepAliveInterval) {
+      clearInterval(keepAliveInterval);
+      console.log("[PIPELINE] Cleared keep-alive interval");
     }
   }
 }
