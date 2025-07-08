@@ -14,6 +14,11 @@ const Interface = () => {
     const { projectContext, setProjectContext } = useContext(ProjectContext);
     const { activeTab, containerUrlRefreshTrigger } = useContext(UxContext);
     const { id: projectId, containerUrl } = projectContext;
+    // ⟶ pull IDLs out of context once so we can forward them to the iframe
+    const {
+        idl:  primaryIdl,
+        idls: allIdls = []
+    } = projectContext.details?.projectState ?? {};
     
     /* ── wallet from the host app ── */
     const { publicKey, connected, connect, disconnect, signTransaction, select } = useWallet();
@@ -148,11 +153,32 @@ const Interface = () => {
                     }, "*");
                 }
             }
+            
+            /* ───────── iframe ⇒ parent : request IDL(s) ───────── */
+            if (event.data?.type === "idl_request") {
+                console.log("[Interface] iframe requested PROGRAM_IDL");
+                if (primaryIdl) {
+                    iframeRef.current?.contentWindow?.postMessage(
+                      { type: "PROGRAM_IDL", idl: primaryIdl, idls: allIdls },
+                      "*"
+                    );
+                }
+            }
         };
         
         window.addEventListener("message", handleMessage);
         return () => window.removeEventListener("message", handleMessage);
-    }, [activeUrl, connected, publicKey, connect, disconnect, signTransaction, select]);
+    }, [
+        activeUrl,
+        connected,
+        publicKey,
+        connect,
+        disconnect,
+        signTransaction,
+        select,
+        primaryIdl,
+        allIdls
+    ]);
 
     // Update iframe with wallet state when connection changes
     useEffect(() => {
@@ -176,6 +202,17 @@ const Interface = () => {
             );
         }
     }, [connected, publicKey]);
+
+    /* ───────── parent ⇒ iframe : push IDL(s) once we have them ───────── */
+    useEffect(() => {
+        if (!iframeRef.current?.contentWindow) return;
+        if (!primaryIdl) return;                 // nothing to send yet
+
+        iframeRef.current.contentWindow.postMessage(
+          { type: "PROGRAM_IDL", idl: primaryIdl, idls: allIdls },
+          "*"
+        );
+    }, [primaryIdl, allIdls, iframeKey /* re-post on manual refresh */]);
 
     /* ───────── iframe ⇒ parent : handle connect requests ───────── */
     useEffect(() => {
