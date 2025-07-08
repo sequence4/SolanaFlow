@@ -49,10 +49,16 @@ const Interface = () => {
     }, [activeUrl]);
 
     // Listen for containerUrlRefreshTrigger changes to force iframe refresh
+    // Skip the *very first* render so we don't reload immediately when the tab is activated.
+    const skipFirstTrigger = useRef(true);
     useEffect(() => {
+        if (skipFirstTrigger.current) {
+            skipFirstTrigger.current = false;
+            return;                                  // <-- ignore the initial run
+        }
         if (containerUrlRefreshTrigger > 0 && activeUrl) {
             console.log("[Interface] Container URL refresh triggered by external event");
-            setIframeKey(prev => prev + 1);
+            setIframeKey(prev => prev + 1);          // now it's a real external change
         }
     }, [containerUrlRefreshTrigger, activeUrl]);
 
