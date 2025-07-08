@@ -10,7 +10,7 @@ import { enablePhantomWalletExtension } from "phantom-iframe-connector";
 
 const Interface = () => {
     const { projectContext, setProjectContext } = useContext(ProjectContext);
-    const { activeTab } = useContext(UxContext);
+    const { activeTab, containerUrlRefreshTrigger } = useContext(UxContext);
     const { id: projectId, containerUrl } = projectContext;
     
     /* ── wallet from the host app ── */
@@ -45,6 +45,14 @@ const Interface = () => {
             }
         }
     }, [activeUrl]);
+
+    // Listen for containerUrlRefreshTrigger changes to force iframe refresh
+    useEffect(() => {
+        if (containerUrlRefreshTrigger > 0 && activeUrl) {
+            console.log("[Interface] Container URL refresh triggered by external event");
+            setIframeKey(prev => prev + 1);
+        }
+    }, [containerUrlRefreshTrigger, activeUrl]);
 
     /* ───────── parent ⇒ iframe : push wallet once connected ───────── */
     useEffect(() => {
@@ -144,90 +152,70 @@ const Interface = () => {
     }, [isLocalDev, projectId, containerUrl]);
 
     return (
-      <div className="flex flex-col w-full h-full">
-        {/* ───── top toolbar – always visible ───── */}
-        <div className="flex items-center justify-between p-2 bg-[#0F1119] border-b border-[#1F2937]">
-          <div className="flex items-center space-x-2 flex-1">
-            {/* status dot – green when we have a URL, red otherwise  */}
-            <div
-              className={`h-3 w-3 rounded-full ${
-                activeUrl ? "bg-green-500" : "bg-red-500"
-              }`}
-            />
-            {/* editable address bar */}
-            <div className="relative flex-1 mr-4">
-              {/* small "pencil" overlay – just a visual cue */}
-              <svg
-                viewBox="0 0 24 24"
-                className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none"
-              >
-                <path
-                  fill="currentColor"
-                  d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM21.41 6.34c.39-.39.39-1.02 0-1.41L19.07 2.59a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
-                />
-              </svg>
-              <input
-                type="text"
-                value={activeUrl}
-                onChange={(e) => setManualUrl(e.target.value.trim())}
-                placeholder="Paste or type a URL…"
-                className="bg-transparent pl-1 pr-6 w-full truncate font-mono text-sm text-gray-300 focus:outline-none border-b border-transparent focus:border-gray-500"
-              />
-            </div>
-          </div>
+        <div className="flex flex-col w-full h-full bg-[#111827] text-white">
+            {/* ───── URL bar ───── */}
+            <div className="flex items-center justify-between p-2 border-b border-gray-700">
+                <div className="flex-1 px-2">
+                    <input
+                        type="text"
+                        value={manualUrl}
+                        onChange={(e) => setManualUrl(e.target.value)}
+                        placeholder={containerUrl || "Enter URL manually..."}
+                        className="w-full px-2 py-1 bg-[#1F2937] text-white border border-gray-600 rounded"
+                    />
+                </div>
 
-          {/* right-side buttons */}
-          <div className="flex items-center space-x-2">
-            <Button
-              onClick={handleRefreshContainerUrl}
-              disabled={isRefreshing}
-              variant="ghost"
-              size="sm"
-              className="h-8 text-gray-400 hover:text-white hover:bg-[#1F2937]"
-            >
-              <RefreshCw
-                className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`}
-              />
-              {isRefreshing ? "Refreshing…" : "Refresh"}
-            </Button>
-            <Button
-              onClick={openInNewTab}
-              variant="ghost"
-              size="sm"
-              disabled={!activeUrl}
-              className="h-8 text-gray-400 hover:text-white hover:bg-[#1F2937]"
-            >
-              <ExternalLink className="h-4 w-4 mr-2" />
-              Open
-            </Button>
-          </div>
-        </div>
-
-        {/* ───── main panel ───── */}
-        {/* flex-child grows to fill the rest of the column */}
-        <div className="flex-1 w-full h-full">
-          {activeUrl ? (
-            <iframe
-              ref={iframeRef}
-              key={`${iframeKey}-${activeUrl}`}
-              src={activeUrl}
-              className="w-full h-full"
-              style={{ border: "none" }}
-              allow="clipboard-read; clipboard-write"
-              sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-              title="Ephemeral Container"
-            />
-          ) : (
-            /* fallback when we have no URL yet */
-            <div className="flex flex-col items-center justify-center w-full h-full space-y-4">
-              <Loader2 className="w-12 h-12 text-blue-400 animate-spin" />
-              <p className="text-gray-400">
-                Waiting for container URL… or paste one above.
-              </p>
+                <div className="flex items-center space-x-2">
+                    <Button
+                        onClick={handleRefreshContainerUrl}
+                        disabled={isRefreshing}
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-gray-400 hover:text-white hover:bg-[#1F2937]"
+                    >
+                        <RefreshCw
+                            className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`}
+                        />
+                        {isRefreshing ? "Refreshing…" : "Refresh"}
+                    </Button>
+                    <Button
+                        onClick={openInNewTab}
+                        variant="ghost"
+                        size="sm"
+                        disabled={!activeUrl}
+                        className="h-8 text-gray-400 hover:text-white hover:bg-[#1F2937]"
+                    >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Open
+                    </Button>
+                </div>
             </div>
-          )}
+
+            {/* ───── main panel ───── */}
+            {/* flex-child grows to fill the rest of the column */}
+            <div className="flex-1 w-full h-full">
+                {activeUrl ? (
+                    <iframe
+                        ref={iframeRef}
+                        key={`${iframeKey}-${activeUrl}`}
+                        src={activeUrl}
+                        className="w-full h-full"
+                        style={{ border: "none" }}
+                        allow="clipboard-read; clipboard-write"
+                        sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+                        title="Ephemeral Container"
+                    />
+                ) : (
+                    /* fallback when we have no URL yet */
+                    <div className="flex flex-col items-center justify-center w-full h-full space-y-4">
+                        <Loader2 className="w-12 h-12 text-blue-400 animate-spin" />
+                        <p className="text-gray-400">
+                            Waiting for container URL… or paste one above.
+                        </p>
+                    </div>
+                )}
+            </div>
         </div>
-      </div>
     );
 }
 

@@ -1,12 +1,14 @@
-import { deployPipeline as sseDeploy } from '@/api/deployPipeline';
-import { ProjectContextType } from '@/context/project/ProjectContextTypes';
-import { useContext } from 'react';
-import FileContext from '@/context/file/FileContext';
-import { FileTreeItemType } from '@/interfaces/FileTreeItemType';
+import React, { useContext } from "react";
+import { deployPipeline as sseDeploy } from "../../api/deployPipeline";
+import { ProjectContextType } from "@/context/project/ProjectContextTypes";
 import UxContext from "@/context/ux/UxContext";
+import { FileTreeItemType } from '@/interfaces/FileTreeItemType';
 
-// Track file tree state internally to handle streaming
+// Track file tree during stream
 let currentFileTree: FileTreeItemType[] = [];
+
+// Flag indicating development server mode (auto-open interface when UI is ready)
+const IS_DEV_SERVER = process.env.NEXT_PUBLIC_SF_DEV_SERVER === '1';
 
 // Helper function to add a file to the tree
 function addFileToTree(path: string, content: string, setFileTree?: (tree: any) => void) {
@@ -52,7 +54,12 @@ export function runDeployPipelineWithLogs(
   taskLogs.setIsVisible(true);
   taskLogs.addSystemLog("🚀 Starting deployment pipeline...");
 
-  const { activeTab, setActiveTab: uxSetActiveTab } = useContext(UxContext);
+  const { activeTab, setActiveTab: uxSetActiveTab, setContainerUrlRefreshTrigger } = useContext(UxContext);
+  
+  // Track if we've already switched tabs to avoid multiple switches
+  let hasAutoSwitchedTab = false;
+  // Track if we've seen Next.js logs to trigger auto-refresh
+  let hasSeenNextJsLogs = false;
 
   const update = (msg: any) => {
     console.log(`[deployPipeline] Received update from SSE:`, msg);
@@ -73,11 +80,33 @@ export function runDeployPipelineWithLogs(
       taskLogs.addSystemLog(`📄 ${msg.path}`);
     }
 
+    // Check for Next.js logs to trigger auto-switch and refresh
+    if (!hasSeenNextJsLogs && msg.message && typeof msg.message === 'string' && 
+        (msg.message.includes('ready started server on') || 
+         msg.message.includes('started server on') || 
+         msg.message.includes('compiled successfully'))) {
+      hasSeenNextJsLogs = true;
+      
+      // Auto-switch to interface tab if not already there
+      if (!hasAutoSwitchedTab && activeTab !== "interface") {
+        console.log('[deployPipeline] First Next.js logs detected, switching to interface tab');
+        uxSetActiveTab("interface");
+        hasAutoSwitchedTab = true;
+      }
+      
+      // Trigger iframe refresh by incrementing the refresh counter
+      console.log('[deployPipeline] First Next.js logs detected, triggering iframe refresh');
+      // Use the current timestamp to ensure the value changes
+      const timestamp = Date.now();
+      setContainerUrlRefreshTrigger(timestamp);
+    }
+
     /* ------------ AUTO TAB SWITCH on ui-complete ------------- */
-    if (msg.stage === "ui-complete" || msg.event === "ui-complete") {
+    if ((msg.stage === "ui-complete" || msg.event === "ui-complete") && !hasAutoSwitchedTab) {
       // Skip if we're already there or the user manually picked a tab **after** the build started
       if (activeTab !== "interface") {
         uxSetActiveTab("interface");
+        hasAutoSwitchedTab = true;
       }
     }
     /* ---------------------------------------------------------- */

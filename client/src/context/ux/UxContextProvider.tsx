@@ -16,6 +16,7 @@ const UxContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   const [activeTab, setActiveTab] = useState<ActiveTab>(defaultTabs.activeTab);
   const [uxOpenPanel, setUxOpenPanel] = useState<UxOpenPanel>('none');
   const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
+  const [containerUrlRefreshTrigger, setContainerUrlRefreshTrigger] = useState<number>(0);
 
   // Load saved tabs from localStorage after component mounts
   useEffect(() => {
@@ -53,6 +54,8 @@ const UxContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     setUxOpenPanel,
     isChatOpen,
     setIsChatOpen,
+    containerUrlRefreshTrigger,
+    setContainerUrlRefreshTrigger,
   };
 
   return (
