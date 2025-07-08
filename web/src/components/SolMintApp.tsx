@@ -52,9 +52,6 @@ export default function SolMintApp() {
       }
     }
     window.addEventListener("message", handleParentMsg);
-    /* ask parent for wallet on boot */
-    if (!isStandalone)
-      window.parent.postMessage({ type: "REQUEST_WALLET_CONNECT" }, "*");
     return () => window.removeEventListener("message", handleParentMsg);
   }, [isBrowser, isStandalone]);
 
