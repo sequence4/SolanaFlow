@@ -202,7 +202,7 @@ const Interface = () => {
                         className="w-full h-full"
                         style={{ border: "none" }}
                         allow="clipboard-read; clipboard-write"
-                        sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+                        sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-popups-to-escape-sandbox"
                         title="Ephemeral Container"
                     />
                 ) : (
