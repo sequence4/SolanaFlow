@@ -217,10 +217,13 @@ const Interface = () => {
         }
     };
 
+    /* add a cache-buster so each "Refresh" forces the browser to re-request
+       the page and kick the Next.js dev-server if it was asleep */
     const iframeSrc = React.useMemo(() => {
         if (!activeUrl) return "";
-        return activeUrl;
-    }, [activeUrl]);
+        const delim = activeUrl.includes('?') ? '&' : '?';
+        return `${activeUrl}${delim}v=${iframeKey}`;
+    }, [activeUrl, iframeKey]);
 
     const openInNewTab = () => activeUrl && window.open(activeUrl, "_blank");
 
@@ -310,7 +313,7 @@ const Interface = () => {
                     <iframe
                         ref={iframeRef}
                         key={`${iframeKey}-${activeUrl}`}
-                        src={activeUrl}
+                        src={iframeSrc}
                         className="w-full h-full overflow-y-auto"
                         style={{ border: "none" }}
                         allow="clipboard-read; clipboard-write"

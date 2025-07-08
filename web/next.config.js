@@ -18,16 +18,15 @@ const nextConfig = {
   basePath:   APP_BASE_PATH,
   assetPrefix: APP_BASE_PATH,
 
+  /** Allow the app to be embedded in SolanaFlow's iframe (different port). */
   async headers() {
     return [
       {
         source: '/:path*',
         headers: [
           { key: 'X-Frame-Options', value: 'ALLOWALL' },
-          {
-            key: 'Content-Security-Policy',
-            value: `frame-ancestors *; default-src * 'unsafe-inline'${process.env.NODE_ENV === 'production' ? '' : " 'unsafe-eval'"} blob: data:;`,
-          },
+          { key: 'Content-Security-Policy',
+            value: "frame-ancestors 'self' http://localhost:*" },
         ],
       },
     ];
