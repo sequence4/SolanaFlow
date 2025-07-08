@@ -72,6 +72,19 @@
   }
 }
 
+/* ───────── FIX: preserve vertical scrollbar & stop layout-shift ───────── */
+html, body {
+  /* Always leave room for the scrollbar so width never changes */
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+}
+
+/* Wallet-adapter's modal sets "overflow:hidden" inline on <body>;
+   force the scrollbar to stay so we can still scroll inside the iframe */
+body[style*="overflow: hidden"] {
+  overflow-y: scroll !important;
+}
+
 /* Custom wallet adapter button styles */
 .wallet-adapter-button {
   background: linear-gradient(135deg, #a0d2ff 0%, #d3c1ff 100%) !important;

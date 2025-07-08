@@ -347,7 +347,7 @@ export default function SolMintApp() {
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen bg-gradient-to-br from-white via-blue-50/30 to-purple-50/30">
+      <div className="min-h-screen overflow-y-auto bg-gradient-to-br from-white via-blue-50/30 to-purple-50/30">
         {/* Optional whimsical blob background */}
         <div className="fixed top-0 right-0 w-96 h-96 bg-gradient-to-br from-blue-200/10 to-purple-200/10 rounded-full blur-3xl -z-10" />
 
