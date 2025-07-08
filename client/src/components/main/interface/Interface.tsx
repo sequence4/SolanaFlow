@@ -7,6 +7,8 @@ import { Loader2, RefreshCw, ExternalLink } from "lucide-react";
 import UxContext from "@/context/ux/UxContext";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { enablePhantomWalletExtension } from "phantom-iframe-connector";
+import { PhantomWalletName } from "@solana/wallet-adapter-phantom";
+import { Transaction } from "@solana/web3.js";
 
 const Interface = () => {
     const { projectContext, setProjectContext } = useContext(ProjectContext);
@@ -14,7 +16,7 @@ const Interface = () => {
     const { id: projectId, containerUrl } = projectContext;
     
     /* ── wallet from the host app ── */
-    const { publicKey, connected, connect } = useWallet();
+    const { publicKey, connected, connect, disconnect, signTransaction, select } = useWallet();
 
     /* iframe handle so we can postMessage downwards */
     const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -53,6 +55,110 @@ const Interface = () => {
             setIframeKey(prev => prev + 1);
         }
     }, [containerUrlRefreshTrigger, activeUrl]);
+
+    /* ───────── Listen for wallet messages from iframe ───────── */
+    useEffect(() => {
+        if (!activeUrl) return;
+        
+        const handleMessage = async (event: MessageEvent) => {
+            // Skip messages not from our iframe
+            if (event.source !== iframeRef.current?.contentWindow) return;
+            
+            // Handle wallet state request
+            if (event.data?.type === "wallet_state_request") {
+                console.log("[Interface] Received wallet state request from iframe");
+                iframeRef.current?.contentWindow?.postMessage({
+                    type: "wallet_state_response",
+                    connected: !!connected,
+                    publicKey: connected && publicKey ? publicKey.toString() : null
+                }, "*");
+            }
+            
+            // Handle wallet connect request
+            if (event.data?.type === "wallet_connect_request") {
+                console.log("[Interface] Received wallet connect request from iframe");
+                if (!connected) {
+                    try {
+                        await select(PhantomWalletName);
+                        await connect();
+                    } catch (error) {
+                        console.error("Error connecting wallet:", error);
+                    }
+                }
+                
+                // Send updated wallet state back to iframe
+                iframeRef.current?.contentWindow?.postMessage({
+                    type: "wallet_state_response",
+                    connected: !!connected,
+                    publicKey: connected && publicKey ? publicKey.toString() : null
+                }, "*");
+            }
+            
+            // Handle wallet disconnect request
+            if (event.data?.type === "wallet_disconnect_request") {
+                console.log("[Interface] Received wallet disconnect request from iframe");
+                if (connected) {
+                    try {
+                        await disconnect();
+                    } catch (error) {
+                        console.error("Error disconnecting wallet:", error);
+                    }
+                }
+                
+                // Send updated wallet state back to iframe
+                iframeRef.current?.contentWindow?.postMessage({
+                    type: "wallet_state_response",
+                    connected: false,
+                    publicKey: null
+                }, "*");
+            }
+            
+            // Handle transaction signing request
+            if (event.data?.type === "sign_transaction") {
+                console.log("[Interface] Received transaction signing request from iframe");
+                try {
+                    if (!connected || !signTransaction) {
+                        throw new Error("Wallet not connected");
+                    }
+                    
+                    // Deserialize the transaction
+                    const txBytes = new Uint8Array(event.data.transaction);
+                    const tx = Transaction.from(txBytes);
+                    
+                    // Sign the transaction
+                    const signedTx = await signTransaction(tx);
+                    
+                    // Serialize and return the signed transaction
+                    const serializedTx = signedTx.serialize();
+                    iframeRef.current?.contentWindow?.postMessage({
+                        type: "sign_transaction_response",
+                        signedTransaction: Array.from(serializedTx)
+                    }, "*");
+                } catch (error: any) {
+                    console.error("Error signing transaction:", error);
+                    iframeRef.current?.contentWindow?.postMessage({
+                        type: "sign_transaction_response",
+                        error: error?.message || String(error)
+                    }, "*");
+                }
+            }
+        };
+        
+        window.addEventListener("message", handleMessage);
+        return () => window.removeEventListener("message", handleMessage);
+    }, [activeUrl, connected, publicKey, connect, disconnect, signTransaction, select]);
+
+    // Update iframe with wallet state when connection changes
+    useEffect(() => {
+        if (!activeUrl || !iframeRef.current?.contentWindow) return;
+        
+        console.log("[Interface] Wallet state changed, updating iframe:", connected);
+        iframeRef.current.contentWindow.postMessage({
+            type: "wallet_state_response",
+            connected: !!connected,
+            publicKey: connected && publicKey ? publicKey.toString() : null
+        }, "*");
+    }, [activeUrl, connected, publicKey]);
 
     /* ───────── parent ⇒ iframe : push wallet once connected ───────── */
     useEffect(() => {
