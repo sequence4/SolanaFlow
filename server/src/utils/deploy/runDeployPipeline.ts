@@ -225,9 +225,20 @@ export async function runDeployPipeline({
     
     const findIdls = (nodes: any[]): void => {
       for (const node of nodes) {
-        if (node.type === 'file' && node.name.endsWith('.json') && 
-            node.path?.includes('/target/idl/') && 
-            !node.name.endsWith('-keypair.json')) {
+        if (
+          node.type === 'file' &&
+          node.name.endsWith('.json') &&
+          /**
+           * Inside the running container the absolute path is
+           *   /usr/src/target/idl/<program>.json
+           * After we copy it into `rawTree` the path is *relative*
+           *   target/idl/<program>.json
+           * so we must allow both variants.
+           */
+          (node.path?.includes('/target/idl/') ||
+           node.path?.includes('target/idl/')) &&
+          !node.name.endsWith('-keypair.json')
+        ) {
           try {
             const content = node.content ? JSON.parse(node.content) : null;
             if (content) {
