@@ -211,9 +211,18 @@ export async function runDeployPipeline({
     //      Anything else (node_modules, .next, yarn releases) is skipped
     //      to keep the tar stream < 5 MB and avoid ENOBUFS.
     // ------------------------------------------------------------------
-    await readContainerFile(workspace.containerName, '/usr/src/target/deploy', projectId, userId);
-    await readContainerFile(workspace.containerName, '/usr/src/Anchor.toml', projectId, userId);
-    await readContainerFile(workspace.containerName, '/usr/src/target/idl', projectId, userId);
+    const projectFolder =
+      workspace.rootPath ??
+      (await import("../fileUtils").then(m => m.getProjectRootPath(projectId)));
+
+    const deployDir = `/usr/src/${projectFolder}/target/deploy`;
+    const idlDir    = `/usr/src/${projectFolder}/target/idl`;
+    const tomlFile  = `/usr/src/${projectFolder}/Anchor.toml`;
+
+    // copy artefacts into the task-file cache
+    await readContainerFile(workspace.containerName, deployDir, projectId, userId);
+    await readContainerFile(workspace.containerName, tomlFile,  projectId, userId);
+    await readContainerFile(workspace.containerName, idlDir,    projectId, userId);
     
     await attachFileContents(rawTree, absRoot, workspace.containerName);
     const fileTree = rawTree;  // now populated
