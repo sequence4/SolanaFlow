@@ -20,6 +20,15 @@ const Interface = () => {
         idls: allIdls = []
     } = projectContext.details?.projectState ?? {};
     
+    /* ───── DEBUG ───────────────────────────────────────────────
+     *  Log once on every React render so we know whether the IDL
+     *  ever makes it into React context before any messaging.
+     *  primaryIdl  – first / active program IDL (or null)
+     *  allIdls     – array of every IDL we've collected so far
+     * ───────────────────────────────────────────────────────────*/
+    console.log('[Interface] render → primaryIdl =', primaryIdl,
+                'allIdls.length =', allIdls.length);
+    
     /* ── wallet from the host app ── */
     const { publicKey, connected, connect, disconnect, signTransaction, select } = useWallet();
 
@@ -158,6 +167,9 @@ const Interface = () => {
             if (event.data?.type === "idl_request") {
                 console.log("[Interface] iframe requested PROGRAM_IDL");
                 if (primaryIdl) {
+                    /* DEBUG: show exactly what we're about to post */
+                    console.log('[Interface] ↪ sending PROGRAM_IDL',
+                                { idl: primaryIdl, idls: allIdls });
                     iframeRef.current?.contentWindow?.postMessage(
                       { type: "PROGRAM_IDL", idl: primaryIdl, idls: allIdls },
                       "*"
@@ -207,6 +219,9 @@ const Interface = () => {
     useEffect(() => {
         if (!iframeRef.current?.contentWindow) return;
         if (!primaryIdl) return;                 // nothing to send yet
+
+        console.log('[Interface] effect → pushing PROGRAM_IDL to iframe',
+                    { idl: primaryIdl, idls: allIdls });
 
         iframeRef.current.contentWindow.postMessage(
           { type: "PROGRAM_IDL", idl: primaryIdl, idls: allIdls },
