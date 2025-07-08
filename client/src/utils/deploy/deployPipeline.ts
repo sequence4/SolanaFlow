@@ -32,6 +32,48 @@ function addFileToTree(path: string, content: string, setFileTree?: (tree: any) 
   setFileTree([...currentFileTree]);
 }
 
+// Helper function to load IDL from localStorage
+export function loadIdlFromStorage(projectId: string): { primaryIdl: any, allIdls: any[] } {
+  const result = {
+    primaryIdl: null as any,
+    allIdls: [] as any[]
+  };
+  
+  try {
+    // Try to load the primary IDL
+    const storedIdl = localStorage.getItem(`idl-${projectId}`);
+    if (storedIdl) {
+      result.primaryIdl = JSON.parse(storedIdl);
+      result.allIdls.push(result.primaryIdl);
+    }
+    
+    // Look for any program-specific IDLs
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(`idl-${projectId}-`)) {
+        try {
+          const idl = JSON.parse(localStorage.getItem(key) || '');
+          // Only add if not already in the array
+          if (idl && !result.allIdls.some(existing => existing.name === idl.name)) {
+            result.allIdls.push(idl);
+          }
+        } catch (e) {
+          console.error(`[deployPipeline] Error parsing IDL from ${key}:`, e);
+        }
+      }
+    }
+    
+    // If we found program-specific IDLs but no primary IDL, use the first one as primary
+    if (!result.primaryIdl && result.allIdls.length > 0) {
+      result.primaryIdl = result.allIdls[0];
+    }
+  } catch (error) {
+    console.error("[deployPipeline] Failed to load IDLs from localStorage:", error);
+  }
+  
+  return result;
+}
+
 export function runDeployPipelineWithLogs(
   projectContext: ProjectContextType,
   graph: unknown,
@@ -144,6 +186,72 @@ export function runDeployPipelineWithLogs(
       console.log(`[deployPipeline] Received fileTree with ${count} items`);
       taskLogs.addSystemLog(`📂 Received project file tree with ${count} items`);
       setFileTree(structuredClone(msg.fileTree as import("@/interfaces/FileTreeItemType").FileTreeItemType[]));
+    }
+
+    if (msg.idl) {
+      console.log(`[deployPipeline] Received IDL:`, msg.idl);
+      taskLogs.addSystemLog(`📜 Received program IDL`);
+      
+      try {
+        localStorage.setItem(`idl-${projectContext.id}`, JSON.stringify(msg.idl));
+      } catch (error) {
+        console.error("[deployPipeline] Failed to save IDL to localStorage:", error);
+      }
+      
+      setProjectContext(prev => ({
+        ...prev,
+        details: {
+          ...prev.details!,
+          projectState: {
+            ...prev.details!.projectState,
+            idl: msg.idl,
+            idls: prev.details!.projectState.idls
+              ? [...prev.details!.projectState.idls.filter((i: any) => 
+                  i.name !== msg.idl.name), msg.idl]
+              : [msg.idl]
+          }
+        }
+      }));
+    }
+
+    if (msg.idls && Array.isArray(msg.idls) && msg.idls.length > 0) {
+      console.log(`[deployPipeline] Received ${msg.idls.length} IDLs`);
+      taskLogs.addSystemLog(`📜 Received ${msg.idls.length} program IDLs`);
+      
+      try {
+        // Store all IDLs in localStorage
+        msg.idls.forEach((idl: any) => {
+          if (idl.name) {
+            localStorage.setItem(`idl-${projectContext.id}-${idl.name}`, JSON.stringify(idl));
+          }
+        });
+      } catch (error) {
+        console.error("[deployPipeline] Failed to save IDLs to localStorage:", error);
+      }
+      
+      setProjectContext(prev => {
+        // Merge new IDLs with existing ones, replacing any with the same name
+        const existingIdls = prev.details?.projectState.idls || [];
+        const mergedIdls = [
+          ...existingIdls.filter((existing: any) => 
+            !msg.idls.some((incoming: any) => incoming.name === existing.name)
+          ),
+          ...msg.idls
+        ];
+        
+        return {
+          ...prev,
+          details: {
+            ...prev.details!,
+            projectState: {
+              ...prev.details!.projectState,
+              // Set the first IDL as the primary one if not already set
+              idl: prev.details!.projectState.idl || msg.idls[0],
+              idls: mergedIdls
+            }
+          }
+        };
+      });
     }
 
     if (msg.stage === 'deploy-done' || msg.stage === 'done' || msg.stage === 'completed') {

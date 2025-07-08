@@ -213,17 +213,51 @@ export async function runDeployPipeline({
     // ------------------------------------------------------------------
     await readContainerFile(workspace.containerName, '/usr/src/target/deploy', projectId, userId);
     await readContainerFile(workspace.containerName, '/usr/src/Anchor.toml', projectId, userId);
+    await readContainerFile(workspace.containerName, '/usr/src/target/idl', projectId, userId);
     
     await attachFileContents(rawTree, absRoot, workspace.containerName);
     const fileTree = rawTree;  // now populated
 
     /* finally emit build-done with artefact + file tree */
+    // Extract IDL from file tree if available
+    let idlContent: any = null;
+    const idls: any[] = [];
+    
+    const findIdls = (nodes: any[]): void => {
+      for (const node of nodes) {
+        if (node.type === 'file' && node.name.endsWith('.json') && 
+            node.path?.includes('/target/idl/') && 
+            !node.name.endsWith('-keypair.json')) {
+          try {
+            const content = node.content ? JSON.parse(node.content) : null;
+            if (content) {
+              idls.push(content);
+              // Use the first IDL as the primary one
+              if (!idlContent) {
+                idlContent = content;
+              }
+            }
+          } catch (err) {
+            console.error(`[pipeline] Failed to parse IDL JSON: ${err}`);
+          }
+        }
+        if (node.children) {
+          findIdls(node.children);
+        }
+      }
+    };
+    
+    findIdls(fileTree);
+    console.log(`[pipeline] Found ${idls.length} IDLs`);
+    
     sendProgress(<ProgressEvent>{
       stage   : "build",
       status  : "completed",
       message : "Build finished",
       artifact: base64So,
-      fileTree
+      fileTree,
+      ...(idlContent ? { idl: idlContent } : {}),
+      ...(idls.length > 0 ? { idls } : {})
     });
 
   } catch (err) {

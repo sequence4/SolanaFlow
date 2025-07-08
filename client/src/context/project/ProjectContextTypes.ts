@@ -35,6 +35,8 @@ export interface ProjectStateType {
              import('../../interfaces/FileTreeItemType').FileTreeItemType[];
   built: boolean;
   deployed: boolean;
+  idl?: any;
+  idls?: any[];
 }
 
 export interface ProjectDetailsType {
@@ -108,4 +110,6 @@ export const savedKeys: (keyof ProjectStateType)[] = [
     'fileTree',
     'built',
     'deployed',
+    'idl',
+    'idls',
 ];
