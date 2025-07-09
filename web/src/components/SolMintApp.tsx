@@ -195,7 +195,7 @@ export default function SolMintApp() {
         console.warn("[IDL] On‑chain IDL missing – using bundled JSON")
         idl = solMintIdl as unknown as anchor.Idl
       }
-      // Anchor ≥0.32: Program constructor is (idl, provider)
+      // Create program instance with the correct constructor signature
       const program = new anchor.Program(idl, provider)
       // Determine mint authority (use wallet if none provided)
       const mintAuthorityPubkey = initMintForm.mintAuthority
@@ -302,6 +302,7 @@ export default function SolMintApp() {
         console.warn("[IDL] On‑chain IDL missing – using bundled JSON")
         idl = solMintIdl as unknown as anchor.Idl
       }
+      // Create program instance with the correct constructor signature
       const program = new anchor.Program(idl, provider)
       // Mint authority must match the one set during initialization
       const mintAuthorityPubkey = initMintForm.mintAuthority
