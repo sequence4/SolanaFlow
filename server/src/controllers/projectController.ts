@@ -706,6 +706,26 @@ export const deployProjectEphemeral = async (
                  WHERE id = $3`,
                 [JSON.stringify({ programId }), new Date(), id],
               );
+              // Update the DApp's .env file with the new Program ID for the frontend
+              try {
+                const { rows: [proj] } = await pool.query(
+                  'SELECT container_name, root_path FROM solanaproject WHERE id = $1',
+                  [id]
+                );
+                if (proj && proj.container_name) {
+                  const containerName = proj.container_name;
+                  const rootPath = proj.root_path;
+                  const envPath = `/usr/src/${rootPath}/web/.env`;
+                  const updateCmd =
+                    `if grep -q '^NEXT_PUBLIC_PROGRAM_ID=' ${envPath}; then ` +
+                    `sed -i 's/^NEXT_PUBLIC_PROGRAM_ID=.*/NEXT_PUBLIC_PROGRAM_ID=${programId}/' ${envPath}; ` +
+                    `else echo 'NEXT_PUBLIC_PROGRAM_ID=${programId}' >> ${envPath}; fi`;
+                  await runCommand(`docker exec ${containerName} bash -c "${updateCmd}"`, '.', uuidv4());
+                  console.log(`[DEPLOY_EPHEMERAL] Updated .env with Program ID ${programId}`);
+                }
+              } catch (err) {
+                console.error('[DEPLOY_EPHEMERAL] Could not write Program ID to .env:', err);
+              }
             } else {
               console.log(`[DEPLOY_EPHEMERAL] WARNING: Task completed but no Program ID found in result`);
             }
