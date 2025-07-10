@@ -15,6 +15,8 @@ import {
 } from "../projectUtils";
 import { waitForTaskCompletion } from "../taskUtils";
 import path from "path";
+import fs from "fs/promises";
+import { PublicKey } from "@solana/web3.js";
 import { attachFileContents } from "../fileUtils/attachFileContents";
 import { readContainerFile } from "../fileUtils/attachFileContents";
 import { builderImage } from './builderImage';
@@ -277,6 +279,38 @@ export async function runDeployPipeline({
     
     findIdls(fileTree);
     console.log(`[pipeline] Found ${idls.length} IDLs`);
+    
+    /* ──────────────────────────────────────────────────────────────
+     * Patch   idl.metadata.address  →  compiled program public key
+     * so the front-end can safely use  new anchor.Program(idl, provider)
+     * (Anchor ≥ 0.30 expects this field to be correct).
+     * ────────────────────────────────────────────────────────────── */
+    if (idlContent) {
+      try {
+        /* derive path:   target/deploy/<program>-keypair.json */
+        const keypairPath = path.join(
+          absRoot,
+          "target",
+          "deploy",
+          `${idlContent.name}-keypair.json`
+        );
+
+        const secretKey = JSON.parse(await fs.readFile(keypairPath, "utf8")) as number[];
+        if (secretKey.length !== 64) {
+          throw new Error("unexpected keypair length");
+        }
+
+        const programId = new PublicKey(secretKey.slice(32)).toBase58(); // last 32 bytes = pubkey
+
+        idlContent.metadata = {
+          ...(idlContent.metadata ?? {}),
+          address: programId,
+        };
+        console.log(`[pipeline] Patched IDL metadata.address → ${programId}`);
+      } catch (err) {
+        console.warn(`[pipeline] Could not patch metadata.address automatically: ${err}`);
+      }
+    }
     
     sendProgress(<ProgressEvent>{
       stage   : "build",
