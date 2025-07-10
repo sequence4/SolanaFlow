@@ -195,11 +195,11 @@ export default function SolMintApp() {
         console.warn("[IDL] On‑chain IDL missing – using bundled JSON")
         idl = solMintIdl as unknown as anchor.Idl
       }
-      // Create program instance – pass the explicit address **as 3rd arg**
-      //   Signature: new Program(idl, provider, address)
+      // Create program instance with the correct signature
+      // Signature: new Program(idl, programId, provider)
       // This works for both on‑chain IDLs (which include metadata.address)
       // and the bundled fallback file (which usually does not).
-      const program = new anchor.Program(idl, provider, programIdKey)
+      const program = new anchor.Program(idl, programIdKey, provider)
       // Determine mint authority (use wallet if none provided)
       const mintAuthorityPubkey = initMintForm.mintAuthority
         ? new PublicKey(initMintForm.mintAuthority)
@@ -305,8 +305,8 @@ export default function SolMintApp() {
         console.warn("[IDL] On‑chain IDL missing – using bundled JSON")
         idl = solMintIdl as unknown as anchor.Idl
       }
-      // Same fix in the mint‑token path
-      const program = new anchor.Program(idl, provider, programIdKey)
+      // Same fix in the mint‑token path with correct argument order
+      const program = new anchor.Program(idl, programIdKey, provider)
       // Mint authority must match the one set during initialization
       const mintAuthorityPubkey = initMintForm.mintAuthority
         ? new PublicKey(initMintForm.mintAuthority)
