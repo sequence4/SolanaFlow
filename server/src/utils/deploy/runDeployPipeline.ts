@@ -308,15 +308,40 @@ export async function runDeployPipeline({
         };
         console.log(`[pipeline] Patched IDL metadata.address → ${programId}`);
 
-        /* ---------- ensure Next.js can read the ID at build time ---------- */
+        /* ---------- ensure the front-end sees the Program ID ---------- */
         try {
-          // Write (or append) NEXT_PUBLIC_PROGRAM_ID to   <projectRoot>/.env.local
-          const envPath = path.join(absRoot, ".env.local");      // e.g. /usr/src/<proj>/web/.env.local
-          const envLine = `NEXT_PUBLIC_PROGRAM_ID=${programId}\n`;
-          await fs.appendFile(envPath, envLine);
-          console.log(`[pipeline] Appended program ID to ${envPath}`);
+          /* Prefer an existing  web/.env  → then root .env  → fall back to web/.env */
+          const candidates = [
+            path.join(absRoot, "web", ".env"),
+            path.join(absRoot, ".env"),
+            path.join(absRoot, "web", ".env.local"),
+            path.join(absRoot, ".env.local"),
+          ];
+
+          let target: string | null = null;
+          for (const p of candidates) {
+            try { await fs.access(p); target = p; break; } catch { /* not there */ }
+          }
+          if (!target) {
+            /* nothing exists yet → create web/.env */
+            target = path.join(absRoot, "web", ".env");
+            await fs.writeFile(target, "");
+          }
+
+          let envText = await fs.readFile(target, "utf8");
+          if (envText.match(/^NEXT_PUBLIC_PROGRAM_ID=/m)) {
+            envText = envText.replace(
+              /^NEXT_PUBLIC_PROGRAM_ID=.*/m,
+              `NEXT_PUBLIC_PROGRAM_ID=${programId}`
+            );
+          } else {
+            envText += (envText.endsWith("\n") ? "" : "\n") +
+                       `NEXT_PUBLIC_PROGRAM_ID=${programId}\n`;
+          }
+          await fs.writeFile(target, envText);
+          console.log(`[pipeline] Program ID written to ${target}`);
         } catch (envErr) {
-          console.warn(`[pipeline] Failed to write .env.local: ${envErr}`);
+          console.warn(`[pipeline] Failed to write .env(.local): ${envErr}`);
         }
       } catch (err) {
         console.warn(`[pipeline] Could not patch metadata.address automatically: ${err}`);
