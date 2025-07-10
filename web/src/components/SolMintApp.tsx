@@ -195,8 +195,11 @@ export default function SolMintApp() {
         console.warn("[IDL] On‑chain IDL missing – using bundled JSON")
         idl = solMintIdl as unknown as anchor.Idl
       }
-      // Create program instance with the correct constructor signature
-      const program = new anchor.Program(idl, provider)
+      // Create program instance – pass the explicit address **as 3rd arg**
+      //   Signature: new Program(idl, provider, address)
+      // This works for both on‑chain IDLs (which include metadata.address)
+      // and the bundled fallback file (which usually does not).
+      const program = new anchor.Program(idl, provider, programIdKey)
       // Determine mint authority (use wallet if none provided)
       const mintAuthorityPubkey = initMintForm.mintAuthority
         ? new PublicKey(initMintForm.mintAuthority)
@@ -210,9 +213,9 @@ export default function SolMintApp() {
       }
       // Generate a new Keypair for the token mint account
       const mintAccount = Keypair.generate()
-      // Call initialize_mint instruction on the Anchor program using fluent methods API
+      // Call initialize_mint (decimals **must** be a BN)
       const txSig = await program.methods
-        .initializeMint(initMintForm.decimals, mintAuthorityPubkey)
+        .initializeMint(new BN(initMintForm.decimals), mintAuthorityPubkey)
         .accounts({
           payer: publicKey,
           tokenMint: mintAccount.publicKey,
@@ -302,8 +305,8 @@ export default function SolMintApp() {
         console.warn("[IDL] On‑chain IDL missing – using bundled JSON")
         idl = solMintIdl as unknown as anchor.Idl
       }
-      // Create program instance with the correct constructor signature
-      const program = new anchor.Program(idl, provider)
+      // Same fix in the mint‑token path
+      const program = new anchor.Program(idl, provider, programIdKey)
       // Mint authority must match the one set during initialization
       const mintAuthorityPubkey = initMintForm.mintAuthority
         ? new PublicKey(initMintForm.mintAuthority)
