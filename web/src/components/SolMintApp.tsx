@@ -199,7 +199,7 @@ export default function SolMintApp() {
       // Signature: new Program(idl, programId, provider)
       // This works for both on‑chain IDLs (which include metadata.address)
       // and the bundled fallback file (which usually does not).
-      const program = new anchor.Program(idl, programIdKey, provider)
+      const program = new anchor.Program(idl, provider)
       // Determine mint authority (use wallet if none provided)
       const mintAuthorityPubkey = initMintForm.mintAuthority
         ? new PublicKey(initMintForm.mintAuthority)
@@ -306,7 +306,7 @@ export default function SolMintApp() {
         idl = solMintIdl as unknown as anchor.Idl
       }
       // Same fix in the mint‑token path with correct argument order
-      const program = new anchor.Program(idl, programIdKey, provider)
+      const program = new anchor.Program(idl, provider)
       // Mint authority must match the one set during initialization
       const mintAuthorityPubkey = initMintForm.mintAuthority
         ? new PublicKey(initMintForm.mintAuthority)
