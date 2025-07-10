@@ -178,6 +178,9 @@ export default function SolMintApp() {
 
     try {
       if (!publicKey || !connected) throw new Error("Wallet not connected")
+      // ─────── RUNTIME ENV CHECK ───────
+      console.log("[DEBUG] process.env.NEXT_PUBLIC_PROGRAM_ID =", process.env.NEXT_PUBLIC_PROGRAM_ID)
+      console.log("[DEBUG] Hard-coded fallback PROGRAM_ID =", PROGRAM_ID)
       // Set up Anchor provider and program
       const connection = new anchor.web3.Connection(anchor.web3.clusterApiUrl("devnet"), "confirmed")
       const anchorWallet = {
@@ -188,6 +191,7 @@ export default function SolMintApp() {
       const provider = new anchor.AnchorProvider(connection, anchorWallet as anchor.Wallet, anchor.AnchorProvider.defaultOptions())
       anchor.setProvider(provider)
       const programIdKey = new PublicKey(PROGRAM_ID)
+      console.log("[DEBUG] programIdKey (PublicKey) =", programIdKey.toBase58())
       // ① Try to pull the IDL from the on‑chain PDA …
       let idl = await anchor.Program.fetchIdl(programIdKey, provider)
       // ② … but fall back to the bundled JSON when it isn't there yet.
@@ -195,15 +199,46 @@ export default function SolMintApp() {
         console.warn("[IDL] On‑chain IDL missing – using bundled JSON")
         idl = solMintIdl as unknown as anchor.Idl
       }
+
+      /* ─────── DEBUG & SAFEGUARD ─────── */
+      console.log("[DEBUG] programIdKey =", PROGRAM_ID)
+      console.log("[DEBUG] idl.metadata.address BEFORE patch =", (idl as any).metadata?.address)
+
+      if (!(idl as any).metadata?.address) {
+        /* metadata.address absent ⇒ add it so anchor.Program() won't choke */
+        idl = {
+          ...(idl as any),
+          metadata: { ...((idl as any).metadata ?? {}), address: PROGRAM_ID },
+        } as anchor.Idl
+        console.warn("[IDL] Patched metadata.address to", PROGRAM_ID)
+      }
+
+      console.log("[DEBUG] idl.metadata.address AFTER patch =", (idl as any).metadata?.address)
+      
       // Create program instance with the correct signature
       // Signature: new Program(idl, programId, provider)
       // This works for both on‑chain IDLs (which include metadata.address)
       // and the bundled fallback file (which usually does not).
       const program = new anchor.Program(idl, provider)
+      console.log("[DEBUG] program.programId =", program.programId.toBase58())
       // Determine mint authority (use wallet if none provided)
-      const mintAuthorityPubkey = initMintForm.mintAuthority
-        ? new PublicKey(initMintForm.mintAuthority)
-        : publicKey
+      // ─────── MINT AUTHORITY VALIDATION ───────
+      let mintAuthorityPubkey: PublicKey
+      try {
+        mintAuthorityPubkey = initMintForm.mintAuthority
+          ? new PublicKey(initMintForm.mintAuthority)
+          : publicKey
+        console.log("[DEBUG] mintAuthorityPubkey =", mintAuthorityPubkey.toBase58())
+      } catch (err) {
+        console.error("[ERROR] Invalid mintAuthority provided:", initMintForm.mintAuthority, err)
+        setErrors((prev) => ({ ...prev, initMint: "Invalid Mint Authority address." }))
+        toast({
+          title: "Invalid address",
+          description: "Mint authority address is not a valid public key.",
+          variant: "destructive",
+        })
+        return
+      }
       // Warn if freeze authority is provided (not supported by program)
       if (initMintForm.freezeAuthority.trim()) {
         toast({
@@ -213,9 +248,22 @@ export default function SolMintApp() {
       }
       // Generate a new Keypair for the token mint account
       const mintAccount = Keypair.generate()
-      // Call initialize_mint (decimals **must** be a BN)
+      console.log("[DEBUG] new mintAccount.publicKey =", mintAccount.publicKey.toBase58())
+      // Decimals handling with explicit BN + log
+      const decimalsBN = new BN(initMintForm.decimals)
+      console.log("[DEBUG] decimals (raw) =", initMintForm.decimals)
+      console.log("[DEBUG] decimalsBN =", decimalsBN.toString())
+
+      console.log("[DEBUG] Accounts passed to initializeMint", {
+        payer: publicKey.toBase58(),
+        tokenMint: mintAccount.publicKey.toBase58(),
+        systemProgram: anchor.web3.SystemProgram.programId.toBase58(),
+        tokenProgram: TOKEN_PROGRAM_ID.toBase58(),
+        rent: anchor.web3.SYSVAR_RENT_PUBKEY.toBase58(),
+      })
+
       const txSig = await program.methods
-        .initializeMint(new BN(initMintForm.decimals), mintAuthorityPubkey)
+        .initializeMint(decimalsBN, mintAuthorityPubkey)
         .accounts({
           payer: publicKey,
           tokenMint: mintAccount.publicKey,
@@ -302,9 +350,25 @@ export default function SolMintApp() {
       const programIdKey = new PublicKey(PROGRAM_ID)
       let idl = await anchor.Program.fetchIdl(programIdKey, provider)
       if (!idl) {
-        console.warn("[IDL] On‑chain IDL missing – using bundled JSON")
+        console.warn("[IDL] On-chain IDL missing – using bundled JSON")
         idl = solMintIdl as unknown as anchor.Idl
       }
+
+      /* ─────── DEBUG & SAFEGUARD ─────── */
+      console.log("[DEBUG] programIdKey =", PROGRAM_ID)
+      console.log("[DEBUG] idl.metadata.address BEFORE patch =", (idl as any).metadata?.address)
+
+      if (!(idl as any).metadata?.address) {
+        /* metadata.address absent ⇒ add it so anchor.Program() won't choke */
+        idl = {
+          ...(idl as any),
+          metadata: { ...((idl as any).metadata ?? {}), address: PROGRAM_ID },
+        } as anchor.Idl
+        console.warn("[IDL] Patched metadata.address to", PROGRAM_ID)
+      }
+
+      console.log("[DEBUG] idl.metadata.address AFTER patch =", (idl as any).metadata?.address)
+      
       // Same fix in the mint‑token path with correct argument order
       const program = new anchor.Program(idl, provider)
       // Mint authority must match the one set during initialization
