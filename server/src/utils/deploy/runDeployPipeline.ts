@@ -307,6 +307,17 @@ export async function runDeployPipeline({
           address: programId,
         };
         console.log(`[pipeline] Patched IDL metadata.address → ${programId}`);
+
+        /* ---------- ensure Next.js can read the ID at build time ---------- */
+        try {
+          // Write (or append) NEXT_PUBLIC_PROGRAM_ID to   <projectRoot>/.env.local
+          const envPath = path.join(absRoot, ".env.local");      // e.g. /usr/src/<proj>/web/.env.local
+          const envLine = `NEXT_PUBLIC_PROGRAM_ID=${programId}\n`;
+          await fs.appendFile(envPath, envLine);
+          console.log(`[pipeline] Appended program ID to ${envPath}`);
+        } catch (envErr) {
+          console.warn(`[pipeline] Failed to write .env.local: ${envErr}`);
+        }
       } catch (err) {
         console.warn(`[pipeline] Could not patch metadata.address automatically: ${err}`);
       }
