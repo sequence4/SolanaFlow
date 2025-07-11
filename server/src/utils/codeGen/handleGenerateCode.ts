@@ -18,6 +18,8 @@ import { execSync } from 'child_process';
 import { attachFileContents } from "../fileUtils/attachFileContents";
 import fs from 'fs/promises';            // promise-based FS API
 import fsSync from 'fs';                 // for existsSync in helper
+import { APP_CONFIG } from '../../config/appConfig';
+import { Keypair } from '@solana/web3.js';
 
 /** Extract all file paths from a file tree recursively. */
 function flattenPaths(tree: any[]): string[] {
@@ -407,7 +409,23 @@ EOF'`,
         // For now, assume a basic program structure exists or will be created
         // TODO: implement findProgramsDirectory and initAnchorProject when available
         const programName = 'my_program'; // TODO: derive from project context
-        const programId = '11111111111111111111111111111111'; // TODO: fetch real ID
+        // Generate a new program keypair for this build
+        const newKeypair = Keypair.generate();
+        const programId = newKeypair.publicKey.toBase58();
+        const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${programId}.json`);
+        fsSync.writeFileSync(walletPath, JSON.stringify(Array.from(newKeypair.secretKey)));
+        // Self-verify the keypair generation
+        const derivedPubkey = Keypair.fromSecretKey(newKeypair.secretKey).publicKey.toBase58();
+        if (derivedPubkey !== programId) {
+          throw new Error('Keypair self-verification failed');
+        }
+        console.log('[GEN] Generated new program ID:', programId);
+        // Copy keypair to the container for Anchor to use during deploy
+        const containerKeyPath = `/usr/src/${workspace.rootPath}/target/deploy/${programName}-keypair.json`;
+        await runCommand(`docker exec ${workspace.containerName} bash -c 'mkdir -p /usr/src/${workspace.rootPath}/target/deploy'`, '.', projectId, { skipSuccessUpdate: true });
+        await runCommand(`docker cp ${walletPath} ${workspace.containerName}:${containerKeyPath}`, '.', projectId, { skipSuccessUpdate: true });
+        // Inform client about the program ID for early access
+        sendProgress({ event: 'ephemeralKey', pubkey: programId });
         
         // Call ensure config helpers BEFORE refreshing the tree
         await ensureAnchorTomlProgram(
