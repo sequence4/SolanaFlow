@@ -20,6 +20,8 @@ import { PublicKey } from "@solana/web3.js";
 import { attachFileContents } from "../fileUtils/attachFileContents";
 import { readContainerFile } from "../fileUtils/attachFileContents";
 import { builderImage } from './builderImage';
+// NEW - generate unique task IDs for docker-restart
+import { v4 as uuidv4 } from "uuid";
 
 // ─── unified progress payload ────────────────────────────
 interface ProgressEvent {
@@ -340,6 +342,27 @@ export async function runDeployPipeline({
           }
           await fs.writeFile(target, envText);
           console.log(`[pipeline] Program ID written to ${target}`);
+
+          /* ----------------------------------------------------------
+           * The file change happens *after* the Next.js dev server
+           * is already running inside the container.  Restart once
+           * so the server reloads the updated env vars.
+           * --------------------------------------------------------- */
+          try {
+            await runCommand(
+              `docker restart ${workspace.containerName}`,
+              ".",                    // run from repo root
+              uuidv4(),               // fresh task-ID
+              { skipSuccessUpdate: true }   // don't spam progress
+            );
+            console.log(
+              `[pipeline] Restarted container ${workspace.containerName} to reload env vars`
+            );
+          } catch (restartErr) {
+            console.warn(
+              `[pipeline] Could not restart container: ${restartErr}`
+            );
+          }
         } catch (envErr) {
           console.warn(`[pipeline] Failed to write .env(.local): ${envErr}`);
         }
