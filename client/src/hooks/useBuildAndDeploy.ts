@@ -57,7 +57,8 @@ export function useBuildAndDeploy() {
                   projectState: {
                     ...prev.details!.projectState,
                     built: true,
-                    deployed: false
+                    deployed: false,
+                    programId: null
                   }
                 }
               }));
@@ -108,7 +109,6 @@ export function useBuildAndDeploy() {
           projectState: {
             ...prev.details!.projectState,
             deployed: true,
-            built: false,
             programId
           }
         }

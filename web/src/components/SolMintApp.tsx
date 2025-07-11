@@ -61,6 +61,28 @@ export default function SolMintApp() {
     return () => window.removeEventListener("message", handler)
   }, [])
 
+  /* Also try to get program ID from localStorage projectContext */
+  useEffect(() => {
+    if (!isBrowserEnv) return
+    try {
+      const stored = localStorage.getItem('projectContext')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        const contextProgramId = parsed?.details?.projectState?.programId || parsed?.details?.programId
+        if (contextProgramId && typeof contextProgramId === 'string') {
+          // Only update if we found a valid program ID and it's different from current
+          if (contextProgramId !== PROGRAM_ID) {
+            console.log("[SolMintApp] Found Program ID in localStorage:", contextProgramId)
+            window.localStorage.setItem("programId", contextProgramId)
+            setPROGRAM_ID(contextProgramId)
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[SolMintApp] Error reading projectContext from localStorage:", err)
+    }
+  }, [PROGRAM_ID])
+
   /* ---------- runtime helpers ---------- */
   const isBrowser    = typeof window !== "undefined";
   const isStandalone = isBrowser && window.parent === window;   // running top‑level, *not* inside iframe
