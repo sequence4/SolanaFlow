@@ -42,6 +42,7 @@ export interface ProjectStateType {
 export interface ProjectDetailsType {
   projectState: ProjectStateType;
   setProjectState: (stateUpdater: ProjectStateUpdater) => void;
+  programId?: string | null;  // Add programId to the details level
 }
 
 export interface ProjectContextType {
