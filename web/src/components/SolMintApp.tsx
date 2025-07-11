@@ -328,16 +328,6 @@ export default function SolMintApp() {
 
       console.log("[DEBUG] idl.metadata.address AFTER patch =", (idl as any).metadata?.address)
       
-      /* ─────── ENSURE IDL HAS PROGRAM ADDRESS ─────── */
-      if (!(idl as any).metadata?.address) {
-        idl = {
-          ...idl,
-          metadata: { ...((idl as any).metadata ?? {}), address: PROGRAM_ID },
-        } as any
-      }
-      // Anchor ≥0.31 also checks a top-level `address` field:
-      ;(idl as any).address = PROGRAM_ID
-
       // Create program instance (Anchor ≥0.31 signature)
       const program = new anchor.Program(idl as AnchorIdl, provider)
       console.log("[DEBUG] program.programId =", program.programId.toBase58())
@@ -369,10 +359,10 @@ export default function SolMintApp() {
       // Generate a new Keypair for the token mint account
       const mintAccount = Keypair.generate()
       console.log("[DEBUG] new mintAccount.publicKey =", mintAccount.publicKey.toBase58())
-      // Decimals handling with explicit BN + log
-      const decimalsBN = new BN(initMintForm.decimals)
-      console.log("[DEBUG] decimals (raw) =", initMintForm.decimals)
-      console.log("[DEBUG] decimalsBN =", decimalsBN.toString())
+              // Decimals handling as plain number
+        const decimals = initMintForm.decimals | 0  // force integer
+        console.log("[DEBUG] decimals (raw) =", initMintForm.decimals)
+        console.log("[DEBUG] decimals (integer) =", decimals)
 
       console.log("[DEBUG] Accounts passed to initializeMint", {
         payer: publicKey.toBase58(),
@@ -383,7 +373,7 @@ export default function SolMintApp() {
       })
 
       const txSig = await program.methods
-        .initializeMint(decimalsBN, mintAuthorityPubkey)
+        .initializeMint(decimals, mintAuthorityPubkey)
         .accounts({
           payer: publicKey,
           tokenMint: mintAccount.publicKey,
@@ -489,16 +479,6 @@ export default function SolMintApp() {
 
       console.log("[DEBUG] idl.metadata.address AFTER patch =", (idl as any).metadata?.address)
       
-      /* ─────── ENSURE IDL HAS PROGRAM ADDRESS ─────── */
-      if (!(idl as any).metadata?.address) {
-        idl = {
-          ...idl,
-          metadata: { ...((idl as any).metadata ?? {}), address: PROGRAM_ID },
-        } as any
-      }
-      // Anchor ≥0.31 also checks a top-level `address` field:
-      ;(idl as any).address = PROGRAM_ID
-
       // Create program instance (Anchor ≥0.31 signature)
       const program = new anchor.Program(idl as AnchorIdl, provider)
       // Mint authority must match the one set during initialization
@@ -518,8 +498,11 @@ export default function SolMintApp() {
           createAssociatedTokenAccountInstruction(publicKey, ata, destinationPubkey, mintPubKey)
         )
       }
-      // Call mint_to instruction on the Anchor program using fluent methods API
-      const amountBN = new BN(mintTokenForm.amount)
+              // Call mint_to instruction on the Anchor program using fluent methods API
+        if (!/^\d+$/.test(mintTokenForm.amount)) {
+          throw new Error("Amount must be a positive integer")
+        }
+        const amountBN = new BN(mintTokenForm.amount)
       const txSig = await program.methods
         .mintTo(amountBN)
         .accounts({
