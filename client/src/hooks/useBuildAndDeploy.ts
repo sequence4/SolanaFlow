@@ -58,7 +58,7 @@ export function useBuildAndDeploy() {
                     ...prev.details!.projectState,
                     built: true,
                     deployed: false,
-                    programId: null
+                    programId: undefined
                   }
                 }
               }));
