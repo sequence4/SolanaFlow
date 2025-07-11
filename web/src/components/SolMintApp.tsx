@@ -106,9 +106,16 @@ export default function SolMintApp() {
     if (!isBrowserEnv) return
     
     const handler = (e: MessageEvent) => {
+      /* ↳ parent-iframe handshake */
       if (e.data?.type === "PROGRAM_ID" && e.data.programId) {
         window.localStorage.setItem("programId", e.data.programId)
         setPROGRAM_ID(e.data.programId)
+
+      /* ↳ SSE → window.postMessage bridge from runDeployPipeline:
+         { event: "ephemeralKey", pubkey: <PROGRAM_ID> }                */
+      } else if (e.data?.event === "ephemeralKey" && e.data.pubkey) {
+        window.localStorage.setItem("programId", e.data.pubkey)
+        setPROGRAM_ID(e.data.pubkey)
       }
     }
     
@@ -121,6 +128,18 @@ export default function SolMintApp() {
     }
     
     return () => window.removeEventListener("message", handler)
+  }, [])
+
+  /* ───────── reflect localStorage updates coming from other tabs or after
+     the dev-server restarts (build pipeline rewrites web/.env) ───────── */
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "programId" && e.newValue) {
+        setPROGRAM_ID(e.newValue)
+      }
+    }
+    window.addEventListener("storage", onStorage)
+    return () => window.removeEventListener("storage", onStorage)
   }, [])
 
   /* Also try to get program ID from localStorage projectContext */
