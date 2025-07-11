@@ -319,11 +319,18 @@ export default function SolMintApp() {
 
       console.log("[DEBUG] idl.metadata.address AFTER patch =", (idl as any).metadata?.address)
       
-      // Create program instance with the correct signature
-      // Signature: new Program(idl, programId, provider)
-      // This works for both on‑chain IDLs (which include metadata.address)
-      // and the bundled fallback file (which usually does not).
-      const program = new anchor.Program(idl, provider)
+      /* ─────── ENSURE IDL HAS PROGRAM ADDRESS ─────── */
+      if (!(idl as any).metadata?.address) {
+        idl = {
+          ...idl,
+          metadata: { ...((idl as any).metadata ?? {}), address: PROGRAM_ID },
+        } as any
+      }
+      // Anchor ≥0.31 also checks a top-level `address` field:
+      ;(idl as any).address = PROGRAM_ID
+
+      // Create program instance (Anchor ≥0.31 signature)
+      const program = new anchor.Program<typeof solMintIdl>(idl as any, provider)
       console.log("[DEBUG] program.programId =", program.programId.toBase58())
       // Determine mint authority (use wallet if none provided)
       // ─────── MINT AUTHORITY VALIDATION ───────
@@ -473,8 +480,18 @@ export default function SolMintApp() {
 
       console.log("[DEBUG] idl.metadata.address AFTER patch =", (idl as any).metadata?.address)
       
-      // Same fix in the mint‑token path with correct argument order
-      const program = new anchor.Program(idl, provider)
+      /* ─────── ENSURE IDL HAS PROGRAM ADDRESS ─────── */
+      if (!(idl as any).metadata?.address) {
+        idl = {
+          ...idl,
+          metadata: { ...((idl as any).metadata ?? {}), address: PROGRAM_ID },
+        } as any
+      }
+      // Anchor ≥0.31 also checks a top-level `address` field:
+      ;(idl as any).address = PROGRAM_ID
+
+      // Create program instance (Anchor ≥0.31 signature)
+      const program = new anchor.Program<typeof solMintIdl>(idl as any, provider)
       // Mint authority must match the one set during initialization
       const mintAuthorityPubkey = initMintForm.mintAuthority
         ? new PublicKey(initMintForm.mintAuthority)
