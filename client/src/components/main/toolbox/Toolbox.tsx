@@ -175,8 +175,11 @@ export const Toolbox = () => {
             
             if (msg.containerUrl) {
               console.log(`[BUILD] Received container URL: ${msg.containerUrl}`);
-              containerURLRef.current = msg.containerUrl;
-              setProjectContext(prev => ({ ...prev, containerUrl: msg.containerUrl }));
+              const fullUrl = msg.containerUrl.includes("/dapp/")
+                ? msg.containerUrl
+                : msg.containerUrl.replace(/\/$/, "") + `/dapp/${projectId}`;
+              containerURLRef.current = fullUrl;
+              setProjectContext(prev => ({ ...prev, containerUrl: fullUrl }));
             }
             
             if (IS_DEV_SERVER && (msg.stage === "ui-complete" || msg.event === "ui-complete")) {

@@ -372,7 +372,7 @@ const Interface = () => {
             try {
                 const res = await fetch(`/api/projects/${projectId}/local-port`);
                 const { hostPort } = await res.json();          // backend returns {"hostPort":32776}
-                if (hostPort) setManualUrl(`http://localhost:${hostPort}`);
+                if (hostPort) setManualUrl(`http://localhost:${hostPort}/dapp/${projectId}`);
             } catch (e) {
                 console.warn("[Interface] WSL auto-port probe failed:", e);
             }
