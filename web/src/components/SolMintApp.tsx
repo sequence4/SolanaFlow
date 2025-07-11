@@ -23,6 +23,15 @@ import {
   createCreateMetadataAccountV3Instruction
 } from "@metaplex-foundation/mpl-token-metadata"
 
+// Define extended IDL type with required address property
+type AnchorIdl = anchor.Idl & { 
+  address?: string;
+  metadata?: { 
+    address?: string;
+    [key: string]: any;
+  };
+};
+
 const { BN } = anchor
 
 /* -------------------------------------------------------------------- *
@@ -330,7 +339,7 @@ export default function SolMintApp() {
       ;(idl as any).address = PROGRAM_ID
 
       // Create program instance (Anchor ≥0.31 signature)
-      const program = new anchor.Program<typeof solMintIdl>(idl as any, provider)
+      const program = new anchor.Program(idl as AnchorIdl, provider)
       console.log("[DEBUG] program.programId =", program.programId.toBase58())
       // Determine mint authority (use wallet if none provided)
       // ─────── MINT AUTHORITY VALIDATION ───────
@@ -491,7 +500,7 @@ export default function SolMintApp() {
       ;(idl as any).address = PROGRAM_ID
 
       // Create program instance (Anchor ≥0.31 signature)
-      const program = new anchor.Program<typeof solMintIdl>(idl as any, provider)
+      const program = new anchor.Program(idl as AnchorIdl, provider)
       // Mint authority must match the one set during initialization
       const mintAuthorityPubkey = initMintForm.mintAuthority
         ? new PublicKey(initMintForm.mintAuthority)
