@@ -46,18 +46,71 @@ export default function SolMintApp() {
   const { toast } = useToast()
 
   /* ---------- dynamic Program ID ---------- */
-  const [PROGRAM_ID, setPROGRAM_ID] = useState<string>(initProgramId())
+  const [PROGRAM_ID, setPROGRAM_ID] = useState<string>(() => {
+    let pid = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+    if (typeof window !== "undefined") {
+      // 1. First check URL query parameter
+      const params = new URLSearchParams(window.location.search);
+      const paramPid = params.get("pid");
+      if (paramPid) {
+        pid = paramPid;
+        // Store for future use
+        window.localStorage.setItem("programId", paramPid);
+      } else {
+        // 2. Then check localStorage directly
+        const storedPid = window.localStorage.getItem("programId");
+        if (storedPid) {
+          pid = storedPid;
+        } else {
+          // 3. Then check projectContext in localStorage
+          const projectCtxStr = window.localStorage.getItem("projectContext");
+          if (projectCtxStr) {
+            try {
+              const projectData = JSON.parse(projectCtxStr);
+              const ctxPid = projectData?.details?.projectState?.programId || 
+                            projectData?.details?.programId;
+              if (ctxPid) {
+                pid = ctxPid;
+                // Store for future use
+                window.localStorage.setItem("programId", ctxPid);
+              }
+            } catch (e) {
+              console.error("Failed to parse projectContext from localStorage", e);
+            }
+          }
+          // 4. Finally, check environment variable
+          if (pid === "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" && process.env.NEXT_PUBLIC_PROGRAM_ID) {
+            pid = process.env.NEXT_PUBLIC_PROGRAM_ID;
+            // Store for future use
+            if (typeof window !== "undefined") {
+              window.localStorage.setItem("programId", pid);
+            }
+          }
+        }
+      }
+    }
+    return pid;
+  });
 
   /* listen for updates pushed by the parent iframe host */
   useEffect(() => {
     if (!isBrowserEnv) return
+    
     const handler = (e: MessageEvent) => {
       if (e.data?.type === "PROGRAM_ID" && e.data.programId) {
         window.localStorage.setItem("programId", e.data.programId)
         setPROGRAM_ID(e.data.programId)
       }
     }
+    
     window.addEventListener("message", handler)
+    
+    // Request Program ID from parent if we're in an iframe
+    if (window.self !== window.parent) {
+      console.log("[SolMintApp] Requesting Program ID from parent");
+      window.parent.postMessage({ type: "REQUEST_PROGRAM_ID" }, "*");
+    }
+    
     return () => window.removeEventListener("message", handler)
   }, [])
 

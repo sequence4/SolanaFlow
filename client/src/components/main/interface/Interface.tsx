@@ -253,6 +253,55 @@ const Interface = () => {
         return () => window.removeEventListener("message", handleIframeMsg);
     }, [connected, connect]);
 
+    /* ───────── parent ⇒ iframe : handle Program ID requests ───────── */
+    useEffect(() => {
+        const handleProgramIdRequest = (event: MessageEvent) => {
+            // Skip messages not from our iframe
+            if (event.source !== iframeRef.current?.contentWindow) return;
+            
+            // Handle Program ID request
+            if (event.data?.type === "REQUEST_PROGRAM_ID") {
+                console.log("[Interface] Received Program ID request from iframe");
+                
+                // Determine the best Program ID to send
+                const currentPid = projectContext.details?.projectState?.programId || 
+                                  projectContext.details?.programId;
+                const envPid = process.env.NEXT_PUBLIC_PROGRAM_ID;
+                const replyPid = currentPid && currentPid !== "" ? currentPid :
+                               envPid && envPid !== "" ? envPid :
+                               "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+                
+                // Send the Program ID back to the iframe
+                if (event.source) {
+                    event.source.postMessage(
+                        { type: "PROGRAM_ID", programId: replyPid },
+                        "*" // In production, use a specific origin
+                    );
+                    console.log("[Interface] Sent Program ID to iframe:", replyPid);
+                }
+            }
+        };
+        
+        window.addEventListener("message", handleProgramIdRequest);
+        return () => window.removeEventListener("message", handleProgramIdRequest);
+    }, [projectContext.details]);
+
+    /* ───────── parent ⇒ iframe : push Program ID when it changes ───────── */
+    useEffect(() => {
+        if (!iframeRef.current?.contentWindow) return;
+        
+        const programId = projectContext.details?.projectState?.programId || 
+                         projectContext.details?.programId;
+        
+        if (programId && programId !== "") {
+            console.log("[Interface] Proactively sending updated Program ID to iframe:", programId);
+            iframeRef.current.contentWindow.postMessage(
+                { type: "PROGRAM_ID", programId },
+                "*" // In production, use a specific origin
+            );
+        }
+    }, [projectContext.details?.projectState?.programId, projectContext.details?.programId]);
+
     const handleRefreshContainerUrl = async () => {
         if (!projectId || isRefreshing) return;
         
