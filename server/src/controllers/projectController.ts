@@ -722,6 +722,9 @@ export const deployProjectEphemeral = async (
                     `else echo 'NEXT_PUBLIC_PROGRAM_ID=${programId}' >> ${envPath}; fi`;
                   await runCommand(`docker exec ${containerName} bash -c "${updateCmd}"`, '.', uuidv4());
                   console.log(`[DEPLOY_EPHEMERAL] Updated .env with Program ID ${programId}`);
+                  // Restart the container to ensure the Next.js server loads the new env variable
+                  await runCommand(`docker restart ${containerName}`, '.', uuidv4());
+                  console.log(`[DEPLOY_EPHEMERAL] Restarted container ${containerName} to apply new Program ID`);
                 }
               } catch (err) {
                 console.error('[DEPLOY_EPHEMERAL] Could not write Program ID to .env:', err);
@@ -1061,6 +1064,21 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
     const resultJson = JSON.stringify({ status: 'success', programId });
     await updateTaskStatus(taskId, 'succeed', resultJson);
     console.log(`[RELAY_SIGNED_TX] Program ${programId} deployed successfully for project ${id}`);
+    
+    // Restart container so Next.js picks up the new Program ID
+    const { rows: [proj] } = await pool.query(
+      'SELECT container_name FROM solanaproject WHERE id = $1',
+      [id]
+    );
+    if (proj && proj.container_name) {
+      try {
+        await runCommand(`docker restart ${proj.container_name}`, '.', uuidv4());
+        console.log(`[RELAY_SIGNED_TX] Restarted container ${proj.container_name} to load new Program ID`);
+      } catch (err) {
+        console.error(`[RELAY_SIGNED_TX] Failed to restart container ${proj.container_name}:`, err);
+      }
+    }
+    
     res.status(200).json({ signature: txSignature, programId });
     return;
   } catch (error: any) {
