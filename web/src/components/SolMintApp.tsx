@@ -25,10 +25,41 @@ import {
 
 const { BN } = anchor
 
+/* -------------------------------------------------------------------- *
+ * Resolve Program ID at runtime (postMessage → localStorage → env → fallback)
+ * -------------------------------------------------------------------- */
+const FALLBACK_PID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+const isBrowserEnv = typeof window !== "undefined"
+
+function initProgramId(): string {
+  if (!isBrowserEnv) return process.env.NEXT_PUBLIC_PROGRAM_ID ?? FALLBACK_PID
+  return (
+    window.localStorage.getItem("programId") ??
+    process.env.NEXT_PUBLIC_PROGRAM_ID ??
+    FALLBACK_PID
+  )
+}
+
 export default function SolMintApp() {
   const { publicKey, connected, signTransaction, signAllTransactions } = useWallet()
   const { theme, setTheme } = useTheme()
   const { toast } = useToast()
+
+  /* ---------- dynamic Program ID ---------- */
+  const [PROGRAM_ID, setPROGRAM_ID] = useState<string>(initProgramId())
+
+  /* listen for updates pushed by the parent iframe host */
+  useEffect(() => {
+    if (!isBrowserEnv) return
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === "PROGRAM_ID" && e.data.programId) {
+        window.localStorage.setItem("programId", e.data.programId)
+        setPROGRAM_ID(e.data.programId)
+      }
+    }
+    window.addEventListener("message", handler)
+    return () => window.removeEventListener("message", handler)
+  }, [])
 
   /* ---------- runtime helpers ---------- */
   const isBrowser    = typeof window !== "undefined";
@@ -93,8 +124,6 @@ export default function SolMintApp() {
     mintToken: "",
     metadata: "",
   })
-
-  const PROGRAM_ID = process.env.NEXT_PUBLIC_PROGRAM_ID || "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 
   // State to store the created mint's public key for later use
   const [mintPubKey, setMintPubKey] = useState<PublicKey | null>(null)

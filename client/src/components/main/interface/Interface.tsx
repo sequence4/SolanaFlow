@@ -215,6 +215,18 @@ const Interface = () => {
         }
     }, [connected, publicKey]);
 
+    /* ───────── parent ⇒ iframe : push Program ID if available ───────── */
+    useEffect(() => {
+        if (!iframeRef.current?.contentWindow) return;
+        if (projectContext.details?.programId) {
+            iframeRef.current.contentWindow.postMessage(
+                { type: "PROGRAM_ID", programId: projectContext.details.programId },
+                "*"
+            );
+            console.log("[Interface] Sent Program ID to iframe:", projectContext.details.programId);
+        }
+    }, [projectContext.details?.programId, iframeKey]);
+
     /* ───────── parent ⇒ iframe : push IDL(s) once we have them ───────── */
     useEffect(() => {
         if (!iframeRef.current?.contentWindow) return;
