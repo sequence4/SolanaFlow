@@ -235,8 +235,15 @@ export async function runDeployPipeline({
     ];
     const tomlFile  = `/usr/src/${projectFolder}/Anchor.toml`;
 
-    // copy artefacts into the task-file cache
-    await readContainerFile(workspace.containerName, deployDir, projectId, userId);
+    // copy only the actual files (directory → ENOTFILE)
+    for (const file of [`${programName}.so`, `${programName}-keypair.json`]) {
+      await readContainerFile(
+        workspace.containerName,
+        path.posix.join(deployDir, file),
+        projectId,
+        userId
+      );
+    }
     await readContainerFile(workspace.containerName, tomlFile,  projectId, userId);
     for (const d of idlDirs) {
       try { await readContainerFile(workspace.containerName, d, projectId, userId); }
@@ -251,7 +258,7 @@ export async function runDeployPipeline({
       absRoot,
       "target",
       "deploy",
-      `${programName}-keypair.json`.replace(/-/g, "_")
+      `${programName}-keypair.json`
     );
     const secretKey = JSON.parse(await fs.readFile(keypairJson, "utf8")) as number[];
     const programId = new PublicKey(secretKey.slice(32)).toBase58();
