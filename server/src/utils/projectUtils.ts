@@ -9,7 +9,7 @@ import { normalizeProjectName } from './stringUtils';
 import pool from 'src/config/database';
 import { pruneContainerResources } from './container/pruneContainer';
 import { startProjectContainer } from './container/startProjectContainer';
-import { Connection, sendAndConfirmRawTransaction } from '@solana/web3.js';
+import { Connection, sendAndConfirmRawTransaction, Keypair } from '@solana/web3.js';
 import { spawn, SpawnOptions } from 'child_process';
 
 //const USER_WORKSPACE_IMAGE = "ghcr.io/sequence4/solanaflow:latest";
@@ -251,7 +251,7 @@ function transformRootPath(rootPath: string): string {
   return rootPath.replace(/-/g, '_');
 }
 
-export const getBuildArtifactTask = async (projectId: string): Promise<{ status: string, base64So: string }> => {
+export const getBuildArtifactTask = async (projectId: string): Promise<{ status: string, base64So: string, programId?: string, programKeypair?: string }> => {
   try {
     const rootPath = await getProjectRootPath(projectId);
     
@@ -283,7 +283,26 @@ export const getBuildArtifactTask = async (projectId: string): Promise<{ status:
     
     console.log(`[ARTIFACT] ✓ Successfully encoded .so file to base64 (${base64So.length} bytes)`);
     
-    return { status: 'success', base64So };
+    // Find the program keypair JSON file and extract program ID
+    const locateJsonCmd = `docker exec ${containerName} bash -c 'cd /usr/src/${rootPath} && JSON_DIR="\${CARGO_TARGET_DIR:-target}/deploy" && find "$JSON_DIR" -maxdepth 1 -name "*-keypair.json" | head -n 1'`;
+    const containerKeypairPath = (await runCommand(locateJsonCmd, '.', tempTaskId, { skipSuccessUpdate: true })).trim();
+    if (!containerKeypairPath) {
+      console.error('[ARTIFACT] ❌  No keypair json found');
+      throw new Error('Program keypair not found in container');
+    }
+    console.log(`[ARTIFACT] ✓ Found keypair file at ${containerKeypairPath}, reading...`);
+    const keypairJson = await runCommand(`docker exec ${containerName} bash -c "cat '${containerKeypairPath}'"`, '.', tempTaskId, { skipSuccessUpdate: true });
+    let programId = "";
+    try {
+      const secretKeyBytes = JSON.parse(keypairJson.trim());
+      const keypair = Keypair.fromSecretKey(Uint8Array.from(secretKeyBytes));
+      programId = keypair.publicKey.toBase58();
+      console.log(`[ARTIFACT] ✓ Extracted Program ID ${programId} from keypair`);
+    } catch (e) {
+      console.error('[ARTIFACT] Failed to parse keypair or derive programId:', e);
+    }
+    
+    return { status: 'success', base64So, programId, programKeypair: keypairJson.trim() };
   } catch (error) {
     console.error('[ARTIFACT] Error retrieving built artifact:', error);
     return { status: 'failed', base64So: '' };

@@ -36,7 +36,8 @@ export async function deployUpgradeableProgramServer(
   phantomPublicKey: PublicKey,
   signAndSendTransaction: (tx: Transaction, signers?: Keypair[]) => Promise<string>,
   programData: Buffer,
-  deployControlOption: 'fullWallet' | 'delegated' = 'delegated'
+  deployControlOption: 'fullWallet' | 'delegated' = 'delegated',
+  programKeypairParam?: Keypair
 ): Promise<PublicKey> {
   console.log('calling deployUpgradeableProgramServer');
 
@@ -210,7 +211,7 @@ export async function deployUpgradeableProgramServer(
     console.log('Current buffer authority is:', bufferAuthority2?.toBase58());
   }
 
-  const programKeypair = Keypair.generate(); 
+  const programKeypair = programKeypairParam ?? Keypair.generate(); 
   console.log('programKeypair', programKeypair);
 
   const [programDataAddress] = PublicKey.findProgramAddressSync(
@@ -907,16 +908,28 @@ export const handleDeployProgram = async (
             return;
           }
         } else {
+          // Full wallet deployment: use program keypair from container build if available
+          let programKeypair: Keypair | undefined;
+          if (buildArtifact.programKeypair) {
+            try {
+              const secretKey = JSON.parse(buildArtifact.programKeypair);
+              programKeypair = Keypair.fromSecretKey(Uint8Array.from(secretKey));
+              console.log('Using program keypair from container build. Program ID:', programKeypair.publicKey.toBase58());
+            } catch (e) {
+              console.error('Failed to parse program keypair from build artifact:', e);
+            }
+          }
           const programKey = await deployUpgradeableProgramServer(
             connection,
             walletPublicKey,
             signAndSendTransaction,
             programData,
-            deployControlOption
+            deployControlOption,
+            programKeypair
           );
           console.log('program deployed to:', programKey.toBase58());
           
-          // Update project context with program ID and deployed flag
+          // Update project context with deployed program ID
           setProjectContext(prev => ({
             ...prev,
             details: prev.details ? {
