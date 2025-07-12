@@ -275,8 +275,8 @@ export const Toolbox = () => {
     ]);
     
     const handleDeploySuccess = useCallback((programId: string) => {
-        // Update project context with deployed status and program ID
         if (projectContext.details?.projectState) {
+            // Update local project context with new deployed program ID
             const updatedContext = {
                 ...projectContext,
                 details: {
@@ -285,10 +285,15 @@ export const Toolbox = () => {
                         ...projectContext.details.projectState,
                         deployed: true,
                         built: false,    // reset built flag so next deploy requires a rebuild
-                        programId
+                        programId: programId
                     }
                 }
             };
+            // Append programId query param to container URL for dApp iframe
+            if (projectContext.containerUrl) {
+                const sep = projectContext.containerUrl.includes('?') ? '&' : '?';
+                updatedContext.containerUrl = `${projectContext.containerUrl}${sep}programId=${programId}`;
+            }
             setProjectContext(updatedContext);
             
             // Persist the updated state to the server
@@ -298,7 +303,7 @@ export const Toolbox = () => {
                         projectState: { 
                             deployed: true,
                             built: false,
-                            programId
+                            programId: programId
                         }
                     }
                 }).catch(err => {

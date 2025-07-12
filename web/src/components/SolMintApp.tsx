@@ -68,7 +68,7 @@ export default function SolMintApp() {
   const { publicKey, connected, signTransaction, signAllTransactions } = useWallet()
   const { theme, setTheme } = useTheme()
   const { toast } = useToast()
-
+  
   /* ---------- dynamic Program ID ---------- */
   const [PROGRAM_ID, setPROGRAM_ID] = useState<string>(() => {
     let pid = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
@@ -76,7 +76,7 @@ export default function SolMintApp() {
     if (typeof window !== "undefined") {
       // 1. First check URL query parameter
       const params = new URLSearchParams(window.location.search);
-      const paramPid = params.get("pid");
+      const paramPid = params.get("programId") || params.get("pid");
       if (paramPid) {
         pid = paramPid;
         dbg("Found pid in <query>", pid)
@@ -127,7 +127,7 @@ export default function SolMintApp() {
     
     const handler = (e: MessageEvent) => {
       /* ↳ parent-iframe handshake */
-      if (e.data?.type === "PROGRAM_ID" && e.data.programId) {
+      if (e.data?.type === "PROGRAM_ID" && e.data?.programId) {
         dbg("postMessage ← PROGRAM_ID", e.data.programId)
         window.localStorage.setItem("programId", e.data.programId)
         setPROGRAM_ID(e.data.programId)
