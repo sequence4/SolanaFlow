@@ -235,19 +235,19 @@ export async function runDeployPipeline({
     ];
     const tomlFile  = `/usr/src/${projectFolder}/Anchor.toml`;
 
-    // copy **only** the .so and keypair JSON we actually need
+    // ── NEW: copy only the files we really need ────────────────
     for (const file of [`${programName}.so`, `${programName}-keypair.json`]) {
       await readContainerFile(
         workspace.containerName,
-        path.posix.join(deployDir, file),
+        path.posix.join(deployDir, file),   // <-- stay inside the container
         projectId,
         userId
       );
     }
-    await readContainerFile(workspace.containerName, tomlFile,  projectId, userId);
+    await readContainerFile(workspace.containerName, tomlFile, projectId, userId);
     for (const d of idlDirs) {
       try { await readContainerFile(workspace.containerName, d, projectId, userId); }
-      catch { /* dir may not exist – that's fine */ }
+      catch { /* directory may not exist – fine */ }
     }
     
     await attachFileContents(rawTree, absRoot, workspace.containerName);
