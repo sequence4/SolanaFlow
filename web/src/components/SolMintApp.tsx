@@ -23,6 +23,21 @@ import {
   createCreateMetadataAccountV3Instruction
 } from "@metaplex-foundation/mpl-token-metadata"
 
+/* ───────────────────────────
+ *  Mini debug helper
+ *    – console.groupCollapsed with ts-safe ellipsis
+ *    – timestamps every call (Date.toISOString)
+ * ─────────────────────────── */
+function dbg(label: string, ...args: any[]) {
+  const ts = new Date().toISOString()
+  // Narrow stacks collapse nicely inside DevTools
+  /* eslint-disable no-console */
+  console.groupCollapsed(`[SolMintApp ${ts}] ${label}`)
+  args.forEach(a => console.log(a))
+  console.groupEnd()
+  /* eslint-enable  no-console */
+}
+
 // Define extended IDL type with required address property
 type AnchorIdl = anchor.Idl & { 
   address?: string;
@@ -57,12 +72,14 @@ export default function SolMintApp() {
   /* ---------- dynamic Program ID ---------- */
   const [PROGRAM_ID, setPROGRAM_ID] = useState<string>(() => {
     let pid = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+    dbg("State init → default PID", pid)
     if (typeof window !== "undefined") {
       // 1. First check URL query parameter
       const params = new URLSearchParams(window.location.search);
       const paramPid = params.get("pid");
       if (paramPid) {
         pid = paramPid;
+        dbg("Found pid in <query>", pid)
         // Store for future use
         window.localStorage.setItem("programId", paramPid);
       } else {
@@ -70,6 +87,7 @@ export default function SolMintApp() {
         const storedPid = window.localStorage.getItem("programId");
         if (storedPid) {
           pid = storedPid;
+          dbg("Found pid in localStorage(programId)", pid)
         } else {
           // 3. Then check projectContext in localStorage
           const projectCtxStr = window.localStorage.getItem("projectContext");
@@ -80,6 +98,7 @@ export default function SolMintApp() {
                             projectData?.details?.programId;
               if (ctxPid) {
                 pid = ctxPid;
+                dbg("Found pid in localStorage(projectContext)", ctxPid)
                 // Store for future use
                 window.localStorage.setItem("programId", ctxPid);
               }
@@ -90,6 +109,7 @@ export default function SolMintApp() {
           // 4. Finally, check environment variable
           if (pid === "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" && process.env.NEXT_PUBLIC_PROGRAM_ID) {
             pid = process.env.NEXT_PUBLIC_PROGRAM_ID;
+            dbg("Fell back to .env NEXT_PUBLIC_PROGRAM_ID", pid)
             // Store for future use
             if (typeof window !== "undefined") {
               window.localStorage.setItem("programId", pid);
@@ -108,12 +128,14 @@ export default function SolMintApp() {
     const handler = (e: MessageEvent) => {
       /* ↳ parent-iframe handshake */
       if (e.data?.type === "PROGRAM_ID" && e.data.programId) {
+        dbg("postMessage ← PROGRAM_ID", e.data.programId)
         window.localStorage.setItem("programId", e.data.programId)
         setPROGRAM_ID(e.data.programId)
 
       /* ↳ SSE → window.postMessage bridge from runDeployPipeline:
          { event: "ephemeralKey", pubkey: <PROGRAM_ID> }                */
       } else if (e.data?.event === "ephemeralKey" && e.data.pubkey) {
+        dbg("postMessage ← SSE ephemeralKey", e.data.pubkey)
         window.localStorage.setItem("programId", e.data.pubkey)
         setPROGRAM_ID(e.data.pubkey)
       }
@@ -124,6 +146,7 @@ export default function SolMintApp() {
     // Request Program ID from parent if we're in an iframe
     if (window.self !== window.parent) {
       console.log("[SolMintApp] Requesting Program ID from parent");
+      dbg("postMessage → REQUEST_PROGRAM_ID (iframe)")
       window.parent.postMessage({ type: "REQUEST_PROGRAM_ID" }, "*");
     }
     
@@ -135,6 +158,7 @@ export default function SolMintApp() {
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key === "programId" && e.newValue) {
+        dbg("storage event → programId updated", e.newValue)
         setPROGRAM_ID(e.newValue)
       }
     }
@@ -309,7 +333,10 @@ export default function SolMintApp() {
     setSuccessTx((prev) => ({ ...prev, metadata: "" }))
 
     try {
-      if (!publicKey || !connected) throw new Error("Wallet not connected")
+      if (!publicKey || !connected) {
+        dbg("InitializeMint abort – wallet not connected")
+        throw new Error("Wallet not connected")
+      }
       // ─────── RUNTIME ENV CHECK ───────
       console.log("[DEBUG] process.env.NEXT_PUBLIC_PROGRAM_ID =", process.env.NEXT_PUBLIC_PROGRAM_ID)
       console.log("[DEBUG] Hard-coded fallback PROGRAM_ID =", PROGRAM_ID)
@@ -323,7 +350,7 @@ export default function SolMintApp() {
       const provider = new anchor.AnchorProvider(connection, anchorWallet as anchor.Wallet, anchor.AnchorProvider.defaultOptions())
       anchor.setProvider(provider)
       const programIdKey = new PublicKey(PROGRAM_ID)
-      console.log("[DEBUG] programIdKey (PublicKey) =", programIdKey.toBase58())
+      dbg("ProgramIdKey", programIdKey.toBase58())
       // ① Try to pull the IDL from the on‑chain PDA …
       let idl = await anchor.Program.fetchIdl(programIdKey, provider)
       // ② … but fall back to the bundled JSON when it isn't there yet.
@@ -345,7 +372,7 @@ export default function SolMintApp() {
         console.warn("[IDL] Patched metadata.address to", PROGRAM_ID)
       }
 
-      console.log("[DEBUG] idl.metadata.address AFTER patch =", (idl as any).metadata?.address)
+      dbg("IDL patched metadata.address =", (idl as any).metadata?.address)
       
       // Create program instance (Anchor ≥0.31 signature)
       const program = new anchor.Program(idl as AnchorIdl, provider)
@@ -377,7 +404,7 @@ export default function SolMintApp() {
       }
       // Generate a new Keypair for the token mint account
       const mintAccount = Keypair.generate()
-      console.log("[DEBUG] new mintAccount.publicKey =", mintAccount.publicKey.toBase58())
+      dbg("Generated mint Keypair", mintAccount.publicKey.toBase58())
               // Decimals handling as plain number
         const decimals = initMintForm.decimals | 0  // force integer
         console.log("[DEBUG] decimals (raw) =", initMintForm.decimals)
@@ -391,6 +418,7 @@ export default function SolMintApp() {
         rent: anchor.web3.SYSVAR_RENT_PUBKEY.toBase58(),
       })
 
+      dbg("Calling initializeMint()", { decimals, mintAuthority: mintAuthorityPubkey.toBase58() })
       const txSig = await program.methods
         .initializeMint(decimals, mintAuthorityPubkey)
         .accounts({
@@ -405,6 +433,7 @@ export default function SolMintApp() {
       
       // Save mint public key for use in mintToken step
       setMintPubKey(mintAccount.publicKey)
+      dbg("initializeMint ➜ txSig", txSig)
       setSuccessTx((prev) => ({ ...prev, initMint: txSig }))
       toast({
         title: "Mint Initialized!",
@@ -448,7 +477,7 @@ export default function SolMintApp() {
         }
       }
     } catch (error) {
-      console.error("InitializeMint error:", error)
+      dbg("InitializeMint ‼️ error", error)
       setErrors((prev) => ({ ...prev, initMint: "Failed to initialize mint. Please try again." }))
       toast({
         title: "Error",
@@ -457,6 +486,7 @@ export default function SolMintApp() {
       })
     } finally {
       setLoading((prev) => ({ ...prev, initMint: false }))
+      dbg("handleInitializeMint() finished")
     }
   }
 
@@ -465,7 +495,10 @@ export default function SolMintApp() {
     setErrors((prev) => ({ ...prev, mintToken: "" }))
 
     try {
-      if (!publicKey || !connected) throw new Error("Wallet not connected")
+      if (!publicKey || !connected) {
+        dbg("MintToken abort – wallet not connected")
+        throw new Error("Wallet not connected")
+      }
       if (!mintPubKey) throw new Error("Mint not initialized")
       // Set up Anchor provider and program (reuse connection and wallet)
       const connection = new anchor.web3.Connection(anchor.web3.clusterApiUrl("devnet"), "confirmed")
@@ -522,6 +555,7 @@ export default function SolMintApp() {
           throw new Error("Amount must be a positive integer")
         }
         const amountBN = new BN(mintTokenForm.amount)
+      dbg("Calling mintTo()", { amount: mintTokenForm.amount })
       const txSig = await program.methods
         .mintTo(amountBN)
         .accounts({
@@ -533,13 +567,14 @@ export default function SolMintApp() {
         .preInstructions(preIx)
         .rpc()
       
+      dbg("mintTo ➜ txSig", txSig)
       setSuccessTx((prev) => ({ ...prev, mintToken: txSig }))
       toast({
         title: "Tokens Minted!",
         description: `Successfully minted ${mintTokenForm.amount} tokens.`,
       })
     } catch (error) {
-      console.error("MintToken error:", error)
+      dbg("MintToken ‼️ error", error)
       setErrors((prev) => ({
         ...prev,
         mintToken: (error as Error).message.includes("Mint not initialized")
@@ -553,6 +588,7 @@ export default function SolMintApp() {
       })
     } finally {
       setLoading((prev) => ({ ...prev, mintToken: false }))
+      dbg("handleMintToken() finished")
     }
   }
 
