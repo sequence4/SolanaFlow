@@ -235,7 +235,7 @@ export async function runDeployPipeline({
     ];
     const tomlFile  = `/usr/src/${projectFolder}/Anchor.toml`;
 
-    // copy only the actual files (directory → ENOTFILE)
+    // copy **only** the .so and keypair JSON we actually need
     for (const file of [`${programName}.so`, `${programName}-keypair.json`]) {
       await readContainerFile(
         workspace.containerName,
