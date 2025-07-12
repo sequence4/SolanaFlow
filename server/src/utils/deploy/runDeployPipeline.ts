@@ -109,7 +109,7 @@ export async function runDeployPipeline({
       message: "Generating Anchor code…"
     });
     sendProgress({ stage: "code-gen", message: "Generating Anchor code…" });
-    const { sentinelId } =
+    const { sentinelId, programName } =
           await handleGenerateCode({ projectId, graph, workspace, sendProgress, userId });
 
     /* 3 ─ build program --------------------------------------------------- */
@@ -248,7 +248,10 @@ export async function runDeployPipeline({
 
     /* derive programId once – used for IDL patch & env file */
     const keypairJson = path.join(
-      absRoot, "target", "deploy", `${programName}-keypair.json`.replace(/-/g, "_")
+      absRoot,
+      "target",
+      "deploy",
+      `${programName}-keypair.json`.replace(/-/g, "_")
     );
     const secretKey = JSON.parse(await fs.readFile(keypairJson, "utf8")) as number[];
     const programId = new PublicKey(secretKey.slice(32)).toBase58();

@@ -146,7 +146,7 @@ export const handleGenerateCode = async ({
   workspace,
   sendProgress,
   userId,
-}: Args): Promise<{ sentinelId: string }> => {   
+}: Args): Promise<{ sentinelId: string; programName: string }> => {   
     /* Dev-mode flag set by dev.sh or CI: container already runs `next dev` */
     const isDevServer = process.env.SF_DEV_SERVER === '1';
 
@@ -407,8 +407,8 @@ EOF'`,
 
         // ───────────────────────── write graph-derived Rust sources ──────────────
         // For now, assume a basic program structure exists or will be created
-        // TODO: implement findProgramsDirectory and initAnchorProject when available
-        const programName = 'my_program'; // TODO: derive from project context
+        // TODO: derive from project context (graph / UI prompt) instead of hard-coded default
+        const programName = 'my_program';
         // Generate a new program keypair for this build
         const newKeypair = Keypair.generate();
         const programId = newKeypair.publicKey.toBase58();
@@ -560,7 +560,7 @@ EOF'`,
         }
         
         // ─── end of function ────────────────────────────────
-        return { sentinelId };            // ← NEW
+        return { sentinelId, programName };
     } catch (err) {
         console.error('Error in handleGenerateCode:', err);
         throw err;
