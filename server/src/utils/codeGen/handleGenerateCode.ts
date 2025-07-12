@@ -423,6 +423,7 @@ EOF'`,
         // Copy keypair to the container for Anchor to use during deploy
         const containerKeyPath = `/usr/src/${workspace.rootPath}/target/deploy/${programName}-keypair.json`;
         await runCommand(`docker exec ${workspace.containerName} bash -c 'mkdir -p /usr/src/${workspace.rootPath}/target/deploy'`, '.', projectId, { skipSuccessUpdate: true });
+        await runCommand(`docker exec ${workspace.containerName} bash -c '[ ! -e /usr/src/${workspace.rootPath}/target/idl ] && ln -sfnT /usr/src/${workspace.rootPath}/target/deploy /usr/src/${workspace.rootPath}/target/idl || true'`, '.', projectId, { skipSuccessUpdate: true });
         await runCommand(`docker cp ${walletPath} ${workspace.containerName}:${containerKeyPath}`, '.', projectId, { skipSuccessUpdate: true });
         // Inform client about the program ID for early access
         sendProgress({ event: 'ephemeralKey', pubkey: programId });

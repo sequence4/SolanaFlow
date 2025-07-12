@@ -168,7 +168,8 @@ export async function runDeployPipeline({
         'rm -rf target/deploy',                // remove accidental dir, if any
         'mkdir -p target',
         // -T treats DEST as a file so ln never creates "deploy/deploy"
-        'ln -sfnT /usr/src/target/deploy target/deploy'
+        'ln -sfnT /usr/src/target/deploy target/deploy',
+        '[ ! -e target/idl ] && ln -sfnT /usr/src/target/deploy target/idl || true'
       ].join(" && ");
 
       // Generate a unique task ID for the symlink command
@@ -228,19 +229,31 @@ export async function runDeployPipeline({
       (await import("../fileUtils").then(m => m.getProjectRootPath(projectId)));
 
     const deployDir = `/usr/src/${projectFolder}/target/deploy`;
-    const idlDir    = `/usr/src/${projectFolder}/target/idl`;
+    const idlDirs   = [
+      `/usr/src/${projectFolder}/target/idl`,       // classic location
+      `/usr/src/${projectFolder}/target/deploy`,    // Anchor ≥0.30 drops JSON here
+    ];
     const tomlFile  = `/usr/src/${projectFolder}/Anchor.toml`;
 
     // copy artefacts into the task-file cache
     await readContainerFile(workspace.containerName, deployDir, projectId, userId);
     await readContainerFile(workspace.containerName, tomlFile,  projectId, userId);
-    await readContainerFile(workspace.containerName, idlDir,    projectId, userId);
+    for (const d of idlDirs) {
+      try { await readContainerFile(workspace.containerName, d, projectId, userId); }
+      catch { /* dir may not exist – that's fine */ }
+    }
     
     await attachFileContents(rawTree, absRoot, workspace.containerName);
     const fileTree = rawTree;  // now populated
 
-    /* finally emit build-done with artefact + file tree */
-    // Extract IDL from file tree if available
+    /* derive programId once – used for IDL patch & env file */
+    const keypairJson = path.join(
+      absRoot, "target", "deploy", `${programName}-keypair.json`.replace(/-/g, "_")
+    );
+    const secretKey = JSON.parse(await fs.readFile(keypairJson, "utf8")) as number[];
+    const programId = new PublicKey(secretKey.slice(32)).toBase58();
+
+    /* finally emit build‑done with artefact + file tree */
     let idlContent: any = null;
     const idls: any[] = [];
     
@@ -331,15 +344,10 @@ export async function runDeployPipeline({
           }
 
           let envText = await fs.readFile(target, "utf8");
-          if (envText.match(/^NEXT_PUBLIC_PROGRAM_ID=/m)) {
-            envText = envText.replace(
-              /^NEXT_PUBLIC_PROGRAM_ID=.*/m,
-              `NEXT_PUBLIC_PROGRAM_ID=${programId}`
-            );
-          } else {
-            envText += (envText.endsWith("\n") ? "" : "\n") +
-                       `NEXT_PUBLIC_PROGRAM_ID=${programId}\n`;
-          }
+          envText = envText
+            .replace(/^NEXT_PUBLIC_PROGRAM_ID=.*/m, "")
+            .replace(/\n{2,}/g, "\n")
+            .trimEnd() + `\nNEXT_PUBLIC_PROGRAM_ID=${programId}\n`;
           await fs.writeFile(target, envText);
           console.log(`[pipeline] Program ID written to ${target}`);
 
@@ -349,15 +357,15 @@ export async function runDeployPipeline({
            * so the server reloads the updated env vars.
            * --------------------------------------------------------- */
           try {
-            await runCommand(
-              `docker restart ${workspace.containerName}`,
-              ".",                    // run from repo root
-              uuidv4(),               // fresh task-ID
-              { skipSuccessUpdate: true }   // don't spam progress
-            );
-            console.log(
-              `[pipeline] Restarted container ${workspace.containerName} to reload env vars`
-            );
+            if (!process.env.SF_DEV_SERVER) {
+              await runCommand(
+                `docker restart ${workspace.containerName}`,
+                ".",                    // run from repo root
+                uuidv4(),               // fresh task-ID
+                { skipSuccessUpdate: true }   // don't spam progress
+              );
+              console.log("[pipeline] Restarted container to reload env vars");
+            }
           } catch (restartErr) {
             console.warn(
               `[pipeline] Could not restart container: ${restartErr}`
@@ -378,7 +386,8 @@ export async function runDeployPipeline({
       artifact: base64So,
       fileTree,
       ...(idlContent ? { idl: idlContent } : {}),
-      ...(idls.length > 0 ? { idls } : {})
+      ...(idls.length > 0 ? { idls } : {}),
+      programId,
     });
 
   } catch (err) {
