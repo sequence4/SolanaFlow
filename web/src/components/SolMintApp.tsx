@@ -50,88 +50,17 @@ type AnchorIdl = anchor.Idl & {
 const { BN } = anchor
 
 /* -------------------------------------------------------------------- *
- * Resolve Program ID – **env file only**.  No hard-coded fallback.
+ * Resolve Program ID – **env file only**.  The value is injected by the
+ * build-pipeline into web/.env and we never touch it again at runtime.
  * -------------------------------------------------------------------- */
-const isBrowserEnv = typeof window !== "undefined"
+const PROGRAM_ID = process.env.NEXT_PUBLIC_PROGRAM_ID ?? "";
 
 export default function SolMintApp() {
   const { publicKey, connected, signTransaction, signAllTransactions } = useWallet()
   const { theme, setTheme } = useTheme()
   const { toast } = useToast()
   
-  /* ---------- dynamic Program ID ---------- */
-  const [PROGRAM_ID, setPROGRAM_ID] = useState<string>(() => {
-    const pid = process.env.NEXT_PUBLIC_PROGRAM_ID ?? "";
-    dbg("State init → PID from .env", pid);
-    return pid;
-  });
-
-  /* listen for updates pushed by the parent iframe host */
-  useEffect(() => {
-    if (!isBrowserEnv) return
-    
-    const handler = (e: MessageEvent) => {
-      /* ↳ parent-iframe handshake */
-      if (e.data?.type === "PROGRAM_ID" && e.data?.programId) {
-        dbg("postMessage ← PROGRAM_ID", e.data.programId)
-        window.localStorage.setItem("programId", e.data.programId)
-        setPROGRAM_ID(e.data.programId)
-
-      /* ↳ SSE → window.postMessage bridge from runDeployPipeline:
-         { event: "ephemeralKey", pubkey: <PROGRAM_ID> }                */
-      } else if (e.data?.event === "ephemeralKey" && e.data.pubkey) {
-        dbg("postMessage ← SSE ephemeralKey", e.data.pubkey)
-        window.localStorage.setItem("programId", e.data.pubkey)
-        setPROGRAM_ID(e.data.pubkey)
-      }
-    }
-    
-    window.addEventListener("message", handler)
-    
-    // Request Program ID from parent if we're in an iframe
-    if (window.self !== window.parent) {
-      console.log("[SolMintApp] Requesting Program ID from parent");
-      dbg("postMessage → REQUEST_PROGRAM_ID (iframe)")
-      window.parent.postMessage({ type: "REQUEST_PROGRAM_ID" }, "*");
-    }
-    
-    return () => window.removeEventListener("message", handler)
-  }, [])
-
-  /* ───────── reflect localStorage updates coming from other tabs or after
-     the dev-server restarts (build pipeline rewrites web/.env) ───────── */
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === "programId" && e.newValue) {
-        dbg("storage event → programId updated", e.newValue)
-        setPROGRAM_ID(e.newValue)
-      }
-    }
-    window.addEventListener("storage", onStorage)
-    return () => window.removeEventListener("storage", onStorage)
-  }, [])
-
-  /* Also try to get program ID from localStorage projectContext */
-  useEffect(() => {
-    if (!isBrowserEnv) return
-    try {
-      const stored = localStorage.getItem('projectContext')
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        const contextProgramId = parsed?.details?.projectState?.programId || parsed?.details?.programId
-        if (contextProgramId && typeof contextProgramId === 'string') {
-          // Only update if we found a valid program ID and it's different from current
-          if (contextProgramId !== PROGRAM_ID) {
-            console.log("[SolMintApp] Found Program ID in localStorage:", contextProgramId)
-            window.localStorage.setItem("programId", contextProgramId)
-            setPROGRAM_ID(contextProgramId)
-          }
-        }
-      }
-    } catch (err) {
-      console.error("[SolMintApp] Error reading projectContext from localStorage:", err)
-    }
-  }, [PROGRAM_ID])
+  /* ---------- Program ID is now a constant ---------- */
 
   /* ---------- runtime helpers ---------- */
   const isBrowser    = typeof window !== "undefined";
