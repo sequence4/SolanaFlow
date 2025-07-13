@@ -274,23 +274,24 @@ export async function runDeployPipeline({
     }
 
     /* -----------------------------------------------------------------
-     * Ensure the keypair JSON is actually present on the host filesystem
-     * before we try to read it below.  readContainerFile() streams the
-     * bytes into a task result only – it does *not* write the file out.
+     * Guarantee the host-side   <root>/target/deploy   directory exists
+     * before we copy the keypair out of the container.  A fresh project
+     * has no host-side `target/`, so fs.mkdir must create **both** levels
+     * or Node will throw ENOENT and abort the pipeline before the PID
+     * can be written into web/.env.
      * ----------------------------------------------------------------- */
-    const hostKeypairPath = path.join(
-      absRoot,
-      "target",
-      "deploy",
-      `${programName}-keypair.json`,
-    );
+
+    const hostDeployDir = path.join(absRoot, "target", "deploy");
+    // Recursive mkdir handles both target/ and deploy/ in one go.
+    await fs.mkdir(hostDeployDir, { recursive: true }).catch(() => { /* already exists */ });
+
+    const hostKeypairPath = path.join(hostDeployDir, `${programName}-keypair.json`);
 
     try {
       // quick existence check
       await fs.access(hostKeypairPath);
     } catch {
       // If missing, copy it out of the running container
-      await fs.mkdir(path.dirname(hostKeypairPath), { recursive: true });
 
       const copyTaskId = `copy-keypair-${Date.now()}`;
       await runCommand(
