@@ -2,10 +2,12 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { toast } from 'sonner';
 import { downloadArtifact } from '@/api/projectArtifact';
+import { projectApi } from '@/api/projectApi';
 import { Button } from '@/components/ui/button';
 import { Rocket, AlertTriangle } from 'lucide-react';
 import { createAndRegisterEphemeral } from '@/utils/ephemeral/ephemeralKey';
 import { deployWithEphemeralKey } from '@/lib/ephemeralDeployment';
+import { Keypair } from '@solana/web3.js';
 import {
   Dialog,
   DialogContent,
@@ -100,25 +102,39 @@ export function ProgramDeployer({
           toast.error('Program bytes missing');
           return;
         }
-
-        // 1. create key & tell backend
+        // 1. Fetch deterministic program key (if any) and create ephemeral key
+        let programKeypair: Keypair | undefined;
+        try {
+          const { ephemeralPubkey: _ } = await projectApi.createEphemeral(projectId, []); // dummy call to ensure container ready
+        } catch {}
+        try {
+          const { secretKey } = await projectApi.getProgramKeypair(projectId);
+          programKeypair = Keypair.fromSecretKey(Uint8Array.from(secretKey));
+          console.log(`🔑 Using deterministic program ID: ${programKeypair.publicKey.toBase58()}`);
+        } catch (error) {
+          console.warn('No deterministic program keypair found, a new program ID will be generated.');
+        }
         const ephem = await createAndRegisterEphemeral(projectId);
-        console.log(`🔑 Ephemeral key: ${ephem.publicKey.toBase58()}`);
+        console.log(`🔑 Ephemeral buffer key: ${ephem.publicKey.toBase58()}`);
 
-        // 2. run the local-wallet deploy signer that **pays fees**
-        const deployResult = await deployWithEphemeralKey({
+        // 2. Run the deploy using wallet (pays fees) and ephemeral key (buffer authority)
+        const deployOptions: any = {
           soBytes: programBytes,
           connection,
           wallet,
           ephemeralKeypair: ephem,
-          verifyTimeoutMs: 120_000,      // allow 2 min for the authority–swap RPC to settle
-          onProgress: (raw, message) => {
+          verifyTimeoutMs: 120_000,
+          onProgress: (raw: number, message?: string) => {
             const pct = raw <= 1 ? Math.round(raw * 100) : Math.round(raw);
             setProgress(Math.max(1, Math.min(pct, 100)));
             setDeployStage(message ?? '');
             console.log('[DEPLOY]', pct + '%', message);
           }
-        });
+        };
+        if (programKeypair) {
+          deployOptions.programKeypair = programKeypair;
+        }
+        const deployResult = await deployWithEphemeralKey(deployOptions);
 
         if (deployResult.success) {
           // if we only got a "lag" warning, surface it once then treat as success

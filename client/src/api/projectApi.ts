@@ -331,5 +331,16 @@ export const projectApi = {
       throw error;
     }
   },
+  
+  /** Get the deterministic program keypair (secret key array) for the project, if available */
+  getProgramKeypair: async (projectId: string): Promise<{ secretKey: number[] }> => {
+    try {
+      const response = await api.get(`/projects/${projectId}/program-keypair`);
+      return response.data;
+    } catch (error) {
+      console.error('Error getting program keypair:', error);
+      throw error;
+    }
+  },
 
 };

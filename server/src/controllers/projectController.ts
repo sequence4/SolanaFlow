@@ -758,6 +758,40 @@ export const deployProjectEphemeral = async (
   }
 };
 
+export const getProgramKeypair = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  const { id } = req.params;
+  const userId = req.user?.id;
+  const orgId = req.user?.org_id;
+  if (!userId || !orgId) {
+    return next(new AppError('User information not found', 400));
+  }
+  try {
+    // Verify project ownership
+    const result = await pool.query('SELECT details FROM solanaproject WHERE id = $1 AND org_id = $2', [id, orgId]);
+    if (result.rows.length === 0) {
+      return next(new AppError('Project not found or access denied', 404));
+    }
+    const detailsObj = (typeof result.rows[0].details === 'object') ? result.rows[0].details : JSON.parse(result.rows[0].details || '{}');
+    const programId = detailsObj?.lastProgramId;
+    if (!programId) {
+      return next(new AppError('No program ID available for this project', 404));
+    }
+    const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${programId}.json`);
+    if (!fs.existsSync(walletPath)) {
+      return next(new AppError('Program keypair file not found', 404));
+    }
+    const secretKey = JSON.parse(fs.readFileSync(walletPath, 'utf8'));
+    res.status(200).json({ secretKey });
+  } catch (err) {
+    console.error('Error retrieving program keypair:', err);
+    next(new AppError('Failed to retrieve program keypair', 500));
+  }
+};
+
 export const testProject = async (
   req: Request,
   res: Response,

@@ -327,6 +327,56 @@ export const startAnchorBuildTask = async (
       
       console.log(`[BUILD] Running anchor build in ${containerName} (root=${rootPath}) for project ${projectId}`);
       
+      // ────────────────────────── Prepare deterministic program key ──────────────────────────
+      const programName = 'my_program';
+      const newKeypair = Keypair.generate();
+      const programId = newKeypair.publicKey.toBase58();
+      // Save keypair to host so Anchor can pick it up
+      const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${programId}.json`);
+      fs.writeFileSync(walletPath, JSON.stringify(Array.from(newKeypair.secretKey)));
+      // Verify keypair saved correctly
+      const derivedPubkey = Keypair.fromSecretKey(newKeypair.secretKey).publicKey.toBase58();
+      if (derivedPubkey !== programId) {
+        throw new Error('Keypair self-verification failed');
+      }
+      console.log('[GEN] Generated new program ID:', programId);
+      // Copy keypair into container for Anchor deploy
+      const containerKeyPath = `/usr/src/${rootPath}/target/deploy/${programName}-keypair.json`;
+      await runCommand(
+        `docker exec ${containerName} bash -c 'mkdir -p /usr/src/${rootPath}/target/deploy'`,
+        '.',
+        projectId,
+        { skipSuccessUpdate: true },
+      );
+      // Symlink target/idl to target/deploy (Anchor expects this)
+      await runCommand(
+        `docker exec ${containerName} bash -c '[ ! -e /usr/src/${rootPath}/target/idl ] && ln -sfnT /usr/src/${rootPath}/target/deploy /usr/src/${rootPath}/target/idl || true'`,
+        '.',
+        projectId,
+        { skipSuccessUpdate: true },
+      );
+      await runCommand(
+        `docker cp ${walletPath} ${containerName}:${containerKeyPath}`,
+        '.',
+        projectId,
+        { skipSuccessUpdate: true },
+      );
+          // Store program ID in .env and database
+    await runCommand(
+        `docker exec ${containerName} bash -lc 'echo NEXT_PUBLIC_PROGRAM_ID=${programId} >> /usr/src/${rootPath}/web/.env'`,
+        '.',
+        `inject-env-${Date.now()}`,
+        { skipSuccessUpdate: true },
+      );
+      try {
+        await pool.query(
+          "UPDATE solanaproject SET details = COALESCE(details, '{}'::jsonb) || $1::jsonb WHERE id = $2",
+          [JSON.stringify({ lastProgramId: programId }), projectId]
+        );
+      } catch (dbErr) {
+        console.error('[BUILD] Warning: failed to update project details with programId:', dbErr);
+      }
+
       const buildScriptContent = `#!/bin/bash
 set -euo pipefail
 

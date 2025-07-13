@@ -83,17 +83,15 @@ export interface EphemeralDeployOptions {
   soBytes: ArrayBuffer;
   connection: Connection;
   wallet: WalletContextState;           // fee-payer (Phantom)
-  /** The **already-generated** Keypair that must become program upgrade authority */
+  /** The **already-generated** Keypair that must become program upgrade authority (ephemeral buffer key) */
   ephemeralKeypair: Keypair;
-  /** progress ∈ [0‑100], plus human log line */
-  onProgress?: (progress: number, message: string) => void;
-  /**
-   * The deterministic keypair ( `target/deploy/<program>-keypair.json` )
-   * Anchor created during `anchor build`.  Supplying it guarantees the
-   * deployed Program Id matches the one written to `web/.env`.
-   */
+  /** Optionally, a deterministic program Keypair (to reuse a known program ID) */
   programKeypair?: Keypair;
-  /** Max milliseconds to wait for on-chain authority transfer (default 60 s) */
+  /** progress ∈ [0-100], plus human log line */
+  onProgress?: (progress: number, message: string) => void;
+  /** If provided instead of programKeypair, an existing program ID to upgrade */
+  programId?: PublicKey;
+  /** Max milliseconds to wait for on-chain authority transfer (default 60_000) */
   verifyTimeoutMs?: number;
 }
 
@@ -120,7 +118,8 @@ export async function deployWithEphemeralKey(
     wallet,
     ephemeralKeypair,
     onProgress = () => {},
-    programKeypair: deterministicProgramKeypair,
+    programId: userProvidedProgramId,
+    programKeypair: userProvidedKeypair,
     verifyTimeoutMs = 60_000,
   } = options;
   
@@ -161,11 +160,16 @@ export async function deployWithEphemeralKey(
     // ── Program-id setup ──────────────────────────────────────────
     let programKeypair: Keypair | null = null;
 
-    if (deterministicProgramKeypair) {
-      programKeypair = deterministicProgramKeypair;      // use build‑time key‑pair
+    if (userProvidedKeypair) {
+      // Deterministic keypair supplied → use it for the program
+      programKeypair = userProvidedKeypair;
       programId      = programKeypair.publicKey;
+    } else if (userProvidedProgramId) {
+      // Only a program ID supplied (existing on chain) → use upgrade path
+      programId = userProvidedProgramId;
     } else {
-      programKeypair = Keypair.generate();               // fallback: brand‑new keypair
+      // No key supplied → generate a new ephemeral program ID
+      programKeypair = Keypair.generate();
       programId      = programKeypair.publicKey;
     }
 
