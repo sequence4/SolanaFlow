@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui"
 import { useWallet } from "@solana/wallet-adapter-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -50,17 +50,81 @@ type AnchorIdl = anchor.Idl & {
 const { BN } = anchor
 
 /* -------------------------------------------------------------------- *
+ *  Generic helper: fetch IDL (fallback to bundled) and ensure
+ *  `metadata.address` is present so Anchor ≥0.31 doesn't choke.
+ * -------------------------------------------------------------------- */
+async function getProgram(
+  provider: anchor.AnchorProvider,
+  programId: PublicKey,
+): Promise<anchor.Program> {
+  let idl = await anchor.Program.fetchIdl(programId, provider)
+  if (!idl) {
+    console.warn("[IDL] On-chain IDL missing – using bundled JSON")
+    idl = solMintIdl as unknown as anchor.Idl
+  }
+  if (!(idl as any).metadata?.address) {
+    idl = {
+      ...(idl as any),
+      metadata: { ...((idl as any).metadata ?? {}), address: programId.toBase58() },
+    } as anchor.Idl
+  }
+  return new anchor.Program(idl as AnchorIdl, provider)
+}
+
+/* -------------------------------------------------------------------- *
  * Resolve Program ID – **env file only**.  The value is injected by the
  * build-pipeline into web/.env and we never touch it again at runtime.
  * -------------------------------------------------------------------- */
-const PROGRAM_ID = process.env.NEXT_PUBLIC_PROGRAM_ID ?? "";
+// Base program ID comes from the build-time environment but can be
+// overridden at runtime via window messages or localStorage.
+const INITIAL_PROGRAM_ID = process.env.NEXT_PUBLIC_PROGRAM_ID ?? "";
 
 export default function SolMintApp() {
   const { publicKey, connected, signTransaction, signAllTransactions } = useWallet()
   const { theme, setTheme } = useTheme()
   const { toast } = useToast()
-  
-  /* ---------- Program ID is now a constant ---------- */
+
+  const [programId, setProgramId] = useState(INITIAL_PROGRAM_ID)
+
+  /* shared Connection (devnet) – created once */
+  const connection = useMemo(
+    () =>
+      new anchor.web3.Connection(
+        anchor.web3.clusterApiUrl("devnet"),
+        "confirmed",
+      ),
+    [],
+  )
+
+  // Update program ID if the parent window sends a PROGRAM_ID message or if the
+  // value in localStorage changes.  This helps keep the iframe in sync with the
+  // build pipeline which may update the .env file after the page has loaded.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleMsg = (e: MessageEvent) => {
+      if (e.data?.type === 'PROGRAM_ID' && typeof e.data.programId === 'string') {
+        const id = e.data.programId
+        if (id && id !== programId) {
+          setProgramId(id)
+          localStorage.setItem('programId', id)
+        }
+      }
+    }
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'programId' && e.newValue && e.newValue !== programId) {
+        setProgramId(e.newValue)
+      }
+    }
+
+    window.addEventListener('message', handleMsg)
+    window.addEventListener('storage', handleStorage)
+    return () => {
+      window.removeEventListener('message', handleMsg)
+      window.removeEventListener('storage', handleStorage)
+    }
+  }, [programId])
 
   /* ---------- runtime helpers ---------- */
   const isBrowser    = typeof window !== "undefined";
@@ -211,13 +275,20 @@ export default function SolMintApp() {
         dbg("InitializeMint abort – wallet not connected")
         throw new Error("Wallet not connected")
       }
+      if (!programId) {
+        toast({
+          title: "Program ID missing",
+          description: "Cannot initialise mint without a program.",
+          variant: "destructive",
+        })
+        return
+      }
       // ─────── RUNTIME ENV CHECK ───────
-      console.log("[DEBUG] Program ID from .env =", PROGRAM_ID)
+      console.log("[DEBUG] Program ID from .env =", programId)
 
-      const programIdKey = new PublicKey(PROGRAM_ID)
+      const programIdKey = new PublicKey(programId)
       dbg("ProgramIdKey", programIdKey.toBase58())
       // Set up Anchor provider and program
-      const connection = new anchor.web3.Connection(anchor.web3.clusterApiUrl("devnet"), "confirmed")
       const anchorWallet = {
         publicKey: publicKey,
         signTransaction: signTransaction!,
@@ -225,31 +296,8 @@ export default function SolMintApp() {
       }
       const provider = new anchor.AnchorProvider(connection, anchorWallet as anchor.Wallet, anchor.AnchorProvider.defaultOptions())
       anchor.setProvider(provider)
-      // ① Try to pull the IDL from the on‑chain PDA …
-      let idl = await anchor.Program.fetchIdl(programIdKey, provider)
-      // ② … but fall back to the bundled JSON when it isn't there yet.
-      if (!idl) {
-        console.warn("[IDL] On‑chain IDL missing – using bundled JSON")
-        idl = solMintIdl as unknown as anchor.Idl
-      }
-
-      /* ─────── DEBUG & SAFEGUARD ─────── */
-      console.log("[DEBUG] programIdKey =", PROGRAM_ID)
-      console.log("[DEBUG] idl.metadata.address BEFORE patch =", (idl as any).metadata?.address)
-
-      if (!(idl as any).metadata?.address) {
-        /* metadata.address absent ⇒ add it so anchor.Program() won't choke */
-        idl = {
-          ...(idl as any),
-          metadata: { ...((idl as any).metadata ?? {}), address: PROGRAM_ID },
-        } as anchor.Idl
-        console.warn("[IDL] Patched metadata.address to", PROGRAM_ID)
-      }
-
-      dbg("IDL patched metadata.address =", (idl as any).metadata?.address)
       
-      // Create program instance (Anchor ≥0.31 signature)
-      const program = new anchor.Program(idl as AnchorIdl, provider)
+      const program = await getProgram(provider, programIdKey)
       console.log("[DEBUG] program.programId =", program.programId.toBase58())
       // Determine mint authority (use wallet if none provided)
       // ─────── MINT AUTHORITY VALIDATION ───────
@@ -374,8 +422,15 @@ export default function SolMintApp() {
         throw new Error("Wallet not connected")
       }
       if (!mintPubKey) throw new Error("Mint not initialized")
+      if (!programId) {
+        toast({
+          title: "Program ID missing",
+          description: "Cannot mint tokens without a program.",
+          variant: "destructive",
+        })
+        return
+      }
       // Set up Anchor provider and program (reuse connection and wallet)
-      const connection = new anchor.web3.Connection(anchor.web3.clusterApiUrl("devnet"), "confirmed")
       const anchorWallet = {
         publicKey: publicKey,
         signTransaction: signTransaction!,
@@ -383,30 +438,9 @@ export default function SolMintApp() {
       }
       const provider = new anchor.AnchorProvider(connection, anchorWallet as anchor.Wallet, anchor.AnchorProvider.defaultOptions())
       anchor.setProvider(provider)
-      const programIdKey = new PublicKey(PROGRAM_ID)
-      let idl = await anchor.Program.fetchIdl(programIdKey, provider)
-      if (!idl) {
-        console.warn("[IDL] On-chain IDL missing – using bundled JSON")
-        idl = solMintIdl as unknown as anchor.Idl
-      }
+      const programIdKey = new PublicKey(programId)
 
-      /* ─────── DEBUG & SAFEGUARD ─────── */
-      console.log("[DEBUG] programIdKey =", PROGRAM_ID)
-      console.log("[DEBUG] idl.metadata.address BEFORE patch =", (idl as any).metadata?.address)
-
-      if (!(idl as any).metadata?.address) {
-        /* metadata.address absent ⇒ add it so anchor.Program() won't choke */
-        idl = {
-          ...(idl as any),
-          metadata: { ...((idl as any).metadata ?? {}), address: PROGRAM_ID },
-        } as anchor.Idl
-        console.warn("[IDL] Patched metadata.address to", PROGRAM_ID)
-      }
-
-      console.log("[DEBUG] idl.metadata.address AFTER patch =", (idl as any).metadata?.address)
-      
-      // Create program instance (Anchor ≥0.31 signature)
-      const program = new anchor.Program(idl as AnchorIdl, provider)
+      const program = await getProgram(provider, programIdKey)
       // Mint authority must match the one set during initialization
       const mintAuthorityPubkey = initMintForm.mintAuthority
         ? new PublicKey(initMintForm.mintAuthority)
@@ -484,9 +518,9 @@ export default function SolMintApp() {
                 <Badge
                   variant="outline"
                   className="font-mono cursor-pointer hover:bg-gray-50 transition-colors"
-                  onClick={() => copyToClipboard(PROGRAM_ID)}
+                  onClick={() => copyToClipboard(programId)}
                 >
-                  {shortenAddress(PROGRAM_ID)}
+                  {shortenAddress(programId)}
                   <Copy className="w-3 h-3 ml-1" />
                 </Badge>
               </div>
