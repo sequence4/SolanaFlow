@@ -211,7 +211,7 @@ export async function deployUpgradeableProgramServer(
     console.log('Current buffer authority is:', bufferAuthority2?.toBase58());
   }
 
-  const programKeypair = programKeypairParam ?? Keypair.generate(); 
+  const programKeypair = programKeypairParam ?? Keypair.generate();
   console.log('programKeypair', programKeypair);
 
   const [programDataAddress] = PublicKey.findProgramAddressSync(
