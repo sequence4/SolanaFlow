@@ -1,6 +1,3 @@
-//import { getBuildArtifactTask, startAnchorBuildTask, startAnchorDeployTask } from "./projectUtils";
-//import { startAnchorInitTask } from "./projectUtils";
-//import { waitForTaskCompletion } from "./taskUtils";
 import { prepEnv } from './prepEnv';
 import type { WorkspaceHandle } from './prepEnv';
 import { Graph } from '../../types/graph';
@@ -10,18 +7,14 @@ import {
   startAnchorBuildTask,
   getBuildArtifactTask,
   runCommand,
-  startAnchorInitTask,
-  startSetClusterTask,
 } from "../projectUtils";
 import { waitForTaskCompletion } from "../taskUtils";
 import path from "path";
 import fs from "fs/promises";
-import { execSync } from "child_process";   // ← NEW
+import { execSync } from "child_process"; 
 import { PublicKey } from "@solana/web3.js";
 import { attachFileContents } from "../fileUtils/attachFileContents";
 import { readContainerFile } from "../fileUtils/attachFileContents";
-import { builderImage } from './builderImage';
-// NEW - generate unique task IDs for docker-restart
 import { v4 as uuidv4 } from "uuid";
 
 // ─── unified progress payload ────────────────────────────
@@ -30,7 +23,7 @@ interface ProgressEvent {
   status: "active" | "completed" | "error";
   message: string;
   pct?: number;
-  [k: string]: unknown;           // allow artefact / containerUrl etc.
+  [k: string]: unknown;      
 }
 // ──────────────────────────────────────────────────────────────
 
@@ -43,16 +36,9 @@ interface PipelineArgs {
   userId: string;
   graph: Graph; 
   sendProgress: (data: unknown) => void;
-
-  /** When true, the program was already deployed by a wallet-signed tx */
   walletSigned?: boolean;
-  
-  /** When true, run the container in dev mode with hot-reload */
   devMode?: boolean;
 }
-
-// NOTE: Pipeline now runs linearly inside runDeployPipeline().
-// Removed the old STAGES array and helper functions.
 
 export async function runDeployPipeline({
   projectId,
@@ -249,6 +235,37 @@ export async function runDeployPipeline({
     for (const d of idlDirs) {
       try { await readContainerFile(workspace.containerName, d, projectId, userId); }
       catch { /* directory may not exist – fine */ }
+    }
+
+    /* -----------------------------------------------------------------
+     * Ensure the keypair JSON is actually present on the host filesystem
+     * before we try to read it below.  readContainerFile() streams the
+     * bytes into a task result only – it does *not* write the file out.
+     * ----------------------------------------------------------------- */
+    const hostKeypairPath = path.join(
+      absRoot,
+      "target",
+      "deploy",
+      `${programName}-keypair.json`,
+    );
+
+    try {
+      // quick existence check
+      await fs.access(hostKeypairPath);
+    } catch {
+      // If missing, copy it out of the running container
+      await fs.mkdir(path.dirname(hostKeypairPath), { recursive: true });
+
+      const copyTaskId = `copy-keypair-${Date.now()}`;
+      await runCommand(
+        `docker cp ` +
+          `${workspace.containerName}:` +
+          `${path.posix.join(deployDir, `${programName}-keypair.json`)} ` +
+          `${hostKeypairPath}`,
+        ".",
+        copyTaskId,
+        { skipSuccessUpdate: true },
+      );
     }
     
     await attachFileContents(rawTree, absRoot, workspace.containerName);
