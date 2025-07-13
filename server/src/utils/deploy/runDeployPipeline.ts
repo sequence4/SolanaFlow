@@ -273,47 +273,7 @@ export async function runDeployPipeline({
       } catch { /* dir may not exist – fine */ }
     }
 
-    /* -----------------------------------------------------------------
-     * Guarantee the host-side   <root>/target/deploy   directory exists
-     * before we copy the keypair out of the container.  A fresh project
-     * has no host-side `target/`, so fs.mkdir must create **both** levels
-     * or Node will throw ENOENT and abort the pipeline before the PID
-     * can be written into web/.env.
-     * ----------------------------------------------------------------- */
-
-    const hostDeployDir = path.join(absRoot, "target", "deploy");
-    // Recursive mkdir handles both target/ and deploy/ in one go.
-    await fs.mkdir(hostDeployDir, { recursive: true });
-
-    // 🔒  Verify the directory really exists before docker cp.
-    try {
-      await fs.access(hostDeployDir);
-    } catch {
-      throw new Error(
-        `[pipeline] Host directory ${hostDeployDir} could not be created – ` +
-        `check ROOT_FOLDER and permissions.`
-      );
-    }
-
-    const hostKeypairPath = path.join(hostDeployDir, `${programName}-keypair.json`);
-
-    try {
-      // quick existence check
-      await fs.access(hostKeypairPath);
-    } catch {
-      // If missing, copy it out of the running container
-
-      const copyTaskId = `copy-keypair-${Date.now()}`;
-      await runCommand(
-        `docker cp ` +
-          `${workspace.containerName}:` +
-          `${path.posix.join(deployDir, `${programName}-keypair.json`)} ` +
-          `${hostKeypairPath}`,
-        ".",
-        copyTaskId,
-        { skipSuccessUpdate: true },
-      );
-    }
+    /* ---- no host copy needed; we'll read the keypair directly below ---- */
     
     await attachFileContents(rawTree, absRoot, workspace.containerName);
     const fileTree = rawTree;  // now populated
