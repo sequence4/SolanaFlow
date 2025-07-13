@@ -297,6 +297,15 @@ export async function runDeployPipeline({
        ------------------------------------------------------------------ */
     await writeProgramIdEnv(programId, absRoot);
 
+    // 📌  Make the env file visible to the Next.js dev server
+    await runCommand(
+      `docker exec ${workspace.containerName} bash -c ` +
+      `'cp ${path.posix.join("/usr/src", workspace.rootPath, "web/.env")} /usr/share/solanaflow/web/.env'`,
+      ".",
+      uuidv4(),
+      { skipSuccessUpdate: true }
+    );
+
     /* finally emit build‑done with artefact + file tree */
     let idlContent: any = null;
     const idls: any[] = [];
