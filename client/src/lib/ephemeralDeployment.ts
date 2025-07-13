@@ -85,10 +85,15 @@ export interface EphemeralDeployOptions {
   wallet: WalletContextState;           // fee-payer (Phantom)
   /** The **already-generated** Keypair that must become program upgrade authority */
   ephemeralKeypair: Keypair;
-  /** progress ∈ [0-100], plus human log line */
+  /** progress ∈ [0‑100], plus human log line */
   onProgress?: (progress: number, message: string) => void;
-  programId?: PublicKey;
-  /** Max milliseconds to wait for on-chain authority transfer (default 60 000) */
+  /**
+   * The deterministic keypair ( `target/deploy/<program>-keypair.json` )
+   * Anchor created during `anchor build`.  Supplying it guarantees the
+   * deployed Program Id matches the one written to `web/.env`.
+   */
+  programKeypair?: Keypair;
+  /** Max milliseconds to wait for on-chain authority transfer (default 60 s) */
   verifyTimeoutMs?: number;
 }
 
@@ -115,7 +120,7 @@ export async function deployWithEphemeralKey(
     wallet,
     ephemeralKeypair,
     onProgress = () => {},
-    programId: userProvidedProgramId,
+    programKeypair: deterministicProgramKeypair,
     verifyTimeoutMs = 60_000,
   } = options;
   
@@ -156,11 +161,11 @@ export async function deployWithEphemeralKey(
     // ── Program-id setup ──────────────────────────────────────────
     let programKeypair: Keypair | null = null;
 
-    if (userProvidedProgramId) {
-      // caller supplied target id → we will NOT create the account
-      programId = userProvidedProgramId;
+    if (deterministicProgramKeypair) {
+      programKeypair = deterministicProgramKeypair;      // use build‑time key‑pair
+      programId      = programKeypair.publicKey;
     } else {
-      programKeypair = Keypair.generate();               // new account we will fund
+      programKeypair = Keypair.generate();               // fallback: brand‑new keypair
       programId      = programKeypair.publicKey;
     }
 

@@ -12,7 +12,7 @@ import { waitForTaskCompletion } from "../taskUtils";
 import path from "path";
 import fs from "fs/promises";
 import { execSync } from "child_process"; 
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, Keypair } from "@solana/web3.js";
 import { attachFileContents } from "../fileUtils/attachFileContents";
 import { readContainerFile } from "../fileUtils/attachFileContents";
 import { v4 as uuidv4 } from "uuid";
@@ -288,7 +288,8 @@ export async function runDeployPipeline({
       { encoding: "utf8" },
     );
     const secretKey = JSON.parse(keypairStr.trim()) as number[];
-    const programId = new PublicKey(secretKey.slice(32)).toBase58();
+    const programKeypair = Keypair.fromSecretKey(Uint8Array.from(secretKey));
+    const programId = programKeypair.publicKey.toBase58();
 
     /* ------------------------------------------------------------------
        Always write the Program ID to web/.env – the previous logic only
