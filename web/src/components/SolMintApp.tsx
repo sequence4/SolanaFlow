@@ -52,17 +52,8 @@ const { BN } = anchor
 /* -------------------------------------------------------------------- *
  * Resolve Program ID at runtime (postMessage → localStorage → env → fallback)
  * -------------------------------------------------------------------- */
-const FALLBACK_PID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+const programIdKey = process.env.NEXT_PUBLIC_PROGRAM_ID as string;
 const isBrowserEnv = typeof window !== "undefined"
-
-function initProgramId(): string {
-  if (!isBrowserEnv) return process.env.NEXT_PUBLIC_PROGRAM_ID ?? FALLBACK_PID
-  return (
-    window.localStorage.getItem("programId") ??
-    process.env.NEXT_PUBLIC_PROGRAM_ID ??
-    FALLBACK_PID
-  )
-}
 
 export default function SolMintApp() {
   const { publicKey, connected, signTransaction, signAllTransactions } = useWallet()
@@ -339,7 +330,7 @@ export default function SolMintApp() {
       }
       // ─────── RUNTIME ENV CHECK ───────
       console.log("[DEBUG] process.env.NEXT_PUBLIC_PROGRAM_ID =", process.env.NEXT_PUBLIC_PROGRAM_ID)
-      console.log("[DEBUG] Hard-coded fallback PROGRAM_ID =", PROGRAM_ID)
+      // Program ID now comes solely from env; no hard-coded fallback
       // Set up Anchor provider and program
       const connection = new anchor.web3.Connection(anchor.web3.clusterApiUrl("devnet"), "confirmed")
       const anchorWallet = {

@@ -273,7 +273,7 @@ export async function runDeployPipeline({
       } catch { /* dir may not exist – fine */ }
     }
 
-    /* ---- no host copy needed; we'll read the keypair directly below ---- */
+    /* ---- host copy removed: program ID is read in-container below ---- */
     
     await attachFileContents(rawTree, absRoot, workspace.containerName);
     const fileTree = rawTree;  // now populated
@@ -376,15 +376,13 @@ export async function runDeployPipeline({
            * so the server reloads the updated env vars.
            * --------------------------------------------------------- */
           try {
-            if (!process.env.SF_DEV_SERVER) {
-              await runCommand(
-                `docker restart ${workspace.containerName}`,
-                ".",                    // run from repo root
-                uuidv4(),               // fresh task-ID
-                { skipSuccessUpdate: true }   // don't spam progress
-              );
-              console.log("[pipeline] Restarted container to reload env vars");
-            }
+            await runCommand(
+              `docker restart ${workspace.containerName}`,
+              ".",                    // run from repo root
+              uuidv4(),               // fresh task-ID
+              { skipSuccessUpdate: true }   // don't spam progress
+            );
+            console.log("[pipeline] Restarted container to reload env vars");
           } catch (restartErr) {
             console.warn(
               `[pipeline] Could not restart container: ${restartErr}`
