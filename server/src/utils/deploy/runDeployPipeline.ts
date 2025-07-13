@@ -283,7 +283,17 @@ export async function runDeployPipeline({
 
     const hostDeployDir = path.join(absRoot, "target", "deploy");
     // Recursive mkdir handles both target/ and deploy/ in one go.
-    await fs.mkdir(hostDeployDir, { recursive: true }).catch(() => { /* already exists */ });
+    await fs.mkdir(hostDeployDir, { recursive: true });
+
+    // 🔒  Verify the directory really exists before docker cp.
+    try {
+      await fs.access(hostDeployDir);
+    } catch {
+      throw new Error(
+        `[pipeline] Host directory ${hostDeployDir} could not be created – ` +
+        `check ROOT_FOLDER and permissions.`
+      );
+    }
 
     const hostKeypairPath = path.join(hostDeployDir, `${programName}-keypair.json`);
 
