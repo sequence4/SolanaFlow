@@ -50,9 +50,8 @@ type AnchorIdl = anchor.Idl & {
 const { BN } = anchor
 
 /* -------------------------------------------------------------------- *
- * Resolve Program ID at runtime (postMessage → localStorage → env → fallback)
+ * Resolve Program ID – **env file only**.  No hard-coded fallback.
  * -------------------------------------------------------------------- */
-const programIdKey = process.env.NEXT_PUBLIC_PROGRAM_ID as string;
 const isBrowserEnv = typeof window !== "undefined"
 
 export default function SolMintApp() {
@@ -62,53 +61,8 @@ export default function SolMintApp() {
   
   /* ---------- dynamic Program ID ---------- */
   const [PROGRAM_ID, setPROGRAM_ID] = useState<string>(() => {
-    let pid = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
-    dbg("State init → default PID", pid)
-    if (typeof window !== "undefined") {
-      // 1. First check URL query parameter
-      const params = new URLSearchParams(window.location.search);
-      const paramPid = params.get("programId") || params.get("pid");
-      if (paramPid) {
-        pid = paramPid;
-        dbg("Found pid in <query>", pid)
-        // Store for future use
-        window.localStorage.setItem("programId", paramPid);
-      } else {
-        // 2. Then check localStorage directly
-        const storedPid = window.localStorage.getItem("programId");
-        if (storedPid) {
-          pid = storedPid;
-          dbg("Found pid in localStorage(programId)", pid)
-        } else {
-          // 3. Then check projectContext in localStorage
-          const projectCtxStr = window.localStorage.getItem("projectContext");
-          if (projectCtxStr) {
-            try {
-              const projectData = JSON.parse(projectCtxStr);
-              const ctxPid = projectData?.details?.projectState?.programId || 
-                            projectData?.details?.programId;
-              if (ctxPid) {
-                pid = ctxPid;
-                dbg("Found pid in localStorage(projectContext)", ctxPid)
-                // Store for future use
-                window.localStorage.setItem("programId", ctxPid);
-              }
-            } catch (e) {
-              console.error("Failed to parse projectContext from localStorage", e);
-            }
-          }
-          // 4. Finally, check environment variable
-          if (pid === "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" && process.env.NEXT_PUBLIC_PROGRAM_ID) {
-            pid = process.env.NEXT_PUBLIC_PROGRAM_ID;
-            dbg("Fell back to .env NEXT_PUBLIC_PROGRAM_ID", pid)
-            // Store for future use
-            if (typeof window !== "undefined") {
-              window.localStorage.setItem("programId", pid);
-            }
-          }
-        }
-      }
-    }
+    const pid = process.env.NEXT_PUBLIC_PROGRAM_ID ?? "";
+    dbg("State init → PID from .env", pid);
     return pid;
   });
 
@@ -329,8 +283,10 @@ export default function SolMintApp() {
         throw new Error("Wallet not connected")
       }
       // ─────── RUNTIME ENV CHECK ───────
-      console.log("[DEBUG] process.env.NEXT_PUBLIC_PROGRAM_ID =", process.env.NEXT_PUBLIC_PROGRAM_ID)
-      // Program ID now comes solely from env; no hard-coded fallback
+      console.log("[DEBUG] Program ID from .env =", PROGRAM_ID)
+
+      const programIdKey = new PublicKey(PROGRAM_ID)
+      dbg("ProgramIdKey", programIdKey.toBase58())
       // Set up Anchor provider and program
       const connection = new anchor.web3.Connection(anchor.web3.clusterApiUrl("devnet"), "confirmed")
       const anchorWallet = {
@@ -340,8 +296,6 @@ export default function SolMintApp() {
       }
       const provider = new anchor.AnchorProvider(connection, anchorWallet as anchor.Wallet, anchor.AnchorProvider.defaultOptions())
       anchor.setProvider(provider)
-      const programIdKey = new PublicKey(PROGRAM_ID)
-      dbg("ProgramIdKey", programIdKey.toBase58())
       // ① Try to pull the IDL from the on‑chain PDA …
       let idl = await anchor.Program.fetchIdl(programIdKey, provider)
       // ② … but fall back to the bundled JSON when it isn't there yet.
