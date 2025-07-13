@@ -16,6 +16,7 @@ import {
 import { waitForTaskCompletion } from "../taskUtils";
 import path from "path";
 import fs from "fs/promises";
+import { execSync } from "child_process";   // ← NEW
 import { PublicKey } from "@solana/web3.js";
 import { attachFileContents } from "../fileUtils/attachFileContents";
 import { readContainerFile } from "../fileUtils/attachFileContents";
@@ -254,13 +255,15 @@ export async function runDeployPipeline({
     const fileTree = rawTree;  // now populated
 
     /* derive programId once – used for IDL patch & env file */
-    const keypairJson = path.join(
-      absRoot,
-      "target",
-      "deploy",
-      `${programName}-keypair.json`
+    // ------------------------------------------------------------
+    // Always read the key‑pair that Anchor generated **inside** the
+    // container, never via a host‑path that may not exist.
+    // ------------------------------------------------------------
+    const keypairStr = execSync(
+      `docker exec ${workspace.containerName} cat ${deployDir}/${programName}-keypair.json`,
+      { encoding: "utf8" },
     );
-    const secretKey = JSON.parse(await fs.readFile(keypairJson, "utf8")) as number[];
+    const secretKey = JSON.parse(keypairStr.trim()) as number[];
     const programId = new PublicKey(secretKey.slice(32)).toBase58();
 
     /* finally emit build‑done with artefact + file tree */
@@ -312,15 +315,13 @@ export async function runDeployPipeline({
      * ────────────────────────────────────────────────────────────── */
     if (idlContent) {
       try {
-        /* derive path:   target/deploy/<program>-keypair.json */
-        const keypairPath = path.join(
-          absRoot,
-          "target",
-          "deploy",
-          `${idlContent.name}-keypair.json`
+        // Re‑read the key‑pair directly from the container so we do
+        // not depend on any host‑side copies.
+        const keypairStr2 = execSync(
+          `docker exec ${workspace.containerName} cat ${deployDir}/${idlContent.name}-keypair.json`,
+          { encoding: "utf8" },
         );
-
-        const secretKey = JSON.parse(await fs.readFile(keypairPath, "utf8")) as number[];
+        const secretKey = JSON.parse(keypairStr2.trim()) as number[];
         if (secretKey.length !== 64) {
           throw new Error("unexpected keypair length");
         }
