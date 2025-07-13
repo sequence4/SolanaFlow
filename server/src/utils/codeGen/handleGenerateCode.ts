@@ -427,6 +427,13 @@ EOF'`,
         await runCommand(`docker cp ${walletPath} ${workspace.containerName}:${containerKeyPath}`, '.', projectId, { skipSuccessUpdate: true });
         // Inform client about the program ID for early access
         sendProgress({ event: 'ephemeralKey', pubkey: programId });
+        // Include the env var so local dev server can pick it up instantly
+        await runCommand(
+          `docker exec ${workspace.containerName} bash -lc 'echo NEXT_PUBLIC_PROGRAM_ID=${programId} >> /usr/src/${workspace.rootPath}/web/.env'`,
+          '.',
+          `inject-env-${Date.now()}`,
+          { skipSuccessUpdate: true },
+        );
         
         // Call ensure config helpers BEFORE refreshing the tree
         await ensureAnchorTomlProgram(

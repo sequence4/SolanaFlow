@@ -40,6 +40,32 @@ interface PipelineArgs {
   devMode?: boolean;
 }
 
+/* Helper: ensure web/.env (or .env.local) contains the compiled PID */
+async function writeProgramIdEnv(programId: string, absRoot: string) {
+  const fs = await import("fs/promises");
+  const path = await import("path");
+  const candidates = [
+    path.join(absRoot, "web", ".env"),
+    path.join(absRoot, ".env"),
+    path.join(absRoot, "web", ".env.local"),
+    path.join(absRoot, ".env.local"),
+  ];
+  let target: string | null = null;
+  for (const p of candidates) {
+    try { await fs.access(p); target = p; break; } catch { /* not there */ }
+  }
+  if (!target) {
+    target = path.join(absRoot, "web", ".env");
+    await fs.writeFile(target, "");
+  }
+  let envText = await fs.readFile(target!, "utf8");
+  envText = envText
+    .replace(/^NEXT_PUBLIC_PROGRAM_ID=.*/m, "")
+    .replace(/\n{2,}/g, "\n")
+    .trimEnd() + `\nNEXT_PUBLIC_PROGRAM_ID=${programId}\n`;
+  await fs.writeFile(target!, envText);
+}
+
 export async function runDeployPipeline({
   projectId,
   userId,
@@ -216,7 +242,7 @@ export async function runDeployPipeline({
       (await import("../fileUtils").then(m => m.getProjectRootPath(projectId)));
 
     const deployDir = `/usr/src/${projectFolder}/target/deploy`;
-    const idlDirs   = [
+    const idlDirs   : string[] = [
       `/usr/src/${projectFolder}/target/idl`,       // classic location
       `/usr/src/${projectFolder}/target/deploy`,    // Anchor ≥0.30 drops JSON here
     ];
@@ -232,9 +258,19 @@ export async function runDeployPipeline({
       );
     }
     await readContainerFile(workspace.containerName, tomlFile, projectId, userId);
+    /* ----------------------------------------------------------------
+       Copy every *.json found under each IDL dir instead of trying to
+       stream the directory itself (which triggers "cat: … Is a directory")
+       ---------------------------------------------------------------- */
     for (const d of idlDirs) {
-      try { await readContainerFile(workspace.containerName, d, projectId, userId); }
-      catch { /* directory may not exist – fine */ }
+      try {
+        await runCommand(
+          `docker exec ${workspace.containerName} bash -c 'shopt -s nullglob && for f in "${d}"/*.json; do cat "$f"; done'`,
+          ".",
+          `copy-idl-${Date.now()}`,
+          { skipSuccessUpdate: true },
+        );
+      } catch { /* dir may not exist – fine */ }
     }
 
     /* -----------------------------------------------------------------
@@ -282,6 +318,13 @@ export async function runDeployPipeline({
     );
     const secretKey = JSON.parse(keypairStr.trim()) as number[];
     const programId = new PublicKey(secretKey.slice(32)).toBase58();
+
+    /* ------------------------------------------------------------------
+       Always write the Program ID to web/.env – the previous logic only
+       did this when an IDL was detected.  Extracted into a helper so it
+       runs before we emit build-done.
+       ------------------------------------------------------------------ */
+    await writeProgramIdEnv(programId, absRoot);
 
     /* finally emit build‑done with artefact + file tree */
     let idlContent: any = null;
@@ -353,31 +396,8 @@ export async function runDeployPipeline({
 
         /* ---------- ensure the front-end sees the Program ID ---------- */
         try {
-          /* Prefer an existing  web/.env  → then root .env  → fall back to web/.env */
-          const candidates = [
-            path.join(absRoot, "web", ".env"),
-            path.join(absRoot, ".env"),
-            path.join(absRoot, "web", ".env.local"),
-            path.join(absRoot, ".env.local"),
-          ];
-
-          let target: string | null = null;
-          for (const p of candidates) {
-            try { await fs.access(p); target = p; break; } catch { /* not there */ }
-          }
-          if (!target) {
-            /* nothing exists yet → create web/.env */
-            target = path.join(absRoot, "web", ".env");
-            await fs.writeFile(target, "");
-          }
-
-          let envText = await fs.readFile(target, "utf8");
-          envText = envText
-            .replace(/^NEXT_PUBLIC_PROGRAM_ID=.*/m, "")
-            .replace(/\n{2,}/g, "\n")
-            .trimEnd() + `\nNEXT_PUBLIC_PROGRAM_ID=${programId}\n`;
-          await fs.writeFile(target, envText);
-          console.log(`[pipeline] Program ID written to ${target}`);
+          await writeProgramIdEnv(programId, absRoot);
+          console.log(`[pipeline] Program ID written to .env file`);
 
           /* ----------------------------------------------------------
            * The file change happens *after* the Next.js dev server
