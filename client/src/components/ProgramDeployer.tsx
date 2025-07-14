@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Rocket, AlertTriangle } from 'lucide-react';
 import { createAndRegisterEphemeral } from '@/utils/ephemeral/ephemeralKey';
 import { deployWithEphemeralKey } from '@/lib/ephemeralDeployment';
-import { Keypair } from '@solana/web3.js';
 import {
   Dialog,
   DialogContent,
@@ -102,18 +101,7 @@ export function ProgramDeployer({
           toast.error('Program bytes missing');
           return;
         }
-        // 1. Fetch deterministic program key (if any) and create ephemeral key
-        let programKeypair: Keypair | undefined;
-        try {
-          const { ephemeralPubkey: _ } = await projectApi.createEphemeral(projectId, []); // dummy call to ensure container ready
-        } catch {}
-        try {
-          const { secretKey } = await projectApi.getProgramKeypair(projectId);
-          programKeypair = Keypair.fromSecretKey(Uint8Array.from(secretKey));
-          console.log(`🔑 Using deterministic program ID: ${programKeypair.publicKey.toBase58()}`);
-        } catch (error) {
-          console.warn('No deterministic program keypair found, a new program ID will be generated.');
-        }
+        // 1. Create ephemeral key for deployment
         const ephem = await createAndRegisterEphemeral(projectId);
         console.log(`🔑 Ephemeral buffer key: ${ephem.publicKey.toBase58()}`);
 
@@ -131,9 +119,6 @@ export function ProgramDeployer({
             console.log('[DEPLOY]', pct + '%', message);
           }
         };
-        if (programKeypair) {
-          deployOptions.programKeypair = programKeypair;
-        }
         const deployResult = await deployWithEphemeralKey(deployOptions);
 
         if (deployResult.success) {

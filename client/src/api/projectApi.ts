@@ -332,13 +332,13 @@ export const projectApi = {
     }
   },
   
-  /** Get the deterministic program keypair (secret key array) for the project, if available */
-  getProgramKeypair: async (projectId: string): Promise<{ secretKey: number[] }> => {
+  /** Fetch the existing **public** program ID (no secret key). */
+  getProgramId: async (projectId: string): Promise<{ programId: string }> => {
     try {
       const response = await api.get(`/projects/${projectId}/program-keypair`);
       return response.data;
     } catch (error) {
-      console.error('Error getting program keypair:', error);
+      console.error('Error getting program ID:', error);
       throw error;
     }
   },
