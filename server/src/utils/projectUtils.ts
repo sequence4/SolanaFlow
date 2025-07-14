@@ -362,8 +362,8 @@ export const startAnchorBuildTask = async (
         { skipSuccessUpdate: true },
       );
           // Store program ID in .env and database
-    await runCommand(
-        `docker exec ${containerName} bash -lc 'echo NEXT_PUBLIC_PROGRAM_ID=${programId} >> /usr/src/${rootPath}/web/.env'`,
+      await runCommand(
+        `docker exec ${containerName} bash -lc "sed -i '/^NEXT_PUBLIC_PROGRAM_ID=/d' /usr/src/${rootPath}/web/.env && echo NEXT_PUBLIC_PROGRAM_ID=${programId} >> /usr/src/${rootPath}/web/.env"`,
         '.',
         `inject-env-${Date.now()}`,
         { skipSuccessUpdate: true },
