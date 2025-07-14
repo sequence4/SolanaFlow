@@ -19,30 +19,25 @@ export type ProjectStateUpdater =
   | ((prevState: ProjectStateType) => ProjectStateType);
 
 export interface ProjectStateType {
-  mode: "basic" | "advanced";
-  nodes: any[];
-  edges: any[]; 
-  config: Record<string, unknown>;
-  programId?: string;
-  instructions?: InstructionType[];
-  projectFiles?: any;
-  /**
-   * A complete tree (or array of trees) representing every file we've received
-   * from the backend.  Added so the builder can seed a blank tree on project
-   * creation without tripping type errors.
-   */
-  fileTree?: import('../../interfaces/FileTreeItemType').FileTreeItemType |
-             import('../../interfaces/FileTreeItemType').FileTreeItemType[];
-  built: boolean;
-  deployed: boolean;
-  idl?: any;
-  idls?: any[];
+  built?: boolean
+  deployed?: boolean
 }
 
+// ---------------------------------------------------------------------------
+//  JSON blob stored in `details`
+//    • keep `projectState` for build/deploy flags
+//    • add optional top-level `programId` so the deterministic public key
+//      can live outside the nested object and survive merges
+// ---------------------------------------------------------------------------
 export interface ProjectDetailsType {
-  projectState: ProjectStateType;
-  setProjectState: (stateUpdater: ProjectStateUpdater) => void;
-  programId?: string | null;  // Add programId to the details level
+  /** Sub-object managed by the build/deploy pipeline */
+  projectState?: Partial<ProjectStateType>
+
+  /** Public program ID written by the build/deploy pipeline */
+  programId?: string
+
+  /** Allow future keys without another type bump */
+  [key: string]: unknown
 }
 
 export interface ProjectContextType {
@@ -55,14 +50,14 @@ export interface ProjectContextType {
 }
 
 // ----------- Save Project -----------
+// ---------------------------------------------------------------------------
+//  Payload used by `projectApi.updateProject`
+// ---------------------------------------------------------------------------
 export interface ProjectContextToSave {
-  id?: string;
-  name?: string;
-  description?: string;
-  containerUrl?: string;
-  details?: {
-    projectState: Partial<ProjectStateType>;
-  };
+  name?: string
+  description?: string
+  /** Free-form JSON persisted server-side */
+  details?: ProjectDetailsType
 }
 
 export interface SaveProjectResponse {
@@ -101,6 +96,8 @@ export interface ListProjectsResponse {
   totalPages: number;
 }
 
+// Commenting out the savedKeys array as it references properties that no longer exist in ProjectStateType
+/*
 export const savedKeys: (keyof ProjectStateType)[] = [
     'nodes',
     'edges',
@@ -114,3 +111,4 @@ export const savedKeys: (keyof ProjectStateType)[] = [
     'idl',
     'idls',
 ];
+*/
