@@ -18,6 +18,7 @@ import {
   startContainer,
   getContainerUrl,
   listProjects,
+  getProgramId,
 } from '../controllers/projectController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { buildProject, testProject, getBuildArtifact } from '../controllers/projectController';
@@ -51,6 +52,8 @@ router.get('/:id/build-artifact', authMiddleware, getBuildArtifact);
 router.post('/:id/deploy', authMiddleware, deployProject);
 router.post('/:id/deploy-ephemeral', authMiddleware, deployProjectEphemeral);
 router.get('/:id/program-keypair', authMiddleware, getProgramKeypair);
+
+router.get('/:id/program-id', authMiddleware, getProgramId);
 // router.post('/:id/relay-tx', authMiddleware, relaySignedTxHandler);
 router.post('/:id/test', authMiddleware, testProject);
 router.post('/:id/run-command', authMiddleware, runProjectCommand);

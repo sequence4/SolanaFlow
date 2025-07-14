@@ -346,8 +346,8 @@ export const projectApi = {
   /** Fetch the existing **public** program ID (no secret key). */
   getProgramId: async (projectId: string): Promise<{ programId: string }> => {
     try {
-      const response = await api.get(`/projects/${projectId}/program-keypair`);
-      return response.data;
+      const response = await api.get(`/projects/${projectId}/program-id`);
+      return response.data;                       // { programId: "..." }
     } catch (error) {
       console.error('Error getting program ID:', error);
       throw error;
