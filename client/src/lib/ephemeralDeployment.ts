@@ -176,9 +176,10 @@ export async function deployWithEphemeralKey(
       // Only a program ID supplied (existing on chain) → use upgrade path
       programId = userProvidedProgramId;
     } else {
-      // No key supplied → generate a new ephemeral program ID
-      programKeypair = Keypair.generate();
-      programId      = programKeypair.publicKey;
+      // 🔒  Safety: never mint a brand‑new keypair in the browser.
+      throw new Error(
+        'Deterministic program keypair missing – aborting deploy to avoid accidental ID drift',
+      );
     }
 
     const [programDataPubkey] = PublicKey.findProgramAddressSync(
