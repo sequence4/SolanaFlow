@@ -232,12 +232,13 @@ export const projectApi = {
   },
 
   /**
-   * POST the 64-byte secret array so the backend can write <pubkey>.json.
+   * POST the 64-byte secret key array so the backend can register the keypair.
+   * Returns the new ephemeral pubkey and the program's secret key if available.
    */
   createEphemeral: async (
     projectId: string,
     secretKey: number[]
-  ): Promise<{ ephemeralPubkey: string }> => {
+  ): Promise<{ ephemeralPubkey: string; programSecretKey?: number[] }> => {
     try {
       const response = await api.post(
         `/projects/${projectId}/ephemeral`,

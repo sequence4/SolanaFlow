@@ -8,6 +8,6 @@ import { projectApi } from '@/api/projectApi';
 export async function createAndRegisterEphemeral(projectId: string) {
   const kp = Keypair.generate(); // 64-byte secret; never hits localStorage
 
-  await projectApi.createEphemeral(projectId, Array.from(kp.secretKey));
-  return kp;
+  const result = await projectApi.createEphemeral(projectId, Array.from(kp.secretKey));
+  return { keypair: kp, programSecretKey: result.programSecretKey };
 } 

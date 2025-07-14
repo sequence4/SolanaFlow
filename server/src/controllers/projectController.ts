@@ -18,6 +18,7 @@ import {
   startInstallNodeDependenciesTask,
   compileTs,
   broadcastSignedTx,
+  getContainerName,
 } from '../utils/projectUtils';
 import path from 'path';
 import { APP_CONFIG } from '../config/appConfig';
@@ -555,22 +556,19 @@ export const getBuildArtifact = async (
 
 export const createEphemeralKeypair = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { secretKey } = req.body;
+    // Generate a new keypair
+    const { id } = req.params;
+    const { secretKey: secretKeyArray } = req.body;
     let ephem: Keypair;
-    
-    if (secretKey && Array.isArray(secretKey)) {
-      try {
-        ephem = Keypair.fromSecretKey(Uint8Array.from(secretKey));
-        console.log(`[createEphemeralKeypair] Using provided secret key to create ephemeral keypair`);
-      } catch (err: any) {
-        console.error('Failed to create keypair from provided secret key:', err);
-        return next(new AppError('Invalid secret key for ephemeral keypair', 400));
-      }
+    if (secretKeyArray && Array.isArray(secretKeyArray) && secretKeyArray.length === 64) {
+      ephem = Keypair.fromSecretKey(Uint8Array.from(secretKeyArray));
+      console.log('[DEPLOY_EPHEMERAL] Using provided secret key for ephemeral Keypair');
     } else {
-      // Generate a new keypair if no secret key provided
       ephem = Keypair.generate();
+      if (secretKeyArray) {
+        console.warn('[DEPLOY_EPHEMERAL] Invalid secretKey array provided. Generated a new Keypair instead.');
+      }
     }
-    
     const pubkey = ephem.publicKey.toBase58();
     
     // Save the keypair to the wallets folder
@@ -587,10 +585,38 @@ export const createEphemeralKeypair = async (req: Request, res: Response, next: 
     if (derived !== pubkey) {
       throw new Error('Keypair self-verification failed');
     }
+
+    // Retrieve program keypair from build artifacts
+    let programKeypairArray: number[] | null = null;
+    try {
+      const rootPath = await getProjectRootPath(id);
+      const containerName = await getContainerName(id);
+      if (containerName) {
+        const tempTaskId = uuidv4();
+        const findCmd = `docker exec ${containerName} bash -c 'cd /usr/src/${rootPath} && find target/deploy -maxdepth 1 -name "*.json" | head -n 1'`;
+        const keyPath = (await runCommand(findCmd, '.', tempTaskId, { skipSuccessUpdate: true })).trim();
+        if (keyPath) {
+          const keyContent = await runCommand(`docker exec ${containerName} cat ${keyPath}`, '.', tempTaskId, { skipSuccessUpdate: true });
+          const arr = JSON.parse(keyContent);
+          if (Array.isArray(arr) && arr.length === 64) {
+            programKeypairArray = arr;
+          } else {
+            console.error('[DEPLOY_EPHEMERAL] Program key JSON content invalid or not 64 bytes');
+          }
+        } else {
+          console.error(`[DEPLOY_EPHEMERAL] No program keypair file found in target/deploy for project ${id}`);
+        }
+      } else {
+        console.error(`[DEPLOY_EPHEMERAL] No container found for project ${id}, cannot retrieve program keypair`);
+      }
+    } catch (err) {
+      console.error(`[DEPLOY_EPHEMERAL] Error retrieving program keypair for project ${id}:`, err);
+    }
     
     res.status(200).json({
       message: 'Ephemeral keypair created successfully',
-      pubkey
+      pubkey,
+      programSecretKey: programKeypairArray
     });
   } catch (error) {
     console.error('Error creating ephemeral keypair:', error);
