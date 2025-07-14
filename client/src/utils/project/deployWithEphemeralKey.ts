@@ -40,7 +40,6 @@ export async function handleEphemeralDeploy(
     // 2. Update the server with the deployed program ID
     // Store the program ID in the project context
     await projectApi.updateProject(projectId, {
-      id: projectId,
       details: {
         projectState: { deployed: true, built: false },
         programId: deployResult.programId.toString()
