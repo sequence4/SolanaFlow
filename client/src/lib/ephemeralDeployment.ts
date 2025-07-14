@@ -277,12 +277,9 @@ export async function deployWithEphemeralKey(
     const fundingSig = await connection.sendRawTransaction(signedFundingTx.serialize());
     signatures.push(fundingSig);
     
-    // Wait for confirmation
-    await connection.confirmTransaction({
-      blockhash,
-      lastValidBlockHeight,
-      signature: fundingSig
-    });
+    // Wait for confirmation ­– use signature‑only form to avoid
+    // "TransactionExpiredBlockheightExceededError" on slow networks
+    await connection.confirmTransaction(fundingSig, 'confirmed');
     
     console.log(`[EPHEMERAL_DEPLOY] Funded ephemeral key with ${totalNeeded} lamports`);
     
@@ -331,11 +328,7 @@ export async function deployWithEphemeralKey(
     );
     signatures.push(bufferSig);
     
-    await connection.confirmTransaction({
-      blockhash: bufferHash,
-      lastValidBlockHeight: bufferHeight,
-      signature: bufferSig
-    });
+    await connection.confirmTransaction(bufferSig, 'confirmed');
     
     console.log(`[EPHEMERAL_DEPLOY] Buffer account created`);
     
@@ -441,11 +434,10 @@ export async function deployWithEphemeralKey(
     onProgress(80, "Verifying all writes...");
     console.log(`[EPHEMERAL_DEPLOY] Waiting for all write transactions to confirm...`);
     
-    await connection.confirmTransaction({
-      signature: writeSigs[writeSigs.length - 1],
-      blockhash: lastSafeHashInfo!.blockhash,
-      lastValidBlockHeight: lastSafeHashInfo!.lastValidBlockHeight,
-    });
+    await connection.confirmTransaction(
+      writeSigs[writeSigs.length - 1],
+      'confirmed',
+    );
     const statuses = await connection.getSignatureStatuses(writeSigs);
     statuses.value.forEach((st, idx) => {
       console.log('[WRITE-STATUS]', idx, st?.slot, st?.confirmations, st?.err);
@@ -529,11 +521,7 @@ export async function deployWithEphemeralKey(
       );
       signatures.push(deployOrUpgradeSig);
 
-      await connection.confirmTransaction({
-        blockhash: deployHash,
-        lastValidBlockHeight: deployHeight,
-        signature: deployOrUpgradeSig,
-      });
+      await connection.confirmTransaction(deployOrUpgradeSig, 'confirmed');
     } else {
       // ------- EXISTING PROGRAM (Upgrade) ------------------------------------
       const spillPubkey = walletPublicKey;   // lamports refund destination
@@ -571,11 +559,7 @@ export async function deployWithEphemeralKey(
       );
       signatures.push(deployOrUpgradeSig);
 
-      await connection.confirmTransaction({
-        blockhash: upHash,
-        lastValidBlockHeight: upHeight,
-        signature: deployOrUpgradeSig,
-      });
+      await connection.confirmTransaction(deployOrUpgradeSig, 'confirmed');
     }
 
     // 5. Hand upgrade authority from ephemeral key → wallet -------------------
@@ -612,10 +596,7 @@ export async function deployWithEphemeralKey(
     signatures.push(authSig);
 
     // ⚡ Use the lighter 'confirmed' level so we return in ~1–2 s instead of ~15 s
-    const authResult = await connection.confirmTransaction(
-      { blockhash: authHash, lastValidBlockHeight: authHeight, signature: authSig },
-      'confirmed',
-    );
+    const authResult = await connection.confirmTransaction(authSig, 'confirmed');
     
     if (authResult.value.err) {
       throw new Error(`SetAuthority transaction failed: ${JSON.stringify(authResult.value.err)}`);
