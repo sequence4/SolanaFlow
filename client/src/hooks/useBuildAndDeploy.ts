@@ -95,9 +95,9 @@ export function useBuildAndDeploy() {
         details: {
           projectState: { 
             deployed: true,
-            built: false,
-            programId
-          }
+            built: false
+          },
+          programId
         }
       });
       
@@ -108,9 +108,9 @@ export function useBuildAndDeploy() {
           ...prev.details!,
           projectState: {
             ...prev.details!.projectState,
-            deployed: true,
-            programId
-          }
+            deployed: true
+          },
+          programId
         }
       }));
     } catch (error) {
@@ -122,9 +122,9 @@ export function useBuildAndDeploy() {
           ...prev.details!,
           projectState: {
             ...prev.details!.projectState,
-            deployed: true,
-            programId
-          }
+            deployed: true
+          },
+          programId
         }
       }));
     }

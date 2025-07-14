@@ -197,17 +197,61 @@ export const editProject = async (
     }
 
     if (details !== undefined) {
-      // Handle case when details contains projectState.built
-      if (details.projectState && details.projectState.built !== undefined) {
-        updateQuery += `, details = jsonb_set(
-          COALESCE(details, '{}'::jsonb),
-          '{projectState,built}',
-          -- cast the parameter so Postgres knows it's boolean JSON
-          to_jsonb(($${valueIndex})::boolean),
-          true
-        )`;
-        updateValues.push(!!details.projectState.built); // ensure true | false
+      // Handle partial updates for built/deployed flags and programId
+      if (
+        (details.projectState && (details.projectState.built !== undefined || details.projectState.deployed !== undefined)) ||
+        details.programId !== undefined
+      ) {
+        // Partial update without overwriting other nested details
+        let detailsQuery = `COALESCE(details, '{}'::jsonb)`;
+        if (details.projectState && details.projectState.built !== undefined) {
+          detailsQuery = `jsonb_set(${detailsQuery}, '{projectState,built}', to_jsonb(($${valueIndex})::boolean), true)`;
+          updateValues.push(!!details.projectState.built);
+          valueIndex++;
+        }
+        if (details.projectState && details.projectState.deployed !== undefined) {
+          detailsQuery = `jsonb_set(${detailsQuery}, '{projectState,deployed}', to_jsonb(($${valueIndex})::boolean), true)`;
+          updateValues.push(!!details.projectState.deployed);
+          valueIndex++;
+        }
+        if (details.programId !== undefined) {
+          detailsQuery = `jsonb_set(${detailsQuery}, '{programId}', to_jsonb($${valueIndex}), true)`;
+          updateValues.push(details.programId);
+          valueIndex++;
+        }
+        updateQuery += `, details = ${detailsQuery}`;
+      } else {
+        // Regular update for other cases
+        updateQuery += `, details = $${valueIndex}`;
+        updateValues.push(JSON.stringify(details));
         valueIndex++;
+      }
+    }
+
+    if (details !== undefined) {
+      // Handle partial updates for built/deployed flags and programId
+      if (
+        (details.projectState && (details.projectState.built !== undefined || details.projectState.deployed !== undefined)) ||
+        details.programId !== undefined
+      ) {
+        // Partial update without overwriting other nested details
+        let detailsQuery = `COALESCE(details, '{}'::jsonb)`;
+        if (details.projectState && details.projectState.built !== undefined) {
+          detailsQuery = `jsonb_set(${detailsQuery}, '{projectState,built}', to_jsonb(($${valueIndex})::boolean), true)`;
+          updateValues.push(!!details.projectState.built);
+          valueIndex++;
+        }
+        if (details.projectState && details.projectState.deployed !== undefined) {
+          detailsQuery = `jsonb_set(${detailsQuery}, '{projectState,deployed}', to_jsonb(($${valueIndex})::boolean), true)`;
+          updateValues.push(!!details.projectState.deployed);
+          valueIndex++;
+        }
+        if (details.programId !== undefined) {
+          detailsQuery = `jsonb_set(${detailsQuery}, '{programId}', to_jsonb($${valueIndex}), true)`;
+          updateValues.push(details.programId);
+          valueIndex++;
+        }
+        updateQuery += `, details = ${detailsQuery}`;
       } else {
         // Regular update for other cases
         updateQuery += `, details = $${valueIndex}`;
@@ -511,8 +555,22 @@ export const getBuildArtifact = async (
 
 export const createEphemeralKeypair = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // Generate a new keypair
-    const ephem = Keypair.generate();
+    const { secretKey } = req.body;
+    let ephem: Keypair;
+    
+    if (secretKey && Array.isArray(secretKey)) {
+      try {
+        ephem = Keypair.fromSecretKey(Uint8Array.from(secretKey));
+        console.log(`[createEphemeralKeypair] Using provided secret key to create ephemeral keypair`);
+      } catch (err: any) {
+        console.error('Failed to create keypair from provided secret key:', err);
+        return next(new AppError('Invalid secret key for ephemeral keypair', 400));
+      }
+    } else {
+      // Generate a new keypair if no secret key provided
+      ephem = Keypair.generate();
+    }
+    
     const pubkey = ephem.publicKey.toBase58();
     
     // Save the keypair to the wallets folder

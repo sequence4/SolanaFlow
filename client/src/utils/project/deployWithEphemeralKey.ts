@@ -42,9 +42,8 @@ export async function handleEphemeralDeploy(
     await projectApi.updateProject(projectId, {
       id: projectId,
       details: {
-        projectState: {
-          programId: deployResult.programId.toString()
-        }
+        projectState: { deployed: true, built: false },
+        programId: deployResult.programId.toString()
       }
     });
 
