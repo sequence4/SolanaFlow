@@ -83,7 +83,7 @@ export default function SolMintApp() {
   const { publicKey, connected, signTransaction, signAllTransactions } = useWallet()
   const { theme, setTheme } = useTheme()
   const { toast } = useToast()
-
+  
   const [programId, setProgramId] = useState(INITIAL_PROGRAM_ID)
 
   /* shared Connection (devnet) – created once */
@@ -101,7 +101,7 @@ export default function SolMintApp() {
   // build pipeline which may update the .env file after the page has loaded.
   useEffect(() => {
     if (typeof window === 'undefined') return
-
+    
     const handleMsg = (e: MessageEvent) => {
       if (e.data?.type === 'PROGRAM_ID' && typeof e.data.programId === 'string') {
         const id = e.data.programId
@@ -111,7 +111,7 @@ export default function SolMintApp() {
         }
       }
     }
-
+    
     const handleStorage = (e: StorageEvent) => {
       if (e.key === 'programId' && e.newValue && e.newValue !== programId) {
         setProgramId(e.newValue)

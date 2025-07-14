@@ -21,6 +21,8 @@ export type ProjectStateUpdater =
 export interface ProjectStateType {
   built?: boolean
   deployed?: boolean
+  /** Public key of the deployed on-chain program (base-58). */
+  programId?: string
 }
 
 // ---------------------------------------------------------------------------
