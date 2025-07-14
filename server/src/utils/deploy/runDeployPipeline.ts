@@ -248,16 +248,30 @@ export async function runDeployPipeline({
     ];
     const tomlFile  = `/usr/src/${projectFolder}/Anchor.toml`;
 
-    // ── NEW: copy only the files we really need ────────────────
-    for (const file of [`${programName}.so`, `${programName}-keypair.json`]) {
-      await readContainerFile(
-        workspace.containerName,
-        path.posix.join(deployDir, file),   // <-- stay inside the container
-        projectId,
-        userId
-      );
-    }
+    /* ── NEW: copy only the artefacts we really need ─────────────────────────
+     * NEVER copy `${programName}-keypair.json`; it contains the 64‑byte secret
+     * key and must stay inside the container.
+     * ----------------------------------------------------------------------*/
+    await readContainerFile(
+      workspace.containerName,
+      path.posix.join(deployDir, `${programName}.so`),   // compiled program
+      projectId,
+      userId
+    );
     await readContainerFile(workspace.containerName, tomlFile, projectId, userId);
+
+    /* ── NEW: copy only the artefacts we really need ─────────────────────────
+     * NEVER copy `${programName}-keypair.json`; it contains the 64‑byte secret
+     * key and must stay inside the container.
+     * ----------------------------------------------------------------------*/
+    await readContainerFile(
+      workspace.containerName,
+      path.posix.join(deployDir, `${programName}.so`),   // compiled program
+      projectId,
+      userId
+    );
+    await readContainerFile(workspace.containerName, tomlFile, projectId, userId);
+
     /* ----------------------------------------------------------------
        Copy every *.json found under each IDL dir instead of trying to
        stream the directory itself (which triggers "cat: … Is a directory")
@@ -287,9 +301,11 @@ export async function runDeployPipeline({
       `docker exec ${workspace.containerName} cat ${deployDir}/${programName}-keypair.json`,
       { encoding: "utf8" },
     );
-    const secretKey = JSON.parse(keypairStr.trim()) as number[];
+    const secretKey     = JSON.parse(keypairStr.trim()) as number[];
     const programKeypair = Keypair.fromSecretKey(Uint8Array.from(secretKey));
-    const programId = programKeypair.publicKey.toBase58();
+    const programId      = programKeypair.publicKey.toBase58();
+    /* wipe sensitive material ASAP */
+    secretKey.fill(0);
 
     /* ------------------------------------------------------------------
        Always write the Program ID to web/.env – the previous logic only
@@ -362,12 +378,13 @@ export async function runDeployPipeline({
           `docker exec ${workspace.containerName} cat ${deployDir}/${idlContent.name}-keypair.json`,
           { encoding: "utf8" },
         );
-        const secretKey = JSON.parse(keypairStr2.trim()) as number[];
+        const secretKey   = JSON.parse(keypairStr2.trim()) as number[];
         if (secretKey.length !== 64) {
           throw new Error("unexpected keypair length");
         }
 
         const programId = new PublicKey(secretKey.slice(32)).toBase58(); // last 32 bytes = pubkey
+        secretKey.fill(0); // purge private bytes
 
         idlContent.metadata = {
           ...(idlContent.metadata ?? {}),
