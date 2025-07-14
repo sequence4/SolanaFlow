@@ -789,8 +789,18 @@ export const getProgramKeypair = async (
       return next(new AppError('Program ID not found for this project', 404));
     }
 
-    /* 🔒  Never expose the private key – return PUBLIC key only */
-    res.status(200).json({ programId });
+    /* Dev / trusted‑env: expose the deterministic 64‑byte secret key so
+       the front‑end can recreate the Keypair.  Remove this when you
+       migrate to the public‑ID‑only flow.                            */
+
+    const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${programId}.json`);
+
+    if (!fs.existsSync(walletPath)) {
+      return next(new AppError('Program keypair file not found on server', 404));
+    }
+
+    const secretKey: number[] = JSON.parse(fs.readFileSync(walletPath, 'utf8'));
+    res.status(200).json({ secretKey });
   } catch (err) {
     console.error('Error retrieving program keypair:', err);
     next(new AppError('Failed to retrieve program keypair', 500));
