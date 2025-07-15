@@ -137,10 +137,16 @@ export async function runDeployPipeline({
     programKeypair = Keypair.generate();
     programSecretKey = Array.from(programKeypair.secretKey);
     programIdStr = programKeypair.publicKey.toBase58();
-    // Write the keypair to target/deploy so Anchor will use this fixed program ID
+    /**
+     * Write the key-pair **directly to the global warm-cache**
+     * (/usr/src/target/deploy) so the file survives the later
+     *   rm -rf target/deploy && ln -sfnT /usr/src/target/deploy target/deploy
+     * step.  This guarantees Anchor re-uses the same key-pair it sees
+     * during code-gen, eliminating the phantom "second" Program ID.
+     */
     const keypairJson = JSON.stringify(programSecretKey);
     await runCommand(
-      `docker exec ${workspace.containerName} bash -c 'mkdir -p /usr/src/${projectFolder}/target/deploy && echo ${JSON.stringify(keypairJson)} > /usr/src/${projectFolder}/target/deploy/${programName}-keypair.json'`,
+      `docker exec ${workspace.containerName} bash -c 'mkdir -p /usr/src/target/deploy && echo ${JSON.stringify(keypairJson)} > /usr/src/target/deploy/${programName}-keypair.json'`,
       ".",
       uuidv4(),
       { skipSuccessUpdate: true }
