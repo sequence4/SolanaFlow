@@ -415,7 +415,7 @@ EOF'`,
           const nameRes = await pool.query('SELECT name FROM solanaproject WHERE id = $1', [projectId]);
           const projName: string | undefined = nameRes.rows[0]?.name;
           if (projName) {
-            programName = normalizeProjectName(projName) || 'my_program';
+            programName = normalizeProjectName(projName);
           }
         } catch (e) {
           console.warn('Could not fetch project name, using default:', e);
