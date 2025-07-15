@@ -20,6 +20,9 @@ import fs from 'fs/promises';            // promise-based FS API
 import fsSync from 'fs';                 // for existsSync in helper
 import { APP_CONFIG } from '../../config/appConfig';
 import { Keypair } from '@solana/web3.js';
+import pool from '../../config/database';
+import { createHash } from 'crypto';
+import { normalizeProjectName } from '../stringUtils';
 
 /** Extract all file paths from a file tree recursively. */
 function flattenPaths(tree: any[]): string[] {
@@ -406,25 +409,46 @@ EOF'`,
         /* runtime server already started by docker run → nothing to do */
 
         // ───────────────────────── write graph-derived Rust sources ──────────────
-        // For now, assume a basic program structure exists or will be created
-        // TODO: derive from project context (graph / UI prompt) instead of hard-coded default
-        const programName = 'my_program';
-        // Generate a new program keypair for this build
-        const newKeypair = Keypair.generate();
-        const programId = newKeypair.publicKey.toBase58();
+        // Derive program name from project context (fallback to 'my_program' if not found)
+        let programName = 'my_program';
+        try {
+          const nameRes = await pool.query('SELECT name FROM solanaproject WHERE id = $1', [projectId]);
+          const projName: string | undefined = nameRes.rows[0]?.name;
+          if (projName) {
+            programName = normalizeProjectName(projName) || 'my_program';
+          }
+        } catch (e) {
+          console.warn('Could not fetch project name, using default:', e);
+        }
+        // Deterministically derive a Keypair from projectId (32-byte SHA-256 seed)
+        const seed = createHash('sha256').update(projectId).digest(); // 32 bytes
+        const programKeypair = Keypair.fromSeed(seed);
+        const programId = programKeypair.publicKey.toBase58();
+        // Save the keypair to a file for later use (e.g. Anchor deploy or upgrades)
         const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${programId}.json`);
-        fsSync.writeFileSync(walletPath, JSON.stringify(Array.from(newKeypair.secretKey)));
+        fsSync.writeFileSync(walletPath, JSON.stringify(Array.from(programKeypair.secretKey)));
         // Self-verify the keypair generation
-        const derivedPubkey = Keypair.fromSecretKey(newKeypair.secretKey).publicKey.toBase58();
+        const derivedPubkey = Keypair.fromSecretKey(programKeypair.secretKey).publicKey.toBase58();
         if (derivedPubkey !== programId) {
           throw new Error('Keypair self-verification failed');
         }
-        console.log('[GEN] Generated new program ID:', programId);
-        // Copy keypair to the container for Anchor to use during deploy
-        const containerKeyPath = `/usr/src/${workspace.rootPath}/target/deploy/${programName}-keypair.json`;
-        await runCommand(`docker exec ${workspace.containerName} bash -c 'mkdir -p /usr/src/${workspace.rootPath}/target/deploy'`, '.', projectId, { skipSuccessUpdate: true });
-        await runCommand(`docker exec ${workspace.containerName} bash -c '[ ! -e /usr/src/${workspace.rootPath}/target/idl ] && ln -sfnT /usr/src/${workspace.rootPath}/target/deploy /usr/src/${workspace.rootPath}/target/idl || true'`, '.', projectId, { skipSuccessUpdate: true });
-        await runCommand(`docker cp ${walletPath} ${workspace.containerName}:${containerKeyPath}`, '.', projectId, { skipSuccessUpdate: true });
+        console.log('[GEN] Generated deterministic program ID:', programId);
+        
+        /**
+         * Write the key-pair **directly to the global warm-cache**
+         * (/usr/src/target/deploy) so the file survives the later
+         *   rm -rf target/deploy && ln -sfnT /usr/src/target/deploy target/deploy
+         * step.  This guarantees Anchor re-uses the same key-pair it sees
+         * during code-gen, eliminating the phantom "second" Program ID.
+         */
+        const keypairJson = JSON.stringify(Array.from(programKeypair.secretKey));
+        await runCommand(
+          `docker exec ${workspace.containerName} bash -c 'mkdir -p /usr/src/target/deploy && echo ${JSON.stringify(keypairJson)} > /usr/src/target/deploy/${programName}-keypair.json'`,
+          ".",
+          randomUUID(),
+          { skipSuccessUpdate: true }
+        );
+        
         // Inform client about the program ID for early access
         sendProgress({ event: 'ephemeralKey', pubkey: programId });
         // Include the env var so local dev server can pick it up instantly
