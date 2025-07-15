@@ -74,6 +74,11 @@ export async function runDeployPipeline({
   walletSigned = false,
   devMode = false,
 }: PipelineArgs): Promise<void> {
+  // Prepare variables for the generated program keypair
+  let programKeypair: Keypair | null = null;
+  let programSecretKey: number[] | null = null;
+  let programIdStr: string | null = null;
+  
   sendProgress(<ProgressEvent>{
     stage: "environment",
     status: "active",
@@ -125,19 +130,35 @@ export async function runDeployPipeline({
     const { sentinelId, programName } =
           await handleGenerateCode({ projectId, graph, workspace, sendProgress, userId });
 
+    // ✅ Code generation is done – generate a program keypair for immediate use
+    const projectFolder =
+      workspace.rootPath ??
+      (await import("../fileUtils").then(m => m.getProjectRootPath(projectId)));
+    programKeypair = Keypair.generate();
+    programSecretKey = Array.from(programKeypair.secretKey);
+    programIdStr = programKeypair.publicKey.toBase58();
+    // Write the keypair to target/deploy so Anchor will use this fixed program ID
+    const keypairJson = JSON.stringify(programSecretKey);
+    await runCommand(
+      `docker exec ${workspace.containerName} bash -c 'mkdir -p /usr/src/${projectFolder}/target/deploy && echo ${JSON.stringify(keypairJson)} > /usr/src/${projectFolder}/target/deploy/${programName}-keypair.json'`,
+      ".",
+      uuidv4(),
+      { skipSuccessUpdate: true }
+    );
+    // Notify the frontend of the Program ID before starting the build
+    sendProgress(<ProgressEvent>{
+      stage: "code-gen",
+      status: "completed",
+      message: `Code generation complete — Program ID: ${programIdStr}`,
+      programId: programIdStr
+    });
+    
     /* 3 ─ build program --------------------------------------------------- */
     console.log("[PIPELINE] ⏳ anchor build started…");
     
     // wait until all src + UI files are on disk
     // allow up to 3 min for large repos (90 × 2 s)
     await waitForTaskCompletion(sentinelId, 90, 2_000);
-
-    // ✅ code-gen really is done now
-    sendProgress(<ProgressEvent>{
-      stage   : "code-gen",
-      status  : "completed",
-      message : "Code generation complete"
-    });
     
     sendProgress(<ProgressEvent>{
       stage: "build",
@@ -163,11 +184,7 @@ export async function runDeployPipeline({
     {
       // If prepEnv already gave you the project root use it, otherwise
       // fall back to a helper that reads solanaproject.root_path
-      const projectFolder =
-        workspace.rootPath ??
-        (await import("../fileUtils").then(m =>
-          m.getProjectRootPath(projectId)
-        ));
+      // projectFolder is already defined earlier (after code‑gen); reuse it here.
 
       sendProgress(<ProgressEvent>{
         stage: "build",
@@ -237,9 +254,7 @@ export async function runDeployPipeline({
     //      Anything else (node_modules, .next, yarn releases) is skipped
     //      to keep the tar stream < 5 MB and avoid ENOBUFS.
     // ------------------------------------------------------------------
-    const projectFolder =
-      workspace.rootPath ??
-      (await import("../fileUtils").then(m => m.getProjectRootPath(projectId)));
+    // projectFolder is already defined earlier (after code‑gen); reuse it here.
 
     const deployDir = `/usr/src/${projectFolder}/target/deploy`;
     const idlDirs   : string[] = [
@@ -292,20 +307,8 @@ export async function runDeployPipeline({
     await attachFileContents(rawTree, absRoot, workspace.containerName);
     const fileTree = rawTree;  // now populated
 
-    /* derive programId once – used for IDL patch & env file */
-    // ------------------------------------------------------------
-    // Always read the key‑pair that Anchor generated **inside** the
-    // container, never via a host‑path that may not exist.
-    // ------------------------------------------------------------
-    const keypairStr = execSync(
-      `docker exec ${workspace.containerName} cat ${deployDir}/${programName}-keypair.json`,
-      { encoding: "utf8" },
-    );
-    const secretKey     = JSON.parse(keypairStr.trim()) as number[];
-    const programKeypair = Keypair.fromSecretKey(Uint8Array.from(secretKey));
-    const programId      = programKeypair.publicKey.toBase58();
-    /* wipe sensitive material ASAP */
-    secretKey.fill(0);
+    /* Program ID was determined pre-build */
+    const programId = programIdStr!;
 
     /* ------------------------------------------------------------------
        Always write the Program ID to web/.env – the previous logic only
@@ -372,20 +375,9 @@ export async function runDeployPipeline({
      * ────────────────────────────────────────────────────────────── */
     if (idlContent) {
       try {
-        // Re‑read the key‑pair directly from the container so we do
-        // not depend on any host‑side copies.
-        const keypairStr2 = execSync(
-          `docker exec ${workspace.containerName} cat ${deployDir}/${idlContent.name}-keypair.json`,
-          { encoding: "utf8" },
-        );
-        const secretKey   = JSON.parse(keypairStr2.trim()) as number[];
-        if (secretKey.length !== 64) {
-          throw new Error("unexpected keypair length");
-        }
-
-        const programId = new PublicKey(secretKey.slice(32)).toBase58(); // last 32 bytes = pubkey
-        secretKey.fill(0); // purge private bytes
-
+        // Program ID was already determined above
+        const programId = programIdStr!;
+        
         idlContent.metadata = {
           ...(idlContent.metadata ?? {}),
           address: programId,
@@ -431,7 +423,8 @@ export async function runDeployPipeline({
       fileTree,
       ...(idlContent ? { idl: idlContent } : {}),
       ...(idls.length > 0 ? { idls } : {}),
-      programId,
+      programId: programIdStr,
+      programSecretKey,
     });
 
   } catch (err) {

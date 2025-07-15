@@ -39,6 +39,7 @@ export function ProgramDeployer({
   const [byteLength, setByteLength] = useState(0);
   const [progress, setProgress] = useState<number | null>(null);
   const [deployStage, setDeployStage] = useState<string>('');
+  const [programSecretKey, setProgramSecretKey] = useState<number[] | null>(null);
 
   // ────────────────────────────────────────────────────────────────
   //  Guards that survive React 18 Strict-Mode double-mounts
@@ -60,10 +61,24 @@ export function ProgramDeployer({
     console.log("🔍 Fetching compiled program...");
     
     try {
+      // Download the program artifact (compiled .so)
       const bytes = await downloadArtifact(projectId);
       setProgramBytes(bytes);
       setByteLength(bytes.byteLength);
       setBytesLoaded(true);
+      
+      // Also fetch the program keypair from the server (generated during build)
+      try {
+        const { secretKey } = await projectApi.getProgramKeypair(projectId);
+        if (secretKey && secretKey.length === 64) {
+          setProgramSecretKey(secretKey);
+          console.log("✅ Program keypair fetched successfully");
+        }
+      } catch (keypairError) {
+        console.warn("Failed to load program keypair:", keypairError);
+        // Continue anyway - the deploy function will handle this case
+      }
+      
       console.log(`✅ Program fetched: ${bytes.byteLength.toLocaleString()} bytes`);
     } catch (error) {
       console.error("Failed to load program bytes:", error);
@@ -103,10 +118,12 @@ export function ProgramDeployer({
           return;
         }
         // 1. Create ephemeral keypair and fetch program secret key from backend
-        const { keypair: ephem, programSecretKey } = await createAndRegisterEphemeral(projectId);
+        const { keypair: ephem } = await createAndRegisterEphemeral(projectId);
         console.log(`🔑 Ephemeral key: ${ephem.publicKey.toBase58()}`);
+        
         if (!programSecretKey) {
-          throw new Error('Prebuilt program keypair not found on server');
+          console.warn("Program secret key not available from build pipeline");
+          // We'll continue anyway, and deployWithEphemeralKey will handle it
         }
 
         // 2. Deploy using the ephemeral key (wallet will pay fees)
@@ -115,7 +132,7 @@ export function ProgramDeployer({
           connection,
           wallet,
           ephemeralKeypair: ephem,
-          programSecretKey: programSecretKey,
+          programSecretKey: programSecretKey || undefined,
           verifyTimeoutMs: 120_000,      // allow 2 min for the authority–swap RPC to settle
           onProgress: (raw, message) => {
             const pct = raw <= 1 ? Math.round(raw * 100) : Math.round(raw);
@@ -164,7 +181,7 @@ export function ProgramDeployer({
         backendRunningRef.current = false;
         backendStartedRef.current = false;  // dialog can deploy again if reopened
       }
-    }, [isLoading, projectId, programBytes, wallet, onSuccess, onClose]);
+    }, [isLoading, projectId, programBytes, programSecretKey, wallet, onSuccess, onClose]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !isLoading && !open && onClose()}>
