@@ -597,15 +597,31 @@ EOF'`,
          * `cargo-build-sbf` (called by `anchor build`) does **not**
          * understand "--force" → use `anchor clean` instead.
          * -------------------------------------------------------------- */
-        const syncCmd    = `cd /usr/src/${workspace.rootPath} && anchor keys sync`;
-        const cleanBuild = [
-          'anchor clean',                 // wipes /target + cache
-          'rm -f target/deploy/*.so',     // just in case
-          'anchor build'                  // fresh compile & link
+        /* --------------------------------------------------------------
+         * Final, deterministic rebuild sequence:
+         *   1. anchor clean            – remove all artefacts **and** keypairs
+         *   2. restore keypair JSON    – copy deterministic pair back
+         *   3. anchor keys sync        – update Anchor.toml + declare_id!
+         *   4. anchor build            – produce fresh .so that embeds our ID
+         * -------------------------------------------------------------- */
+        const WORKDIR  = `/usr/src/${workspace.rootPath}`;
+        const KEY_PATH = `target/deploy/${programName}-keypair.json`;
+
+        // stringify once and escape single quotes for safe bash heredoc
+        const keyJsonEsc = keypairJson.replace(/'/g, `'\\''`);
+
+        const script = [
+          `cd ${WORKDIR}`,
+          'anchor clean',
+          `mkdir -p target/deploy`,
+          // restore the deterministic keypair that anchor clean just deleted
+          `echo '${keyJsonEsc}' > ${KEY_PATH}`,
+          'anchor keys sync',
+          'anchor build'
         ].join(' && ');
 
         await runCommand(
-          `docker exec ${workspace.containerName} bash -lc '${syncCmd} && ${cleanBuild}'`,
+          `docker exec ${workspace.containerName} bash -lc "${script}"`,
           '.',
           randomUUID(),
           { skipSuccessUpdate: true }
