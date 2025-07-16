@@ -785,10 +785,14 @@ export const deployProjectEphemeral = async (
               // Store the Program ID in project details for future use
               await client.query(
                 `UPDATE solanaproject
-                   SET details = COALESCE(details::jsonb, '{}'::jsonb) || $1::jsonb,
+                   SET details = jsonb_set(
+                         jsonb_set(COALESCE(details::jsonb, '{}'::jsonb),
+                                   '{projectState,programId}', to_jsonb($1), true),
+                         '{projectState,deployed}', to_jsonb(true), true
+                       ),
                        last_updated = $2
                  WHERE id = $3`,
-                [JSON.stringify({ programId }), new Date(), id],
+                [programId, new Date(), id],
               );
               // Update the DApp's .env file with the new Program ID for the frontend
               try {

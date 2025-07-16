@@ -77,7 +77,7 @@ async function getProgram(
  * -------------------------------------------------------------------- */
 // Base program ID comes from the build-time environment but can be
 // overridden at runtime via window messages or localStorage.
-const INITIAL_PROGRAM_ID = process.env.NEXT_PUBLIC_PROGRAM_ID ?? "";
+const INITIAL_PROGRAM_ID = process.env.NEXT_PUBLIC_PROGRAM_ID || "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 
 export default function SolMintApp() {
   const { publicKey, connected, signTransaction, signAllTransactions } = useWallet()

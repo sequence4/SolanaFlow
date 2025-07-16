@@ -262,11 +262,11 @@ export async function startProjectContainer(
         ? detailsData
         : JSON.parse(detailsData || '{}');
       if (detailsObj.programId) {
-        if (detailsObj.projectState && detailsObj.projectState.built === true) {
-          console.log(`[startProjectContainer] Project has built code not yet deployed – skipping PROGRAM_ID injection to avoid stale ID`);
-        } else {
+        if (detailsObj.projectState && detailsObj.projectState.deployed) {
           programIdEnv = ['-e', `PROGRAM_ID=${detailsObj.programId}`, '-e', `NEXT_PUBLIC_PROGRAM_ID=${detailsObj.programId}`];
           console.log(`[startProjectContainer] Found Program ID ${detailsObj.programId} – adding to container env`);
+        } else {
+          console.log(`[startProjectContainer] Project has Program ID but not yet deployed – skipping PROGRAM_ID injection to avoid stale ID`);
         }
       }
     }
