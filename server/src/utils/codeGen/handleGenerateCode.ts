@@ -417,6 +417,10 @@ EOF'`,
           if (projName) {
             programName = normalizeProjectName(projName);
           }
+
+          // 🔧 Anchor treats every crate as *snake_case*; a dash here makes
+          // it regenerate a fresh keypair and triggers DeclaredProgramIdMismatch.
+          programName = programName.replace(/-/g, '_');
         } catch (e) {
           console.warn('Could not fetch project name, using default:', e);
         }
@@ -582,6 +586,18 @@ EOF'`,
           anchorTaskId,
           message: "[handleGenerateCode] Amend done",
         });
+
+        /* --------------------------------------------------------------
+         * ensureAnchorTomlProgram / amendConfigFiles may have just
+         * touched Anchor.toml – run a second keys sync so
+         * Anchor.toml, declare_id!(), and the JSON keypair stay equal
+         * -------------------------------------------------------------- */
+        await runCommand(
+          `docker exec ${workspace.containerName} bash -lc 'cd /usr/src/${workspace.rootPath} && anchor keys sync'`,
+          '.',
+          randomUUID(),
+          { skipSuccessUpdate: true }
+        );
 
         // ─────────── Debug: dump container tree ───────────
         const dumpTaskId = await createTask(
