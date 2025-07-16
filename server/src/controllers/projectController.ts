@@ -198,67 +198,21 @@ export const editProject = async (
     }
 
     if (details !== undefined) {
-      // Handle partial updates for built/deployed flags and programId
-      if (
-        (details.projectState && (details.projectState.built !== undefined || details.projectState.deployed !== undefined)) ||
-        details.programId !== undefined
-      ) {
-        // Partial update without overwriting other nested details
-        let detailsQuery = `COALESCE(details, '{}'::jsonb)`;
-        if (details.projectState && details.projectState.built !== undefined) {
-          detailsQuery = `jsonb_set(${detailsQuery}, '{projectState,built}', to_jsonb(($${valueIndex})::boolean), true)`;
-          updateValues.push(!!details.projectState.built);
-          valueIndex++;
-        }
-        if (details.projectState && details.projectState.deployed !== undefined) {
-          detailsQuery = `jsonb_set(${detailsQuery}, '{projectState,deployed}', to_jsonb(($${valueIndex})::boolean), true)`;
-          updateValues.push(!!details.projectState.deployed);
-          valueIndex++;
-        }
-        if (details.programId !== undefined) {
-          detailsQuery = `jsonb_set(${detailsQuery}, '{programId}', to_jsonb($${valueIndex}), true)`;
-          updateValues.push(details.programId);
-          valueIndex++;
-        }
-        updateQuery += `, details = ${detailsQuery}`;
-      } else {
-        // Regular update for other cases
-        updateQuery += `, details = $${valueIndex}`;
-        updateValues.push(JSON.stringify(details));
-        valueIndex++;
+      /* single pass-through for details updates (built/deployed/programId) */
+      let detailsQuery = `COALESCE(details, '{}'::jsonb)`;
+      if (details.projectState?.built !== undefined) {
+        detailsQuery = `jsonb_set(${detailsQuery}, '{projectState,built}', to_jsonb(($${valueIndex})::boolean), true)`;
+        updateValues.push(!!details.projectState.built); valueIndex++;
       }
-    }
-
-    if (details !== undefined) {
-      // Handle partial updates for built/deployed flags and programId
-      if (
-        (details.projectState && (details.projectState.built !== undefined || details.projectState.deployed !== undefined)) ||
-        details.programId !== undefined
-      ) {
-        // Partial update without overwriting other nested details
-        let detailsQuery = `COALESCE(details, '{}'::jsonb)`;
-        if (details.projectState && details.projectState.built !== undefined) {
-          detailsQuery = `jsonb_set(${detailsQuery}, '{projectState,built}', to_jsonb(($${valueIndex})::boolean), true)`;
-          updateValues.push(!!details.projectState.built);
-          valueIndex++;
-        }
-        if (details.projectState && details.projectState.deployed !== undefined) {
-          detailsQuery = `jsonb_set(${detailsQuery}, '{projectState,deployed}', to_jsonb(($${valueIndex})::boolean), true)`;
-          updateValues.push(!!details.projectState.deployed);
-          valueIndex++;
-        }
-        if (details.programId !== undefined) {
-          detailsQuery = `jsonb_set(${detailsQuery}, '{programId}', to_jsonb($${valueIndex}), true)`;
-          updateValues.push(details.programId);
-          valueIndex++;
-        }
-        updateQuery += `, details = ${detailsQuery}`;
-      } else {
-        // Regular update for other cases
-        updateQuery += `, details = $${valueIndex}`;
-        updateValues.push(JSON.stringify(details));
-        valueIndex++;
+      if (details.projectState?.deployed !== undefined) {
+        detailsQuery = `jsonb_set(${detailsQuery}, '{projectState,deployed}', to_jsonb(($${valueIndex})::boolean), true)`;
+        updateValues.push(!!details.projectState.deployed); valueIndex++;
       }
+      if (details.programId !== undefined) {
+        detailsQuery = `jsonb_set(${detailsQuery}, '{projectState,programId}', to_jsonb($${valueIndex}), true)`;
+        updateValues.push(details.programId); valueIndex++;
+      }
+      updateQuery += `, details = ${detailsQuery}`;
     }
 
     updateQuery += ` WHERE id = $${valueIndex} RETURNING *`;
@@ -872,7 +826,10 @@ export const getProgramKeypair = async (
       ? result.rows[0].details
       : JSON.parse(result.rows[0].details || '{}');
 
-    const programId  = detailsObj?.programId ?? detailsObj?.lastProgramId;
+    const programId =
+      detailsObj?.projectState?.programId ??
+      detailsObj?.programId ??
+      detailsObj?.lastProgramId;
     if (!programId) {
       return next(new AppError('Program ID not found for this project', 404));
     }
@@ -921,7 +878,10 @@ export const getProgramId = async (
       ? result.rows[0].details
       : JSON.parse(result.rows[0].details || '{}');
 
-    const programId = detailsObj?.programId ?? detailsObj?.lastProgramId;
+    const programId =
+      detailsObj?.projectState?.programId ??
+      detailsObj?.programId ??
+      detailsObj?.lastProgramId;
     if (!programId) {
       return next(new AppError('Program ID not found for this project', 404));
     }

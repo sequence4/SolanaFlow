@@ -75,9 +75,8 @@ async function getProgram(
  * Resolve Program ID – **env file only**.  The value is injected by the
  * build-pipeline into web/.env and we never touch it again at runtime.
  * -------------------------------------------------------------------- */
-// Base program ID comes from the build-time environment but can be
-// overridden at runtime via window messages or localStorage.
-const INITIAL_PROGRAM_ID = process.env.NEXT_PUBLIC_PROGRAM_ID || "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+// Build-time value injected by the pipeline; no silent fall-back.
+const INITIAL_PROGRAM_ID = process.env.NEXT_PUBLIC_PROGRAM_ID ?? "";
 
 export default function SolMintApp() {
   const { publicKey, connected, signTransaction, signAllTransactions } = useWallet()
@@ -193,9 +192,10 @@ export default function SolMintApp() {
   // State to store the created mint's public key for later use
   const [mintPubKey, setMintPubKey] = useState<PublicKey | null>(null)
 
-  const shortenAddress = (address: string) => {
-    return `${address.slice(0, 4)}...${address.slice(-4)}`
-  }
+  const shortenAddress = (address: string) =>
+    address && address.length > 8
+      ? `${address.slice(0, 4)}...${address.slice(-4)}`
+      : address;
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
