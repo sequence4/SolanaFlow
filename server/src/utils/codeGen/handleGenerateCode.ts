@@ -427,6 +427,36 @@ EOF'`,
         // Save the keypair to a file for later use (e.g. Anchor deploy or upgrades)
         const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${programId}.json`);
         fsSync.writeFileSync(walletPath, JSON.stringify(Array.from(programKeypair.secretKey)));
+
+        /* ────────────────────────────────────────────────────────────────
+         * NEW ✨  Keep every Anchor source‑of‑truth in sync *before* build
+         * ────────────────────────────────────────────────────────────────
+         * 1.  Ensure the keypair file stem exactly matches the crate name
+         *     (Anchor looks for target/deploy/<crate>-keypair.json).
+         * 2.  Run `anchor keys sync` to copy that pubkey into
+         *        • programs/<crate>/src/lib.rs   (declare_id!)
+         *        • Anchor.toml [programs.devnet] (and other clusters)
+         *     so the subsequent `anchor build` bakes the correct ID.
+         */
+        const crateStem = programName.replace(/-/g, "_");      // Anchor crate dirs are snake_case
+        await runCommand(
+          `docker exec ${workspace.containerName} bash -lc 'mkdir -p /usr/src/target/deploy && ` +
+          // copy only when the stem differs to avoid duplicate files
+          `[ "${crateStem}" != "${programName}" ] && cp /usr/src/target/deploy/${programName}-keypair.json ` +
+          `/usr/src/target/deploy/${crateStem}-keypair.json || true'`,
+          ".",
+          randomUUID(),
+          { skipSuccessUpdate: true }
+        );
+
+        // ⚠️  Must be executed from the workspace root *inside* the container.
+        await runCommand(
+          `docker exec ${workspace.containerName} bash -lc 'cd /usr/src/${workspace.rootPath} && anchor keys sync'`,
+          ".",
+          randomUUID(),
+          { skipSuccessUpdate: true }
+        );
+
         // Self-verify the keypair generation
         const derivedPubkey = Keypair.fromSecretKey(programKeypair.secretKey).publicKey.toBase58();
         if (derivedPubkey !== programId) {
