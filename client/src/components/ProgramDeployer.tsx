@@ -6,7 +6,7 @@ import { projectApi } from '@/api/projectApi';
 import { Button } from '@/components/ui/button';
 import { Rocket, AlertTriangle } from 'lucide-react';
 import { createAndRegisterEphemeral } from '@/utils/ephemeral/ephemeralKey';
-import { deployWithEphemeralKey } from '@/lib/ephemeralDeployment';
+import { deployWithEphemeralKey, EphemeralDeployOptions } from '@/lib/ephemeralDeployment';
 import { Keypair, PublicKey } from '@solana/web3.js';
 import ProjectContext from '@/context/project/ProjectContext';
 import {
@@ -130,14 +130,14 @@ export function ProgramDeployer({
         }
 
         // 2. Deploy using the ephemeral key (wallet will pay fees)
-        const deployOptions = {
+        const deployOptions: EphemeralDeployOptions = {
           soBytes: programBytes,
           connection,
           wallet,
           ephemeralKeypair: ephem,
           programSecretKey: programSecretKey || undefined,
           verifyTimeoutMs: 120_000,      // allow 2 min for the authority–swap RPC to settle
-          onProgress: (raw, message) => {
+          onProgress: (raw: number, message: string) => {
             const pct = raw <= 1 ? Math.round(raw * 100) : Math.round(raw);
             setProgress(Math.max(1, Math.min(pct, 100)));
             setDeployStage(message ?? '');

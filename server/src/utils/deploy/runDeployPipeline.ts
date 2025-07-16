@@ -158,7 +158,7 @@ export async function runDeployPipeline({
       message: `Code generation complete — Program ID: ${programIdStr}`,
       programId: programIdStr
     });
-    
+
     /* 3 ─ build program --------------------------------------------------- */
     console.log("[PIPELINE] ⏳ anchor build started…");
     
@@ -383,7 +383,7 @@ export async function runDeployPipeline({
       try {
         // Program ID was already determined above
         const programId = programIdStr!;
-        
+
         idlContent.metadata = {
           ...(idlContent.metadata ?? {}),
           address: programId,
