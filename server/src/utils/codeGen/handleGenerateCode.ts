@@ -593,19 +593,19 @@ EOF'`,
          * Anchor.toml, declare_id!(), and the JSON keypair stay equal
          * -------------------------------------------------------------- */
         /* --------------------------------------------------------------
-         * Re‑sync keys *then* do a clean rebuild so .so embeds
-         * the deterministic pubkey we will deploy with.
+         * Re‑sync keys, purge old artefacts, then force a *clean* build.
+         * `cargo-build-sbf` (called by `anchor build`) does **not**
+         * understand "--force" → use `anchor clean` instead.
          * -------------------------------------------------------------- */
-        const syncCmd = `cd /usr/src/${workspace.rootPath} && anchor keys sync`;
-        const rebuildCmd = [
-          // wipe old artefacts; keep JSON keypairs
-          'rm -f target/deploy/*.so',
-          // a full rebuild guarantees Cargo ignores incremental cache
-          'anchor build -- --force'
+        const syncCmd    = `cd /usr/src/${workspace.rootPath} && anchor keys sync`;
+        const cleanBuild = [
+          'anchor clean',                 // wipes /target + cache
+          'rm -f target/deploy/*.so',     // just in case
+          'anchor build'                  // fresh compile & link
         ].join(' && ');
 
         await runCommand(
-          `docker exec ${workspace.containerName} bash -lc '${syncCmd} && ${rebuildCmd}'`,
+          `docker exec ${workspace.containerName} bash -lc '${syncCmd} && ${cleanBuild}'`,
           '.',
           randomUUID(),
           { skipSuccessUpdate: true }
