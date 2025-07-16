@@ -604,18 +604,22 @@ EOF'`,
          *   3. anchor keys sync        – update Anchor.toml + declare_id!
          *   4. anchor build            – produce fresh .so that embeds our ID
          * -------------------------------------------------------------- */
-        const WORKDIR  = `/usr/src/${workspace.rootPath}`;
-        const KEY_PATH = `target/deploy/${programName}-keypair.json`;
+        const WORKDIR   = `/usr/src/${workspace.rootPath}`;
+        const KEYS_DIR  = `target/deploy`;
+        const kebabKey  = `${programName}-keypair.json`;          // e.g. untitled-project‑keypair.json
+        const snakeKey  = `${programName.replace(/-/g, '_')}-keypair.json`; // e.g. untitled_project‑keypair.json
 
-        // stringify once and escape single quotes for safe bash heredoc
+        // escape once for safe bash literal
         const keyJsonEsc = keypairJson.replace(/'/g, `'\\''`);
 
         const script = [
           `cd ${WORKDIR}`,
           'anchor clean',
-          `mkdir -p target/deploy`,
-          // restore the deterministic keypair that anchor clean just deleted
-          `echo '${keyJsonEsc}' > ${KEY_PATH}`,
+          `mkdir -p ${KEYS_DIR}`,
+          // restore determin‑istic keypair under **both** possible stems
+          `echo '${keyJsonEsc}' > ${KEYS_DIR}/${kebabKey}`,
+          // only write the second file when the stem actually differs
+          `[ "${kebabKey}" != "${snakeKey}" ] && echo '${keyJsonEsc}' > ${KEYS_DIR}/${snakeKey} || true`,
           'anchor keys sync',
           'anchor build'
         ].join(' && ');
