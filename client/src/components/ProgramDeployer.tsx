@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useContext } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { toast } from 'sonner';
 import { downloadArtifact } from '@/api/projectArtifact';
@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Rocket, AlertTriangle } from 'lucide-react';
 import { createAndRegisterEphemeral } from '@/utils/ephemeral/ephemeralKey';
 import { deployWithEphemeralKey } from '@/lib/ephemeralDeployment';
-import { Keypair } from '@solana/web3.js';
+import { Keypair, PublicKey } from '@solana/web3.js';
+import ProjectContext from '@/context/project/ProjectContext';
 import {
   Dialog,
   DialogContent,
@@ -33,6 +34,8 @@ export function ProgramDeployer({
   onSuccess,
 }: ProgramDeployerProps) {
   const wallet = useWallet();
+  const { projectContext } = useContext(ProjectContext);
+  const existingProgramId = projectContext?.details?.projectState?.programId;
   const [isLoading, setIsLoading] = useState(false);
   const [bytesLoaded, setBytesLoaded] = useState(false);
   const [programBytes, setProgramBytes] = useState<ArrayBuffer | null>(null);
@@ -127,7 +130,7 @@ export function ProgramDeployer({
         }
 
         // 2. Deploy using the ephemeral key (wallet will pay fees)
-        const deployResult = await deployWithEphemeralKey({
+        const deployOptions = {
           soBytes: programBytes,
           connection,
           wallet,
@@ -140,7 +143,15 @@ export function ProgramDeployer({
             setDeployStage(message ?? '');
             console.log('[DEPLOY]', pct + '%', message);
           }
-        });
+        };
+
+        // If we have an existing program ID, use it for upgrades
+        if (existingProgramId && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(existingProgramId)) {
+          console.log(`Using existing program ID for upgrade: ${existingProgramId}`);
+          deployOptions.programId = new PublicKey(existingProgramId);
+        }
+
+        const deployResult = await deployWithEphemeralKey(deployOptions);
 
         if (deployResult.success) {
           // Record deployed program ID in backend project details (fail silently if it fails)
@@ -181,7 +192,7 @@ export function ProgramDeployer({
         backendRunningRef.current = false;
         backendStartedRef.current = false;  // dialog can deploy again if reopened
       }
-    }, [isLoading, projectId, programBytes, programSecretKey, wallet, onSuccess, onClose]);
+    }, [isLoading, projectId, programBytes, programSecretKey, wallet, onSuccess, onClose, existingProgramId]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !isLoading && !open && onClose()}>
