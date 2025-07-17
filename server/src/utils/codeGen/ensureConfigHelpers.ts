@@ -94,7 +94,7 @@ export async function ensureRootWorkspaceMembers(
 
   // Build an explicit member list like ["programs/my_program", …]
   // Fallback to wildcard if nothing found (rare but safe).
-  const desiredMembers =
+  const programDirs =
     memberDirs.length ? memberDirs.map(d => `programs/${d}`) : ['programs/*'];
 
   // --- 2. read Cargo.toml --------------------------------------------------
@@ -104,29 +104,46 @@ export async function ensureRootWorkspaceMembers(
     console.error(`[ENSURE_CONFIG] Could not read ${cargoTomlPath}.`);
     return;
   }
-  const parsedToml: any = parseToml(cargoTomlContent);
+  
+  let rootLines = cargoTomlContent.split('\n');
+  
+  const newMembersBlock = [
+    'members = [',
+    ...programDirs.map((p, idx) => {
+      const comma = idx === programDirs.length - 1 ? '' : ',';
+      return `    "${p}"${comma}`;
+    }),
+    ']',
+  ];
 
-  // --- 3. synchronise the member list -------------------------------------
-  parsedToml.workspace ||= {};
-  parsedToml.workspace.members ||= [];
+  let wsIdx = rootLines.findIndex(l => l.trim() === '[workspace]');
+  if (wsIdx === -1) {
+    rootLines.unshift('[workspace]', ...newMembersBlock, '');
+  } else {
+    let wsEnd = rootLines.length;
+    for (let i = wsIdx + 1; i < rootLines.length; i++) {
+      if (/^\[.*\]/.test(rootLines[i].trim())) { wsEnd = i; break; }
+    }
 
-  const current: string[] = parsedToml.workspace.members;
-  const next: string[] = [...desiredMembers].sort();
+    // remove old members block (handles multiline form)
+    let i = wsIdx + 1;
+    while (i < wsEnd) {
+      if (rootLines[i].trim().startsWith('members')) {
+        let j = i;
+        while (j < wsEnd && !rootLines[j].trim().endsWith(']')) j++;
+        if (j < wsEnd) j++;
+        rootLines.splice(i, j - i);
+        wsEnd -= (j - i);
+        break;
+      }
+      i++;
+    }
 
-  current.sort();
-  const changed =
-    current.length !== next.length ||
-    current.some((m, i) => m !== next[i]);
-
-  if (!changed) {
-    console.log('[ENSURE_CONFIG] Cargo.toml workspace.members already up-to-date.');
-    return;
+    rootLines.splice(wsIdx + 1, 0, ...newMembersBlock);
   }
-
-  // Strip any stale "anchor-template" entry that might linger.
-  parsedToml.workspace.members = next;
-  console.log('[ENSURE_CONFIG] Cargo.toml: set workspace.members =', next);
-
-  // --- 4. write back if modified ------------------------------------------
-  await updateFile(ws, cargoTomlPath, iarnaTomlStringify(parsedToml), projectId, creatorId);
+  
+  console.log('[ENSURE_CONFIG] Cargo.toml: updated workspace.members with multi-line format');
+  
+  // --- 4. write back modified content --------------------------------------
+  await updateFile(ws, cargoTomlPath, rootLines.join('\n'), projectId, creatorId);
 } 

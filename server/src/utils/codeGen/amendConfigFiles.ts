@@ -433,21 +433,44 @@ export const amendConfigFiles = async (
 
     /* --------------------------------------------------------------- *
      * Ensure the workspace members list matches the generated crates
+     * without leaving stray array items or ']' brackets behind.
      * --------------------------------------------------------------- */
-    const wantedMembersLine =
-      `members = [${programPaths.map(p => `"${p}"`).join(', ')}]`;
+    const newMembersBlock = [
+      'members = [',
+      ...programPaths.map((p, i) => {
+        const comma = i === programPaths.length - 1 ? '' : ',';
+        return `    "${p}"${comma}`;
+      }),
+      ']',
+    ];
 
-    const membersIdx = rootLines.findIndex(l => l.trim().startsWith('members ='));
-    if (membersIdx !== -1) {
-      rootLines[membersIdx] = wantedMembersLine;
+    // ── locate (or create) the [workspace] section ──────────────────
+    let wsIdx = rootLines.findIndex(l => l.trim() === '[workspace]');
+    if (wsIdx === -1) {
+      rootLines.unshift('[workspace]', ...newMembersBlock, '');
     } else {
-      // guarantee a [workspace] header exists, then insert
-      let wsIdx = rootLines.findIndex(l => l.trim() === '[workspace]');
-      if (wsIdx === -1) {
-        rootLines.unshift('[workspace]', wantedMembersLine, '');
-      } else {
-        rootLines.splice(wsIdx + 1, 0, wantedMembersLine);
+      // find where the section ends (next header or EOF)
+      let wsEnd = rootLines.length;
+      for (let i = wsIdx + 1; i < rootLines.length; i++) {
+        if (/^\[.*\]/.test(rootLines[i].trim())) { wsEnd = i; break; }
       }
+
+      /* remove any previous `members = [` block (inline or multiline) */
+      let i = wsIdx + 1;
+      while (i < wsEnd) {
+        if (rootLines[i].trim().startsWith('members')) {
+          let j = i;
+          while (j < wsEnd && !rootLines[j].trim().endsWith(']')) j++;
+          if (j < wsEnd) j++;           // include the closing ']'
+          rootLines.splice(i, j - i);
+          wsEnd -= (j - i);
+          break;
+        }
+        i++;
+      }
+
+      /* insert the fresh block just after the header */
+      rootLines.splice(wsIdx + 1, 0, ...newMembersBlock);
     }
     
     // Define the size-optimized profile blocks for both release and test
