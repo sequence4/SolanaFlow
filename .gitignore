@@ -35,6 +35,8 @@ certs/*.pem
 
 projects/
 wallets/
+target/deploy/anchor_template*
+target/deploy/my_program*
 wallets/landing/coverage/
 landing/.env.production
 
