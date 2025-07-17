@@ -444,11 +444,34 @@ EOF'`,
          */
         const crateSnake = programName.replace(/-/g, "_");      // Anchor crate dirs are snake_case
         const crateKebab = programName.replace(/_/g, "-");      // Anchor crate dirs are kebab-case
+        /**
+         * Copy the deterministic keypair under **both** possible stems so that
+         * `anchor keys sync` finds whichever variant it expects.
+         *
+         * ⚠️  When `crateStem === programName` the two filenames are identical, and
+         * `cp` aborts with "are the same file".  Wrap the second copy in a guard to
+         * make the command idempotent.
+         */
+        const copyKeypairCmd =
+          programName === crateSnake
+            ? "true"       // nothing to do – stems already match
+            : `cp -f /usr/src/target/deploy/${programName}-keypair.json /usr/src/target/deploy/${crateSnake}-keypair.json`;
+
         await runCommand(
-          `docker exec ${workspace.containerName} bash -lc 'mkdir -p /usr/src/target/deploy && ` +
-          // always write the deterministic pair under **both** stems
-          `cp -f /usr/src/target/deploy/${programName}-keypair.json /usr/src/target/deploy/${crateSnake}-keypair.json && \
-          cp -f /usr/src/target/deploy/${programName}-keypair.json /usr/src/target/deploy/${crateKebab}-keypair.json'`,
+          `docker exec ${workspace.containerName} bash -lc 'mkdir -p /usr/src/target/deploy && ${copyKeypairCmd}'`,
+          ".",
+          randomUUID(),
+          { skipSuccessUpdate: true }
+        );
+        
+        // Also copy for kebab-case variant if it differs from the program name
+        const copyKebabKeypairCmd =
+          programName === crateKebab
+            ? "true"       // nothing to do – stems already match
+            : `cp -f /usr/src/target/deploy/${programName}-keypair.json /usr/src/target/deploy/${crateKebab}-keypair.json`;
+            
+        await runCommand(
+          `docker exec ${workspace.containerName} bash -lc 'mkdir -p /usr/src/target/deploy && ${copyKebabKeypairCmd}'`,
           ".",
           randomUUID(),
           { skipSuccessUpdate: true }
