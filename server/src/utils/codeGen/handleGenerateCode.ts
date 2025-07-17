@@ -442,12 +442,13 @@ EOF'`,
          *        • Anchor.toml [programs.devnet] (and other clusters)
          *     so the subsequent `anchor build` bakes the correct ID.
          */
-        const crateStem = programName.replace(/-/g, "_");      // Anchor crate dirs are snake_case
+        const crateSnake = programName.replace(/-/g, "_");      // Anchor crate dirs are snake_case
+        const crateKebab = programName.replace(/_/g, "-");      // Anchor crate dirs are kebab-case
         await runCommand(
           `docker exec ${workspace.containerName} bash -lc 'mkdir -p /usr/src/target/deploy && ` +
-          // copy only when the stem differs to avoid duplicate files
-          `[ "${crateStem}" != "${programName}" ] && cp /usr/src/target/deploy/${programName}-keypair.json ` +
-          `/usr/src/target/deploy/${crateStem}-keypair.json || true'`,
+          // always write the deterministic pair under **both** stems
+          `cp -f /usr/src/target/deploy/${programName}-keypair.json /usr/src/target/deploy/${crateSnake}-keypair.json && \
+          cp -f /usr/src/target/deploy/${programName}-keypair.json /usr/src/target/deploy/${crateKebab}-keypair.json'`,
           ".",
           randomUUID(),
           { skipSuccessUpdate: true }
@@ -476,8 +477,12 @@ EOF'`,
          * during code-gen, eliminating the phantom "second" Program ID.
          */
         const keypairJson = JSON.stringify(Array.from(programKeypair.secretKey));
+        const snakeKeyFile = `${crateSnake}-keypair.json`;
+        const kebabKeyFile = `${crateKebab}-keypair.json`;
         await runCommand(
-          `docker exec ${workspace.containerName} bash -c 'mkdir -p /usr/src/target/deploy && echo ${JSON.stringify(keypairJson)} > /usr/src/target/deploy/${programName}-keypair.json'`,
+          `docker exec ${workspace.containerName} bash -lc 'mkdir -p /usr/src/target/deploy && ` +
+          // tee writes the same bytes to both stems in a single pass
+          `echo ${JSON.stringify(keypairJson)} | tee /usr/src/target/deploy/${snakeKeyFile} > /usr/src/target/deploy/${kebabKeyFile}'`,
           ".",
           randomUUID(),
           { skipSuccessUpdate: true }
@@ -606,8 +611,8 @@ EOF'`,
          * -------------------------------------------------------------- */
         const WORKDIR   = `/usr/src/${workspace.rootPath}`;
         const KEYS_DIR  = `target/deploy`;
-        const kebabKey  = `${programName}-keypair.json`;          // e.g. untitled-project‑keypair.json
-        const snakeKey  = `${programName.replace(/-/g, '_')}-keypair.json`; // e.g. untitled_project‑keypair.json
+        const snakeKey  = `${crateSnake}-keypair.json`;  // anchor_template-keypair.json
+        const kebabKey  = `${crateKebab}-keypair.json`;  // anchor-template-keypair.json
 
         // escape once for safe bash literal
         const keyJsonEsc = keypairJson.replace(/'/g, `'\\''`);
@@ -616,10 +621,8 @@ EOF'`,
           `cd ${WORKDIR}`,
           'anchor clean',
           `mkdir -p ${KEYS_DIR}`,
-          // restore determin‑istic keypair under **both** possible stems
-          `echo '${keyJsonEsc}' > ${KEYS_DIR}/${kebabKey}`,
-          // only write the second file when the stem actually differs
-          `[ "${kebabKey}" != "${snakeKey}" ] && echo '${keyJsonEsc}' > ${KEYS_DIR}/${snakeKey} || true`,
+          // always restore under **both** stems so Anchor never regenerates
+          `echo '${keyJsonEsc}' | tee ${KEYS_DIR}/${snakeKey} > ${KEYS_DIR}/${kebabKey}`,
           'anchor keys sync',
           'anchor build'
         ].join(' && ');
