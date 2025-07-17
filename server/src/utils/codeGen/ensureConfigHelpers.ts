@@ -125,19 +125,25 @@ export async function ensureRootWorkspaceMembers(
       if (/^\[.*\]/.test(rootLines[i].trim())) { wsEnd = i; break; }
     }
 
-    // remove old members block (handles multiline form)
-    let i = wsIdx + 1;
-    while (i < wsEnd) {
-      if (rootLines[i].trim().startsWith('members')) {
-        let j = i;
+    // wipe any previous `members = [` block (one‑ or multi‑line)
+    let scan = wsIdx + 1;
+    while (scan < wsEnd) {
+      if (rootLines[scan].trim().startsWith('members')) {
+        let j = scan;
         while (j < wsEnd && !rootLines[j].trim().endsWith(']')) j++;
         if (j < wsEnd) j++;
-        rootLines.splice(i, j - i);
-        wsEnd -= (j - i);
-        break;
+        rootLines.splice(scan, j - scan);
+        wsEnd -= (j - scan);
+        continue;
       }
-      i++;
+      scan++;
     }
+    // strip leftover wildcard / bracket pair
+    rootLines = rootLines.filter((ln, idx, arr) => {
+      if (ln.trim() === '"programs/*"') return false;
+      if (ln.trim() === ']' && idx > 0 && arr[idx - 1].trim() === '"programs/*"') return false;
+      return true;
+    });
 
     rootLines.splice(wsIdx + 1, 0, ...newMembersBlock);
   }

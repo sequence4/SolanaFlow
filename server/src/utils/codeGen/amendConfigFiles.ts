@@ -455,19 +455,29 @@ export const amendConfigFiles = async (
         if (/^\[.*\]/.test(rootLines[i].trim())) { wsEnd = i; break; }
       }
 
-      /* remove any previous `members = [` block (inline or multiline) */
-      let i = wsIdx + 1;
-      while (i < wsEnd) {
-        if (rootLines[i].trim().startsWith('members')) {
-          let j = i;
+      // ─────────────────────────────────────────────────────────────
+      // Purge *every* existing `members = [` block — no matter if it
+      // is a one‑liner or the old three‑line variant containing
+      // `"programs/*"`.
+      // ─────────────────────────────────────────────────────────────
+      let scan = wsIdx + 1;
+      while (scan < wsEnd) {
+        if (rootLines[scan].trim().startsWith('members')) {
+          let j = scan;
           while (j < wsEnd && !rootLines[j].trim().endsWith(']')) j++;
-          if (j < wsEnd) j++;           // include the closing ']'
-          rootLines.splice(i, j - i);
-          wsEnd -= (j - i);
-          break;
+          if (j < wsEnd) j++;            // include the closing bracket
+          rootLines.splice(scan, j - scan);
+          wsEnd -= (j - scan);
+          continue;                      // keep scanning for more
         }
-        i++;
+        scan++;
       }
+      // Drop any orphan `"programs/*"` line (and its trailing `]`)
+      rootLines = rootLines.filter((ln, idx, arr) => {
+        if (ln.trim() === '"programs/*"') return false;
+        if (ln.trim() === ']' && idx > 0 && arr[idx - 1].trim() === '"programs/*"') return false;
+        return true;
+      });
 
       /* insert the fresh block just after the header */
       rootLines.splice(wsIdx + 1, 0, ...newMembersBlock);
