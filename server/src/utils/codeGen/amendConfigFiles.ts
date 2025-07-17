@@ -393,6 +393,11 @@ export const amendConfigFiles = async (
   const anchorSrc = await getFileContentBlocking(projectId, 'Anchor.toml', userId);
   console.log('[AMEND] Loaded Anchor.toml bytes:', anchorSrc.length);
 
+  /* ------------------------------------------------------------------ *
+   * Discover generated program crates (e.g. "programs/untitled_project")
+   * ------------------------------------------------------------------ */
+  const programPaths = await listGeneratedPrograms(projectId, userId);
+
   /* ────────────────────────────────────────────────────────────────
    * Strip any [programs.*] entries that have no matching crate name
    * ──────────────────────────────────────────────────────────────── */
@@ -425,6 +430,25 @@ export const amendConfigFiles = async (
     console.log('[AMEND] Loaded root Cargo.toml bytes:', rootCargoSrc.length);
     
     let rootLines = rootCargoSrc.split('\n');
+
+    /* --------------------------------------------------------------- *
+     * Ensure the workspace members list matches the generated crates
+     * --------------------------------------------------------------- */
+    const wantedMembersLine =
+      `members = [${programPaths.map(p => `"${p}"`).join(', ')}]`;
+
+    const membersIdx = rootLines.findIndex(l => l.trim().startsWith('members ='));
+    if (membersIdx !== -1) {
+      rootLines[membersIdx] = wantedMembersLine;
+    } else {
+      // guarantee a [workspace] header exists, then insert
+      let wsIdx = rootLines.findIndex(l => l.trim() === '[workspace]');
+      if (wsIdx === -1) {
+        rootLines.unshift('[workspace]', wantedMembersLine, '');
+      } else {
+        rootLines.splice(wsIdx + 1, 0, wantedMembersLine);
+      }
+    }
     
     // Define the size-optimized profile blocks for both release and test
     const sizeProfile = [
@@ -634,7 +658,7 @@ export const amendConfigFiles = async (
   }
   
   // Find and patch all program Cargo.toml files
-  const programPaths = await listGeneratedPrograms(projectId, userId);
+  /* programPaths already computed above */
   for (const p of programPaths) {
     const cargoPath = `${p}/Cargo.toml`;
     const res = await patchProgramCargoToml(projectId, cargoPath, userId);
