@@ -162,19 +162,21 @@ export async function deployWithEphemeralKey(
     const bufferKey = Keypair.generate();
     
     // ── Program-id setup ──────────────────────────────────────────
+    // ───────── Program‑ID resolution order ──────────
+    // 1️⃣  Upgrade path if the caller passed an explicit programId
+    // 2️⃣  Use build‑time deterministic keypair bytes
+    // 3️⃣  Fallback to a supplied Keypair object
+    // 4️⃣  Otherwise abort – never mint a brand‑new program keypair            */
     let programKeypair: Keypair | null = null;
 
-    if (programSecretKey && programSecretKey.length === 64) {
-      // Most common path – build system sent us the raw secret bytes
+    if (userProvidedProgramId) {
+      programId = userProvidedProgramId;               // upgrade existing
+    } else if (programSecretKey?.length === 64) {
       programKeypair = Keypair.fromSecretKey(Uint8Array.from(programSecretKey));
-      programId      = programKeypair.publicKey;
+      programId      = programKeypair.publicKey;       // deterministic deploy
     } else if (userProvidedKeypair) {
-      // Deterministic keypair supplied → use it for the program
-      programKeypair = userProvidedKeypair;
+      programKeypair = userProvidedKeypair;            // deterministic deploy
       programId      = programKeypair.publicKey;
-    } else if (userProvidedProgramId) {
-      // Only a program ID supplied (existing on chain) → use upgrade path
-      programId = userProvidedProgramId;
     } else {
       // 🔒  Safety: never mint a brand‑new keypair in the browser.
       throw new Error(
@@ -399,7 +401,8 @@ export async function deployWithEphemeralKey(
           const { blockhash: simHash } = await connection.getLatestBlockhash('confirmed');
           simTx.recentBlockhash = simHash;
         }
-        simTx.feePayer = walletPublicKey;
+        // Use the *same* signer as fee‑payer so the signature set matches
+        simTx.feePayer = ephemeralKey.publicKey;
         simTx.sign(ephemeralKey);
         const { value:{err, logs} } = await connection.simulateTransaction(simTx);
         console.log('[SIM-WRITE] err', err, '\nlogs', logs);
