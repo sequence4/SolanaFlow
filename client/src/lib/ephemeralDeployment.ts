@@ -161,28 +161,47 @@ export async function deployWithEphemeralKey(
     // 2. Create a buffer account (using a real keypair, not PDA)
     const bufferKey = Keypair.generate();
     
-    // ── Program-id setup ──────────────────────────────────────────
-    // ───────── Program‑ID resolution order ──────────
-    // 1️⃣  Upgrade path if the caller passed an explicit programId
-    // 2️⃣  Use build‑time deterministic keypair bytes
-    // 3️⃣  Fallback to a supplied Keypair object
-    // 4️⃣  Otherwise abort – never mint a brand‑new program keypair            */
+    // ── Program‑ID setup ──────────────────────────────────────────
+    // Priority:
+    //  1. caller‑supplied `programId` (upgrade path)
+    //  2. 64‑byte deterministic secret key from build pipeline
+    //  3. explicit `Keypair` object from caller
+    //  🚫 never generate a brand‑new program keypair in‑browser
     let programKeypair: Keypair | null = null;
+    type IdSource = 'providedId' | 'secretKey' | 'keypair';
+    let idSource: IdSource = 'keypair';
 
     if (userProvidedProgramId) {
-      programId = userProvidedProgramId;               // upgrade existing
+      programId = userProvidedProgramId;
+      idSource  = 'providedId';
+
+      // sanity‑check: backend secret key must agree with the supplied ID
+      if (programSecretKey?.length === 64) {
+        const derived = Keypair
+          .fromSecretKey(Uint8Array.from(programSecretKey))
+          .publicKey;
+        if (!derived.equals(programId)) {
+          console.warn(
+            `[EPHEMERAL_DEPLOY] ⚠️ Build secretKey ${derived.toBase58()} ` +
+            `≠ provided programId ${programId.toBase58()} – ignoring secretKey`,
+          );
+        }
+      }
     } else if (programSecretKey?.length === 64) {
       programKeypair = Keypair.fromSecretKey(Uint8Array.from(programSecretKey));
-      programId      = programKeypair.publicKey;       // deterministic deploy
-    } else if (userProvidedKeypair) {
-      programKeypair = userProvidedKeypair;            // deterministic deploy
       programId      = programKeypair.publicKey;
+      idSource       = 'secretKey';
+    } else if (userProvidedKeypair) {
+      programKeypair = userProvidedKeypair;
+      programId      = programKeypair.publicKey;
+      idSource       = 'keypair';
     } else {
-      // 🔒  Safety: never mint a brand‑new keypair in the browser.
       throw new Error(
         'Deterministic program keypair missing – aborting deploy to avoid accidental ID drift',
       );
     }
+
+    onProgress(1, `Using programId (${idSource}) ${programId.toBase58()}`);
 
     const [programDataPubkey] = PublicKey.findProgramAddressSync(
       [programId.toBuffer()],
@@ -401,7 +420,8 @@ export async function deployWithEphemeralKey(
           const { blockhash: simHash } = await connection.getLatestBlockhash('confirmed');
           simTx.recentBlockhash = simHash;
         }
-        // Use the *same* signer as fee‑payer so the signature set matches
+        // Use *matching* fee‑payer for simulation so signature set matches the
+        // real transaction's signer list.
         simTx.feePayer = ephemeralKey.publicKey;
         simTx.sign(ephemeralKey);
         const { value:{err, logs} } = await connection.simulateTransaction(simTx);
