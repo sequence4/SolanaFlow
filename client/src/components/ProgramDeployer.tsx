@@ -76,7 +76,7 @@ export function ProgramDeployer({
         const { secretKey } = await projectApi.getProgramKeypair(projectId);
         if (secretKey && secretKey.length === 64) {
           setProgramSecretKey(secretKey);
-          console.log("✅ Program keypair fetched successfully");
+          console.log("✅ Program secret key fetched successfully");
         }
       } catch (keypairError) {
         console.warn("Failed to load program keypair:", keypairError);
@@ -121,7 +121,7 @@ export function ProgramDeployer({
           toast.error('Program bytes missing');
           return;
         }
-        // 1. Create ephemeral keypair and fetch program secret key from backend
+        // 1. Create an ephemeral keypair to upload chunks
         const { keypair: ephem } = await createAndRegisterEphemeral(projectId);
         console.log(`🔑 Ephemeral key: ${ephem.publicKey.toBase58()}`);
         
@@ -140,12 +140,14 @@ export function ProgramDeployer({
           existingProgramId = undefined;
         }
 
-        // Build options for deployment. Only include programId for upgrades.
+        // Build options for deployment.
         const deployOptions: EphemeralDeployOptions = {
           soBytes: programBytes,
           connection,
           wallet,
           ephemeralKeypair: ephem,
+          // provide the program secret key if available (deterministic new program)
+          programSecretKey: programSecretKey ?? undefined,
           verifyTimeoutMs: 120_000,      // allow 2 min for the authority–swap RPC to settle
           onProgress: (raw: number, message: string) => {
             const pct = raw <= 1 ? Math.round(raw * 100) : Math.round(raw);
@@ -204,7 +206,16 @@ export function ProgramDeployer({
         backendRunningRef.current = false;
         backendStartedRef.current = false;  // dialog can deploy again if reopened
       }
-    }, [isLoading, projectId, programBytes, programSecretKey, wallet, onSuccess, onClose, existingProgramId]);
+    }, [
+      isLoading,
+      projectId,
+      programBytes,
+      programSecretKey,
+      wallet,
+      onSuccess,
+      onClose,
+      existingProgramId,
+    ]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !isLoading && !open && onClose()}>

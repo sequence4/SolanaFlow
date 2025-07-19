@@ -166,49 +166,36 @@ export async function deployWithEphemeralKey(
     const bufferKey = Keypair.generate();
     
     // ── Program‑ID setup ──────────────────────────────────────────
+    // Determine programId and keypair.
     // Priority:
     //  1. caller‑supplied `programId` (upgrade path)
     //  2. 64‑byte deterministic secret key from build pipeline
     //  3. explicit `Keypair` object from caller
-    //  🚫 never generate a brand‑new program keypair in‑browser
+    //  4. generate a new keypair (new deployment)
     let programKeypair: Keypair | null = null;
-    type IdSource = 'providedId' | 'secretKey' | 'keypair';
-    let idSource: IdSource = 'keypair';
-
     if (userProvidedProgramId) {
+      // upgrade path: use existing program id
       programId = userProvidedProgramId;
       resolvedProgramId = programId;
-      idSource  = 'providedId';
-
-      // sanity‑check: backend secret key must agree with the supplied ID
-      if (programSecretKey?.length === 64) {
-        const derived = Keypair
-          .fromSecretKey(Uint8Array.from(programSecretKey))
-          .publicKey;
-        if (!derived.equals(programId)) {
-          console.warn(
-            `[EPHEMERAL_DEPLOY] ⚠️ Build secretKey ${derived.toBase58()} ` +
-            `≠ provided programId ${programId.toBase58()} – ignoring secretKey`,
-          );
-        }
-      }
     } else if (programSecretKey?.length === 64) {
+      // derive program keypair from secret key
       programKeypair = Keypair.fromSecretKey(Uint8Array.from(programSecretKey));
       programId      = programKeypair.publicKey;
       resolvedProgramId = programId;
-      idSource       = 'secretKey';
     } else if (userProvidedKeypair) {
+      // use provided keypair
       programKeypair = userProvidedKeypair;
       programId      = programKeypair.publicKey;
       resolvedProgramId = programId;
-      idSource       = 'keypair';
     } else {
-      throw new Error(
-        'Deterministic program keypair missing – aborting deploy to avoid accidental ID drift',
-      );
+      // no predetermined key; generate a new program keypair
+      programKeypair = Keypair.generate();
+      programId      = programKeypair.publicKey;
+      resolvedProgramId = programId;
     }
 
-    onProgress(1, `Using programId (${idSource}) ${programId.toBase58()}`);
+    // Inform the caller about the chosen programId
+    onProgress(1, `Using programId ${programId.toBase58()}`);
 
     const [programDataPubkey] = PublicKey.findProgramAddressSync(
       [programId.toBuffer()],
