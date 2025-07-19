@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "echo \"(Client) No tests implemented yet.\" && exit 0"
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "resolutions": {
     "@types/react": "19.1.8"

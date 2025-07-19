@@ -135,6 +135,8 @@ export async function deployWithEphemeralKey(
   const walletPublicKey = wallet.publicKey;
   const signatures: string[] = [];
   let programId: PublicKey | null = null;
+  // Define resolvedProgramId at function scope so it's accessible in catch block
+  let resolvedProgramId: PublicKey | null = null;
   
   try {
     // Convert ArrayBuffer to Uint8Array for processing
@@ -207,6 +209,17 @@ export async function deployWithEphemeralKey(
       [programId.toBuffer()],
       BPF_UPGRADE_LOADER_ID,
     );
+    
+    // ------------------------------------------------------------------------
+    // Freeze the resolved programId.  Without this defensive copy the mutable
+    // `programId` variable can be reassigned later in this function (for
+    // example, via the catch block), and any TransactionInstruction created
+    // earlier still holds a reference to that variable.  If the variable is
+    // overwritten, subsequent simulations and toast messages may reflect a
+    // *different* program id than the one originally derived here.  Capture it
+    // once and use the frozen value for all subsequent instructions, logging
+    // and return values.
+    resolvedProgramId = programId!; // assert non-null and assign to function-scoped variable
     
     console.log(`[EPHEMERAL_DEPLOY] Program ID: ${programId.toBase58()}`);
     console.log(`[EPHEMERAL_DEPLOY] Buffer: ${bufferKey.publicKey.toBase58()}`);
@@ -552,7 +565,7 @@ export async function deployWithEphemeralKey(
         programId: BPF_UPGRADE_LOADER_ID,
         keys: [
           { pubkey: programDataPubkey,    isSigner: false, isWritable: true },
-          { pubkey: programId,            isSigner: false, isWritable: true },
+          { pubkey: resolvedProgramId!,   isSigner: false, isWritable: true },
           { pubkey: bufferKey.publicKey,  isSigner: false, isWritable: true },
           { pubkey: spillPubkey,          isSigner: false, isWritable: true },
           { pubkey: SYSVAR_RENT_PUBKEY,   isSigner: false, isWritable: false },
@@ -677,7 +690,7 @@ export async function deployWithEphemeralKey(
         console.warn(msg);
         return {
           success: true,
-          programId,
+          programId: resolvedProgramId,
           signatures,
           warning: msg,
         };
@@ -706,7 +719,7 @@ export async function deployWithEphemeralKey(
     }
 
     const ix = new TransactionInstruction({
-      programId, keys: [], data: Buffer.alloc(0)   // will fail gracefully
+      programId: resolvedProgramId, keys: [], data: Buffer.alloc(0)   // will fail gracefully
     });
     const testTx = new Transaction().add(ix);
     // ② Add a recent block-hash for the final simulate
@@ -742,21 +755,25 @@ export async function deployWithEphemeralKey(
       console.warn('[CLOSE] Could not close buffer:', e);
     }
 
-    console.log(`[EPHEMERAL_DEPLOY] Program deployed successfully to ${programId.toBase58()}`);
+    console.log(
+      `[EPHEMERAL_DEPLOY] Program deployed successfully to ${resolvedProgramId.toBase58()}`,
+    );
     onProgress(100, "Deployment successful!");
     
     return {
-      programId,
+      programId: resolvedProgramId,
       signatures,
-      success: true
+      success: true,
     };
   } catch (e: any) {
     console.error('RAW ERROR', e);
     // web3.js puts logs in `e.logs` (v1.95+) or `e.data.logs` (older)
     console.error('ERROR LOGS:', e.logs ?? e.data?.logs ?? []);
     onProgress(99, "Deployment failed - check console for details");
+
     return {
-      programId: programId ?? PublicKey.default,
+      // Use resolvedProgramId when available, fallback to programId or default
+      programId: resolvedProgramId ?? PublicKey.default,
       signatures,
       success: false
     };
