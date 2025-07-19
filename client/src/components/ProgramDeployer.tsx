@@ -20,6 +20,7 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { connection } from "@/utils/connection";
 import bs58 from 'bs58';
+import process from 'process';
 
 interface ProgramDeployerProps {
   projectId: string;
@@ -82,6 +83,30 @@ export function ProgramDeployer({
         console.warn("Failed to load program keypair:", keypairError);
         // Continue anyway - the deploy function will handle this case
       }
+
+      // If the program secret key wasn't provided by the server, try to parse it from
+      // an environment variable.  This supports deterministic deployments using a
+      // secret stored in NEXT_PUBLIC_PROGRAM_SECRET_KEY (either JSON array or base58).
+      if (!programSecretKey) {
+        const envSecret = process.env.NEXT_PUBLIC_PROGRAM_SECRET_KEY;
+        if (envSecret) {
+          try {
+            // Try JSON array first
+            const arr = JSON.parse(envSecret);
+            if (Array.isArray(arr) && arr.length === 64) {
+              setProgramSecretKey(arr);
+            }
+          } catch {
+            // Fallback: decode base58-encoded secret
+            try {
+              const decoded = bs58.decode(envSecret.trim());
+              if (decoded.length === 64) {
+                setProgramSecretKey(Array.from(decoded));
+              }
+            } catch { /* ignore invalid env secret */ }
+          }
+        }
+      }
       
       console.log(`✅ Program fetched: ${bytes.byteLength.toLocaleString()} bytes`);
     } catch (error) {
@@ -140,29 +165,35 @@ export function ProgramDeployer({
           existingProgramId = undefined;
         }
 
-        // Build options for deployment.
+        // Build options for deployment.  Note: provide only one of `programId` or `programSecretKey`.
         const deployOptions: EphemeralDeployOptions = {
           soBytes: programBytes,
           connection,
           wallet,
-          ephemeralKeypair: ephem,
-          // provide the program secret key if available (deterministic new program)
-          programSecretKey: programSecretKey ?? undefined,
           verifyTimeoutMs: 120_000,      // allow 2 min for the authority–swap RPC to settle
           onProgress: (raw: number, message: string) => {
             const pct = raw <= 1 ? Math.round(raw * 100) : Math.round(raw);
             setProgress(Math.max(1, Math.min(pct, 100)));
             setDeployStage(message ?? '');
             console.log('[DEPLOY]', pct + '%', message);
-          }
-        };
-        
-        // If we have a valid existing ID (Solana base58 string), pass it to upgrade
+          },
+          // Always pass the correct property name for the in-memory buffer authority
+          // The name `ephemeralKeypair` is required by deployWithEphemeralKey
+          // (typo previously prevented deployer from receiving this key).
+          // We assign it after constructing the object to avoid TypeScript errors.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any;
+        (deployOptions as any).ephemeralKeypair = ephem;
+
+        // If upgrading an existing program, include its ID; otherwise include the secret key
         if (existingProgramId && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(existingProgramId)) {
           deployOptions.programId = new PublicKey(existingProgramId);
           console.log(`[ProgramDeployer] Using existing program ID for upgrade: ${existingProgramId}`);
+        } else if (programSecretKey && programSecretKey.length === 64) {
+          deployOptions.programSecretKey = programSecretKey;
+          console.log(`[ProgramDeployer] Using deterministic program secret key for new deployment`);
         } else {
-          console.log(`[ProgramDeployer] No existing program ID found, will deploy new program`);
+          console.log(`[ProgramDeployer] No deterministic key found; will deploy with a random program ID`);
         }
 
         const deployResult = await deployWithEphemeralKey(deployOptions);
