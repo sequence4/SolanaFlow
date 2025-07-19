@@ -8,6 +8,7 @@ import { Rocket, AlertTriangle } from 'lucide-react';
 import { createAndRegisterEphemeral } from '@/utils/ephemeral/ephemeralKey';
 import { deployWithEphemeralKey, EphemeralDeployOptions } from '@/lib/ephemeralDeployment';
 import { Keypair, PublicKey } from '@solana/web3.js';
+import { deriveProgramKeypair } from '@/utils/program/deriveProgramKeypair';
 import ProjectContext from '@/context/project/ProjectContext';
 import {
   Dialog,
@@ -173,14 +174,22 @@ export function ProgramDeployer({
 
         // Apply root-cause priority: existing program ID first; otherwise secret key if available.
         if (hasExistingId) {
+          // Use the existing program ID for upgrades.
           deployOptions.programId = new PublicKey(projProgId!);
           console.log(`[ProgramDeployer] Using existing program ID for upgrade: ${projProgId}`);
         } else if (secretKeyToUse && secretKeyToUse.length === 64) {
+          // Use the secret key (from server or env) for deterministic new deployments.
           deployOptions.programSecretKey = secretKeyToUse;
-          console.log(`[ProgramDeployer] Using deterministic program secret key for new deployment`);
-        } else {
           console.log(
-            `[ProgramDeployer] No deterministic key found; will deploy with a random program ID`,
+            `[ProgramDeployer] Using deterministic program secret key for new deployment`,
+          );
+        } else {
+          // Last resort: derive a program keypair from the project ID itself.
+          const derived = deriveProgramKeypair(projectId);
+          secretKeyToUse = Array.from(derived.secretKey);
+          deployOptions.programSecretKey = secretKeyToUse;
+          console.log(
+            `[ProgramDeployer] Derived program keypair from projectId for deterministic new deployment`,
           );
         }
 
