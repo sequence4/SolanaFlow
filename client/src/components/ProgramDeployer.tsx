@@ -20,7 +20,6 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { connection } from "@/utils/connection";
 import bs58 from 'bs58';
-import process from 'process';
 
 interface ProgramDeployerProps {
   projectId: string;
@@ -83,30 +82,6 @@ export function ProgramDeployer({
         console.warn("Failed to load program keypair:", keypairError);
         // Continue anyway - the deploy function will handle this case
       }
-
-      // If the program secret key wasn't provided by the server, try to parse it from
-      // an environment variable.  This supports deterministic deployments using a
-      // secret stored in NEXT_PUBLIC_PROGRAM_SECRET_KEY (either JSON array or base58).
-      if (!programSecretKey) {
-        const envSecret = process.env.NEXT_PUBLIC_PROGRAM_SECRET_KEY;
-        if (envSecret) {
-          try {
-            // Try JSON array first
-            const arr = JSON.parse(envSecret);
-            if (Array.isArray(arr) && arr.length === 64) {
-              setProgramSecretKey(arr);
-            }
-          } catch {
-            // Fallback: decode base58-encoded secret
-            try {
-              const decoded = bs58.decode(envSecret.trim());
-              if (decoded.length === 64) {
-                setProgramSecretKey(Array.from(decoded));
-              }
-            } catch { /* ignore invalid env secret */ }
-          }
-        }
-      }
       
       console.log(`✅ Program fetched: ${bytes.byteLength.toLocaleString()} bytes`);
     } catch (error) {
@@ -149,51 +124,64 @@ export function ProgramDeployer({
         // 1. Create an ephemeral keypair to upload chunks
         const { keypair: ephem } = await createAndRegisterEphemeral(projectId);
         console.log(`🔑 Ephemeral key: ${ephem.publicKey.toBase58()}`);
-        
-        if (!programSecretKey) {
-          console.warn("Program secret key not available from build pipeline");
-          // We'll continue anyway, and deployWithEphemeralKey will handle it
+
+        // 2. Determine deployment parameters just before sending:
+        // - Check if a programId exists in projectContext (upgrade).
+        // - Check if a 64-byte secret key is available (from API or env).
+        const projProgId = projectContext?.details?.projectState?.programId;
+        const hasExistingId =
+          !!projProgId && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(projProgId);
+        // Prefer the key loaded from the server; fall back to NEXT_PUBLIC_PROGRAM_SECRET_KEY
+        let secretKeyToUse: number[] | undefined = undefined;
+        if (programSecretKey && programSecretKey.length === 64) {
+          secretKeyToUse = programSecretKey;
+        } else {
+          const envSecret = process.env.NEXT_PUBLIC_PROGRAM_SECRET_KEY;
+          if (envSecret) {
+            try {
+              const arr = JSON.parse(envSecret);
+              if (Array.isArray(arr) && arr.length === 64) {
+                secretKeyToUse = arr;
+              }
+            } catch {
+              try {
+                const decoded = bs58.decode(envSecret.trim());
+                if (decoded.length === 64) {
+                  secretKeyToUse = Array.from(decoded);
+                }
+              } catch {
+                /* ignore invalid env secret */
+              }
+            }
+          }
         }
 
-        // 2. Deploy using the ephemeral key (wallet will pay fees)
-        
-        // Determine if there is already a deployed program ID (upgrade scenario)
-        let existingProgramId: string | undefined;
-        try {
-          existingProgramId = projectContext?.details?.projectState?.programId;
-        } catch (_) {
-          existingProgramId = undefined;
-        }
-
-        // Build options for deployment.  Note: provide only one of `programId` or `programSecretKey`.
+        // Build options for deployment.
         const deployOptions: EphemeralDeployOptions = {
           soBytes: programBytes,
           connection,
           wallet,
-          verifyTimeoutMs: 120_000,      // allow 2 min for the authority–swap RPC to settle
+          ephemeralKeypair: ephem,
+          verifyTimeoutMs: 120_000,
           onProgress: (raw: number, message: string) => {
             const pct = raw <= 1 ? Math.round(raw * 100) : Math.round(raw);
             setProgress(Math.max(1, Math.min(pct, 100)));
             setDeployStage(message ?? '');
             console.log('[DEPLOY]', pct + '%', message);
           },
-          // Always pass the correct property name for the in-memory buffer authority
-          // The name `ephemeralKeypair` is required by deployWithEphemeralKey
-          // (typo previously prevented deployer from receiving this key).
-          // We assign it after constructing the object to avoid TypeScript errors.
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any;
-        (deployOptions as any).ephemeralKeypair = ephem;
+        };
 
-        // If upgrading an existing program, include its ID; otherwise include the secret key
-        if (existingProgramId && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(existingProgramId)) {
-          deployOptions.programId = new PublicKey(existingProgramId);
-          console.log(`[ProgramDeployer] Using existing program ID for upgrade: ${existingProgramId}`);
-        } else if (programSecretKey && programSecretKey.length === 64) {
-          deployOptions.programSecretKey = programSecretKey;
+        // Apply root-cause priority: existing program ID first; otherwise secret key if available.
+        if (hasExistingId) {
+          deployOptions.programId = new PublicKey(projProgId!);
+          console.log(`[ProgramDeployer] Using existing program ID for upgrade: ${projProgId}`);
+        } else if (secretKeyToUse && secretKeyToUse.length === 64) {
+          deployOptions.programSecretKey = secretKeyToUse;
           console.log(`[ProgramDeployer] Using deterministic program secret key for new deployment`);
         } else {
-          console.log(`[ProgramDeployer] No deterministic key found; will deploy with a random program ID`);
+          console.log(
+            `[ProgramDeployer] No deterministic key found; will deploy with a random program ID`,
+          );
         }
 
         const deployResult = await deployWithEphemeralKey(deployOptions);
@@ -245,7 +233,7 @@ export function ProgramDeployer({
       wallet,
       onSuccess,
       onClose,
-      existingProgramId,
+      projectContext,
     ]);
 
   return (
