@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import { connection } from "@/utils/connection";
+import bs58 from 'bs58';
 
 interface ProgramDeployerProps {
   projectId: string;
@@ -130,12 +131,14 @@ export function ProgramDeployer({
         }
 
         // 2. Deploy using the ephemeral key (wallet will pay fees)
+        // Build options for the deploy helper. We default to a fresh deploy
+        // and override with programId or programSecretKey based on project state
+        // and environment variables.
         const deployOptions: EphemeralDeployOptions = {
           soBytes: programBytes,
           connection,
           wallet,
           ephemeralKeypair: ephem,
-          programSecretKey: programSecretKey || undefined,
           verifyTimeoutMs: 120_000,      // allow 2 min for the authority–swap RPC to settle
           onProgress: (raw: number, message: string) => {
             const pct = raw <= 1 ? Math.round(raw * 100) : Math.round(raw);
@@ -145,10 +148,45 @@ export function ProgramDeployer({
           }
         };
 
+        // Determine whether we're upgrading an existing program or deploying a new one.
         // If we have an existing program ID, use it for upgrades
         if (existingProgramId && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(existingProgramId)) {
           console.log(`Using existing program ID for upgrade: ${existingProgramId}`);
           deployOptions.programId = new PublicKey(existingProgramId);
+        } else {
+          // Try the programSecretKey from the backend first
+          if (programSecretKey && programSecretKey.length === 64) {
+            deployOptions.programSecretKey = programSecretKey;
+            console.log("Using program secret key from build pipeline");
+          } else {
+            // Use deterministic secret key from environment if provided
+            const envSecret = process.env.NEXT_PUBLIC_PROGRAM_SECRET_KEY;
+            if (envSecret) {
+              let secretArr: number[] | undefined;
+              try {
+                if (envSecret.trim().startsWith('[')) {
+                  secretArr = JSON.parse(envSecret) as number[];
+                } else {
+                  const decoded = bs58.decode(envSecret.trim());
+                  secretArr = Array.from(decoded);
+                }
+              } catch (e) {
+                console.warn(
+                  '[ProgramDeployer] Failed to parse NEXT_PUBLIC_PROGRAM_SECRET_KEY',
+                  e,
+                );
+              }
+              // Accept only 64-byte secret keys
+              if (secretArr && secretArr.length === 64) {
+                deployOptions.programSecretKey = secretArr;
+                console.log("Using program secret key from environment");
+              } else {
+                console.warn(
+                  '[ProgramDeployer] NEXT_PUBLIC_PROGRAM_SECRET_KEY is not a valid 64-byte secret key'
+                );
+              }
+            }
+          }
         }
 
         const deployResult = await deployWithEphemeralKey(deployOptions);
