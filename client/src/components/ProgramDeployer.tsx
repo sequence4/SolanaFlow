@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Rocket, AlertTriangle } from 'lucide-react';
 import { createAndRegisterEphemeral } from '@/utils/ephemeral/ephemeralKey';
 import { deployWithEphemeralKey, EphemeralDeployOptions } from '@/lib/ephemeralDeployment';
-import { deriveProgramId } from '@/utils/program/deriveProgramId';
 import { Keypair, PublicKey } from '@solana/web3.js';
 import ProjectContext from '@/context/project/ProjectContext';
 import {
@@ -132,20 +131,21 @@ export function ProgramDeployer({
         }
 
         // 2. Deploy using the ephemeral key (wallet will pay fees)
-        // Derive the program ID from the project ID so deployments always
-        // target the same account (supports upgrades and matches build output).
-        const deterministicProgramId = deriveProgramId(projectId);
         
-        // Build options for the deploy helper. We default to a fresh deploy
-        // using the derived deterministic program ID.
+        // Determine if there is already a deployed program ID (upgrade scenario)
+        let existingProgramId: string | undefined;
+        try {
+          existingProgramId = projectContext?.details?.projectState?.programId;
+        } catch (_) {
+          existingProgramId = undefined;
+        }
+
+        // Build options for deployment. Only include programId for upgrades.
         const deployOptions: EphemeralDeployOptions = {
           soBytes: programBytes,
           connection,
           wallet,
-          // The generated keypair signs the write transactions and becomes the upgrade authority.
           ephemeralKeypair: ephem,
-          // Always use the deterministic program ID derived from project UUID
-          programId: deterministicProgramId,
           verifyTimeoutMs: 120_000,      // allow 2 min for the authority–swap RPC to settle
           onProgress: (raw: number, message: string) => {
             const pct = raw <= 1 ? Math.round(raw * 100) : Math.round(raw);
@@ -154,23 +154,14 @@ export function ProgramDeployer({
             console.log('[DEPLOY]', pct + '%', message);
           }
         };
-
-        // If we have an existing program ID from context, verify it matches our derived ID
+        
+        // If we have a valid existing ID (Solana base58 string), pass it to upgrade
         if (existingProgramId && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(existingProgramId)) {
-          const existingPubkey = new PublicKey(existingProgramId);
-          if (!existingPubkey.equals(deterministicProgramId)) {
-            console.warn(
-              `[ProgramDeployer] Existing program ID ${existingProgramId} differs from deterministic ID ${deterministicProgramId.toBase58()}. Using deterministic ID for consistency.`
-            );
-          } else {
-            console.log(`[ProgramDeployer] Confirmed existing program ID ${existingProgramId} matches derived ID.`);
-          }
+          deployOptions.programId = new PublicKey(existingProgramId);
+          console.log(`[ProgramDeployer] Using existing program ID for upgrade: ${existingProgramId}`);
+        } else {
+          console.log(`[ProgramDeployer] No existing program ID found, will deploy new program`);
         }
-        
-        console.log(`[ProgramDeployer] Using deterministic program ID: ${deterministicProgramId.toBase58()}`);
-        
-        // Note: we no longer need the programSecretKey or environment variable logic
-        // since we're always using the deterministic program ID
 
         const deployResult = await deployWithEphemeralKey(deployOptions);
 

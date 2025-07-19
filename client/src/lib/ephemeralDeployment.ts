@@ -135,7 +135,9 @@ export async function deployWithEphemeralKey(
   const walletPublicKey = wallet.publicKey;
   const signatures: string[] = [];
   let programId: PublicKey | null = null;
-  // Define resolvedProgramId at function scope so it's accessible in catch block
+  
+  // Track the final program ID once it's determined. This allows error
+  // handlers to report the correct ID even if the deployment is cancelled.
   let resolvedProgramId: PublicKey | null = null;
   
   try {
@@ -175,6 +177,7 @@ export async function deployWithEphemeralKey(
 
     if (userProvidedProgramId) {
       programId = userProvidedProgramId;
+      resolvedProgramId = programId;
       idSource  = 'providedId';
 
       // sanity‑check: backend secret key must agree with the supplied ID
@@ -192,10 +195,12 @@ export async function deployWithEphemeralKey(
     } else if (programSecretKey?.length === 64) {
       programKeypair = Keypair.fromSecretKey(Uint8Array.from(programSecretKey));
       programId      = programKeypair.publicKey;
+      resolvedProgramId = programId;
       idSource       = 'secretKey';
     } else if (userProvidedKeypair) {
       programKeypair = userProvidedKeypair;
       programId      = programKeypair.publicKey;
+      resolvedProgramId = programId;
       idSource       = 'keypair';
     } else {
       throw new Error(
@@ -772,8 +777,8 @@ export async function deployWithEphemeralKey(
     onProgress(99, "Deployment failed - check console for details");
 
     return {
-      // Use resolvedProgramId when available, fallback to programId or default
-      programId: resolvedProgramId ?? PublicKey.default,
+      // Use the resolved ID if available; fall back to programId or default
+      programId: resolvedProgramId ?? programId ?? PublicKey.default,
       signatures,
       success: false
     };
