@@ -1,6 +1,7 @@
 import { Connection, PublicKey, Keypair } from '@solana/web3.js';
 import type { WalletContextState } from '@solana/wallet-adapter-react';
 import { deployWithEphemeralKey } from '../../lib/ephemeralDeployment';
+import bs58 from 'bs58';
 import { projectApi } from '../../api/projectApi';
 import { toast } from 'sonner';
 import { createAndRegisterEphemeral } from '@/utils/ephemeral/ephemeralKey';
@@ -23,21 +24,86 @@ export async function handleEphemeralDeploy(
 
     onProgress(0, 'Starting ephemeral key deployment...');
 
-    // 1. Generate an ephemeral keypair and register it (retrieve program secret key)
+    // 1. Generate an ephemeral keypair and register it
     const { keypair: ephem, programSecretKey } = await createAndRegisterEphemeral(projectId);
-    
-    // 2. Use the ephemeral key approach to handle the deployment
-    if (!programSecretKey) {
-      throw new Error('Prebuilt program keypair not found for deployment');
+
+    // Determine programId or secret key from project details or env
+    let programIdArg: PublicKey | undefined;
+    let programSecretArg: number[] | undefined;
+    try {
+      const project = await projectApi.getProjectDetails(projectId);
+      const existingProgramIdStr = project?.details?.projectState?.programId as
+        | string
+        | null
+        | undefined;
+      if (existingProgramIdStr) {
+        try {
+          programIdArg = new PublicKey(existingProgramIdStr);
+          console.log(`[handleEphemeralDeploy] Using existing program ID: ${existingProgramIdStr} for upgrade`);
+        } catch (e) {
+          console.warn(
+            `[handleEphemeralDeploy] Invalid existing program ID: ${existingProgramIdStr}`,
+            e,
+          );
+        }
+      }
+    } catch (e) {
+      console.warn('[handleEphemeralDeploy] Could not fetch project details', e);
     }
-    const deployResult = await deployWithEphemeralKey({
+
+    // 2. Use the ephemeral key approach to handle the deployment
+    // Configure deployment parameters with appropriate program identification
+    const deployParams: any = {
       soBytes: programSoData,
       connection,
       wallet,
       ephemeralKeypair: ephem,
-      programSecretKey: programSecretKey,
-      onProgress
-    });
+      onProgress,
+    };
+
+    // Priority: 1. Existing programId from server, 2. Program secret key from backend, 3. Env variable
+    if (programIdArg) {
+      // Use existing program ID for upgrades
+      deployParams.programId = programIdArg;
+    } else {
+      // Try the backend programSecretKey first
+      if (programSecretKey && programSecretKey.length === 64) {
+        deployParams.programSecretKey = programSecretKey;
+        console.log("[handleEphemeralDeploy] Using program secret key from build pipeline");
+      } else {
+        // Fall back to environment variable
+        const envSecret = process.env.NEXT_PUBLIC_PROGRAM_SECRET_KEY;
+        if (envSecret) {
+          let arr: number[] | undefined;
+          try {
+            if (envSecret.trim().startsWith('[')) {
+              arr = JSON.parse(envSecret) as number[];
+            } else {
+              const decoded = bs58.decode(envSecret.trim());
+              arr = Array.from(decoded);
+            }
+          } catch (e) {
+            console.warn(
+              '[handleEphemeralDeploy] Failed to parse NEXT_PUBLIC_PROGRAM_SECRET_KEY',
+              e,
+            );
+          }
+          if (arr && arr.length === 64) {
+            deployParams.programSecretKey = arr;
+            console.log("[handleEphemeralDeploy] Using program secret key from environment");
+          } else {
+            console.warn(
+              '[handleEphemeralDeploy] NEXT_PUBLIC_PROGRAM_SECRET_KEY is not a valid 64-byte secret key',
+            );
+          }
+        } else if (!programSecretKey) {
+          // Only throw if we have no secret key at all
+          throw new Error('No program keypair or ID found for deployment');
+        }
+      }
+    }
+
+    const deployResult = await deployWithEphemeralKey(deployParams);
 
     onProgress(95, 'Deployment successful, registering with server...');
 
