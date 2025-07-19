@@ -122,33 +122,40 @@ export function ProgramDeployer({
           toast.error('Program bytes missing');
           return;
         }
-        // 1. Create an ephemeral keypair to upload chunks
+        // 1. Create an ephem keypair to upload chunks.
         const { keypair: ephem } = await createAndRegisterEphemeral(projectId);
         console.log(`🔑 Ephemeral key: ${ephem.publicKey.toBase58()}`);
 
         // 2. Determine deployment parameters just before sending:
-        // - Check if a programId exists in projectContext (upgrade).
-        // - Check if a 64-byte secret key is available (from API or env).
+        // Fetch the program's secret key (64-byte array) from the backend again to ensure it's current.
+        let serverSecret: number[] | undefined;
+        try {
+          const { secretKey } = await projectApi.getProgramKeypair(projectId);
+          if (secretKey && secretKey.length === 64) {
+            serverSecret = secretKey;
+          }
+        } catch {
+          /* ignore errors when keypair is missing */
+        }
+        // Next check if a programId exists (upgrade scenario).
         const projProgId = projectContext?.details?.projectState?.programId;
         const hasExistingId =
-          !!projProgId && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(projProgId);
-        // Prefer the key loaded from the server; fall back to NEXT_PUBLIC_PROGRAM_SECRET_KEY
-        let secretKeyToUse: number[] | undefined = undefined;
-        if (programSecretKey && programSecretKey.length === 64) {
-          secretKeyToUse = programSecretKey;
-        } else {
+          projProgId && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(projProgId);
+        // If no server secret, try reading from NEXT_PUBLIC_PROGRAM_SECRET_KEY (JSON array or base58).
+        let fallbackSecret: number[] | undefined;
+        if (!serverSecret) {
           const envSecret = process.env.NEXT_PUBLIC_PROGRAM_SECRET_KEY;
           if (envSecret) {
             try {
               const arr = JSON.parse(envSecret);
               if (Array.isArray(arr) && arr.length === 64) {
-                secretKeyToUse = arr;
+                fallbackSecret = arr;
               }
             } catch {
               try {
                 const decoded = bs58.decode(envSecret.trim());
                 if (decoded.length === 64) {
-                  secretKeyToUse = Array.from(decoded);
+                  fallbackSecret = Array.from(decoded);
                 }
               } catch {
                 /* ignore invalid env secret */
@@ -156,7 +163,6 @@ export function ProgramDeployer({
             }
           }
         }
-
         // Build options for deployment.
         const deployOptions: EphemeralDeployOptions = {
           soBytes: programBytes,
@@ -171,26 +177,21 @@ export function ProgramDeployer({
             console.log('[DEPLOY]', pct + '%', message);
           },
         };
-
-        // Apply root-cause priority: existing program ID first; otherwise secret key if available.
+        // Apply the prioritised selection: existing ID > server secret > env secret > derived seed.
         if (hasExistingId) {
-          // Use the existing program ID for upgrades.
           deployOptions.programId = new PublicKey(projProgId!);
           console.log(`[ProgramDeployer] Using existing program ID for upgrade: ${projProgId}`);
-        } else if (secretKeyToUse && secretKeyToUse.length === 64) {
-          // Use the secret key (from server or env) for deterministic new deployments.
-          deployOptions.programSecretKey = secretKeyToUse;
-          console.log(
-            `[ProgramDeployer] Using deterministic program secret key for new deployment`,
-          );
+        } else if (serverSecret && serverSecret.length === 64) {
+          deployOptions.programSecretKey = serverSecret;
+          console.log(`[ProgramDeployer] Using server-provided secret key for new deployment`);
+        } else if (fallbackSecret && fallbackSecret.length === 64) {
+          deployOptions.programSecretKey = fallbackSecret;
+          console.log(`[ProgramDeployer] Using NEXT_PUBLIC_PROGRAM_SECRET_KEY for new deployment`);
         } else {
-          // Last resort: derive a program keypair from the project ID itself.
+          // As a last resort, derive a program keypair from the project ID.
           const derived = deriveProgramKeypair(projectId);
-          secretKeyToUse = Array.from(derived.secretKey);
-          deployOptions.programSecretKey = secretKeyToUse;
-          console.log(
-            `[ProgramDeployer] Derived program keypair from projectId for deterministic new deployment`,
-          );
+          deployOptions.programSecretKey = Array.from(derived.secretKey);
+          console.log(`[ProgramDeployer] Derived program keypair from projectId for deterministic deployment`);
         }
 
         const deployResult = await deployWithEphemeralKey(deployOptions);
