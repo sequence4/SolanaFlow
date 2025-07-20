@@ -9,8 +9,9 @@ import { normalizeProjectName } from './stringUtils';
 import pool from 'src/config/database';
 import { pruneContainerResources } from './container/pruneContainer';
 import { startProjectContainer } from './container/startProjectContainer';
-import { Connection, sendAndConfirmRawTransaction, Keypair } from '@solana/web3.js';
+import { Connection, sendAndConfirmRawTransaction, Transaction, Keypair } from '@solana/web3.js';
 import { spawn, SpawnOptions } from 'child_process';
+import { getProgramSecret } from './awsSecrets';
 
 //const USER_WORKSPACE_IMAGE = "ghcr.io/sequence4/solanaflow:latest";
 
@@ -1295,19 +1296,32 @@ EOF`;
 }
 
 /**
- * Relays a fully-signed deploy transaction (base64) to Devnet and
- * returns the confirmed signature string.
+ * Relay and sign an unsigned deployment/upgrade transaction using the
+ * program's secret key retrieved from AWS Secrets Manager.
+ * @param projectId Project ID for logging/DB consistency.
+ * @param programId Program ID whose keypair will be used to sign.
+ * @param encodedTx Base64‑encoded unsigned transaction.
+ * @returns The confirmed signature string.
  */
-export async function broadcastSignedTx(projectId: string, encodedTx: string): Promise<string> {
-  // TODO: verify that the deployed program address matches the current project
-  // before relaying, to prevent malicious reuse of this endpoint.
-  // NOTE: encodedTx must be base64-encoded. If using Phantom, call 
-  // tx.serialize({ verifySignatures: false }).toString('base64') before sending.
-  console.log(`[broadcastSignedTx] project ${projectId} relaying…`);
+export async function broadcastSignedTx(
+  projectId: string,
+  programId: string,
+  encodedTx: string,
+): Promise<string> {
+  console.log(
+    `[broadcastSignedTx] project ${projectId} signing and relaying for program ${programId}…`,
+  );
+  // Decode the serialized transaction
+  const rawBuffer = Buffer.from(encodedTx, 'base64');
+  const tx = Transaction.from(rawBuffer);
+  // Retrieve the secret key from Secrets Manager and sign
+  const secretKey = await getProgramSecret(programId);
+  const signer = Keypair.fromSecretKey(secretKey);
+  tx.partialSign(signer);
+  // Broadcast the fully signed transaction
   const conn = new Connection('https://api.devnet.solana.com', 'confirmed');
-  const raw  = Buffer.from(encodedTx, 'base64');
-  const sig  = await sendAndConfirmRawTransaction(conn, raw);
-  return sig;
+  const signature = await sendAndConfirmRawTransaction(conn, tx.serialize());
+  return signature;
 }
 
 /**

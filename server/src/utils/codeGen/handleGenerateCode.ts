@@ -22,6 +22,7 @@ import { APP_CONFIG } from '../../config/appConfig';
 import { Keypair } from '@solana/web3.js';
 import pool from '../../config/database';
 import { normalizeProjectName } from '../stringUtils';
+import { saveProgramSecret } from '../awsSecrets';
 
 /** Extract all file paths from a file tree recursively. */
 function flattenPaths(tree: any[]): string[] {
@@ -426,6 +427,10 @@ EOF'`,
         // Generate a fresh, random keypair so every dApp has a unique program ID
         const programKeypair = Keypair.generate();
         const programId = programKeypair.publicKey.toBase58();
+
+        // Persist the secret key in AWS Secrets Manager for secure storage
+        await saveProgramSecret(programId, programKeypair.secretKey);
+
         // Save the keypair to a file for later use (e.g. Anchor deploy or upgrades)
         const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${programId}.json`);
         fsSync.writeFileSync(walletPath, JSON.stringify(Array.from(programKeypair.secretKey)));

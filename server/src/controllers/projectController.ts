@@ -1235,7 +1235,7 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
   }
   try {
     // Broadcast the signed transaction to Devnet
-    const txSignature = await broadcastSignedTx(id, encodedTx);
+    const txSignature = await broadcastSignedTx(id, programId, encodedTx);
     // Persist the Program ID in the project's details
     const client = await pool.connect();
     try {
