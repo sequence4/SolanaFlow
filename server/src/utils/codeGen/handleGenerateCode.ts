@@ -511,6 +511,33 @@ EOF'`,
           throw new Error('Keypair self-verification failed');
         }
         console.log('[GEN] Generated deterministic program ID:', programId);
+
+        /* ──────────────────────────────────────────────────────────────
+         * Persist programId inside solanaproject.details.projectState
+         * so the FE can read it before the first deploy attempt.
+         * ────────────────────────────────────────────────────────────── */
+        try {
+          await pool.query(
+            `
+            UPDATE solanaproject
+            SET    details =
+                   jsonb_set(
+                     COALESCE(details, '{}'::jsonb),
+                     '{projectState,programId}',
+                     to_jsonb($1::text),
+                     true
+                   )
+            WHERE  id = $2
+            `,
+            [programId, projectId],
+          );
+          console.log('[GEN] Program ID persisted to project.details');
+          
+          // Notify frontend that the programId is now available
+          sendProgress({ event: 'programIdPersisted', programId });
+        } catch (e) {
+          console.error('[GEN] Failed to persist program ID to DB:', e);
+        }
         
         /**
          * Write the key-pair **directly to the global warm-cache**
