@@ -237,10 +237,14 @@ export function runDeployPipelineWithLogs(
           projectState: {
             ...prev.details!.projectState,
             idl: msg.idl,
-            idls: prev.details!.projectState.idls
-              ? [...prev.details!.projectState.idls.filter((i: any) => 
-                  i.name !== msg.idl.name), msg.idl]
-              : [msg.idl]
+            idls: prev.details!.projectState?.idls
+              ? [
+                  ...prev.details!.projectState.idls.filter(
+                    (i: any) => i.name !== msg.idl.name,
+                  ),
+                  msg.idl,
+                ]
+              : [msg.idl],
           }
         }
       }));
@@ -263,7 +267,7 @@ export function runDeployPipelineWithLogs(
       
       setProjectContext(prev => {
         // Merge new IDLs with existing ones, replacing any with the same name
-        const existingIdls = prev.details?.projectState.idls || [];
+        const existingIdls = prev.details?.projectState?.idls ?? [];
         const mergedIdls = [
           ...existingIdls.filter((existing: any) => 
             !msg.idls.some((incoming: any) => incoming.name === existing.name)
@@ -278,7 +282,7 @@ export function runDeployPipelineWithLogs(
             projectState: {
               ...prev.details!.projectState,
               // Set the first IDL as the primary one if not already set
-              idl: prev.details!.projectState.idl || msg.idls[0],
+              idl: prev.details!.projectState?.idl || msg.idls[0],
               idls: mergedIdls
             }
           }

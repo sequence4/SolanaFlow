@@ -23,6 +23,10 @@ export interface ProjectStateType {
   deployed?: boolean
   /** Public key of the deployed on-chain program (base-58). */
   programId?: string
+  /** Anchor IDL (interface description language) for the program */
+  idl?: any
+  /** optional list of all IDLs we've received for this project */
+  idls?: any[]
 }
 
 // ---------------------------------------------------------------------------
