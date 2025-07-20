@@ -630,8 +630,11 @@ export const startAnchorDeployTask = async (
         await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && solana config set --keypair ${containerWalletPath}"`, '.', sanitizedTaskId, { skipSuccessUpdate: true });
       }
       
-      await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && solana config set --url devnet"`, '.', sanitizedTaskId, { skipSuccessUpdate: true });
-
+            await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && solana config set --url devnet"`, '.', sanitizedTaskId, { skipSuccessUpdate: true });
+      // Remove any existing program keypair files to ensure a new Program ID on each deployment
+      await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && rm -f target/deploy/*-keypair.json"`, '.', sanitizedTaskId, { skipSuccessUpdate: true });
+      console.log(`[DEPLOY] Removed existing program keypair files to force fresh program ID`);
+      
       const anchorDeployCmd = `anchor deploy \
         --provider.wallet ${containerWalletPath} \
         --provider.cluster devnet`;
@@ -755,6 +758,17 @@ export const startAnchorDeployTask = async (
         console.error(`[DEPLOY_DEBUG] Error verifying program ID: ${verifyProgramErr.message}`);
       }
       
+      // Update the frontend .env with the new Program ID
+      if (programId) {
+        try {
+          const envUpdateCmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && if [ -d web ]; then if [ -f web/.env ] && grep -q '^REACT_APP_PROGRAM_ID=' web/.env; then sed -i 's/^REACT_APP_PROGRAM_ID=.*/REACT_APP_PROGRAM_ID=${programId}/' web/.env; else echo 'REACT_APP_PROGRAM_ID=${programId}' >> web/.env; fi; fi"`;
+          await runCommand(envUpdateCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
+          console.log(`[DEPLOY] Updated web/.env with Program ID: ${programId}`);
+        } catch (updateErr: any) {
+          console.error(`[DEPLOY] Failed to update web/.env: ${updateErr.message}`);
+        }
+      }
+
       const successResult = JSON.stringify({
         status: 'success',
         programId: programId

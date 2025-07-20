@@ -234,17 +234,20 @@ export const projectApi = {
   /**
    * POST the 64-byte secret key array so the backend can register the keypair.
    * Returns the new ephemeral pubkey and the program's secret key if available.
+   * If no secretKey provided, attempts to use the Anchor-generated program keypair.
    */
   createEphemeral: async (
     projectId: string,
-    secretKey: number[]
-  ): Promise<{ ephemeralPubkey: string; programSecretKey?: number[] }> => {
+    secretKey?: number[]
+  ): Promise<{ ephemeralPubkey: string; secretKey?: number[] }> => {
     try {
-      const response = await api.post(
-        `/projects/${projectId}/ephemeral`,
-        { secretKey }
-      );
-      return response.data;
+      const body = secretKey ? { secretKey } : {};
+      const response = await api.post(`/projects/${projectId}/ephemeral`, body);
+      const data = response.data;
+      return {
+        ephemeralPubkey: data.pubkey ?? data.ephemeralPubkey,
+        secretKey: data.secretKey
+      };
     } catch (err) {
       console.error('Error creating ephemeral:', err);
       throw err;
@@ -342,6 +345,20 @@ export const projectApi = {
       console.error('Error getting program keypair:', error);
       throw error;
     }
+  },
+
+  /**
+   * Persist the freshly‑generated 64‑byte secret key so later builds
+   * (and other team‑members) can upgrade the same program ID.
+   */
+  saveProgramKeypair: async (
+    projectId: string,
+    secretKey: number[],
+  ) => {
+    return api.post(
+      `/projects/${projectId}/program-keypair`,
+      { secretKey },
+    );
   },
 
   /** Fetch the existing **public** program ID (no secret key). */

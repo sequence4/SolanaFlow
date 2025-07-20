@@ -55,10 +55,15 @@ export async function ensureAnchorTomlProgram(
     }
 
     let changed = false;
-    if (clusterPrograms[programName] !== programId) {
-      clusterPrograms[programName] = programId;
-      changed = true;
-      console.log(`[ENSURE_CONFIG] Anchor.toml: Setting ${programsClusterKey}.${programName} = ${programId}`);
+    // Only set program ID if not using placeholder on non-localnet clusters
+    if (programId === '11111111111111111111111111111111' && cluster !== 'localnet') {
+      console.log(`[ENSURE_CONFIG] Skipping program ID for ${cluster}: will use new key at deploy time`);
+    } else {
+      if (clusterPrograms[programName] !== programId) {
+        clusterPrograms[programName] = programId;
+        changed = true;
+        console.log(`[ENSURE_CONFIG] Anchor.toml: Setting ${programsClusterKey}.${programName} = ${programId}`);
+      }
     }
 
     if (changed) {

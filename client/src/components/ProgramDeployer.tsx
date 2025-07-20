@@ -5,11 +5,9 @@ import { downloadArtifact } from '@/api/projectArtifact';
 import { projectApi } from '@/api/projectApi';
 import { Button } from '@/components/ui/button';
 import { Rocket, AlertTriangle } from 'lucide-react';
-import { createAndRegisterEphemeral } from '@/utils/ephemeral/ephemeralKey';
+// Removed import of createAndRegisterEphemeral (no longer used)
 import { deployWithEphemeralKey, EphemeralDeployOptions } from '@/lib/ephemeralDeployment';
 import { Keypair, PublicKey } from '@solana/web3.js';
-// Retain deriveProgramKeypair import in case it is used elsewhere.
-import { deriveProgramKeypair } from '@/utils/program/deriveProgramKeypair';
 import ProjectContext from '@/context/project/ProjectContext';
 import {
   Dialog,
@@ -47,7 +45,6 @@ export function ProgramDeployer({
   const [byteLength, setByteLength] = useState(0);
   const [progress, setProgress] = useState<number | null>(null);
   const [deployStage, setDeployStage] = useState<string>('');
-  const [programSecretKey, setProgramSecretKey] = useState<number[] | null>(null);
 
   // ────────────────────────────────────────────────────────────────
   //  Guards that survive React 18 Strict-Mode double-mounts
@@ -74,18 +71,6 @@ export function ProgramDeployer({
       setProgramBytes(bytes);
       setByteLength(bytes.byteLength);
       setBytesLoaded(true);
-      
-      // Also fetch the program keypair from the server (generated during build)
-      try {
-        const { secretKey } = await projectApi.getProgramKeypair(projectId);
-        if (secretKey && secretKey.length === 64) {
-          setProgramSecretKey(secretKey);
-          console.log("✅ Program secret key fetched successfully");
-        }
-      } catch (keypairError) {
-        console.warn("Failed to load program keypair:", keypairError);
-        // Continue anyway - the deploy function will handle this case
-      }
       
       console.log(`✅ Program fetched: ${bytes.byteLength.toLocaleString()} bytes`);
     } catch (error) {
@@ -125,34 +110,29 @@ export function ProgramDeployer({
           toast.error('Program bytes missing');
           return;
         }
-        // 1. createAndRegisterEphemeral returns an object with a keypair property
-        const { keypair: ephem } = await createAndRegisterEphemeral(projectId);
-        console.log(`🔑 Ephemeral key: ${ephem.publicKey.toBase58()}`);
-
-        // 2. Determine deployment parameters just before sending:
-        // Fetch the program's secret key (64-byte array) from the backend again to ensure it's current.
-        let serverSecret: number[] | undefined;
+        // 1. Generate an ephemeral key for authority and register it on the backend
+        const authorityEphem = Keypair.generate();
         try {
-          const { secretKey } = await projectApi.getProgramKeypair(projectId);
-          if (secretKey && secretKey.length === 64) {
-            serverSecret = secretKey;
-          }
-        } catch {
-          /* ignore errors when keypair is missing */
+          await projectApi.createEphemeral(projectId, Array.from(authorityEphem.secretKey));
+        } catch (error) {
+          console.error('Failed to register ephemeral key:', error);
         }
-        // Next check if a programId exists (upgrade scenario).
-        const projProgId = projectContext?.details?.projectState?.programId;
-        const hasExistingId =
-          projProgId && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(projProgId);
-        // Do not attempt to use an environment secret.  If the server does
-        // not provide a secret key, deployWithEphemeralKey will generate
-        // a new program ID.
-        // Build options for deployment.
+        console.log(`🔑 Ephemeral key (authority): ${authorityEphem.publicKey.toBase58()}`);
+        
+        // 2. ALWAYS mint a brand‑new program key (one per deployment)
+        const programKeypair = Keypair.generate();
+        // persist it so future upgrades reuse the same ID
+        await projectApi.saveProgramKeypair(projectId, Array.from(programKeypair.secretKey))
+          .catch((e: Error) => console.warn('Could not persist program keypair:', e));
+        console.log(`🆔 Fresh program ID: ${programKeypair.publicKey.toBase58()}`);
+        
+        // 3. Deploy the program using the ephemeral authority key and Anchor program key
         const deployOptions: EphemeralDeployOptions = {
           soBytes: programBytes,
           connection,
           wallet,
-          ephemeralKeypair: ephem,
+          ephemeralKeypair: authorityEphem,
+          programKeypair,                     /* guarantees same ID in sim + commit */
           verifyTimeoutMs: 120_000,
           onProgress: (raw: number, message: string) => {
             const pct = raw <= 1 ? Math.round(raw * 100) : Math.round(raw);
@@ -161,39 +141,41 @@ export function ProgramDeployer({
             console.log('[DEPLOY]', pct + '%', message);
           },
         };
-        // The buffer authority keypair is already assigned in the deployment options
-
-        // Apply the prioritised selection: existing ID > server secret.
+        
+        // If this is an upgrade, use the existing program ID
+        const projProgId = projectContext?.details?.projectState?.programId;
+        const hasExistingId =
+          projProgId && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(projProgId);
         if (hasExistingId) {
           deployOptions.programId = new PublicKey(projProgId!);
           console.log(`[ProgramDeployer] Using existing program ID for upgrade: ${projProgId}`);
-        } else if (serverSecret && serverSecret.length === 64) {
-          deployOptions.programSecretKey = serverSecret;
-          console.log(`[ProgramDeployer] Using server-provided secret key for new deployment`);
         }
 
         const deployResult = await deployWithEphemeralKey(deployOptions);
 
         if (deployResult.success) {
+          if (deployResult.warning) {
+            toast.warning(deployResult.warning);
+          }
           // Record deployed program ID in backend project details (fail silently if it fails)
           try {
             await projectApi.updateProject(projectId, {
-              details: { projectState: { programId: deployResult.programId.toBase58() } }
+              details: { projectState: { programId: programKeypair.publicKey.toBase58() } }
             });
           } catch (updateErr) {
             console.error('Failed to update project with program ID:', updateErr);
           }
-          onSuccess(deployResult.programId.toBase58());
+          onSuccess(programKeypair.publicKey.toBase58());
         }
 
         /* 5 – success UX */
-        toast.success('Program deployed with ephemeral key', {
-          description: `Program ID: ${deployResult.programId.toBase58()}`,
+        toast.success('Program deployed successfully', {
+          description: `Program ID: ${programKeypair.publicKey.toBase58()}`,
           action: {
             label: 'Explorer',
             onClick: () =>
               window.open(
-                `https://explorer.solana.com/address/${deployResult.programId.toBase58()}?cluster=devnet`,
+                `https://explorer.solana.com/address/${programKeypair.publicKey.toBase58()}?cluster=devnet`,
                 '_blank',
               ),
           },
@@ -217,7 +199,6 @@ export function ProgramDeployer({
       isLoading,
       projectId,
       programBytes,
-      programSecretKey,
       wallet,
       onSuccess,
       onClose,

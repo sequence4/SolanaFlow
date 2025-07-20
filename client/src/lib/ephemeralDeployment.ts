@@ -115,14 +115,14 @@ interface DeployResult {
 export async function deployWithEphemeralKey(
   options: EphemeralDeployOptions
 ): Promise<DeployResult> {
-  const {
+      const {
     soBytes,
     connection,
     wallet,
     ephemeralKeypair,
     onProgress = () => {},
     programId: userProvidedProgramId,
-    programKeypair: userProvidedKeypair,
+    programKeypair: providedProgramKeypair,
     programSecretKey,
     verifyTimeoutMs = 60_000,
   } = options;
@@ -168,23 +168,22 @@ export async function deployWithEphemeralKey(
     // ── Program‑ID setup ──────────────────────────────────────────
     // Determine programId and keypair.
     // Priority:
-    //  1. caller‑supplied `programId` (upgrade path)
-    //  2. 64‑byte deterministic secret key from build pipeline
-    //  3. explicit `Keypair` object from caller
-    //  4. generate a new keypair (new deployment)
+    //  1. Use provided program keypair (from Anchor build)
+    //  2. Use caller‑supplied `programId` (upgrade path)
+    //  3. Use 64‑byte secret key array from build pipeline
+    //  4. Generate a new keypair (new deployment)
     let programKeypair: Keypair | null = null;
-    if (userProvidedProgramId) {
+    if (providedProgramKeypair) {
+      programKeypair = providedProgramKeypair;
+      programId = programKeypair.publicKey;
+      resolvedProgramId = programId;
+    } else if (userProvidedProgramId) {
       // upgrade path: use existing program id
       programId = userProvidedProgramId;
       resolvedProgramId = programId;
     } else if (programSecretKey?.length === 64) {
       // derive program keypair from secret key
       programKeypair = Keypair.fromSecretKey(Uint8Array.from(programSecretKey));
-      programId      = programKeypair.publicKey;
-      resolvedProgramId = programId;
-    } else if (userProvidedKeypair) {
-      // use provided keypair
-      programKeypair = userProvidedKeypair;
       programId      = programKeypair.publicKey;
       resolvedProgramId = programId;
     } else {

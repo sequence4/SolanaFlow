@@ -510,67 +510,64 @@ export const getBuildArtifact = async (
 
 export const createEphemeralKeypair = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // Generate a new keypair
-    const { id } = req.params;
-    const { secretKey: secretKeyArray } = req.body;
+    const { secretKey } = req.body;
     let ephem: Keypair;
-    if (secretKeyArray && Array.isArray(secretKeyArray) && secretKeyArray.length === 64) {
-      ephem = Keypair.fromSecretKey(Uint8Array.from(secretKeyArray));
-      console.log('[DEPLOY_EPHEMERAL] Using provided secret key for ephemeral Keypair');
+    if (secretKey && Array.isArray(secretKey)) {
+      console.log(`[ARTIFACT] Using provided secret key for ephemeral Keypair`);
+      ephem = Keypair.fromSecretKey(Uint8Array.from(secretKey));
     } else {
-      ephem = Keypair.generate();
-      if (secretKeyArray) {
-        console.warn('[DEPLOY_EPHEMERAL] Invalid secretKey array provided. Generated a new Keypair instead.');
+      const projectId = req.params.id;
+      // Attempt to use Anchor-generated program keypair if available
+      let secretArr: number[] | null = null;
+      const containerName = await getContainerName(projectId);
+      if (containerName) {
+        const rootPath = await getProjectRootPath(projectId);
+        const findTaskId = uuidv4();
+        const keyPath = await runCommand(
+          `docker exec ${containerName} bash -c 'cd /usr/src/${rootPath} && find target/deploy -maxdepth 1 -name "*.json" | head -n 1'`,
+          ".",
+          findTaskId,
+          { skipSuccessUpdate: true }
+        );
+        if (keyPath && keyPath.trim() !== "") {
+          console.log(`[ARTIFACT] ✓ Found keypair file at /usr/src/${rootPath}/${keyPath.trim()}, reading...`);
+          const readTaskId = uuidv4();
+          const keyContent = await runCommand(
+            `docker exec ${containerName} bash -c "cat /usr/src/${rootPath}/${keyPath.trim()}"`,
+            ".",
+            readTaskId,
+            { skipSuccessUpdate: true }
+          );
+                     const parsedArr = JSON.parse(keyContent.trim());
+           if (Array.isArray(parsedArr) && parsedArr.length === 64) {
+             secretArr = parsedArr;
+             const programPubkey = Keypair.fromSecretKey(Uint8Array.from(secretArr)).publicKey.toBase58();
+             console.log(`[ARTIFACT] ✓ Extracted Program ID ${programPubkey} from keypair`);
+           }
+         } else {
+           console.log(`[ARTIFACT] ❌ No program keypair file found in target/deploy for project ${projectId}`);
+         }
+       }
+       if (secretArr && Array.isArray(secretArr)) {
+         ephem = Keypair.fromSecretKey(Uint8Array.from(secretArr));
+       } else {
+        ephem = Keypair.generate();
+        console.log(`[ARTIFACT] Generated new ephemeral keypair (no existing program ID)`);
       }
     }
     const pubkey = ephem.publicKey.toBase58();
-    
     // Save the keypair to the wallets folder
     const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${pubkey}.json`);
     fs.writeFileSync(walletPath, JSON.stringify(Array.from(ephem.secretKey)));
-    
-    /* ---------------------------------------------------------
-     * Self-verify the keypair without relying on solana-keygen.
-     * If the derived pubkey doesn't round-trip, throw.
-     * --------------------------------------------------------*/
-    const derived = Keypair
-      .fromSecretKey(ephem.secretKey)
-      .publicKey.toBase58();
+    // Self-verify the keypair
+    const derived = Keypair.fromSecretKey(ephem.secretKey).publicKey.toBase58();
     if (derived !== pubkey) {
       throw new Error('Keypair self-verification failed');
     }
-
-    // Retrieve program keypair from build artifacts
-    let programKeypairArray: number[] | null = null;
-    try {
-      const rootPath = await getProjectRootPath(id);
-      const containerName = await getContainerName(id);
-      if (containerName) {
-        const tempTaskId = uuidv4();
-        const findCmd = `docker exec ${containerName} bash -c 'cd /usr/src/${rootPath} && find target/deploy -maxdepth 1 -name "*.json" | head -n 1'`;
-        const keyPath = (await runCommand(findCmd, '.', tempTaskId, { skipSuccessUpdate: true })).trim();
-        if (keyPath) {
-          const keyContent = await runCommand(`docker exec ${containerName} cat ${keyPath}`, '.', tempTaskId, { skipSuccessUpdate: true });
-          const arr = JSON.parse(keyContent);
-          if (Array.isArray(arr) && arr.length === 64) {
-            programKeypairArray = arr;
-          } else {
-            console.error('[DEPLOY_EPHEMERAL] Program key JSON content invalid or not 64 bytes');
-          }
-        } else {
-          console.error(`[DEPLOY_EPHEMERAL] No program keypair file found in target/deploy for project ${id}`);
-        }
-      } else {
-        console.error(`[DEPLOY_EPHEMERAL] No container found for project ${id}, cannot retrieve program keypair`);
-      }
-    } catch (err) {
-      console.error(`[DEPLOY_EPHEMERAL] Error retrieving program keypair for project ${id}:`, err);
-    }
-    
     res.status(200).json({
       message: 'Ephemeral keypair created successfully',
       pubkey,
-      programSecretKey: programKeypairArray
+      secretKey: Array.from(ephem.secretKey)
     });
   } catch (error) {
     console.error('Error creating ephemeral keypair:', error);
@@ -615,8 +612,65 @@ export const deployProject = async (
       return next(new AppError('Error parsing project details', 500));
     }
 
-    const taskId = await startAnchorDeployTask(id, userId);
-
+    // Generate a new ephemeral keypair for this deployment
+    let ephem = Keypair.generate();
+    const pubkey = ephem.publicKey.toBase58();
+    const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${pubkey}.json`);
+    fs.writeFileSync(walletPath, JSON.stringify(Array.from(ephem.secretKey)));
+    // Verify the generated keypair
+    if (Keypair.fromSecretKey(ephem.secretKey).publicKey.toBase58() !== pubkey) {
+      throw new AppError('Failed to create ephemeral keypair', 500);
+    }
+    console.log(`[DEPLOY] Generated new ephemeral keypair: ${pubkey}`);
+    // Start deploy using the new ephemeral key
+    const taskId = await startAnchorDeployTask(id, userId, pubkey);
+    console.log(`[DEPLOY] Deploy task started: ${taskId}`);
+    // Wait for the deploy task to complete (up to 2 minutes)
+    const status = await waitForTaskCompletion(taskId, 120000);
+    console.log(`[DEPLOY] Task ${taskId} completed with status: ${status}`);
+    if (status === 'succeed' || status === 'finished') {
+      // Retrieve the Program ID from task result
+      const resultRes = await pool.query('SELECT result FROM task WHERE id = $1', [taskId]);
+      let programId: string | null = null;
+      if (resultRes.rows.length && resultRes.rows[0].result) {
+        try {
+          programId = JSON.parse(resultRes.rows[0].result).programId;
+        } catch (e) {
+          console.error('[DEPLOY] Failed to parse deploy result JSON:', e);
+        }
+      }
+      if (programId) {
+        console.log(`[DEPLOY] Program deployed with ID: ${programId}`);
+        // Update project details in DB with the new programId
+        await pool.query(
+          `UPDATE solanaproject
+             SET details = COALESCE(details::jsonb, '{}'::jsonb) || $1::jsonb,
+                 last_updated = NOW()
+           WHERE id = $2`,
+          [JSON.stringify({ programId }), id]
+        );
+        // Write the new Program ID to the .env file inside the web container
+        const containerName = await getContainerName(id);
+        const rootPath = await getProjectRootPath(id);
+        if (containerName && rootPath) {
+          const updateEnvCmd = 
+            `docker exec ${containerName} bash -c "echo 'NEXT_PUBLIC_PROGRAM_ID=${programId}\nPROGRAM_ID=${programId}' > /usr/src/${rootPath}/web/.env"`;
+          try {
+            await runCommand(updateEnvCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+            console.log(`[DEPLOY] Updated .env in container ${containerName} with Program ID ${programId}`);
+          } catch (err) {
+            console.error('[DEPLOY] .env update failed:', err);
+          }
+        }
+      } else {
+        console.warn('[DEPLOY] WARNING: Program ID not found in deploy result');
+      }
+    } else if (status === 'failed') {
+      console.error('[DEPLOY] Deployment failed');
+    } else if (status === 'timeout') {
+      console.error('[DEPLOY] Deployment timed out');
+    }
+    // Respond with the task ID (deployment process has been triggered)
     res.status(200).json({
       message: 'Anchor deploy process started',
       taskId: taskId,
