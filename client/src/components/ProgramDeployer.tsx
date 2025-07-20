@@ -122,7 +122,7 @@ export function ProgramDeployer({
           toast.error('Program bytes missing');
           return;
         }
-        // 1. Create an ephem keypair to upload chunks.
+        // 1. createAndRegisterEphemeral returns an object with a keypair property
         const { keypair: ephem } = await createAndRegisterEphemeral(projectId);
         console.log(`🔑 Ephemeral key: ${ephem.publicKey.toBase58()}`);
 
@@ -177,7 +177,9 @@ export function ProgramDeployer({
             console.log('[DEPLOY]', pct + '%', message);
           },
         };
-        // Apply the prioritised selection: existing ID > server secret > env secret > derived seed.
+        // The buffer authority keypair is already assigned in the deployment options
+
+        // Apply the prioritised selection: existing ID > server secret > environment secret.
         if (hasExistingId) {
           deployOptions.programId = new PublicKey(projProgId!);
           console.log(`[ProgramDeployer] Using existing program ID for upgrade: ${projProgId}`);
@@ -187,11 +189,6 @@ export function ProgramDeployer({
         } else if (fallbackSecret && fallbackSecret.length === 64) {
           deployOptions.programSecretKey = fallbackSecret;
           console.log(`[ProgramDeployer] Using NEXT_PUBLIC_PROGRAM_SECRET_KEY for new deployment`);
-        } else {
-          // As a last resort, derive a program keypair from the project ID.
-          const derived = deriveProgramKeypair(projectId);
-          deployOptions.programSecretKey = Array.from(derived.secretKey);
-          console.log(`[ProgramDeployer] Derived program keypair from projectId for deterministic deployment`);
         }
 
         const deployResult = await deployWithEphemeralKey(deployOptions);
