@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Rocket, AlertTriangle } from 'lucide-react';
 // Removed import of createAndRegisterEphemeral (no longer used)
 import { deployWithEphemeralKey, EphemeralDeployOptions } from '@/lib/ephemeralDeployment';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, Keypair } from '@solana/web3.js';
 import ProjectContext from '@/context/project/ProjectContext';
 import {
   Dialog,
@@ -110,6 +110,10 @@ export function ProgramDeployer({
           toast.error('Program bytes missing');
           return;
         }
+        // 1. Generate a fresh *ephemeral* authority key (only signs buffer writes)
+        const authorityEphem = Keypair.generate();
+        console.log(`🔑 Ephemeral authority key: ${authorityEphem.publicKey.toBase58()}`);
+
         // 2. Use the deterministic program ID that the backend baked into the .so
         const deterministicId =
           projectContext?.details?.projectState?.programId;
@@ -124,7 +128,8 @@ export function ProgramDeployer({
           soBytes: programBytes,
           connection,
           wallet,
-          // Frontend no longer holds the program secret; backend will sign.
+          // Front-end never holds the program secret; backend signs final tx.
+          ephemeralKeypair: authorityEphem,
           programId: programIdPubkey,
           verifyTimeoutMs: 120_000,
           onProgress: (raw: number, message: string) => {
