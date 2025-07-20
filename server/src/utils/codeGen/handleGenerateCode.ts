@@ -21,7 +21,6 @@ import fsSync from 'fs';                 // for existsSync in helper
 import { APP_CONFIG } from '../../config/appConfig';
 import { Keypair } from '@solana/web3.js';
 import pool from '../../config/database';
-import { createHash } from 'crypto';
 import { normalizeProjectName } from '../stringUtils';
 
 /** Extract all file paths from a file tree recursively. */
@@ -424,13 +423,25 @@ EOF'`,
         } catch (e) {
           console.warn('Could not fetch project name, using default:', e);
         }
-        // Deterministically derive a Keypair from projectId (32-byte SHA-256 seed)
-        const seed = createHash('sha256').update(projectId).digest(); // 32 bytes
-        const programKeypair = Keypair.fromSeed(seed);
+        // Generate a fresh, random keypair so every dApp has a unique program ID
+        const programKeypair = Keypair.generate();
         const programId = programKeypair.publicKey.toBase58();
         // Save the keypair to a file for later use (e.g. Anchor deploy or upgrades)
         const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${programId}.json`);
         fsSync.writeFileSync(walletPath, JSON.stringify(Array.from(programKeypair.secretKey)));
+
+        /** -----------------------------------------------------------------
+         * Ensure the keypair exists inside the container *before* we call any
+         * `anchor keys sync` commands.  This prevents missing‑file errors for
+         * crates whose kebab/snake stems differ from `programName`.
+         * ----------------------------------------------------------------- */
+        const initialKeyJson = JSON.stringify(Array.from(programKeypair.secretKey));
+        await runCommand(
+          `docker exec ${workspace.containerName} bash -lc 'mkdir -p /usr/src/target/deploy && echo ${initialKeyJson.replace(/'/g, "'\\''")} > /usr/src/target/deploy/${programName}-keypair.json'`,
+          '.',
+          randomUUID(),
+          { skipSuccessUpdate: true },
+        );
 
         /* ────────────────────────────────────────────────────────────────
          * NEW ✨  Keep every Anchor source‑of‑truth in sync *before* build
