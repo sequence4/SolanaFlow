@@ -854,57 +854,7 @@ export const deployProjectEphemeral = async (
   }
 };
 
-export const getProgramKeypair = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  const { id } = req.params;
-  const userId = req.user?.id;
-  if (!userId) {
-    return next(new AppError('User not authenticated', 401));
-  }
-  try {
-    /*------------------------------------------------------------------
-      Only verify the project exists – full RBAC will be added later.
-      The previous query failed on the non‑existent "org_id" column.
-    ------------------------------------------------------------------*/
-    const result = await pool.query(
-      'SELECT details FROM solanaproject WHERE id = $1',
-      [id]
-    );
-    if (result.rows.length === 0) {
-      return next(new AppError('Project not found or access denied', 404));
-    }
-    const detailsObj = (typeof result.rows[0].details === 'object')
-      ? result.rows[0].details
-      : JSON.parse(result.rows[0].details || '{}');
-
-    const programId =
-      detailsObj?.projectState?.programId ??
-      detailsObj?.programId ??
-      detailsObj?.lastProgramId;
-    if (!programId) {
-      return next(new AppError('Program ID not found for this project', 404));
-    }
-
-    /* Dev / trusted‑env: expose the deterministic 64‑byte secret key so
-       the front‑end can recreate the Keypair.  Remove this when you
-       migrate to the public‑ID‑only flow.                            */
-
-    const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${programId}.json`);
-
-    if (!fs.existsSync(walletPath)) {
-      return next(new AppError('Program keypair file not found on server', 404));
-    }
-
-    const secretKey: number[] = JSON.parse(fs.readFileSync(walletPath, 'utf8'));
-    res.status(200).json({ secretKey });
-  } catch (err) {
-    console.error('Error retrieving program keypair:', err);
-    next(new AppError('Failed to retrieve program keypair', 500));
-  }
-};
+/** GET /projects/:id/program-keypair — was leaking secret. Removed. */
 
 /**
  * GET /projects/:id/program-id

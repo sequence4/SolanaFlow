@@ -336,30 +336,7 @@ export const projectApi = {
     }
   },
   
-  /** Get the deterministic **secret** keypair generated during build. */
-  getProgramKeypair: async (projectId: string): Promise<{ secretKey: number[] }> => {
-    try {
-      const response = await api.get(`/projects/${projectId}/program-keypair`);
-      return response.data;                   // { secretKey: [...] }
-    } catch (error) {
-      console.error('Error getting program keypair:', error);
-      throw error;
-    }
-  },
 
-  /**
-   * Persist the freshly‑generated 64‑byte secret key so later builds
-   * (and other team‑members) can upgrade the same program ID.
-   */
-  saveProgramKeypair: async (
-    projectId: string,
-    secretKey: number[],
-  ) => {
-    return api.post(
-      `/projects/${projectId}/program-keypair`,
-      { secretKey },
-    );
-  },
 
   /** Fetch the existing **public** program ID (no secret key). */
   getProgramId: async (projectId: string): Promise<{ programId: string }> => {

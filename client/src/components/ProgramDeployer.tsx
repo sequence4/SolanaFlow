@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Rocket, AlertTriangle } from 'lucide-react';
 // Removed import of createAndRegisterEphemeral (no longer used)
 import { deployWithEphemeralKey, EphemeralDeployOptions } from '@/lib/ephemeralDeployment';
-import { Keypair, PublicKey } from '@solana/web3.js';
+import { PublicKey } from '@solana/web3.js';
 import ProjectContext from '@/context/project/ProjectContext';
 import {
   Dialog,
@@ -110,29 +110,22 @@ export function ProgramDeployer({
           toast.error('Program bytes missing');
           return;
         }
-        // 1. Generate an ephemeral key for authority and register it on the backend
-        const authorityEphem = Keypair.generate();
-        try {
-          await projectApi.createEphemeral(projectId, Array.from(authorityEphem.secretKey));
-        } catch (error) {
-          console.error('Failed to register ephemeral key:', error);
+        // 2. Use the deterministic program ID that the backend baked into the .so
+        const deterministicId =
+          projectContext?.details?.projectState?.programId;
+        if (!deterministicId) {
+          throw new Error('Deterministic program ID missing in project context');
         }
-        console.log(`🔑 Ephemeral key (authority): ${authorityEphem.publicKey.toBase58()}`);
+        const programIdPubkey = new PublicKey(deterministicId);
+        console.log(`🆔 Using deterministic program ID: ${programIdPubkey.toBase58()}`);
         
-        // 2. ALWAYS mint a brand‑new program key (one per deployment)
-        const programKeypair = Keypair.generate();
-        // persist it so future upgrades reuse the same ID
-        await projectApi.saveProgramKeypair(projectId, Array.from(programKeypair.secretKey))
-          .catch((e: Error) => console.warn('Could not persist program keypair:', e));
-        console.log(`🆔 Fresh program ID: ${programKeypair.publicKey.toBase58()}`);
-        
-        // 3. Deploy the program using the ephemeral authority key and Anchor program key
+        // 3. Deploy the program using the ephemeral authority key and deterministic program ID
         const deployOptions: EphemeralDeployOptions = {
           soBytes: programBytes,
           connection,
           wallet,
-          ephemeralKeypair: authorityEphem,
-          programKeypair,                     /* guarantees same ID in sim + commit */
+          // Frontend no longer holds the program secret; backend will sign.
+          programId: programIdPubkey,
           verifyTimeoutMs: 120_000,
           onProgress: (raw: number, message: string) => {
             const pct = raw <= 1 ? Math.round(raw * 100) : Math.round(raw);
@@ -160,22 +153,22 @@ export function ProgramDeployer({
           // Record deployed program ID in backend project details (fail silently if it fails)
           try {
             await projectApi.updateProject(projectId, {
-              details: { projectState: { programId: programKeypair.publicKey.toBase58() } }
+              details: { projectState: { programId: programIdPubkey.toBase58() } }
             });
           } catch (updateErr) {
             console.error('Failed to update project with program ID:', updateErr);
           }
-          onSuccess(programKeypair.publicKey.toBase58());
+          onSuccess(programIdPubkey.toBase58());
         }
 
         /* 5 – success UX */
         toast.success('Program deployed successfully', {
-          description: `Program ID: ${programKeypair.publicKey.toBase58()}`,
+          description: `Program ID: ${programIdPubkey.toBase58()}`,
           action: {
             label: 'Explorer',
             onClick: () =>
               window.open(
-                `https://explorer.solana.com/address/${programKeypair.publicKey.toBase58()}?cluster=devnet`,
+                `https://explorer.solana.com/address/${programIdPubkey.toBase58()}?cluster=devnet`,
                 '_blank',
               ),
           },
