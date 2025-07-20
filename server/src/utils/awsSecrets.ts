@@ -1,4 +1,21 @@
-import { SecretsManagerClient, CreateSecretCommand, PutSecretValueCommand, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
+import {
+  SecretsManagerClient,
+  CreateSecretCommand,
+  PutSecretValueCommand,
+  GetSecretValueCommand,
+  ResourceNotFoundException,
+} from '@aws-sdk/client-secrets-manager';
+
+/** ─────────────────────────  ENV helpers  ───────────────────────── */
+const SKIP = process.env.SKIP_AWS_SECRETS === '1';
+
+export function awsSecretsEnabled(): boolean {
+  if (SKIP) return false;
+  return Boolean(
+    process.env.AWS_ACCESS_KEY_ID &&
+      process.env.AWS_SECRET_ACCESS_KEY,
+  );
+}
 
 /**
  * A singleton SecretsManager client.  Region is taken from AWS_REGION
@@ -18,6 +35,10 @@ export async function saveProgramSecret(
   programId: string,
   secretKey: Uint8Array,
 ): Promise<void> {
+  if (!awsSecretsEnabled()) {
+    console.warn('[awsSecrets] AWS secrets disabled – skipping saveProgramSecret');
+    return;
+  }
   const secretName = `solana/program/${programId}/keypair`;
   const secretString = JSON.stringify(Array.from(secretKey));
   try {
@@ -28,6 +49,14 @@ export async function saveProgramSecret(
       }),
     );
   } catch (err: any) {
+    // Token/cred problems → warn and continue (dev mode)
+    if (
+      err?.name === 'UnrecognizedClientException' ||
+      err?.name === 'InvalidClientTokenId'
+    ) {
+      console.warn(`[awsSecrets] ${err.name}: skipping saveProgramSecret`);
+      return;
+    }
     // If the secret exists, update it; otherwise rethrow.
     if (err.name === 'ResourceExistsException') {
       await secretsClient.send(
@@ -49,14 +78,30 @@ export async function saveProgramSecret(
  */
 export async function getProgramSecret(programId: string): Promise<Uint8Array> {
   const secretName = `solana/program/${programId}/keypair`;
-  const resp = await secretsClient.send(
-    new GetSecretValueCommand({
-      SecretId: secretName,
-    }),
-  );
-  if (!resp.SecretString) {
-    throw new Error(`Secret ${secretName} returned no SecretString`);
+  if (!awsSecretsEnabled()) {
+    throw new Error('AWS credentials not configured or SKIP_AWS_SECRETS=1');
   }
-  const arr = JSON.parse(resp.SecretString);
-  return Uint8Array.from(arr);
+  try {
+    const resp = await secretsClient.send(
+      new GetSecretValueCommand({
+        SecretId: secretName,
+      }),
+    );
+    if (!resp.SecretString) {
+      throw new Error(`Secret ${secretName} returned no SecretString`);
+    }
+    const arr = JSON.parse(resp.SecretString);
+    return Uint8Array.from(arr);
+  } catch (err) {
+    if (
+      (err as any)?.name === 'UnrecognizedClientException' ||
+      (err as any)?.name === 'InvalidClientTokenId'
+    ) {
+      throw new Error('AWS credentials invalid');
+    }
+    if (err instanceof ResourceNotFoundException) {
+      throw new Error(`Secret ${secretName} not found in AWS Secrets Manager`);
+    }
+    throw err;
+  }
 } 

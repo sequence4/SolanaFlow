@@ -22,7 +22,7 @@ import { APP_CONFIG } from '../../config/appConfig';
 import { Keypair } from '@solana/web3.js';
 import pool from '../../config/database';
 import { normalizeProjectName } from '../stringUtils';
-import { saveProgramSecret } from '../awsSecrets';
+import { saveProgramSecret, awsSecretsEnabled } from '../awsSecrets';
 
 /** Extract all file paths from a file tree recursively. */
 function flattenPaths(tree: any[]): string[] {
@@ -429,7 +429,11 @@ EOF'`,
         const programId = programKeypair.publicKey.toBase58();
 
         // Persist the secret key in AWS Secrets Manager for secure storage
-        await saveProgramSecret(programId, programKeypair.secretKey);
+        if (awsSecretsEnabled()) {
+          await saveProgramSecret(programId, programKeypair.secretKey);
+        } else {
+          console.warn('[handleGenerateCode] AWS secrets disabled – keypair kept only on disk');
+        }
 
         // Save the keypair to a file for later use (e.g. Anchor deploy or upgrades)
         const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${programId}.json`);

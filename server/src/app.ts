@@ -16,6 +16,11 @@ import poolRoutes from '@/routes/poolRoutes';
 import internalCertRoute from '@/routes/internalCertRoute';
 import artifactRoute from '@/routes/artifactRoute';
 import { startCleanupWorker } from "./workers/cleanupWorker";
+import { awsSecretsEnabled } from './utils/awsSecrets';
+
+if (!awsSecretsEnabled()) {
+  console.warn('[boot] AWS Secrets disabled (SKIP_AWS_SECRETS=1 or missing creds). Using on‑disk keypairs.');
+}
 
 const app = express();
 const PORT = process.env.PORT || 9999;

@@ -11,7 +11,7 @@ import { pruneContainerResources } from './container/pruneContainer';
 import { startProjectContainer } from './container/startProjectContainer';
 import { Connection, sendAndConfirmRawTransaction, Transaction, Keypair } from '@solana/web3.js';
 import { spawn, SpawnOptions } from 'child_process';
-import { getProgramSecret } from './awsSecrets';
+import { getProgramSecret, awsSecretsEnabled } from './awsSecrets';
 
 //const USER_WORKSPACE_IMAGE = "ghcr.io/sequence4/solanaflow:latest";
 
@@ -1315,8 +1315,23 @@ export async function broadcastSignedTx(
   const rawBuffer = Buffer.from(encodedTx, 'base64');
   const tx = Transaction.from(rawBuffer);
   // Retrieve the secret key from Secrets Manager and sign
-  const secretKey = await getProgramSecret(programId);
-  const signer = Keypair.fromSecretKey(secretKey);
+  let signer: Keypair;
+  try {
+    const secretKey = await getProgramSecret(programId);
+    signer = Keypair.fromSecretKey(secretKey);
+  } catch (e: any) {
+    // Fallback when AWS disabled or creds invalid
+    if (awsSecretsEnabled() && e.message !== 'AWS credentials invalid') {
+      throw e;
+    }
+    // Fallback: read the cached keypair JSON written during build
+    const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${programId}.json`);
+    if (!fs.existsSync(walletPath)) {
+      throw new Error(`Program keypair not found at ${walletPath}`);
+    }
+    const secretArr = JSON.parse(fs.readFileSync(walletPath, 'utf-8'));
+    signer = Keypair.fromSecretKey(Uint8Array.from(secretArr));
+  }
   tx.partialSign(signer);
   // Broadcast the fully signed transaction
   const conn = new Connection('https://api.devnet.solana.com', 'confirmed');
