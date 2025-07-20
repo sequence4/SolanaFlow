@@ -372,4 +372,23 @@ export const projectApi = {
     }
   },
 
+  relaySignedTx: async (
+    projectId: string,
+    encodedTx: string,
+    programId: string,
+    taskId: string,
+  ): Promise<{ signature: string; programId: string }> => {
+    try {
+      const response = await api.post(`/projects/${projectId}/relay-tx`, {
+        encodedTx,
+        programId,
+        taskId,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error relaying signed transaction:', error);
+      throw error;
+    }
+  },
+
 };
