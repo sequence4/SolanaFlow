@@ -21,30 +21,9 @@ import {
 } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import { connection } from "@/utils/connection";
-import bs58 from 'bs58';
-
-// Parse NEXT_PUBLIC_PROGRAM_SECRET_KEY (if provided via container env).
-// It can be a JSON array or base58 string.  The server should supply the key,
-// so this env-based fallback is only used if the server does not return one.
-let envSecretKey: number[] | undefined;
-const envVar = process.env.NEXT_PUBLIC_PROGRAM_SECRET_KEY;
-if (envVar) {
-  try {
-    const arr = JSON.parse(envVar);
-    if (Array.isArray(arr) && arr.length === 64) {
-      envSecretKey = arr;
-    }
-  } catch {
-    try {
-      const decoded = bs58.decode(envVar.trim());
-      if (decoded.length === 64) {
-        envSecretKey = Array.from(decoded);
-      }
-    } catch {
-      /* Ignore invalid env secret */
-    }
-  }
-}
+// Remove environment-based secret parsing.  The secret key is only needed
+// for initial deployments and must come from the server.  If the server
+// cannot find it, a new program ID will be used.
 
 interface ProgramDeployerProps {
   projectId: string;
@@ -165,8 +144,9 @@ export function ProgramDeployer({
         const projProgId = projectContext?.details?.projectState?.programId;
         const hasExistingId =
           projProgId && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(projProgId);
-        // If no server secret, use the parsed envSecretKey if present.
-        const fallbackSecret = (!serverSecret && envSecretKey) ? envSecretKey : undefined;
+        // Do not attempt to use an environment secret.  If the server does
+        // not provide a secret key, deployWithEphemeralKey will generate
+        // a new program ID.
         // Build options for deployment.
         const deployOptions: EphemeralDeployOptions = {
           soBytes: programBytes,
@@ -183,16 +163,13 @@ export function ProgramDeployer({
         };
         // The buffer authority keypair is already assigned in the deployment options
 
-        // Apply the prioritised selection: existing ID > server secret > environment secret.
+        // Apply the prioritised selection: existing ID > server secret.
         if (hasExistingId) {
           deployOptions.programId = new PublicKey(projProgId!);
           console.log(`[ProgramDeployer] Using existing program ID for upgrade: ${projProgId}`);
         } else if (serverSecret && serverSecret.length === 64) {
           deployOptions.programSecretKey = serverSecret;
           console.log(`[ProgramDeployer] Using server-provided secret key for new deployment`);
-        } else if (fallbackSecret && fallbackSecret.length === 64) {
-          deployOptions.programSecretKey = fallbackSecret;
-          console.log(`[ProgramDeployer] Using NEXT_PUBLIC_PROGRAM_SECRET_KEY for new deployment`);
         }
 
         const deployResult = await deployWithEphemeralKey(deployOptions);
