@@ -181,11 +181,30 @@ export function runDeployPipelineWithLogs(
       }
     }
 
-    if (msg.fileTree && setFileTree) {
+         if (msg.fileTree && setFileTree) {
       const count = Array.isArray(msg.fileTree) ? msg.fileTree.length : 1;
       console.log(`[deployPipeline] Received fileTree with ${count} items`);
       taskLogs.addSystemLog(`📂 Received project file tree with ${count} items`);
       setFileTree(structuredClone(msg.fileTree as import("@/interfaces/FileTreeItemType").FileTreeItemType[]));
+     }
+
+    // 🔑 Merge deterministic program ID into context on SSE events.
+    // Deep‑clone each level so React notices the change.
+    if (msg.event === 'ephemeralKey' || msg.event === 'programIdPersisted') {
+      const newProgramId = msg.pubkey || msg.programId;
+      if (newProgramId) {
+        console.log(`[deployPipeline] Received programId via event:`, newProgramId);
+        setProjectContext(prev => ({
+          ...prev,
+          details: {
+            ...structuredClone(prev.details ?? {}),
+            projectState: {
+              ...structuredClone(prev.details?.projectState ?? {}),
+              programId: newProgramId,
+            },
+          },
+        }));
+      }
     }
 
          /* ─────────────── NEW: capture program‑ID events ─────────────── */
