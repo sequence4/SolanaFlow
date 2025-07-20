@@ -190,7 +190,7 @@ export function runDeployPipelineWithLogs(
 
          /* ─────────────── NEW: capture program‑ID events ─────────────── */
      // 1. first notification right after keypair is generated
-     if (msg.event === 'ephemeralKey' && msg.pubkey) {
+     if (msg.stage === 'ephemeralKey' && msg.pubkey) {
        console.log('[deployPipeline] Received deterministic programId via ephemeralKey:', msg.pubkey);
        setProjectContext(prev => ({
          ...prev,
@@ -205,7 +205,7 @@ export function runDeployPipelineWithLogs(
      }
 
      // 2. redundant but safer – after it's persisted in the DB
-     if (msg.event === 'programIdPersisted' && msg.programId) {
+     if (msg.stage === 'programIdPersisted' && msg.programId) {
        console.log('[deployPipeline] programIdPersisted:', msg.programId);
        setProjectContext(prev => ({
          ...prev,

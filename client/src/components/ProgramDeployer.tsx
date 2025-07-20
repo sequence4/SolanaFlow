@@ -281,7 +281,7 @@ export function ProgramDeployer({
             disabled={
               isLoading || 
               !bytesLoaded ||
-              !projectContext?.details?.projectState?.programId   // wait for SSE
+              !existingProgramId   // wait for SSE
             }
             className="w-full sm:w-auto bg-[#22c55e] hover:bg-[#22c55e]/90 text-white flex items-center"
           >

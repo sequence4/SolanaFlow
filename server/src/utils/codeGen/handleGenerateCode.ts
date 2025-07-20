@@ -534,7 +534,7 @@ EOF'`,
           console.log('[GEN] Program ID persisted to project.details');
           
           // Notify frontend that the programId is now available
-          sendProgress({ event: 'programIdPersisted', programId });
+          sendProgress({ stage: 'programIdPersisted', programId });
         } catch (e) {
           console.error('[GEN] Failed to persist program ID to DB:', e);
         }
@@ -559,7 +559,7 @@ EOF'`,
         );
         
         // Inform client about the program ID for early access
-        sendProgress({ event: 'ephemeralKey', pubkey: programId });
+        sendProgress({ stage: 'ephemeralKey', pubkey: programId });
         // Include the env var so local dev server can pick it up instantly
         await runCommand(
           `docker exec ${workspace.containerName} bash -lc 'echo NEXT_PUBLIC_PROGRAM_ID=${programId} >> /usr/src/${workspace.rootPath}/web/.env'`,
