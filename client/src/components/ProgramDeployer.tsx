@@ -8,7 +8,8 @@ import { Rocket, AlertTriangle } from 'lucide-react';
 import { createAndRegisterEphemeral } from '@/utils/ephemeral/ephemeralKey';
 import { deployWithEphemeralKey, EphemeralDeployOptions } from '@/lib/ephemeralDeployment';
 import { Keypair, PublicKey } from '@solana/web3.js';
-import { deriveProgramKeypair } from '@/utils/program/deriveProgramKeypair'; // can be used elsewhere if needed
+// Retain deriveProgramKeypair import in case it is used elsewhere.
+import { deriveProgramKeypair } from '@/utils/program/deriveProgramKeypair';
 import ProjectContext from '@/context/project/ProjectContext';
 import {
   Dialog,
@@ -22,9 +23,10 @@ import { Progress } from '@/components/ui/progress';
 import { connection } from "@/utils/connection";
 import bs58 from 'bs58';
 
-// Parse NEXT_PUBLIC_PROGRAM_SECRET_KEY once at module load time.
-// It can be either a JSON array (e.g., "[1,2,...]") or a base58 string.
-let envSecretKey: number[] | undefined = undefined;
+// Parse NEXT_PUBLIC_PROGRAM_SECRET_KEY (if provided via container env).
+// It can be a JSON array or base58 string.  The server should supply the key,
+// so this env-based fallback is only used if the server does not return one.
+let envSecretKey: number[] | undefined;
 const envVar = process.env.NEXT_PUBLIC_PROGRAM_SECRET_KEY;
 if (envVar) {
   try {
@@ -39,7 +41,7 @@ if (envVar) {
         envSecretKey = Array.from(decoded);
       }
     } catch {
-      /* ignore invalid env secret */
+      /* Ignore invalid env secret */
     }
   }
 }
@@ -163,7 +165,7 @@ export function ProgramDeployer({
         const projProgId = projectContext?.details?.projectState?.programId;
         const hasExistingId =
           projProgId && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(projProgId);
-        // If no server secret, use the environment secret if provided at runtime.
+        // If no server secret, use the parsed envSecretKey if present.
         const fallbackSecret = (!serverSecret && envSecretKey) ? envSecretKey : undefined;
         // Build options for deployment.
         const deployOptions: EphemeralDeployOptions = {
