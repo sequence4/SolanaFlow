@@ -8,7 +8,7 @@ import { Rocket, AlertTriangle } from 'lucide-react';
 import { createAndRegisterEphemeral } from '@/utils/ephemeral/ephemeralKey';
 import { deployWithEphemeralKey, EphemeralDeployOptions } from '@/lib/ephemeralDeployment';
 import { Keypair, PublicKey } from '@solana/web3.js';
-import { deriveProgramKeypair } from '@/utils/program/deriveProgramKeypair';
+import { deriveProgramKeypair } from '@/utils/program/deriveProgramKeypair'; // can be used elsewhere if needed
 import ProjectContext from '@/context/project/ProjectContext';
 import {
   Dialog,
@@ -21,6 +21,28 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { connection } from "@/utils/connection";
 import bs58 from 'bs58';
+
+// Parse NEXT_PUBLIC_PROGRAM_SECRET_KEY once at module load time.
+// It can be either a JSON array (e.g., "[1,2,...]") or a base58 string.
+let envSecretKey: number[] | undefined = undefined;
+const envVar = process.env.NEXT_PUBLIC_PROGRAM_SECRET_KEY;
+if (envVar) {
+  try {
+    const arr = JSON.parse(envVar);
+    if (Array.isArray(arr) && arr.length === 64) {
+      envSecretKey = arr;
+    }
+  } catch {
+    try {
+      const decoded = bs58.decode(envVar.trim());
+      if (decoded.length === 64) {
+        envSecretKey = Array.from(decoded);
+      }
+    } catch {
+      /* ignore invalid env secret */
+    }
+  }
+}
 
 interface ProgramDeployerProps {
   projectId: string;
@@ -141,28 +163,8 @@ export function ProgramDeployer({
         const projProgId = projectContext?.details?.projectState?.programId;
         const hasExistingId =
           projProgId && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(projProgId);
-        // If no server secret, try reading from NEXT_PUBLIC_PROGRAM_SECRET_KEY (JSON array or base58).
-        let fallbackSecret: number[] | undefined;
-        if (!serverSecret) {
-          const envSecret = process.env.NEXT_PUBLIC_PROGRAM_SECRET_KEY;
-          if (envSecret) {
-            try {
-              const arr = JSON.parse(envSecret);
-              if (Array.isArray(arr) && arr.length === 64) {
-                fallbackSecret = arr;
-              }
-            } catch {
-              try {
-                const decoded = bs58.decode(envSecret.trim());
-                if (decoded.length === 64) {
-                  fallbackSecret = Array.from(decoded);
-                }
-              } catch {
-                /* ignore invalid env secret */
-              }
-            }
-          }
-        }
+        // If no server secret, use the environment secret if provided at runtime.
+        const fallbackSecret = (!serverSecret && envSecretKey) ? envSecretKey : undefined;
         // Build options for deployment.
         const deployOptions: EphemeralDeployOptions = {
           soBytes: programBytes,
