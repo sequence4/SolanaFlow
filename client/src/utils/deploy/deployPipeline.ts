@@ -195,9 +195,9 @@ export function runDeployPipelineWithLogs(
        setProjectContext(prev => ({
          ...prev,
          details: {
-           ...prev.details!,
+           ...(prev.details ?? {}),
            projectState: {
-             ...(prev.details?.projectState ?? {}),  // guard against undefined
+             ...(prev.details?.projectState ?? {}),
              programId: msg.pubkey,
            },
          },
@@ -210,9 +210,9 @@ export function runDeployPipelineWithLogs(
        setProjectContext(prev => ({
          ...prev,
          details: {
-           ...prev.details!,
+           ...(prev.details ?? {}),
            projectState: {
-             ...(prev.details?.projectState ?? {}),  // guard against undefined
+             ...(prev.details?.projectState ?? {}),
              programId: msg.programId,
            },
          },
@@ -233,9 +233,9 @@ export function runDeployPipelineWithLogs(
       setProjectContext(prev => ({
         ...prev,
         details: {
-          ...prev.details!,
+          ...(prev.details ?? {}),
           projectState: {
-            ...(prev.details?.projectState ?? {}),  // guard against undefined
+            ...(prev.details?.projectState ?? {}),
             idl: msg.idl,
             idls: (prev.details?.projectState?.idls ?? [])
               .filter((i: any) => i.name !== msg.idl.name)
