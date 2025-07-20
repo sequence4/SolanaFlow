@@ -189,31 +189,20 @@ export function runDeployPipelineWithLogs(
     }
 
          /* ─────────────── NEW: capture program‑ID events ─────────────── */
-     // 1. first notification right after keypair is generated
-     if (msg.stage === 'ephemeralKey' && msg.pubkey) {
-       console.log('[deployPipeline] Received deterministic programId via ephemeralKey:', msg.pubkey);
+     // Handle both program ID events with the same deep-clone logic
+     if ((msg.stage === 'ephemeralKey' && msg.pubkey) || 
+         (msg.stage === 'programIdPersisted' && msg.programId)) {
+       const newProgramId = msg.pubkey || msg.programId;
+       console.log('[deployPipeline] Received programId:', newProgramId);
+       
+       // Deep‑clone each level so React sees a new object reference
        setProjectContext(prev => ({
          ...prev,
          details: {
-           ...(prev.details ?? {}),
+           ...structuredClone(prev.details ?? {}),
            projectState: {
-             ...(prev.details?.projectState ?? {}),
-             programId: msg.pubkey,
-           },
-         },
-       }));
-     }
-
-     // 2. redundant but safer – after it's persisted in the DB
-     if (msg.stage === 'programIdPersisted' && msg.programId) {
-       console.log('[deployPipeline] programIdPersisted:', msg.programId);
-       setProjectContext(prev => ({
-         ...prev,
-         details: {
-           ...(prev.details ?? {}),
-           projectState: {
-             ...(prev.details?.projectState ?? {}),
-             programId: msg.programId,
+             ...structuredClone(prev.details?.projectState ?? {}),
+             programId: newProgramId,
            },
          },
        }));
@@ -233,9 +222,9 @@ export function runDeployPipelineWithLogs(
       setProjectContext(prev => ({
         ...prev,
         details: {
-          ...(prev.details ?? {}),
+          ...structuredClone(prev.details ?? {}),
           projectState: {
-            ...(prev.details?.projectState ?? {}),
+            ...structuredClone(prev.details?.projectState ?? {}),
             idl: msg.idl,
             idls: (prev.details?.projectState?.idls ?? [])
               .filter((i: any) => i.name !== msg.idl.name)
