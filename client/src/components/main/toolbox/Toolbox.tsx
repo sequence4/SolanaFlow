@@ -84,6 +84,11 @@ export const Toolbox = () => {
         setProjectName(projectContext.name || "My Token Project");
         console.log('projectContext programId', projectContext.details?.projectState?.programId);
     }, [projectContext.name, projectContext.details?.projectState?.programId, projectContext.details?.projectState?.deployed]);
+    
+    // Debug: track programId changes to help diagnose context updates
+    useEffect(() => {
+        console.log('[Toolbox DEBUG] context programId changed to', projectContext.details?.projectState?.programId);
+    }, [projectContext.details?.projectState?.programId]);
 
     const handleTabChange = (tab: "on-chain" | "off-chain") => {
         setActiveChainTab(tab);

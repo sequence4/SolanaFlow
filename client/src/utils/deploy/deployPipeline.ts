@@ -104,6 +104,8 @@ export function runDeployPipelineWithLogs(
   let hasSeenNextJsLogs = false;
 
   const update = (msg: any) => {
+    // Debug: log every raw SSE message to inspect its fields
+    console.log('[SSE DEBUG] raw message', msg);
     console.log(`[deployPipeline] Received update from SSE:`, msg);
     taskLogs.addSystemLog(JSON.stringify(msg));
 
@@ -194,6 +196,7 @@ export function runDeployPipelineWithLogs(
       const newProgramId = msg.pubkey || msg.programId;
       if (newProgramId) {
         console.log(`[deployPipeline] Received programId via event:`, newProgramId);
+        console.log('[SSE DEBUG] updating programId with', newProgramId);
         setProjectContext(prev => ({
           ...prev,
           details: {
@@ -204,6 +207,10 @@ export function runDeployPipelineWithLogs(
             },
           },
         }));
+        // log after updating to catch stale closures
+        setTimeout(() => {
+          console.log('[SSE DEBUG] context.programId now', newProgramId);
+        }, 0);
       }
     }
 
@@ -213,6 +220,7 @@ export function runDeployPipelineWithLogs(
          (msg.stage === 'programIdPersisted' && msg.programId)) {
        const newProgramId = msg.pubkey || msg.programId;
        console.log('[deployPipeline] Received programId:', newProgramId);
+       console.log('[SSE DEBUG] updating programId with (stage)', newProgramId);
        
        // Deep‑clone each level so React sees a new object reference
        setProjectContext(prev => ({
@@ -225,6 +233,11 @@ export function runDeployPipelineWithLogs(
            },
          },
        }));
+       
+       // log after updating to catch stale closures
+       setTimeout(() => {
+         console.log('[SSE DEBUG] context.programId now (stage)', newProgramId);
+       }, 0);
      }
     /* ─────────────────────────────────────────────────────────────── */
 
