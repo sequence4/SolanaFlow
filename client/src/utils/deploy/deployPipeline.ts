@@ -188,6 +188,38 @@ export function runDeployPipelineWithLogs(
       setFileTree(structuredClone(msg.fileTree as import("@/interfaces/FileTreeItemType").FileTreeItemType[]));
     }
 
+    /* ─────────────── NEW: capture program‑ID events ─────────────── */
+    // 1. first notification right after keypair is generated
+    if (msg.event === 'ephemeralKey' && msg.pubkey) {
+      console.log('[deployPipeline] Received deterministic programId via ephemeralKey:', msg.pubkey);
+      setProjectContext(prev => ({
+        ...prev,
+        details: {
+          ...prev.details!,
+          projectState: {
+            ...prev.details!.projectState,
+            programId: msg.pubkey,
+          },
+        },
+      }));
+    }
+
+    // 2. redundant but safer – after it's persisted in the DB
+    if (msg.event === 'programIdPersisted' && msg.programId) {
+      console.log('[deployPipeline] programIdPersisted:', msg.programId);
+      setProjectContext(prev => ({
+        ...prev,
+        details: {
+          ...prev.details!,
+          projectState: {
+            ...prev.details!.projectState,
+            programId: msg.programId,
+          },
+        },
+      }));
+    }
+    /* ─────────────────────────────────────────────────────────────── */
+
     if (msg.idl) {
       console.log(`[deployPipeline] Received IDL:`, msg.idl);
       taskLogs.addSystemLog(`📜 Received program IDL`);
