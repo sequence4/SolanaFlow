@@ -188,36 +188,36 @@ export function runDeployPipelineWithLogs(
       setFileTree(structuredClone(msg.fileTree as import("@/interfaces/FileTreeItemType").FileTreeItemType[]));
     }
 
-    /* ─────────────── NEW: capture program‑ID events ─────────────── */
-    // 1. first notification right after keypair is generated
-    if (msg.event === 'ephemeralKey' && msg.pubkey) {
-      console.log('[deployPipeline] Received deterministic programId via ephemeralKey:', msg.pubkey);
-      setProjectContext(prev => ({
-        ...prev,
-        details: {
-          ...prev.details!,
-          projectState: {
-            ...prev.details!.projectState,
-            programId: msg.pubkey,
-          },
-        },
-      }));
-    }
+         /* ─────────────── NEW: capture program‑ID events ─────────────── */
+     // 1. first notification right after keypair is generated
+     if (msg.event === 'ephemeralKey' && msg.pubkey) {
+       console.log('[deployPipeline] Received deterministic programId via ephemeralKey:', msg.pubkey);
+       setProjectContext(prev => ({
+         ...prev,
+         details: {
+           ...prev.details!,
+           projectState: {
+             ...(prev.details?.projectState ?? {}),  // guard against undefined
+             programId: msg.pubkey,
+           },
+         },
+       }));
+     }
 
-    // 2. redundant but safer – after it's persisted in the DB
-    if (msg.event === 'programIdPersisted' && msg.programId) {
-      console.log('[deployPipeline] programIdPersisted:', msg.programId);
-      setProjectContext(prev => ({
-        ...prev,
-        details: {
-          ...prev.details!,
-          projectState: {
-            ...prev.details!.projectState,
-            programId: msg.programId,
-          },
-        },
-      }));
-    }
+     // 2. redundant but safer – after it's persisted in the DB
+     if (msg.event === 'programIdPersisted' && msg.programId) {
+       console.log('[deployPipeline] programIdPersisted:', msg.programId);
+       setProjectContext(prev => ({
+         ...prev,
+         details: {
+           ...prev.details!,
+           projectState: {
+             ...(prev.details?.projectState ?? {}),  // guard against undefined
+             programId: msg.programId,
+           },
+         },
+       }));
+     }
     /* ─────────────────────────────────────────────────────────────── */
 
     if (msg.idl) {
@@ -235,16 +235,11 @@ export function runDeployPipelineWithLogs(
         details: {
           ...prev.details!,
           projectState: {
-            ...prev.details!.projectState,
+            ...(prev.details?.projectState ?? {}),  // guard against undefined
             idl: msg.idl,
-            idls: prev.details!.projectState?.idls
-              ? [
-                  ...prev.details!.projectState.idls.filter(
-                    (i: any) => i.name !== msg.idl.name,
-                  ),
-                  msg.idl,
-                ]
-              : [msg.idl],
+            idls: (prev.details?.projectState?.idls ?? [])
+              .filter((i: any) => i.name !== msg.idl.name)
+              .concat(msg.idl),
           }
         }
       }));

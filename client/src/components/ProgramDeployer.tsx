@@ -278,7 +278,11 @@ export function ProgramDeployer({
           <Button
             type="button"                      /* stops implicit form submit */
             onClick={handleDeploy}
-            disabled={isLoading || !bytesLoaded}
+            disabled={
+              isLoading || 
+              !bytesLoaded ||
+              !projectContext?.details?.projectState?.programId   // wait for SSE
+            }
             className="w-full sm:w-auto bg-[#22c55e] hover:bg-[#22c55e]/90 text-white flex items-center"
           >
             {isLoading ? (
