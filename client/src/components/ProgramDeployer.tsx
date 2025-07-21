@@ -171,14 +171,33 @@ export function ProgramDeployer({
           },
         };
 
-        // upgrade path (same program ID)
-        const projProgId = projectContext?.details?.projectState?.programId;
-        if (projProgId && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(projProgId)) {
-          deployOptions.programId = new PublicKey(projProgId);
-          console.log(
-            "[ProgramDeployer] Using existing program ID for upgrade:",
-            projProgId
-          );
+        /* -----------------------------------------------------------
+         * Fresh deploy vs upgrade?
+         *   1.  Make sure the string looks like a pubkey.
+         *   2.  Hit the RPC – if the Program account exists we upgrade,
+         *       otherwise we treat this as the first deploy.
+         * ----------------------------------------------------------- */
+        const ctxProgramId = projectContext?.details?.projectState?.programId;
+        const looksLikePubkey =
+          ctxProgramId && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(ctxProgramId);
+
+        if (looksLikePubkey) {
+          const candidatePk = new PublicKey(ctxProgramId!);
+          const acctInfo    = await connection.getAccountInfo(candidatePk, "confirmed");
+
+          if (acctInfo) {
+            // ✅  Program account really exists – perform an upgrade.
+            deployOptions.programId = candidatePk;
+            console.log(
+              `[ProgramDeployer] Existing on‑chain program found – upgrading: ${ctxProgramId}`,
+            );
+          } else {
+            // Fresh deploy – keep deployOptions.programId unset so
+            // the loader creates Program + ProgramData for us.
+            console.log(
+              `[ProgramDeployer] No on‑chain account for ${ctxProgramId} ‑‑ fresh deploy`,
+            );
+          }
         }
 
         const deployResult = await deployWithEphemeralKey(deployOptions);
