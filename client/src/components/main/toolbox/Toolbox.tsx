@@ -171,6 +171,11 @@ export const Toolbox = () => {
           projectId,                              // ✅  ALWAYS defined now
           graph,
           (msg: any) => {
+            // ───────────────────────────────────
+            //  DEBUG  –  log every raw message
+            // ───────────────────────────────────
+            console.log('[BUILD DEBUG] raw SSE message', msg);
+
             // … existing progress / fileTree logic unchanged …
             if (msg.fileTree) {
               console.log(`[BUILD] Received fileTree update`);
@@ -214,6 +219,32 @@ export const Toolbox = () => {
               }
             }
             
+            /* ──────────────────────────────────────────────────
+             * Program ID extraction from code‑gen completion
+             * Backend emits: "Code generation complete — Program ID: <ID>"
+             * ────────────────────────────────────────────────── */
+            if (
+              msg.stage === 'code-gen' &&
+              typeof msg.message === 'string' &&
+              msg.message.includes('Program ID')
+            ) {
+              const m = msg.message.match(/Program ID[: ]+([0-9A-Za-z]+)/);
+              if (m) {
+                const programId = m[1];
+                console.log('[BUILD DEBUG] extracted programId', programId);
+                setProjectContext(prev => ({
+                  ...prev,
+                  details: {
+                    ...structuredClone(prev.details ?? {}),
+                    projectState: {
+                      ...structuredClone(prev.details?.projectState ?? {}),
+                      programId,
+                    },
+                  },
+                }));
+              }
+            }
+
             if (msg.stage === "done" || msg.stage === "build-done") {
               pollingCancelledRef.current = true;
               setIsBuilding(false);
