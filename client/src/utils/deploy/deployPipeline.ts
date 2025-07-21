@@ -214,32 +214,32 @@ export function runDeployPipelineWithLogs(
       }
     }
 
-         /* ─────────────── NEW: capture program‑ID events ─────────────── */
-     // Handle both program ID events with the same deep-clone logic
-     if ((msg.stage === 'ephemeralKey' && msg.pubkey) || 
-         (msg.stage === 'programIdPersisted' && msg.programId)) {
-       const newProgramId = msg.pubkey || msg.programId;
-       console.log('[deployPipeline] Received programId:', newProgramId);
-       console.log('[SSE DEBUG] updating programId with (stage)', newProgramId);
-       
-       // Deep‑clone each level so React sees a new object reference
-       setProjectContext(prev => ({
-         ...prev,
-         details: {
-           ...structuredClone(prev.details ?? {}),
-           projectState: {
-             ...structuredClone(prev.details?.projectState ?? {}),
-             programId: newProgramId,
-           },
-         },
-       }));
-       
-       // log after updating to catch stale closures
-       setTimeout(() => {
-         console.log('[SSE DEBUG] context.programId now (stage)', newProgramId);
-       }, 0);
-     }
-    /* ─────────────────────────────────────────────────────────────── */
+    // Also check for stage-based events
+    if (
+      (msg.stage === 'ephemeralKey' && msg.pubkey) ||
+      (msg.stage === 'programIdPersisted' && msg.programId)
+    ) {
+      const newProgramId = msg.pubkey || msg.programId;
+      console.log('[deployPipeline] Received programId via stage:', newProgramId);
+      console.log('[SSE DEBUG] updating programId with (stage)', newProgramId);
+      
+      // Deep‑clone each level so React sees a new object reference
+      setProjectContext(prev => ({
+        ...prev,
+        details: {
+          ...structuredClone(prev.details ?? {}),
+          projectState: {
+            ...structuredClone(prev.details?.projectState ?? {}),
+            programId: newProgramId,
+          },
+        },
+      }));
+      
+      // log after updating to catch stale closures
+      setTimeout(() => {
+        console.log('[SSE DEBUG] context.programId now (stage)', newProgramId);
+      }, 0);
+    }
 
     if (msg.idl) {
       console.log(`[deployPipeline] Received IDL:`, msg.idl);
