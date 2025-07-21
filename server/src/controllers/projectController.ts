@@ -662,6 +662,7 @@ export const deployProjectEphemeral = async (
       message: 'Awaiting signed transaction from wallet',
       taskId: taskId,
     });
+    return;
   }
   
   // Validate the ephemeral key format for provided pubkey
@@ -718,92 +719,64 @@ export const deployProjectEphemeral = async (
     const taskId = await startAnchorDeployTask(id, userId, ephemeralPubkey);
     console.log(`[DEPLOY_EPHEMERAL] Deploy task started: ${taskId}`);
 
-    // Wait for task completion and validate result before sending response
-    try {
-      console.log(`[DEPLOY_EPHEMERAL] Waiting for task ${taskId} to complete...`);
-      const status = await waitForTaskCompletion(taskId, 120000); // 2 minute timeout
-      console.log(`[DEPLOY_EPHEMERAL] Task ${taskId} completed with status: ${status}`);
-      
-      if (status === 'succeed' || status === 'finished') {
-        // Fetch the task's result from the database
-        const client = await pool.connect();
-        try {
-          const taskQuery = await client.query(
-            'SELECT result FROM task WHERE id = $1',
-            [taskId]
-          );
-          
-          if (taskQuery.rows.length > 0 && taskQuery.rows[0].result) {
-            let programId: string | null = null;
-            try {
-              const resultObj = JSON.parse(taskQuery.rows[0].result);
-              programId = resultObj.programId;
-            } catch (e) {
-              console.error('[DEPLOY_EPHEMERAL] Failed to parse task result JSON:', e);
-            }
-            if (programId) {
-              console.log(`[DEPLOY_EPHEMERAL] Valid program ID confirmed: ${programId}`);
-              // Store the Program ID in project details for future use
-              await client.query(
-                `UPDATE solanaproject
-                   SET details = jsonb_set(
-                         jsonb_set(COALESCE(details::jsonb, '{}'::jsonb),
-                                   '{projectState,programId}', to_jsonb($1), true),
-                         '{projectState,deployed}', to_jsonb(true), true
-                       ),
-                       last_updated = $2
-                 WHERE id = $3`,
-                [programId, new Date(), id],
-              );
-              // Update the DApp's .env file with the new Program ID for the frontend
-              try {
-                const { rows: [proj] } = await pool.query(
-                  'SELECT container_name, root_path FROM solanaproject WHERE id = $1',
-                  [id]
-                );
-                if (proj && proj.container_name) {
-                  const containerName = proj.container_name;
-                  const rootPath = proj.root_path;
-                  const envPath = `/usr/src/${rootPath}/web/.env`;
-                  const updateCmd =
-                    `if grep -q '^NEXT_PUBLIC_PROGRAM_ID=' ${envPath}; then ` +
-                    `sed -i 's/^NEXT_PUBLIC_PROGRAM_ID=.*/NEXT_PUBLIC_PROGRAM_ID=${programId}/' ${envPath}; ` +
-                    `else echo 'NEXT_PUBLIC_PROGRAM_ID=${programId}' >> ${envPath}; fi`;
-                  await runCommand(`docker exec ${containerName} bash -c "${updateCmd}"`, '.', uuidv4());
-                  console.log(`[DEPLOY_EPHEMERAL] Updated .env with Program ID ${programId}`);
-                  // Restart the container to ensure the Next.js server loads the new env variable
-                  await runCommand(`docker restart ${containerName}`, '.', uuidv4());
-                  console.log(`[DEPLOY_EPHEMERAL] Restarted container ${containerName} to apply new Program ID`);
-                }
-              } catch (err) {
-                console.error('[DEPLOY_EPHEMERAL] Could not write Program ID to .env:', err);
-              }
-            } else {
-              console.log(`[DEPLOY_EPHEMERAL] WARNING: Task completed but no Program ID found in result`);
-            }
-          } else {
-            console.log(`[DEPLOY_EPHEMERAL] WARNING: Task completed but returned null or empty result`);
-          }
-        } finally {
-          client.release();
-        }
-      } else if (status === 'failed') {
-        console.log(`[DEPLOY_EPHEMERAL] WARNING: Task completed with failed status`);
-      } else if (status === 'timeout') {
-        console.log(`[DEPLOY_EPHEMERAL] WARNING: Task timed out waiting for completion`);
-      }
-    } catch (waitError: any) {
-      console.log(`[DEPLOY_EPHEMERAL] Error waiting for task completion: ${waitError.message}`);
-      // Continue sending response with taskId, client will poll for completion
-    }
+    // Wait for the task to complete (up to 120s)
+    console.log(`[DEPLOY_EPHEMERAL] Waiting for task ${taskId} to complete...`);
+    const status = await waitForTaskCompletion(taskId, 120000);
+    console.log(`[DEPLOY_EPHEMERAL] Task ${taskId} completed with status: ${status}`);
 
-    res.status(200).json({
-      message: 'Ephemeral anchor deploy process started',
-      taskId: taskId,
-    });
+    if (status === 'succeed' || status === 'finished') {
+      // Retrieve the programId from the task result
+      const client = await pool.connect();
+      let programId: string | null = null;
+      try {
+        const taskRes = await client.query('SELECT result FROM task WHERE id = $1', [taskId]);
+        if (taskRes.rows.length && taskRes.rows[0].result) {
+          try {
+            const resultObj = JSON.parse(taskRes.rows[0].result);
+            programId = resultObj.programId ?? null;
+          } catch (e) {
+            console.error('[DEPLOY_EPHEMERAL] Error parsing task result JSON:', e);
+          }
+          if (programId) {
+            // Ensure programId is stored in project details (in case not already updated)
+            await client.query(
+              `UPDATE solanaproject
+                 SET details = COALESCE(details::jsonb, '{}'::jsonb) || $1::jsonb,
+                     last_updated = $2
+               WHERE id = $3`,
+              [JSON.stringify({ programId }), new Date(), id]
+            );
+            console.log(`[DEPLOY_EPHEMERAL] Program ID ${programId} stored in DB.`);
+          }
+        }
+      } finally {
+        client.release();
+      }
+      if (programId) {
+        console.log(`[DEPLOY_EPHEMERAL] Deployment succeeded with Program ID: ${programId}`);
+        res.status(200).json({ success: true, programId, signatures: [] });
+        return;
+      } else {
+        console.log(`[DEPLOY_EPHEMERAL] Task succeeded but no Program ID found.`);
+        next(new AppError('Deployment finished but Program ID not found in result', 500));
+        return;
+      }
+    } else if (status === 'failed') {
+      console.warn(`[DEPLOY_EPHEMERAL] Deployment task failed.`);
+      res.status(200).json({ success: false, error: 'Program deployment failed', programId: null, signatures: [] });
+      return;
+    } else if (status === 'timeout') {
+      console.warn(`[DEPLOY_EPHEMERAL] Deployment task timed out.`);
+      res.status(200).json({ success: false, error: 'Deployment timed out', programId: null, signatures: [] });
+      return;
+    } else {
+      // Should not happen (covers any other status)
+      res.status(200).json({ success: false, error: `Deployment ended with status: ${status}`, programId: null, signatures: [] });
+      return;
+    }
   } catch (error: any) {
     console.error('[DEPLOY_EPHEMERAL] Error in deployProjectEphemeral:', error);
-    return next(new AppError('Failed to start ephemeral deployment process', 500));
+    return next(new AppError('Ephemeral deployment process failed', 500));
   }
 };
 

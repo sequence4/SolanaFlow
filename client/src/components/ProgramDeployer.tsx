@@ -15,7 +15,7 @@ import {
   deployWithEphemeralKey,
   EphemeralDeployOptions,
 } from "@/lib/ephemeralDeployment";
-import { PublicKey, Keypair } from "@solana/web3.js";
+import { PublicKey, Keypair, SystemProgram, Transaction, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import ProjectContext from "@/context/project/ProjectContext";
 import {
   Dialog,
@@ -27,6 +27,8 @@ import {
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { connection } from "@/utils/connection";
+import { createAndRegisterEphemeral } from "@/utils/ephemeral/ephemeralKey";
+import { BPF_LOADER_CHUNK_SIZE } from "@/utils/constants";
 
 interface ProgramDeployerProps {
   projectId: string;
@@ -110,7 +112,7 @@ export function ProgramDeployer({
       setByteLength(bytes.byteLength);
       setBytesLoaded(true);
 
-      console.log(`✅ Program fetched: ${bytes.byteLength.toLocaleString()} bytes`);
+      console.log(`✅ Program fetched: ${bytes.byteLength.toLocaleString()} bytes`);
     } catch (err) {
       console.error("Failed to load program bytes:", err);
       toast.error("Failed to load program", {
@@ -143,97 +145,109 @@ export function ProgramDeployer({
           return;
         }
 
-        const authorityEphem = Keypair.generate();
-        console.log(
-          "🔑 Ephemeral authority key:",
-          authorityEphem.publicKey.toBase58()
-        );
-
-        const deterministicId = existingProgramId;
-        if (!deterministicId) {
-          throw new Error("Deterministic program ID missing in project context");
-        }
-        const programIdPubkey = new PublicKey(deterministicId);
-        console.log("🆔 Using deterministic program ID:", programIdPubkey.toBase58());
-
-        /* -----------------------------------------------------------
-         * Build options **without** programId.  We'll add it later,
-         * but only if an on‑chain Program account is already present.
-         * ----------------------------------------------------------- */
-        const deployOptions: EphemeralDeployOptions = {
-          soBytes: programBytes as unknown as ArrayBuffer,
-          connection: connection as any,
-          wallet: wallet as any,
-          // Front‑end never holds the program secret; backend signs final tx.
-          ephemeralKeypair: authorityEphem as any,
-          verifyTimeoutMs: 120_000,
-          onProgress: (raw: number, message: string) => {
-            const pct = raw <= 1 ? Math.round(raw * 100) : Math.round(raw);
-            setProgress(Math.max(1, Math.min(pct, 100)));
-            setDeployStage(message ?? "");
-            console.log("[DEPLOY]", pct + "%", message);
-          },
-        };
-
-        /* -----------------------------------------------------------
-         * Fresh deploy vs upgrade?
-         *   1.  Make sure the string looks like a pubkey.
-         *   2.  Hit the RPC – if the Program account exists we upgrade,
-         *       otherwise we treat this as the first deploy.
-         * ----------------------------------------------------------- */
         const ctxProgramId = projectContext?.details?.projectState?.programId;
         const looksLikePubkey =
           ctxProgramId && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(ctxProgramId);
 
         if (looksLikePubkey) {
           const candidatePk = new PublicKey(ctxProgramId!);
-          const acctInfo    = await connection.getAccountInfo(candidatePk, "confirmed");
+          const acctInfo = await connection.getAccountInfo(candidatePk, "confirmed");
 
           if (acctInfo) {
-            // ✅  Program account exists – perform an **upgrade**
-            deployOptions.programId = candidatePk;
-            console.log(
-              `[ProgramDeployer] Existing on‑chain program found – upgrading: ${ctxProgramId}`,
-            );
-          } else {
-            // 🆕  Fresh deploy – leave programId **undefined**
-            // so DeployWithMaxDataLen creates Program + ProgramData.
-            console.log(
-              `[ProgramDeployer] No on‑chain account for ${ctxProgramId} – fresh deploy`,
-            );
-          }
-        }
+            /* UPGRADE path (unchanged) */
+            const authorityEphem = Keypair.generate();
+            console.log("🔑 Ephemeral authority key:", authorityEphem.publicKey.toBase58());
 
-        const deployResult = await deployWithEphemeralKey(deployOptions);
+            const deployOptions: EphemeralDeployOptions = {
+              soBytes: programBytes as unknown as ArrayBuffer,
+              connection: connection as any,
+              wallet: wallet as any,
+              ephemeralKeypair: authorityEphem as any,
+              programId: candidatePk,
+              verifyTimeoutMs: 120_000,
+              onProgress: (raw: number, message: string) => {
+                const pct = raw <= 1 ? Math.round(raw * 100) : Math.round(raw);
+                setProgress(Math.max(1, Math.min(pct, 100)));
+                setDeployStage(message ?? "");
+                console.log("[DEPLOY]", pct + "%", message);
+              },
+            };
 
-        if (deployResult.success) {
-          if (deployResult.warning) toast.warning(deployResult.warning);
+            const deployResult = await deployWithEphemeralKey(deployOptions);
+            if (deployResult.success) onSuccess(candidatePk.toBase58());
 
-          const deployedId = deployResult.programId.toBase58();
-          try {
-            await projectApi.updateProject(projectId, {
-              details: { projectState: { programId: deployedId } },
+            if (deployResult.warning) toast.warning(deployResult.warning);
+
+            toast.success("Program upgraded successfully", {
+              description: `Program ID: ${candidatePk.toBase58()}`,
+              action: {
+                label: "Explorer",
+                onClick: () =>
+                  window.open(
+                    `https://explorer.solana.com/address/${candidatePk.toBase58()}?cluster=devnet`,
+                    "_blank"
+                  ),
+              },
             });
-          } catch (updateErr) {
-            console.error("Failed to update project with program ID:", updateErr);
+            onClose();
+            return;
           }
-          onSuccess(deployedId);
         }
 
-        const finalProgramId = deployResult.programId.toBase58();
-        toast.success("Program deployed successfully", {
-          description: `Program ID: ${finalProgramId}`,
+        /* ───────────── NEW: fresh deploy handled on server ───────────── */
+        // 1. Request an ephemeral keypair from the backend
+        const ephemPubkeyStr = await createAndRegisterEphemeral(projectId);
+        const ephemeralPubkey = new PublicKey(ephemPubkeyStr);
+        console.log(`🔑 Ephemeral key (server-generated): ${ephemeralPubkey.toBase58()}`);
+
+        // 2. Fund the ephemeral account from the wallet (if needed)
+        const bufferSpace = 37 + programBytes.byteLength;
+        const bufferRent = await connection.getMinimumBalanceForRentExemption(bufferSpace);
+        const programDataRent = await connection.getMinimumBalanceForRentExemption(36);
+        const chunkCount = Math.ceil(programBytes.byteLength / BPF_LOADER_CHUNK_SIZE);
+        const feeEstimate = (chunkCount + 2) * 10000; // create-buffer + deploy + chunk TXs
+        const marginLamports = 0.02 * LAMPORTS_PER_SOL;
+        const lamportsNeeded = BigInt(bufferRent) + BigInt(programDataRent) + BigInt(feeEstimate) + BigInt(marginLamports);
+        const existingBalance = await connection.getBalance(ephemeralPubkey);
+        if (BigInt(existingBalance) < lamportsNeeded) {
+          const additional = lamportsNeeded - BigInt(existingBalance);
+          console.log(`Ephemeral account needs ${Number(additional) / LAMPORTS_PER_SOL} SOL; funding from wallet...`);
+          const fundIx = SystemProgram.transfer({
+            fromPubkey: wallet.publicKey!,
+            toPubkey: ephemeralPubkey,
+            lamports: Number(additional),
+          });
+          const fundTx = new Transaction().add(fundIx);
+          const signedFundTx = await wallet.signTransaction!(fundTx);
+          const fundSig = await connection.sendRawTransaction(signedFundTx.serialize());
+          await connection.confirmTransaction(fundSig, 'confirmed');
+          console.log(`✅ Funded ephemeral key with ${Number(additional) / LAMPORTS_PER_SOL} SOL (tx: ${fundSig})`);
+        } else {
+          console.log('Ephemeral account already sufficiently funded.');
+        }
+
+        // 3. Trigger the backend deployment process
+        setDeployStage('Deploying program on backend...');
+        const server = await projectApi.deployProject(
+          projectId,
+          wallet.publicKey!.toBase58()
+        );
+        if (!server.success) throw new Error('Server deploy failed');
+        onSuccess(server.programId);
+
+        toast.success('Program deployed', {
+          description: `Program ID: ${server.programId}`,
           action: {
-            label: "Explorer",
+            label: 'Explorer',
             onClick: () =>
               window.open(
-                `https://explorer.solana.com/address/${finalProgramId}?cluster=devnet`,
-                "_blank"
+                `https://explorer.solana.com/address/${server.programId}?cluster=devnet`,
+                '_blank'
               ),
           },
         });
-
         onClose();
+        return;
       } catch (err: any) {
         console.error(err);
         toast.error("Deployment failed", { description: err.message });
@@ -255,7 +269,6 @@ export function ProgramDeployer({
       wallet,
       onSuccess,
       onClose,
-      existingProgramId,
       projectContext,
     ]
   );
@@ -272,7 +285,7 @@ export function ProgramDeployer({
           </DialogTitle>
           <DialogDescription className="text-[#6e6e76]">
             Your program will be deployed using your connected wallet. Make sure
-            you have enough SOL for the transaction fees.
+            you have enough SOL for the transaction fees.
           </DialogDescription>
         </DialogHeader>
 
@@ -284,7 +297,7 @@ export function ProgramDeployer({
                   Program size:
                 </span>
                 <span className="text-sm font-mono">
-                  {byteLength.toLocaleString()} bytes
+                  {byteLength.toLocaleString()} bytes
                 </span>
               </div>
 
@@ -344,7 +357,7 @@ export function ProgramDeployer({
           <Button
             type="button"
             onClick={handleDeploy}
-            disabled={isLoading || !bytesLoaded || !existingProgramId}
+            disabled={isLoading || !bytesLoaded}
             className="w-full sm:w-auto bg-[#22c55e] hover:bg-[#22c55e]/90 text-white flex items-center"
           >
             {isLoading ? (

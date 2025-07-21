@@ -239,14 +239,13 @@ export const projectApi = {
   createEphemeral: async (
     projectId: string,
     secretKey?: number[]
-  ): Promise<{ ephemeralPubkey: string; secretKey?: number[] }> => {
+  ): Promise<{ pubkey: string }> => {
     try {
       const body = secretKey ? { secretKey } : {};
       const response = await api.post(`/projects/${projectId}/ephemeral`, body);
       const data = response.data;
       return {
-        ephemeralPubkey: data.pubkey ?? data.ephemeralPubkey,
-        secretKey: data.secretKey
+        pubkey: data.pubkey ?? data.ephemeralPubkey
       };
     } catch (err) {
       console.error('Error creating ephemeral:', err);
