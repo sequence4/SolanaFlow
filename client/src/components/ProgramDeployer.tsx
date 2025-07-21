@@ -67,7 +67,29 @@ export function ProgramDeployer({
     
     try {
       // Download the program artifact (compiled .so)
-      const bytes = await downloadArtifact(projectId);
+      const raw = await downloadArtifact(projectId);        // may be base‑64 or ArrayBuffer
+
+      let bytes: Uint8Array;
+
+      if (raw instanceof Uint8Array) {
+        bytes = raw;                                        // already OK
+      } else if (raw instanceof ArrayBuffer) {
+        bytes = new Uint8Array(raw);                       // axios {responseType:'arraybuffer'}
+      } else if (typeof raw === 'string') {                 // base‑64 from server
+        const bin = atob(raw.replace(/\s+/g, ''));
+        bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      } else {
+        throw new Error('Unsupported artifact format returned by downloadArtifact');
+      }
+
+      // Sanity‑check ELF magic
+      if (!(bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46)) {
+        console.warn('[DEPLOY] Unexpected ELF magic', bytes.slice(0, 4));
+      } else {
+        console.log('[DEPLOY] Valid ELF magic verified:', Array.from(bytes.slice(0, 4)));
+      }
+
       setProgramBytes(bytes);
       setByteLength(bytes.byteLength);
       setBytesLoaded(true);
