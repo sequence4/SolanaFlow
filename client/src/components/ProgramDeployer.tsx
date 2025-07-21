@@ -218,6 +218,16 @@ export function ProgramDeployer({
             lamports: Number(additional),
           });
           const fundTx = new Transaction().add(fundIx);
+
+          /* ------------------------------------------------------------ *
+           * Wallet‑adapter `signTransaction()` expects:
+           *   • recentBlockhash    – so the TX is broadcast‑ready
+           *   • feePayer           – so the correct signer set is formed
+           * ------------------------------------------------------------ */
+          const { blockhash } = await connection.getLatestBlockhash('confirmed');
+          fundTx.recentBlockhash = blockhash;
+          fundTx.feePayer = wallet.publicKey!;
+
           const signedFundTx = await wallet.signTransaction!(fundTx);
           const fundSig = await connection.sendRawTransaction(signedFundTx.serialize());
           await connection.confirmTransaction(fundSig, 'confirmed');
