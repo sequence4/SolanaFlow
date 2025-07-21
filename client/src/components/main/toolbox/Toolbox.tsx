@@ -234,10 +234,11 @@ export const Toolbox = () => {
                 console.log('[BUILD DEBUG] extracted programId', programId);
                 setProjectContext(prev => ({
                   ...prev,
+                  // ⚠️  shallow‑spread is enough; we only need fresh refs
                   details: {
-                    ...structuredClone(prev.details ?? {}),
+                    ...prev.details,
                     projectState: {
-                      ...structuredClone(prev.details?.projectState ?? {}),
+                      ...(prev.details?.projectState ?? {}),
                       programId,
                     },
                   },
