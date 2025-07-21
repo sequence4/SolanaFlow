@@ -254,9 +254,14 @@ export const projectApi = {
     }
   },
 
-  deployProject: async (projectId: string): Promise<TaskResponse> => {
+  deployProject: async (
+    projectId: string,
+    walletPubkey: string
+  ): Promise<{ success: boolean; programId: string; signatures: string[]; warning?: string }> => {
     try {
-      const response = await api.post(`/projects/${projectId}/deploy`);
+      const response = await api.post(`/projects/${projectId}/deploy`, {
+        walletPubkey,
+      });
       return response.data;
     } catch (error) {
       console.error('Error deploying project:', error);
