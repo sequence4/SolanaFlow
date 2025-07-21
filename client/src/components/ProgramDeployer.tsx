@@ -156,12 +156,16 @@ export function ProgramDeployer({
         const programIdPubkey = new PublicKey(deterministicId);
         console.log("🆔 Using deterministic program ID:", programIdPubkey.toBase58());
 
+        /* -----------------------------------------------------------
+         * Build options **without** programId.  We'll add it later,
+         * but only if an on‑chain Program account is already present.
+         * ----------------------------------------------------------- */
         const deployOptions: EphemeralDeployOptions = {
           soBytes: programBytes as unknown as ArrayBuffer,
           connection: connection as any,
           wallet: wallet as any,
+          // Front‑end never holds the program secret; backend signs final tx.
           ephemeralKeypair: authorityEphem as any,
-          programId: programIdPubkey,
           verifyTimeoutMs: 120_000,
           onProgress: (raw: number, message: string) => {
             const pct = raw <= 1 ? Math.round(raw * 100) : Math.round(raw);
@@ -186,16 +190,16 @@ export function ProgramDeployer({
           const acctInfo    = await connection.getAccountInfo(candidatePk, "confirmed");
 
           if (acctInfo) {
-            // ✅  Program account really exists – perform an upgrade.
+            // ✅  Program account exists – perform an **upgrade**
             deployOptions.programId = candidatePk;
             console.log(
               `[ProgramDeployer] Existing on‑chain program found – upgrading: ${ctxProgramId}`,
             );
           } else {
-            // Fresh deploy – keep deployOptions.programId unset so
-            // the loader creates Program + ProgramData for us.
+            // 🆕  Fresh deploy – leave programId **undefined**
+            // so DeployWithMaxDataLen creates Program + ProgramData.
             console.log(
-              `[ProgramDeployer] No on‑chain account for ${ctxProgramId} ‑‑ fresh deploy`,
+              `[ProgramDeployer] No on‑chain account for ${ctxProgramId} – fresh deploy`,
             );
           }
         }
@@ -204,23 +208,26 @@ export function ProgramDeployer({
 
         if (deployResult.success) {
           if (deployResult.warning) toast.warning(deployResult.warning);
+
+          const deployedId = deployResult.programId.toBase58();
           try {
             await projectApi.updateProject(projectId, {
-              details: { projectState: { programId: programIdPubkey.toBase58() } },
+              details: { projectState: { programId: deployedId } },
             });
           } catch (updateErr) {
             console.error("Failed to update project with program ID:", updateErr);
           }
-          onSuccess(programIdPubkey.toBase58());
+          onSuccess(deployedId);
         }
 
+        const finalProgramId = deployResult.programId.toBase58();
         toast.success("Program deployed successfully", {
-          description: `Program ID: ${programIdPubkey.toBase58()}`,
+          description: `Program ID: ${finalProgramId}`,
           action: {
             label: "Explorer",
             onClick: () =>
               window.open(
-                `https://explorer.solana.com/address/${programIdPubkey.toBase58()}?cluster=devnet`,
+                `https://explorer.solana.com/address/${finalProgramId}?cluster=devnet`,
                 "_blank"
               ),
           },
