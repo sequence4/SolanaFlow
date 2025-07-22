@@ -1,10 +1,11 @@
-import { Connection, PublicKey, Keypair } from '@solana/web3.js';
+import { Connection, PublicKey, Keypair, TransactionInstruction, Transaction } from '@solana/web3.js';
 import type { WalletContextState } from '@solana/wallet-adapter-react';
 import { deployWithEphemeralKey } from '../../lib/ephemeralDeployment';
 import bs58 from 'bs58';
 import { projectApi } from '../../api/projectApi';
 import { toast } from 'sonner';
 import { createAndRegisterEphemeral } from '@/utils/ephemeral/ephemeralKey';
+import { BPF_UPGRADE_LOADER_ID } from '@/utils/constants';
 
 /**
  * Handles the deployment of a Solana program using an ephemeral key approach
@@ -24,96 +25,79 @@ export async function handleEphemeralDeploy(
 
     onProgress(0, 'Starting ephemeral key deployment...');
 
-    // 1. Generate an ephemeral keypair and register it
-    const { keypair: ephem, programSecretKey } = await createAndRegisterEphemeral(projectId);
+    // 1. Generate an in-memory Keypair; it signs chunk uploads
+    const ephem = Keypair.generate();
 
-    // Determine programId or secret key from project details or env
-    let programIdArg: PublicKey | undefined;
-    let programSecretArg: number[] | undefined;
-    try {
-      const project = await projectApi.getProjectDetails(projectId);
-      const existingProgramIdStr = project?.details?.projectState?.programId as
-        | string
-        | null
-        | undefined;
-      if (existingProgramIdStr) {
-        try {
-          programIdArg = new PublicKey(existingProgramIdStr);
-          console.log(`[handleEphemeralDeploy] Using existing program ID: ${existingProgramIdStr} for upgrade`);
-        } catch (e) {
-          console.warn(
-            `[handleEphemeralDeploy] Invalid existing program ID: ${existingProgramIdStr}`,
-            e,
-          );
-        }
-      }
-    } catch (e) {
-      console.warn('[handleEphemeralDeploy] Could not fetch project details', e);
+    // 2. Fetch the code-generated program ID from the server
+    const projectDetails = await projectApi.getProjectDetails(projectId);
+    const storedProgramId = (projectDetails?.details?.projectState?.programId ?? projectDetails?.details?.programId) as string | undefined;
+    if (!storedProgramId) {
+      throw new Error('Program ID not found. Did you run code generation first?');
     }
+    const programPubKey = new PublicKey(storedProgramId);
 
-    // 2. Use the ephemeral key approach to handle the deployment
-    // Configure deployment parameters with appropriate program identification
-    const deployParams: any = {
+    // 3. Build a partial deploy transaction (signed only by the buffer authority)
+    const deployResult = await deployWithEphemeralKey({
       soBytes: programSoData,
       connection,
       wallet,
       ephemeralKeypair: ephem,
+      programId: programPubKey,
+      relayToBackend: true,
       onProgress,
-    };
+    });
 
-    // Priority: 1. Existing programId from server, 2. Program secret key from backend, 3. Env variable
-    if (programIdArg) {
-      // Use existing program ID for upgrades
-      deployParams.programId = programIdArg;
-    } else {
-      // Try the backend programSecretKey first
-      if (programSecretKey && programSecretKey.length === 64) {
-        deployParams.programSecretKey = programSecretKey;
-        console.log("[handleEphemeralDeploy] Using program secret key from build pipeline");
-      } else {
-        // Fall back to environment variable
-        const envSecret = process.env.NEXT_PUBLIC_PROGRAM_SECRET_KEY;
-        if (envSecret) {
-          let arr: number[] | undefined;
-          try {
-            if (envSecret.trim().startsWith('[')) {
-              arr = JSON.parse(envSecret) as number[];
-            } else {
-              const decoded = bs58.decode(envSecret.trim());
-              arr = Array.from(decoded);
-            }
-          } catch (e) {
-            console.warn(
-              '[handleEphemeralDeploy] Failed to parse NEXT_PUBLIC_PROGRAM_SECRET_KEY',
-              e,
-            );
-          }
-          if (arr && arr.length === 64) {
-            deployParams.programSecretKey = arr;
-            console.log("[handleEphemeralDeploy] Using program secret key from environment");
-          } else {
-            console.warn(
-              '[handleEphemeralDeploy] NEXT_PUBLIC_PROGRAM_SECRET_KEY is not a valid 64-byte secret key',
-            );
-          }
-        } else if (!programSecretKey) {
-          // Only throw if we have no secret key at all
-          throw new Error('No program keypair or ID found for deployment');
-        }
-      }
+    if (!deployResult.relayPending || !deployResult.encodedTx) {
+      throw new Error('Unexpected result: encoded transaction missing.');
     }
 
-    const deployResult = await deployWithEphemeralKey(deployParams);
+    onProgress(80, 'Sending partial deploy transaction to backend for signature...');
 
-    onProgress(95, 'Deployment successful, registering with server...');
+    // 4. Ask the backend to sign the deploy transaction with the program keypair and broadcast it
+    const relayRes = await projectApi.relayTx(projectId, {
+      encodedTx: deployResult.encodedTx,
+      programId: storedProgramId,
+    });
 
-    // 3. Update the server with the deployed program ID in project details
+    onProgress(90, 'Backend signed deploy transaction; transferring upgrade authority…');
+
+    // 5. Transfer upgrade authority from the buffer authority (ephem) to the wallet
+    const [programDataPubkey] = PublicKey.findProgramAddressSync(
+      [programPubKey.toBuffer()],
+      BPF_UPGRADE_LOADER_ID,
+    );
+    // Prepare instruction to set authority (LoaderIx.SetAuthority = 4)
+    const data = Buffer.alloc(4);
+    data.writeUInt32LE(4, 0);
+    const setAuthIx = new TransactionInstruction({
+      programId: BPF_UPGRADE_LOADER_ID,
+      keys: [
+        { pubkey: programDataPubkey, isSigner: false, isWritable: true },
+        { pubkey: ephem.publicKey, isSigner: true, isWritable: false },
+        { pubkey: wallet.publicKey!, isSigner: false, isWritable: false },
+      ],
+      data,
+    });
+    const setAuthTx = new Transaction().add(setAuthIx);
+    setAuthTx.feePayer = ephem.publicKey;
+    const { blockhash: authHash, lastValidBlockHeight: authHeight } = await connection.getLatestBlockhash('confirmed');
+    setAuthTx.recentBlockhash = authHash;
+    setAuthTx.sign(ephem);
+    const setSig = await connection.sendRawTransaction(setAuthTx.serialize(), {
+      skipPreflight: false,
+    });
+    await connection.confirmTransaction(
+      { signature: setSig, blockhash: authHash, lastValidBlockHeight: authHeight },
+      'confirmed',
+    );
+
+    onProgress(98, 'Upgrade authority transferred; saving program ID…');
+
+    // 6. Persist the program ID on the server
     await projectApi.updateProject(projectId, {
       details: {
         projectState: {
-          deployed: true,
-          built: false,
-          programId: deployResult.programId.toString(),
+          programId: storedProgramId,
         },
       },
     });
@@ -122,8 +106,8 @@ export async function handleEphemeralDeploy(
 
     return {
       success: true,
-      programId: deployResult.programId.toString(),
-      signatures: deployResult.signatures
+      programId: storedProgramId,
+      signatures: [...deployResult.signatures, relayRes.signature, setSig],
     };
   } catch (error: any) {
     console.error('Ephemeral deployment failed:', error);

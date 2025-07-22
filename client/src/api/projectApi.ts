@@ -280,6 +280,24 @@ export const projectApi = {
     }
   },
 
+  /**
+   * Relay a partially signed deploy transaction to the backend.
+   * The backend will load the program keypair, sign the transaction, broadcast it,
+   * and return the final signature and programId.
+   */
+  relayTx: async (
+    projectId: string,
+    payload: { encodedTx: string; programId: string }
+  ): Promise<{ signature: string; programId: string }> => {
+    try {
+      const response = await api.post(`/projects/${projectId}/relay-tx`, payload);
+      return response.data;
+    } catch (error) {
+      console.error('Error relaying transaction:', error);
+      throw error;
+    }
+  },
+
   runProjectCommand: async (
     projectId: string,
     commandType: 'anchor clean' | 'cargo clean'

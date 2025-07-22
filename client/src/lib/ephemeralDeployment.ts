@@ -94,6 +94,8 @@ export interface EphemeralDeployOptions {
   onProgress?: (progress: number, message: string) => void;
   /** If provided instead of programKeypair, an existing program ID to upgrade */
   programId?: PublicKey;
+  /** If true, return a partially signed deploy TX for backend signing and broadcasting. */
+  relayToBackend?: boolean;
   /** Max milliseconds to wait for on-chain authority transfer (default 60_000) */
   verifyTimeoutMs?: number;
 }
@@ -106,6 +108,10 @@ interface DeployResult {
   signatures: string[];
   success: boolean;
   warning?: string;
+  /** base64-encoded DeployWithMaxDataLen transaction when relayToBackend is true */
+  encodedTx?: string;
+  /** set when relayToBackend is true to indicate the deploy must be signed on the backend */
+  relayPending?: boolean;
 }
 
 /**
@@ -125,6 +131,7 @@ export async function deployWithEphemeralKey(
     programKeypair: providedProgramKeypair,
     programSecretKey,
     verifyTimeoutMs = 60_000,
+    relayToBackend,
   } = options;
   
   if (!wallet.publicKey || !wallet.signTransaction) {
@@ -188,6 +195,9 @@ export async function deployWithEphemeralKey(
       resolvedProgramId = programId;
     } else {
       // no predetermined key; generate a new program keypair
+      if (relayToBackend) {
+        throw new Error('Program ID must be provided when relaying to backend');
+      }
       programKeypair = Keypair.generate();
       programId      = programKeypair.publicKey;
       resolvedProgramId = programId;
@@ -496,6 +506,8 @@ export async function deployWithEphemeralKey(
     onProgress(85, programKeypair ? 'Deploying program…' : 'Upgrading program…');
 
     let deployOrUpgradeSig: string;
+    let encodedTx: string | undefined;
+    let relayPending: boolean | undefined;
 
     if (programKeypair) {
       // ------- NEW PROGRAM (DeployWithMaxDataLen) ---------------------------
@@ -533,22 +545,40 @@ export async function deployWithEphemeralKey(
             await connection.getLatestBlockhash('confirmed');
       deployTx.recentBlockhash = deployHash;
       deployTx.feePayer = ephemeralKey.publicKey;
-      deployTx.sign(ephemeralKey, programKeypair);      // wallet no longer signs
-
-      // Simulate the transaction first to catch any potential issues
-      const sim = await connection.simulateTransaction(deployTx);
-      if (sim.value.err) {
-        console.error('Simulation failure', sim.value.logs);
-        throw new Error('Final deploy simulation failed');
-      }
       
-      deployOrUpgradeSig = await connection.sendRawTransaction(
-        deployTx.serialize(),
-        SEND_WITH_PREFLIGHT,
-      );
-      signatures.push(deployOrUpgradeSig);
+      if (relayToBackend) {
+        // Partially sign with the buffer authority only; program signature to be added by backend
+        deployTx.partialSign(ephemeralKey);
+        const encodedTx = deployTx.serialize({ requireAllSignatures: false }).toString('base64');
+        return {
+          programId,
+          signatures,
+          success: true,
+          encodedTx,
+          relayPending: true,
+        };
+      } else {
+        deployTx.sign(ephemeralKey, programKeypair);      // wallet no longer signs
 
-      await connection.confirmTransaction(deployOrUpgradeSig, 'confirmed');
+        // Simulate the transaction first to catch any potential issues
+        const sim = await connection.simulateTransaction(deployTx);
+        if (sim.value.err) {
+          console.error('Simulation failure', sim.value.logs);
+          throw new Error('Final deploy simulation failed');
+        }
+        
+        deployOrUpgradeSig = await connection.sendRawTransaction(
+          deployTx.serialize(),
+          SEND_WITH_PREFLIGHT,
+        );
+        signatures.push(deployOrUpgradeSig);
+
+        await connection.confirmTransaction({
+          blockhash: deployHash,
+          lastValidBlockHeight: deployHeight,
+          signature: deployOrUpgradeSig,
+        });
+      }
     } else {
       // ------- EXISTING PROGRAM (Upgrade) ------------------------------------
       const spillPubkey = walletPublicKey;   // lamports refund destination
@@ -571,122 +601,137 @@ export async function deployWithEphemeralKey(
             await connection.getLatestBlockhash('confirmed');
       upgradeTx.recentBlockhash = upHash;
       upgradeTx.feePayer = ephemeralKey.publicKey;
-      upgradeTx.sign(ephemeralKey);          // wallet already signed buffer writes
+      
+      if (relayToBackend) {
+        upgradeTx.partialSign(ephemeralKey);
+        const encodedTx = upgradeTx.serialize({ requireAllSignatures: false }).toString('base64');
+        return {
+          programId,
+          signatures,
+          success: true,
+          encodedTx,
+          relayPending: true,
+        };
+      } else {
+        upgradeTx.sign(ephemeralKey);          // wallet already signed buffer writes
 
-      // Simulate the transaction first to catch any potential issues
-      const sim = await connection.simulateTransaction(upgradeTx);
-      if (sim.value.err) {
-        console.error('Simulation failure', sim.value.logs);
-        throw new Error('Final upgrade simulation failed');
+        // Simulate the transaction first to catch any potential issues
+        const sim = await connection.simulateTransaction(upgradeTx);
+        if (sim.value.err) {
+          console.error('Simulation failure', sim.value.logs);
+          throw new Error('Final upgrade simulation failed');
+        }
+
+        deployOrUpgradeSig = await connection.sendRawTransaction(
+          upgradeTx.serialize(),
+          SEND_WITH_PREFLIGHT,
+        );
+        signatures.push(deployOrUpgradeSig);
+
+        await connection.confirmTransaction({
+          blockhash: upHash,
+          lastValidBlockHeight: upHeight,
+          signature: deployOrUpgradeSig,
+        });
       }
+    }
 
-      deployOrUpgradeSig = await connection.sendRawTransaction(
-        upgradeTx.serialize(),
+    // 5. Hand upgrade authority from ephemeral key to wallet
+    onProgress(85, 'Transferring upgrade authority...');
+    
+    if (!relayToBackend) {
+      const setAuthIx = new TransactionInstruction({
+        programId: BPF_UPGRADE_LOADER_ID,
+        keys: [
+          { pubkey: programDataPubkey,     isSigner: false, isWritable: true },
+          { pubkey: ephemeralKey.publicKey, isSigner: true, isWritable: false },  // old owner
+          { pubkey: walletPublicKey,        isSigner: false, isWritable: false },  // new owner
+        ],
+        data: u32LE(LoaderIx.SetAuthority),
+      });
+      
+      const setAuthTx = new Transaction().add(setAuthIx);
+      const { blockhash: authHash, lastValidBlockHeight: authHeight } = 
+            await connection.getLatestBlockhash('confirmed');
+      setAuthTx.recentBlockhash = authHash;
+      setAuthTx.feePayer       = ephemeralKey.publicKey;
+      
+      setAuthTx.sign(ephemeralKey);
+      
+      // Simulate the transaction first to catch any potential issues
+      const simResult = await connection.simulateTransaction(setAuthTx);
+      if (simResult.value.err) {
+        console.error('SetAuthority simulation failure:', simResult.value.logs);
+        throw new Error('SetAuthority simulation failed');
+      }
+      
+      const authSig = await connection.sendRawTransaction(
+        setAuthTx.serialize(),
         SEND_WITH_PREFLIGHT,
       );
-      signatures.push(deployOrUpgradeSig);
-
-      await connection.confirmTransaction(deployOrUpgradeSig, 'confirmed');
-    }
-
-    // 5. Hand upgrade authority from ephemeral key → wallet -------------------
-    const setAuthIx = new TransactionInstruction({
-      programId: BPF_UPGRADE_LOADER_ID,
-      keys: [
-        { pubkey: programDataPubkey,      isSigner: false, isWritable: true },  // ProgramData
-        { pubkey: ephemeralKey.publicKey, isSigner: true,  isWritable: false }, // current authority
-        { pubkey: walletPublicKey,        isSigner: false, isWritable: false }, // NEW -- the future authority
-      ],
-      data: u32LE(LoaderIx.SetAuthority), // ✅ only 4-byte tag
-    });
-
-    const setAuthTx = new Transaction().add(setAuthIx);
-    setAuthTx.feePayer = ephemeralKey.publicKey;
-
-    const { blockhash: authHash, lastValidBlockHeight: authHeight } =
-          await connection.getLatestBlockhash('confirmed');
-    setAuthTx.recentBlockhash = authHash;
-
-    setAuthTx.sign(ephemeralKey);
-    
-    // Simulate the transaction first to catch any potential issues
-    const simResult = await connection.simulateTransaction(setAuthTx);
-    if (simResult.value.err) {
-      console.error('SetAuthority simulation failure:', simResult.value.logs);
-      throw new Error('SetAuthority simulation failed');
-    }
-
-    const authSig = await connection.sendRawTransaction(
-      setAuthTx.serialize(),
-      SEND_WITH_PREFLIGHT,
-    );
-    signatures.push(authSig);
-
-    // ⚡ Use the lighter 'confirmed' level so we return in ~1–2 s instead of ~15 s
-    const authResult = await connection.confirmTransaction(authSig, 'confirmed');
-    
-    if (authResult.value.err) {
-      throw new Error(`SetAuthority transaction failed: ${JSON.stringify(authResult.value.err)}`);
-    }
-    
-    // Optionally fetch the transaction to check for runtime errors
-    const txInfo = await connection.getParsedTransaction(authSig, 'confirmed');
-    if (txInfo?.meta?.err) {
-      throw new Error(`SetAuthority had runtime error: ${JSON.stringify(txInfo.meta.err)}`);
-    }
-    
-    onProgress(90, 'Authority tx confirmed — verifying on-chain…');
-
-    // ---------- Verify the authority change  ----------
-    // Try 'confirmed' for ≤60 s (120×0.5 s); fall back to 'finalized' once
-    const COMMIT_PRIMARY   = 'confirmed';
-    const COMMIT_FALLBACK  = 'finalized';
-    const retriesMax = Math.ceil(verifyTimeoutMs / 500);
-    let retries = retriesMax;
-    let newAuth: PublicKey | null = null;
-
-    while (retries-- > 0) {
-      const pdaInfo = await connection.getAccountInfo(programDataPubkey, COMMIT_PRIMARY as any);
-      if (pdaInfo) {
-        const optTag = pdaInfo.data[PROGRAMDATA_AUTHORITY_OFFSET];   // COption tag
-        if (optTag === 1) {                                          // Some(pubkey)
-          newAuth = new PublicKey(
-            pdaInfo.data.slice(
-              PROGRAMDATA_AUTHORITY_OFFSET + 1,
-              PROGRAMDATA_AUTHORITY_OFFSET + 33,
-            ),
-          );
-          if (newAuth.equals(walletPublicKey)) break;                // ✅ success
+      signatures.push(authSig);
+      
+      // ⚡ Use the lighter 'confirmed' level so we return in ~1–2 s instead of ~15 s
+      const authResult = await connection.confirmTransaction(
+        { blockhash: authHash, lastValidBlockHeight: authHeight, signature: authSig },
+        'confirmed',
+      );
+      
+      if (authResult.value.err) {
+        throw new Error(`SetAuthority transaction failed: ${JSON.stringify(authResult.value.err)}`);
+      }
+      
+      // Optionally fetch the transaction to check for runtime errors
+      const txInfo = await connection.getParsedTransaction(authSig, 'confirmed');
+      if (txInfo?.meta?.err) {
+        throw new Error(`SetAuthority had runtime error: ${JSON.stringify(txInfo.meta.err)}`);
+      }
+      
+      onProgress(90, 'Authority tx confirmed — verifying on-chain…');
+      
+      // ── Verify authority change with an explicit AccountInfo fetch ──────
+      onProgress(95, 'Verifying Authority is now wallet...');
+      
+      // Poll for a while (30 s default) to wait for the authority to change
+      const startTime = Date.now();
+      let currentAuth = null;
+      
+      while (Date.now() - startTime < verifyTimeoutMs) {
+        const programData = await connection.getAccountInfo(programDataPubkey, 'confirmed');
+        if (!programData) {
+          console.warn(`Program data account not found for ${resolvedProgramId!.toBase58()} – retrying…`);
+          await new Promise(r => setTimeout(r, 2_000));  // short delay
+          continue;
         }
+        
+        const buffer = programData.data.slice(
+          PROGRAMDATA_AUTHORITY_OFFSET,       // 13: after enum + slot
+          PROGRAMDATA_AUTHORITY_OFFSET + 32,  // 45: program auth pubkey
+        );
+        currentAuth = new PublicKey(buffer);
+        console.log('[AUTH-CHECK] current:', currentAuth.toBase58());
+        
+        // Simple check if the authority equals the wallet addr now
+        if (currentAuth.equals(walletPublicKey)) {
+          console.log('[AUTH-CHECK] Authority correctly set to wallet');
+          break;
+        }
+        
+        console.log('[AUTH-CHECK] Authority not yet changed – retrying in 2s...');
+        await new Promise(r => setTimeout(r, 2_000));  // short delay
       }
-      await new Promise(r => setTimeout(r, 500));
-    }
-
-    if (!newAuth?.equals(walletPublicKey)) {
-      // one last shot at the heavier commitment before bailing out
-      const finalPda = await connection.getAccountInfo(programDataPubkey, COMMIT_FALLBACK as any);
-      if (
-        finalPda &&
-        finalPda.data[PROGRAMDATA_AUTHORITY_OFFSET] === 1 &&
-        new PublicKey(
-          finalPda.data.slice(
-            PROGRAMDATA_AUTHORITY_OFFSET + 1,
-            PROGRAMDATA_AUTHORITY_OFFSET + 33,
-          ),
-        ).equals(walletPublicKey)
-      ) {
-        newAuth = walletPublicKey; // ✅ success, just slower RPC
-      } else {
-        const msg = `Authority transfer not visible after ${((retriesMax - retries) * 0.5).toFixed(1)}s – treating as lag, continuing`;
-        console.warn(msg);
-        return {
-          success: true,
-          programId: resolvedProgramId,
-          signatures,
-          warning: msg,
-        };
+      
+      // If we exit the loop and the auth is still not the wallet, warn + set a warning
+      const warningMsg = 
+        currentAuth && !currentAuth.equals(walletPublicKey)
+          ? `⚠️ Authority is still set to ${currentAuth.toBase58()} after timeout. ` +
+            `Expected ${walletPublicKey.toBase58()}. You may need to manually run SetAuthority.`
+          : undefined;
+      
+      if (warningMsg) {
+        console.warn(warningMsg);
       }
-    }
+    } // end !relayToBackend
 
     /* -----------------------------------------------------------------
      * 6 – SHA-256 the ProgramData PDA and compare again
@@ -755,6 +800,8 @@ export async function deployWithEphemeralKey(
       programId: resolvedProgramId,
       signatures,
       success: true,
+      encodedTx,
+      relayPending,
     };
   } catch (e: any) {
     console.error('RAW ERROR', e);
