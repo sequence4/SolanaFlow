@@ -1393,23 +1393,36 @@ export async function signDeployTxAndBroadcast(
   }
   // Use a temporary task ID to avoid polluting the task database.
   const tempTaskId = uuidv4();
-  // Locate the program keypair JSON (e.g. my_program-keypair.json) inside /usr/src/target/deploy.
-  const findCmd = `docker exec ${containerName} bash -c 'find /usr/src/target/deploy -maxdepth 1 -name "*-keypair.json" | head -n 1'`;
-  const keyPath = (await runCommand(findCmd, '.', tempTaskId, { skipSuccessUpdate: true })).trim();
-  if (!keyPath) {
-    throw new Error('Program keypair file not found in target/deploy');
+  // Enumerate all *-keypair.json files and select the one whose public key matches programId
+  const listCmd = `docker exec ${containerName} bash -c 'find /usr/src/target/deploy -maxdepth 1 -name "*-keypair.json" -print'`;
+  const listOutput = await runCommand(listCmd, '.', tempTaskId, { skipSuccessUpdate: true });
+  const candidates = listOutput.split(/\r?\n/).filter(Boolean);
+  if (candidates.length === 0) {
+    throw new Error('No *-keypair.json files found in target/deploy');
   }
-  // Read the keypair JSON from inside the container.
-  const readCmd = `docker exec ${containerName} bash -c "cat '${keyPath}'"`;
-  const keyJson = await runCommand(readCmd, '.', tempTaskId, { skipSuccessUpdate: true });
-  const secretArr = JSON.parse(keyJson) as number[];
-  if (!Array.isArray(secretArr) || secretArr.length !== 64) {
-    throw new Error('Invalid program keypair contents');
+  let programKeypair: Keypair | null = null;
+  for (const candidate of candidates) {
+    try {
+      const content = await runCommand(
+        `docker exec ${containerName} bash -c "cat '${candidate}'"`,
+        '.',
+        tempTaskId,
+        { skipSuccessUpdate: true },
+      );
+      const arr = JSON.parse(content.trim());
+      if (Array.isArray(arr) && arr.length === 64) {
+        const kp = Keypair.fromSecretKey(Uint8Array.from(arr));
+        if (kp.publicKey.toBase58() === programId) {
+          programKeypair = kp;
+          break;
+        }
+      }
+    } catch {
+      continue;
+    }
   }
-  const programKeypair = Keypair.fromSecretKey(Uint8Array.from(secretArr));
-  const expectedId = programKeypair.publicKey.toBase58();
-  if (expectedId !== programId) {
-    throw new Error(`Program ID mismatch: expected ${expectedId}, got ${programId}`);
+  if (!programKeypair) {
+    throw new Error(`No keypair in target/deploy matches program ID ${programId}`);
   }
   // Decode the partial transaction and add the program signature.
   const raw = Buffer.from(encodedTx, 'base64');
