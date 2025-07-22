@@ -1108,35 +1108,29 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
   const { id } = req.params;
   const userId = req.user?.id;
   const orgId = req.user?.org_id;
-  const { encodedTx, programId, taskId } = req.body;
-  if (!userId || !orgId) {
-    next(new AppError('User information not found', 400));
-    return;
+  const { encodedTx, programId } = req.body;
+  
+  if (!encodedTx || !programId) {
+    return next(new AppError('Missing encodedTx or programId', 400));
   }
-  if (!encodedTx || !programId || !taskId) {
-    next(new AppError('Missing encodedTx, programId, or taskId', 400));
-    return;
-  }
+  
   try {
-    // Sign the transaction with the original program keypair and broadcast it
+    // Add program signature and broadcast
     const txSignature = await signDeployTxAndBroadcast(id, encodedTx, programId);
     
-    // Persist the Program ID in the project's details
     const client = await pool.connect();
     try {
       await client.query(
         `UPDATE solanaproject
-           SET details = COALESCE(details::jsonb, '{}'::jsonb) || $1::jsonb,
-               last_updated  = $2
+           SET details     = COALESCE(details::jsonb, '{}'::jsonb) || $1::jsonb,
+               last_updated = $2
          WHERE id = $3`,
         [JSON.stringify({ programId }), new Date(), id],
       );
     } finally {
       client.release();
     }
-    // Mark the deploy task as succeeded with the program ID
-    const resultJson = JSON.stringify({ status: 'success', programId });
-    await updateTaskStatus(taskId, 'succeed', resultJson);
+    
     console.log(`[RELAY_SIGNED_TX] Program ${programId} deployed successfully for project ${id}`);
     
     // Restart container so Next.js picks up the new Program ID
@@ -1157,10 +1151,6 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
     return;
   } catch (error: any) {
     console.error('[RELAY_SIGNED_TX] Failed to broadcast signed transaction:', error);
-    if (taskId) {
-      // Mark task as failed if broadcast fails
-      await updateTaskStatus(taskId, 'failed', `Broadcast failed: ${error.message}`);
-    }
     next(new AppError('Failed to relay signed transaction', 500));
     return;
   }
