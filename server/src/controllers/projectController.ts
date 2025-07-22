@@ -525,31 +525,45 @@ export const createEphemeralKeypair = async (req: Request, res: Response, next: 
       if (containerName) {
         const rootPath = await getProjectRootPath(projectId);
         const findTaskId = uuidv4();
-        const keyPath = await runCommand(
-          `docker exec ${containerName} bash -c 'cd /usr/src/${rootPath} && find target/deploy -maxdepth 1 -name "*.json" | head -n 1'`,
+        // 1️⃣ look in the project sub‑folder first …
+        let keyPath = await runCommand(
+          `docker exec ${containerName} bash -c 'cd /usr/src/${rootPath} && find target/deploy -maxdepth 1 -name "*-keypair.json" ! -name "anchor_template-*" | head -n 1'`,
           ".",
           findTaskId,
-          { skipSuccessUpdate: true }
+          { skipSuccessUpdate: true },
         );
-        if (keyPath && keyPath.trim() !== "") {
-          console.log(`[ARTIFACT] ✓ Found keypair file at /usr/src/${rootPath}/${keyPath.trim()}, reading...`);
+        keyPath = keyPath.trim();
+
+        // 2️⃣ … if nothing found, fall back to the monorepo‑root build folder
+        if (!keyPath) {
+          keyPath = await runCommand(
+            `docker exec ${containerName} bash -c 'find /usr/src/target/deploy -maxdepth 1 -name "*-keypair.json" ! -name "anchor_template-*" | head -n 1'`,
+            ".",
+            findTaskId,
+            { skipSuccessUpdate: true },
+          );
+          keyPath = keyPath.trim();
+        }
+
+        if (keyPath) {
+          console.log(`[ARTIFACT] ✓ Found keypair file at ${keyPath}, reading…`);
           const readTaskId = uuidv4();
           const keyContent = await runCommand(
-            `docker exec ${containerName} bash -c "cat /usr/src/${rootPath}/${keyPath.trim()}"`,
+            `docker exec ${containerName} bash -c "cat '${keyPath}'"`,
             ".",
             readTaskId,
             { skipSuccessUpdate: true }
           );
-                     const parsedArr = JSON.parse(keyContent.trim());
+           const parsedArr = JSON.parse(keyContent.trim());
            if (Array.isArray(parsedArr) && parsedArr.length === 64) {
              secretArr = parsedArr;
              const programPubkey = Keypair.fromSecretKey(Uint8Array.from(secretArr)).publicKey.toBase58();
              console.log(`[ARTIFACT] ✓ Extracted Program ID ${programPubkey} from keypair`);
            }
-         } else {
-           console.log(`[ARTIFACT] ❌ No program keypair file found in target/deploy for project ${projectId}`);
-         }
-       }
+        } else {
+          console.log(`[ARTIFACT] ❌ No keypair JSON found after global + local search for project ${projectId}`);
+        }
+      }
        if (secretArr && Array.isArray(secretArr)) {
          ephem = Keypair.fromSecretKey(Uint8Array.from(secretArr));
        } else {
