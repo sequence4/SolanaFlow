@@ -1314,12 +1314,15 @@ export async function broadcastSignedTx(
   // Decode the serialized transaction
   const rawBuffer = Buffer.from(encodedTx, 'base64');
   const tx = Transaction.from(rawBuffer);
+  
   // Retrieve the secret key from Secrets Manager and sign
   let signer: Keypair;
   try {
     const secretKey = await getProgramSecret(programId);
     signer = Keypair.fromSecretKey(secretKey);
+    console.log(`[broadcastSignedTx] Retrieved program secret key from AWS Secrets Manager for ${programId}`);
   } catch (e: any) {
+    console.log(`[broadcastSignedTx] AWS retrieval failed, falling back to local file: ${e.message}`);
     // Fallback when AWS disabled or creds invalid
     if (awsSecretsEnabled() && e.message !== 'AWS credentials invalid') {
       throw e;
@@ -1327,16 +1330,39 @@ export async function broadcastSignedTx(
     // Fallback: read the cached keypair JSON written during build
     const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${programId}.json`);
     if (!fs.existsSync(walletPath)) {
+      console.error(`[broadcastSignedTx] ERROR: Program keypair file not found at ${walletPath}`);
       throw new Error(`Program keypair not found at ${walletPath}`);
     }
-    const secretArr = JSON.parse(fs.readFileSync(walletPath, 'utf-8'));
-    signer = Keypair.fromSecretKey(Uint8Array.from(secretArr));
+    try {
+      const secretArr = JSON.parse(fs.readFileSync(walletPath, 'utf-8'));
+      signer = Keypair.fromSecretKey(Uint8Array.from(secretArr));
+      console.log(`[broadcastSignedTx] Using locally stored keypair for ${programId}`);
+    } catch (err: any) {
+      console.error(`[broadcastSignedTx] ERROR: Failed to parse program keypair from ${walletPath}: ${err.message}`);
+      throw new Error(`Failed to parse program keypair: ${err.message}`);
+    }
   }
-  tx.partialSign(signer);
+  
+  // Sign the transaction with the program keypair
+  try {
+    tx.partialSign(signer);
+    console.log(`[broadcastSignedTx] Successfully signed transaction with program keypair ${programId}`);
+  } catch (err: any) {
+    console.error(`[broadcastSignedTx] ERROR: Failed to sign transaction with program key: ${err.message}`);
+    throw new Error(`Failed to sign transaction with program key: ${err.message}`);
+  }
+  
   // Broadcast the fully signed transaction
-  const conn = new Connection('https://api.devnet.solana.com', 'confirmed');
-  const signature = await sendAndConfirmRawTransaction(conn, tx.serialize());
-  return signature;
+  try {
+    const conn = new Connection('https://api.devnet.solana.com', 'confirmed');
+    console.log(`[broadcastSignedTx] Broadcasting transaction to Solana devnet...`);
+    const signature = await sendAndConfirmRawTransaction(conn, tx.serialize());
+    console.log(`[broadcastSignedTx] Transaction confirmed with signature: ${signature}`);
+    return signature;
+  } catch (err: any) {
+    console.error(`[broadcastSignedTx] ERROR: Failed to broadcast transaction: ${err.message}`);
+    throw new Error(`Failed to broadcast transaction: ${err.message}`);
+  }
 }
 
 /**

@@ -657,10 +657,17 @@ export const deployProjectEphemeral = async (
   // If using Phantom (signed transaction path), skip container deploy and await relay
   if (ephemeralPubkey === 'SIGNED') {
     console.log(`[DEPLOY_EPHEMERAL] 'SIGNED' flag received – expecting front-end to handle deployment`);
+    // Generate a new program keypair for this deploy
+    const program = Keypair.generate();
+    const pubkey = program.publicKey.toBase58();
+    // Persist the secret (e.g., store in AWS Secrets Manager or an encrypted file)
+    const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${pubkey}.json`);
+    fs.writeFileSync(walletPath, JSON.stringify(Array.from(program.secretKey)));
     const taskId = await startAnchorDeployTask(id, userId, 'SIGNED');
     res.status(200).json({
       message: 'Awaiting signed transaction from wallet',
       taskId: taskId,
+      programId: pubkey
     });
     return;
   }
