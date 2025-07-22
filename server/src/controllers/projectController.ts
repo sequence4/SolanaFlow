@@ -18,6 +18,7 @@ import {
   startInstallNodeDependenciesTask,
   compileTs,
   broadcastSignedTx,
+  signDeployTxAndBroadcast,
   getContainerName,
 } from '../utils/projectUtils';
 import path from 'path';
@@ -1117,8 +1118,9 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
     return;
   }
   try {
-    // Broadcast the signed transaction to Devnet
-    const txSignature = await broadcastSignedTx(id, programId, encodedTx);
+    // Sign the transaction with the original program keypair and broadcast it
+    const txSignature = await signDeployTxAndBroadcast(id, encodedTx, programId);
+    
     // Persist the Program ID in the project's details
     const client = await pool.connect();
     try {

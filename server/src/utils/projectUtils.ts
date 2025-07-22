@@ -1366,6 +1366,62 @@ export async function broadcastSignedTx(
 }
 
 /**
+ * Signs a partially-signed deploy transaction with the fixed program keypair (generated during codegen)
+ * and broadcasts it to Devnet. This helper ensures the program's secret key remains on the backend,
+ * never reaching the client.
+ *
+ * Steps:
+ *   1. Locate the `*-keypair.json` file inside `/usr/src/target/deploy` of the project's container.
+ *   2. Load the secret key, derive the programId, and verify it matches the expected `programId`.
+ *   3. Decode the partial transaction from `encodedTx`, add the program signature via `partialSign`.
+ *   4. Broadcast the fully signed transaction and return its signature.
+ *
+ * @param projectId  ID of the project whose container holds the compiled artifacts.
+ * @param encodedTx  Base64-encoded partially-signed transaction (ephemeral signature present).
+ * @param programId  Expected public key of the program; used to verify we loaded the correct keypair.
+ * @returns         Transaction signature of the deployed program.
+ */
+export async function signDeployTxAndBroadcast(
+  projectId: string,
+  encodedTx: string,
+  programId: string
+): Promise<string> {
+  // Find the container for this project.
+  const containerName = await getContainerName(projectId);
+  if (!containerName) {
+    throw new Error(`No container found for project ${projectId}`);
+  }
+  // Use a temporary task ID to avoid polluting the task database.
+  const tempTaskId = uuidv4();
+  // Locate the program keypair JSON (e.g. my_program-keypair.json) inside /usr/src/target/deploy.
+  const findCmd = `docker exec ${containerName} bash -c 'find /usr/src/target/deploy -maxdepth 1 -name "*-keypair.json" | head -n 1'`;
+  const keyPath = (await runCommand(findCmd, '.', tempTaskId, { skipSuccessUpdate: true })).trim();
+  if (!keyPath) {
+    throw new Error('Program keypair file not found in target/deploy');
+  }
+  // Read the keypair JSON from inside the container.
+  const readCmd = `docker exec ${containerName} bash -c "cat '${keyPath}'"`;
+  const keyJson = await runCommand(readCmd, '.', tempTaskId, { skipSuccessUpdate: true });
+  const secretArr = JSON.parse(keyJson) as number[];
+  if (!Array.isArray(secretArr) || secretArr.length !== 64) {
+    throw new Error('Invalid program keypair contents');
+  }
+  const programKeypair = Keypair.fromSecretKey(Uint8Array.from(secretArr));
+  const expectedId = programKeypair.publicKey.toBase58();
+  if (expectedId !== programId) {
+    throw new Error(`Program ID mismatch: expected ${expectedId}, got ${programId}`);
+  }
+  // Decode the partial transaction and add the program signature.
+  const raw = Buffer.from(encodedTx, 'base64');
+  const transaction = Transaction.from(raw);
+  transaction.partialSign(programKeypair);
+  // Broadcast the fully signed transaction.
+  const conn = new Connection('https://api.devnet.solana.com', 'confirmed');
+  const sig = await sendAndConfirmRawTransaction(conn, transaction.serialize());
+  return sig;
+}
+
+/**
  * Runs a command in a detached process, not waiting for completion.
  * Useful for long-running processes like dev servers.
  */
