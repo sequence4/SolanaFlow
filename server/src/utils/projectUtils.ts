@@ -284,13 +284,22 @@ export const getBuildArtifactTask = async (projectId: string): Promise<{ status:
     
     console.log(`[ARTIFACT] ✓ Successfully encoded .so file to base64 (${base64So.length} bytes)`);
     
-    // Find the program keypair JSON file and extract program ID
-    const locateJsonCmd = `docker exec ${containerName} bash -c 'cd /usr/src/${rootPath} && JSON_DIR="\${CARGO_TARGET_DIR:-target}/deploy" && find "$JSON_DIR" -maxdepth 1 -name "*-keypair.json" | head -n 1'`;
-    const containerKeypairPath = (await runCommand(locateJsonCmd, '.', tempTaskId, { skipSuccessUpdate: true })).trim();
+    // 1️⃣ First look in the project sub‑folder
+    let containerKeypairPath = '';
+    let locateJsonCmd = `docker exec ${containerName} bash -c 'cd /usr/src/${rootPath} && find target/deploy -maxdepth 1 -name "*-keypair.json" ! -name "anchor_template-*" | head -n 1'`;
+    containerKeypairPath = (await runCommand(locateJsonCmd, '.', tempTaskId, { skipSuccessUpdate: true })).trim();
+    
+    // 2️⃣ If nothing found, fall back to the monorepo‑root build folder
     if (!containerKeypairPath) {
-      console.error('[ARTIFACT] ❌  No keypair json found');
+      locateJsonCmd = `docker exec ${containerName} bash -c 'find /usr/src/target/deploy -maxdepth 1 -name "*-keypair.json" ! -name "anchor_template-*" | head -n 1'`;
+      containerKeypairPath = (await runCommand(locateJsonCmd, '.', tempTaskId, { skipSuccessUpdate: true })).trim();
+    }
+    
+    if (!containerKeypairPath) {
+      console.error('[ARTIFACT] ❌ No keypair JSON found after global + local search');
       throw new Error('Program keypair not found in container');
     }
+    
     console.log(`[ARTIFACT] ✓ Found keypair file at ${containerKeypairPath}, reading...`);
     const keypairJson = await runCommand(`docker exec ${containerName} bash -c "cat '${containerKeypairPath}'"`, '.', tempTaskId, { skipSuccessUpdate: true });
     let programId = "";
@@ -1391,15 +1400,31 @@ export async function signDeployTxAndBroadcast(
   if (!containerName) {
     throw new Error(`No container found for project ${projectId}`);
   }
+  
+  // Get project root path for project-specific search
+  const rootPath = await getProjectRootPath(projectId);
+  
   // Use a temporary task ID to avoid polluting the task database.
   const tempTaskId = uuidv4();
-  // Enumerate all *-keypair.json files and select the one whose public key matches programId
-  const listCmd = `docker exec ${containerName} bash -c 'find /usr/src/target/deploy -maxdepth 1 -name "*-keypair.json" -print'`;
-  const listOutput = await runCommand(listCmd, '.', tempTaskId, { skipSuccessUpdate: true });
-  const candidates = listOutput.split(/\r?\n/).filter(Boolean);
+  
+  // 1️⃣ First search in the project sub-folder
+  let listCmd = `docker exec ${containerName} bash -c 'cd /usr/src/${rootPath} && find target/deploy -maxdepth 1 -name "*-keypair.json" ! -name "anchor_template-*" -print'`;
+  let listOutput = await runCommand(listCmd, '.', tempTaskId, { skipSuccessUpdate: true });
+  let candidates = listOutput.split(/\r?\n/).filter(Boolean);
+  
+  // 2️⃣ If nothing found in project folder, search in the global folder
   if (candidates.length === 0) {
-    throw new Error('No *-keypair.json files found in target/deploy');
+    listCmd = `docker exec ${containerName} bash -c 'find /usr/src/target/deploy -maxdepth 1 -name "*-keypair.json" ! -name "anchor_template-*" -print'`;
+    listOutput = await runCommand(listCmd, '.', tempTaskId, { skipSuccessUpdate: true });
+    candidates = listOutput.split(/\r?\n/).filter(Boolean);
   }
+  
+  if (candidates.length === 0) {
+    throw new Error('No *-keypair.json files found after global + local search');
+  }
+  
+  console.log(`[SIGNING] Found ${candidates.length} keypair candidate(s): ${candidates.join(', ')}`);
+  
   let programKeypair: Keypair | null = null;
   for (const candidate of candidates) {
     try {
@@ -1412,17 +1437,21 @@ export async function signDeployTxAndBroadcast(
       const arr = JSON.parse(content.trim());
       if (Array.isArray(arr) && arr.length === 64) {
         const kp = Keypair.fromSecretKey(Uint8Array.from(arr));
-        if (kp.publicKey.toBase58() === programId) {
+        const pubkey = kp.publicKey.toBase58();
+        console.log(`[SIGNING] Candidate ${candidate} has public key ${pubkey}`);
+        if (pubkey === programId) {
+          console.log(`[SIGNING] ✓ Found matching keypair at ${candidate}`);
           programKeypair = kp;
           break;
         }
       }
-    } catch {
+    } catch (err) {
+      console.log(`[SIGNING] Error processing ${candidate}: ${err}`);
       continue;
     }
   }
   if (!programKeypair) {
-    throw new Error(`No keypair in target/deploy matches program ID ${programId}`);
+    throw new Error(`No keypair matches program ID ${programId} after checking ${candidates.length} candidates`);
   }
   // Decode the partial transaction and add the program signature.
   const raw = Buffer.from(encodedTx, 'base64');
