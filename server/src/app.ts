@@ -15,6 +15,8 @@ import workspaceRoutes from '@/routes/workspaceRoutes';
 import poolRoutes from '@/routes/poolRoutes';
 import internalCertRoute from '@/routes/internalCertRoute';
 import artifactRoute from '@/routes/artifactRoute';
+import ephemeralRoutes from '@/routes/ephemeral';
+import deployRelayRoutes from '@/routes/deploy';
 import { startCleanupWorker } from "./workers/cleanupWorker";
 import { awsSecretsEnabled } from './utils/awsSecrets';
 
@@ -61,6 +63,8 @@ app.use('/api/deploy', deployRoutes);
 app.use('/api/projects', artifactRoute);
 app.use('/workspace', workspaceRoutes);
 app.use('/api/pool', poolRoutes); 
+app.use('/api/projects', ephemeralRoutes);
+app.use('/api/projects', deployRelayRoutes);
 app.use(internalCertRoute);
 
 app.get('/health', (req, res) => {

@@ -238,15 +238,11 @@ export const projectApi = {
    */
   createEphemeral: async (
     projectId: string,
-    secretKey?: number[]
-  ): Promise<{ pubkey: string }> => {
+    pubkey: string
+  ): Promise<{ status: string }> => {
     try {
-      const body = secretKey ? { secretKey } : {};
-      const response = await api.post(`/projects/${projectId}/ephemeral`, body);
-      const data = response.data;
-      return {
-        pubkey: data.pubkey ?? data.ephemeralPubkey
-      };
+      const response = await api.post(`/projects/${projectId}/ephemeral`, { pubkey });
+      return response.data;
     } catch (err) {
       console.error('Error creating ephemeral:', err);
       throw err;
@@ -386,6 +382,19 @@ export const projectApi = {
       return response.data;
     } catch (error) {
       console.error('Error relaying signed transaction:', error);
+      throw error;
+    }
+  },
+
+  relayDeployTx: async (
+    projectId: string,
+    payload: { encodedTx: string; programId: string }
+  ): Promise<{ signature: string }> => {
+    try {
+      const response = await api.post(`/projects/${projectId}/relayDeployTx`, payload);
+      return response.data;
+    } catch (error) {
+      console.error('Error relaying deploy transaction:', error);
       throw error;
     }
   },

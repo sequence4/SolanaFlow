@@ -98,6 +98,8 @@ export interface EphemeralDeployOptions {
   relayToBackend?: boolean;
   /** Max milliseconds to wait for on-chain authority transfer (default 60_000) */
   verifyTimeoutMs?: number;
+  /** Project ID for API calls */
+  projectId?: string;
 }
 
 /**
@@ -121,7 +123,7 @@ interface DeployResult {
 export async function deployWithEphemeralKey(
   options: EphemeralDeployOptions
 ): Promise<DeployResult> {
-      const {
+  const {
     soBytes,
     connection,
     wallet,
@@ -132,6 +134,7 @@ export async function deployWithEphemeralKey(
     programSecretKey,
     verifyTimeoutMs = 60_000,
     relayToBackend,
+    projectId,
   } = options;
   
   if (!wallet.publicKey || !wallet.signTransaction) {
@@ -166,8 +169,22 @@ export async function deployWithEphemeralKey(
     console.log(`[EPHEMERAL_DEPLOY] Starting deployment, program size: ${dataLength} bytes`);
     
     // 1. Use the provided ephemeral keypair
-    const ephemeralKey = ephemeralKeypair;
-    console.log(`[EPHEMERAL_DEPLOY] Using ephemeral key: ${ephemeralKey.publicKey.toBase58()}`);
+    const bufferKp = ephemeralKeypair;
+    console.log(`[EPHEMERAL_DEPLOY] Using ephemeral key: ${bufferKp.publicKey.toBase58()}`);
+    
+    // Register ephemeral key with backend (only send public key)
+    try {
+      if (projectId) {
+        await fetch(`/api/projects/${projectId}/ephemeral`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pubkey: bufferKp.publicKey.toBase58() })
+        });
+      }
+    } catch (err) {
+      console.warn('Failed to register ephemeral key with backend:', err);
+      // Continue anyway - not critical for the deployment
+    }
     
     // 2. Create a buffer account (using a real keypair, not PDA)
     const bufferKey = Keypair.generate();
@@ -292,7 +309,7 @@ export async function deployWithEphemeralKey(
     const fundingTx = new Transaction().add(
       SystemProgram.transfer({
         fromPubkey: walletPublicKey,
-        toPubkey: ephemeralKey.publicKey,
+        toPubkey: bufferKp.publicKey,
         lamports: Number(totalNeeded),
       })
     );
@@ -326,7 +343,7 @@ export async function deployWithEphemeralKey(
     const createBufferTx = new Transaction()
       .add(
         SystemProgram.createAccount({
-          fromPubkey: ephemeralKey.publicKey,
+          fromPubkey: bufferKp.publicKey,
           newAccountPubkey: bufferKey.publicKey,
           // Only fund with buffer rent, not programDataRent
           lamports: parseInt(bufferRent.toString()),
@@ -339,7 +356,7 @@ export async function deployWithEphemeralKey(
       programId: BPF_UPGRADE_LOADER_ID,
       keys: [
         { pubkey: bufferKey.publicKey,   isSigner: false, isWritable: true },
-        { pubkey: ephemeralKey.publicKey,isSigner: true,  isWritable: false },
+        { pubkey: bufferKp.publicKey,isSigner: true,  isWritable: false },
       ],
       data: u32LE(LoaderIx.InitializeBuffer),           // 4-byte tag
     });
@@ -351,10 +368,10 @@ export async function deployWithEphemeralKey(
     const bufferHeight = bufferBlockhashInfo.lastValidBlockHeight;
       
     createBufferTx.recentBlockhash = bufferHash;
-    createBufferTx.feePayer = ephemeralKey.publicKey;
+    createBufferTx.feePayer = bufferKp.publicKey;
     
     // Sign with both the ephemeral key and buffer key
-    createBufferTx.sign(ephemeralKey, bufferKey);
+    createBufferTx.sign(bufferKp, bufferKey);
     
     // Send and confirm buffer creation
     const bufferSig = await connection.sendRawTransaction(
@@ -411,7 +428,7 @@ export async function deployWithEphemeralKey(
         programId: BPF_UPGRADE_LOADER_ID,
         keys: [
           { pubkey: bufferKey.publicKey,   isSigner: false, isWritable: true },
-          { pubkey: ephemeralKey.publicKey,isSigner: true,  isWritable: false },
+          { pubkey: bufferKp.publicKey,isSigner: true,  isWritable: false },
         ],
         data: Buffer.concat([
           u32LE(LoaderIx.Write),                          // 4-byte tag
@@ -436,8 +453,8 @@ export async function deployWithEphemeralKey(
         }
         // Use *matching* fee‑payer for simulation so signature set matches the
         // real transaction's signer list.
-        simTx.feePayer = ephemeralKey.publicKey;
-        simTx.sign(ephemeralKey);
+        simTx.feePayer = bufferKp.publicKey;
+        simTx.sign(bufferKp);
         const { value:{err, logs} } = await connection.simulateTransaction(simTx);
         console.log('[SIM-WRITE] err', err, '\nlogs', logs);
         if (err) throw new Error('Simulation of first Write failed: ' + JSON.stringify(err));
@@ -450,10 +467,10 @@ export async function deployWithEphemeralKey(
         lastSafeHashInfo = await getSafeHash(connection);
       }
       writeTx.recentBlockhash = lastSafeHashInfo!.blockhash;
-      writeTx.feePayer = ephemeralKey.publicKey;
+      writeTx.feePayer = bufferKp.publicKey;
       
       // Sign with the ephemeral key
-      writeTx.sign(ephemeralKey);
+      writeTx.sign(bufferKp);
       
       // Send raw transaction without waiting for confirmation
       // We'll send them all quickly
@@ -512,7 +529,7 @@ export async function deployWithEphemeralKey(
     if (programKeypair) {
       // ------- NEW PROGRAM (DeployWithMaxDataLen) ---------------------------
       const createProgramAcct = SystemProgram.createAccount({
-        fromPubkey: ephemeralKey.publicKey,
+        fromPubkey: bufferKp.publicKey,
         newAccountPubkey: programKeypair.publicKey,
         lamports: Number(programRent),
         space: PROGRAM_ACCOUNT_SPACE,
@@ -522,14 +539,14 @@ export async function deployWithEphemeralKey(
       const deployIx = new TransactionInstruction({
         programId: BPF_UPGRADE_LOADER_ID,
         keys: [
-          { pubkey: ephemeralKey.publicKey,  isSigner: true,  isWritable: true },  // payer
+          { pubkey: bufferKp.publicKey,  isSigner: true,  isWritable: true },  // payer
           { pubkey: programDataPubkey,       isSigner: false, isWritable: true },
           { pubkey: programKeypair.publicKey,isSigner: true,  isWritable: true },  // Program
           { pubkey: bufferKey.publicKey,     isSigner: false, isWritable: true },
           { pubkey: SYSVAR_RENT_PUBKEY,      isSigner: false, isWritable: false },
           { pubkey: SYSVAR_CLOCK_PUBKEY,     isSigner: false, isWritable: false },
           { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-          { pubkey: ephemeralKey.publicKey,  isSigner: true,  isWritable: false }, // authority = buffer authority
+          { pubkey: bufferKp.publicKey,  isSigner: true,  isWritable: false }, // authority = buffer authority
         ],
         data: Buffer.concat([
           u32LE(LoaderIx.DeployWithMaxDataLen),          // 4-byte tag
@@ -544,18 +561,32 @@ export async function deployWithEphemeralKey(
       const { blockhash: deployHash, lastValidBlockHeight: deployHeight } =
             await connection.getLatestBlockhash('confirmed');
       deployTx.recentBlockhash = deployHash;
-      deployTx.feePayer = ephemeralKey.publicKey;
+      deployTx.feePayer = bufferKp.publicKey;
       
       if (relayToBackend) {
         // Partially sign with the buffer authority only; program signature to be added by backend
-        deployTx.partialSign(ephemeralKey);
+        deployTx.partialSign(bufferKp);
         const encodedTx = deployTx.serialize({ requireAllSignatures: false }).toString('base64');
+        
+        // ❸ send to backend for program‑key signature & broadcast
+        if (!projectId) {
+          throw new Error("Project ID required for relay to backend");
+        }
+        
+        const relayRes = await fetch(`/api/projects/${projectId}/relayDeployTx`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ encodedTx, programId: programId.toBase58() })
+        }).then(r => r.json());
+        
+        // relayRes.signature is the final on‑chain tx id
+        signatures.push(relayRes.signature);
+        
         return {
           programId,
           signatures,
           success: true,
-          encodedTx,
-          relayPending: true,
+          relayPending: false,
         };
       } else {
         // Simulate the transaction first to catch any potential issues
@@ -599,7 +630,7 @@ export async function deployWithEphemeralKey(
           { pubkey: spillPubkey,          isSigner: false, isWritable: true },
           { pubkey: SYSVAR_RENT_PUBKEY,   isSigner: false, isWritable: false },
           { pubkey: SYSVAR_CLOCK_PUBKEY,  isSigner: false, isWritable: false },
-          { pubkey: ephemeralKey.publicKey, isSigner: true,  isWritable: false }, // authority = buffer authority
+          { pubkey: bufferKp.publicKey, isSigner: true,  isWritable: false }, // authority = buffer authority
         ],
         data: u32LE(LoaderIx.Upgrade), // Upgrade (u32 LE)
       });
@@ -608,20 +639,34 @@ export async function deployWithEphemeralKey(
       const { blockhash: upHash, lastValidBlockHeight: upHeight } =
             await connection.getLatestBlockhash('confirmed');
       upgradeTx.recentBlockhash = upHash;
-      upgradeTx.feePayer = ephemeralKey.publicKey;
+      upgradeTx.feePayer = bufferKp.publicKey;
       
       if (relayToBackend) {
-        upgradeTx.partialSign(ephemeralKey);
+        upgradeTx.partialSign(bufferKp);
         const encodedTx = upgradeTx.serialize({ requireAllSignatures: false }).toString('base64');
+        
+        // ❸ send to backend for program‑key signature & broadcast
+        if (!projectId) {
+          throw new Error("Project ID required for relay to backend");
+        }
+        
+        const relayRes = await fetch(`/api/projects/${projectId}/relayDeployTx`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ encodedTx, programId: programId.toBase58() })
+        }).then(r => r.json());
+        
+        // relayRes.signature is the final on‑chain tx id
+        signatures.push(relayRes.signature);
+        
         return {
           programId,
           signatures,
           success: true,
-          encodedTx,
-          relayPending: true,
+          relayPending: false,
         };
       } else {
-        upgradeTx.sign(ephemeralKey);          // wallet already signed buffer writes
+        upgradeTx.sign(bufferKp);          // wallet already signed buffer writes
 
         // Simulate the transaction first to catch any potential issues
         // ── DEBUG ── print all account keys & signer status
@@ -662,7 +707,7 @@ export async function deployWithEphemeralKey(
         programId: BPF_UPGRADE_LOADER_ID,
         keys: [
           { pubkey: programDataPubkey,     isSigner: false, isWritable: true },
-          { pubkey: ephemeralKey.publicKey, isSigner: true, isWritable: false },  // old owner
+          { pubkey: bufferKp.publicKey, isSigner: true, isWritable: false },  // old owner
           { pubkey: walletPublicKey,        isSigner: false, isWritable: false },  // new owner
         ],
         data: u32LE(LoaderIx.SetAuthority),
@@ -672,9 +717,9 @@ export async function deployWithEphemeralKey(
       const { blockhash: authHash, lastValidBlockHeight: authHeight } = 
             await connection.getLatestBlockhash('confirmed');
       setAuthTx.recentBlockhash = authHash;
-      setAuthTx.feePayer       = ephemeralKey.publicKey;
+      setAuthTx.feePayer       = bufferKp.publicKey;
       
-      setAuthTx.sign(ephemeralKey);
+      setAuthTx.sign(bufferKp);
       
       // Simulate the transaction first to catch any potential issues
       const simResult = await connection.simulateTransaction(setAuthTx);
@@ -795,12 +840,12 @@ export async function deployWithEphemeralKey(
           lamports: lamportsLeft,
         });
         const closeTx = new Transaction().add(closeIx);
-        closeTx.feePayer = ephemeralKey.publicKey;
+        closeTx.feePayer = bufferKp.publicKey;
 
         const { blockhash: cHash, lastValidBlockHeight: cHeight } =
               await connection.getLatestBlockhash('confirmed');
         closeTx.recentBlockhash = cHash;
-        closeTx.sign(ephemeralKey, bufferKey);
+        closeTx.sign(bufferKp, bufferKey);
 
         await connection.sendRawTransaction(closeTx.serialize(), SEND_WITH_PREFLIGHT);
         console.log('[CLOSE] Buffer account closed; rent refunded');
