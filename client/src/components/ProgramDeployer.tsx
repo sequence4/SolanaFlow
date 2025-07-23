@@ -155,23 +155,23 @@ export function ProgramDeployer({
 
           if (acctInfo) {
             /* UPGRADE path (unchanged) */
-            const authorityEphem = Keypair.generate();
+        const authorityEphem = Keypair.generate();
             console.log("🔑 Ephemeral authority key:", authorityEphem.publicKey.toBase58());
 
-            const deployOptions: EphemeralDeployOptions = {
-              soBytes: programBytes as unknown as ArrayBuffer,
-              connection: connection as any,
-              wallet: wallet as any,
-              ephemeralKeypair: authorityEphem as any,
+        const deployOptions: EphemeralDeployOptions = {
+          soBytes: programBytes as unknown as ArrayBuffer,
+          connection: connection as any,
+          wallet: wallet as any,
+          ephemeralKeypair: authorityEphem as any,
               programId: candidatePk,
-              verifyTimeoutMs: 120_000,
-              onProgress: (raw: number, message: string) => {
-                const pct = raw <= 1 ? Math.round(raw * 100) : Math.round(raw);
-                setProgress(Math.max(1, Math.min(pct, 100)));
-                setDeployStage(message ?? "");
-                console.log("[DEPLOY]", pct + "%", message);
-              },
-            };
+          verifyTimeoutMs: 120_000,
+          onProgress: (raw: number, message: string) => {
+            const pct = raw <= 1 ? Math.round(raw * 100) : Math.round(raw);
+            setProgress(Math.max(1, Math.min(pct, 100)));
+            setDeployStage(message ?? "");
+            console.log("[DEPLOY]", pct + "%", message);
+          },
+        };
 
             const deployResult = await deployWithEphemeralKey(deployOptions);
             if (deployResult.success) onSuccess(candidatePk.toBase58());

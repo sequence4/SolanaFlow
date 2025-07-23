@@ -554,16 +554,16 @@ export const createEphemeralKeypair = async (req: Request, res: Response, next: 
             readTaskId,
             { skipSuccessUpdate: true }
           );
-           const parsedArr = JSON.parse(keyContent.trim());
+                     const parsedArr = JSON.parse(keyContent.trim());
            if (Array.isArray(parsedArr) && parsedArr.length === 64) {
              secretArr = parsedArr;
              const programPubkey = Keypair.fromSecretKey(Uint8Array.from(secretArr)).publicKey.toBase58();
              console.log(`[ARTIFACT] ✓ Extracted Program ID ${programPubkey} from keypair`);
            }
-        } else {
+         } else {
           console.log(`[ARTIFACT] ❌ No keypair JSON found after global + local search for project ${projectId}`);
-        }
-      }
+         }
+       }
        if (secretArr && Array.isArray(secretArr)) {
          ephem = Keypair.fromSecretKey(Uint8Array.from(secretArr));
        } else {
@@ -742,38 +742,38 @@ export const deployProjectEphemeral = async (
     console.log(`[DEPLOY_EPHEMERAL] Deploy task started: ${taskId}`);
 
     // Wait for the task to complete (up to 120s)
-    console.log(`[DEPLOY_EPHEMERAL] Waiting for task ${taskId} to complete...`);
+      console.log(`[DEPLOY_EPHEMERAL] Waiting for task ${taskId} to complete...`);
     const status = await waitForTaskCompletion(taskId, 120000);
-    console.log(`[DEPLOY_EPHEMERAL] Task ${taskId} completed with status: ${status}`);
-
-    if (status === 'succeed' || status === 'finished') {
+      console.log(`[DEPLOY_EPHEMERAL] Task ${taskId} completed with status: ${status}`);
+      
+      if (status === 'succeed' || status === 'finished') {
       // Retrieve the programId from the task result
-      const client = await pool.connect();
-      let programId: string | null = null;
-      try {
+        const client = await pool.connect();
+            let programId: string | null = null;
+            try {
         const taskRes = await client.query('SELECT result FROM task WHERE id = $1', [taskId]);
         if (taskRes.rows.length && taskRes.rows[0].result) {
           try {
             const resultObj = JSON.parse(taskRes.rows[0].result);
             programId = resultObj.programId ?? null;
-          } catch (e) {
+            } catch (e) {
             console.error('[DEPLOY_EPHEMERAL] Error parsing task result JSON:', e);
-          }
-          if (programId) {
+            }
+            if (programId) {
             // Ensure programId is stored in project details (in case not already updated)
-            await client.query(
-              `UPDATE solanaproject
+              await client.query(
+                `UPDATE solanaproject
                  SET details = COALESCE(details::jsonb, '{}'::jsonb) || $1::jsonb,
-                     last_updated = $2
-               WHERE id = $3`,
+                       last_updated = $2
+                 WHERE id = $3`,
               [JSON.stringify({ programId }), new Date(), id]
             );
             console.log(`[DEPLOY_EPHEMERAL] Program ID ${programId} stored in DB.`);
+            }
           }
+        } finally {
+          client.release();
         }
-      } finally {
-        client.release();
-      }
       if (programId) {
         console.log(`[DEPLOY_EPHEMERAL] Deployment succeeded with Program ID: ${programId}`);
         res.status(200).json({ success: true, programId, signatures: [] });
@@ -783,11 +783,11 @@ export const deployProjectEphemeral = async (
         next(new AppError('Deployment finished but Program ID not found in result', 500));
         return;
       }
-    } else if (status === 'failed') {
+      } else if (status === 'failed') {
       console.warn(`[DEPLOY_EPHEMERAL] Deployment task failed.`);
       res.status(200).json({ success: false, error: 'Program deployment failed', programId: null, signatures: [] });
       return;
-    } else if (status === 'timeout') {
+      } else if (status === 'timeout') {
       console.warn(`[DEPLOY_EPHEMERAL] Deployment task timed out.`);
       res.status(200).json({ success: false, error: 'Deployment timed out', programId: null, signatures: [] });
       return;
