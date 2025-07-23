@@ -1459,6 +1459,15 @@ export async function signDeployTxAndBroadcast(
   transaction.partialSign(programKeypair);
   // Broadcast the fully signed transaction.
   const conn = new Connection('https://api.devnet.solana.com', 'confirmed');
+  
+  // ── DEBUG ── try a cheap simulation first so we see on‑chain logs
+  const sim = await conn.simulateTransaction(transaction);
+  console.log('SIM logs:', sim.value.logs);
+  if (sim.value.err) {
+    console.error('Simulation FAILED →', sim.value.err);
+    throw new Error(`Simulation failed: ${JSON.stringify(sim.value.err)}`);
+  }
+  
   const sig = await sendAndConfirmRawTransaction(conn, transaction.serialize());
   return sig;
 }

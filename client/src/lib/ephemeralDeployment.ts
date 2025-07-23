@@ -558,9 +558,17 @@ export async function deployWithEphemeralKey(
           relayPending: true,
         };
       } else {
-        deployTx.sign(ephemeralKey, programKeypair);      // wallet no longer signs
-
         // Simulate the transaction first to catch any potential issues
+        // ── DEBUG ── print all account keys & signer status
+        const msg = deployTx.compileMessage();
+        const signerKeys = deployTx.signatures.map(s => s.publicKey.toBase58());
+        console.log('DEBUG deployTx accounts:',
+          msg.accountKeys.map(
+            (k,i)=>`${i}:${k.toBase58()}${signerKeys.includes(k.toBase58())?'*':''}`
+          )
+        );
+        console.log('DEBUG feePayer =', deployTx.feePayer?.toBase58());
+        console.log('DEBUG signers  =', signerKeys);
         const sim = await connection.simulateTransaction(deployTx);
         if (sim.value.err) {
           console.error('Simulation failure', sim.value.logs);
@@ -616,6 +624,16 @@ export async function deployWithEphemeralKey(
         upgradeTx.sign(ephemeralKey);          // wallet already signed buffer writes
 
         // Simulate the transaction first to catch any potential issues
+        // ── DEBUG ── print all account keys & signer status
+        const msgUpgrade = upgradeTx.compileMessage();
+        const signerKeysUpgrade = upgradeTx.signatures.map(s => s.publicKey.toBase58());
+        console.log('DEBUG upgradeTx accounts:',
+          msgUpgrade.accountKeys.map(
+            (k,i)=>`${i}:${k.toBase58()}${signerKeysUpgrade.includes(k.toBase58())?'*':''}`
+          )
+        );
+        console.log('DEBUG feePayer =', upgradeTx.feePayer?.toBase58());
+        console.log('DEBUG signers  =', signerKeysUpgrade);
         const sim = await connection.simulateTransaction(upgradeTx);
         if (sim.value.err) {
           console.error('Simulation failure', sim.value.logs);
