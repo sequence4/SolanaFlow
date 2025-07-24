@@ -76,7 +76,7 @@ export async function runDeployPipeline({
 }: PipelineArgs): Promise<void> {
   // Prepare variables for the generated program keypair
   let programKeypair: Keypair | null = null;
-  let programSecretKey: number[] | null = null;
+  /* programSecretKey has been removed – never expose it to the client */
   let programIdStr: string | null = null;
   
   sendProgress(<ProgressEvent>{
@@ -135,7 +135,7 @@ export async function runDeployPipeline({
       workspace.rootPath ??
       (await import("../fileUtils").then(m => m.getProjectRootPath(projectId)));
     programKeypair = Keypair.generate();
-    programSecretKey = Array.from(programKeypair.secretKey);
+    /* secret key deliberately **not** saved in a variable that leaks */
     programIdStr = programKeypair.publicKey.toBase58();
     /**
      * Write the key-pair **directly to the global warm-cache**
@@ -144,7 +144,7 @@ export async function runDeployPipeline({
      * step.  This guarantees Anchor re-uses the same key-pair it sees
      * during code-gen, eliminating the phantom "second" Program ID.
      */
-    const keypairJson = JSON.stringify(programSecretKey);
+    const keypairJson = JSON.stringify(Array.from(programKeypair.secretKey));
     await runCommand(
       `docker exec ${workspace.containerName} bash -c 'mkdir -p /usr/src/target/deploy && echo ${JSON.stringify(keypairJson)} > /usr/src/target/deploy/${programName}-keypair.json'`,
       ".",
@@ -430,7 +430,6 @@ export async function runDeployPipeline({
       ...(idlContent ? { idl: idlContent } : {}),
       ...(idls.length > 0 ? { idls } : {}),
       programId: programIdStr,
-      programSecretKey,
     });
 
   } catch (err) {
