@@ -410,7 +410,8 @@ EOF'`,
 
         // ───────────────────────── write graph-derived Rust sources ──────────────
         // Derive program name from project context (fallback to 'my_program' if not found)
-        let programName = 'my_program';
+        let programName = workspace.rootPath.replace(/-/g, '_');
+        if (/^[0-9]/.test(programName)) programName = 'p' + programName;
         try {
           const nameRes = await pool.query('SELECT name FROM solanaproject WHERE id = $1', [projectId]);
           const projName: string | undefined = nameRes.rows[0]?.name;

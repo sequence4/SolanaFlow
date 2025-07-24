@@ -334,11 +334,12 @@ export const startAnchorBuildTask = async (
       }
       
       const rootPath = await getProjectRootPath(projectId);
+      let programName = rootPath.replace(/-/g, '_');
+      if (/^[0-9]/.test(programName)) programName = 'p' + programName;
       
       console.log(`[BUILD] Running anchor build in ${containerName} (root=${rootPath}) for project ${projectId}`);
       
       // ────────────────────────── Prepare deterministic program key ──────────────────────────
-      const programName = 'my_program';
       const newKeypair = Keypair.generate();
       const programId = newKeypair.publicKey.toBase58();
       // Save keypair to host so Anchor can pick it up
@@ -393,7 +394,7 @@ set -euo pipefail
 cd /usr/src/${rootPath}
 
 # build the Anchor workspace
-anchor build -- --jobs 1
+anchor build -p ${programName} -- --jobs 1
 
 # ── determine the correct target directory and find the first .so file ──
 SO_DIR="\${CARGO_TARGET_DIR:-target}/deploy"
@@ -517,6 +518,8 @@ export const startAnchorDeployTask = async (
       }
 
       const rootPath = await getProjectRootPath(projectId);
+      let programName = rootPath.replace(/-/g, '_');
+      if (/^[0-9]/.test(programName)) programName = 'p' + programName;
 
       /* ──────────────────────────────────────────────────────────
        *  Symlink ./target/deploy → /usr/src/target/deploy
@@ -645,7 +648,7 @@ export const startAnchorDeployTask = async (
       await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && rm -f target/deploy/*-keypair.json"`, '.', sanitizedTaskId, { skipSuccessUpdate: true });
       console.log(`[DEPLOY] Removed existing program keypair files to force fresh program ID`);
       
-      const anchorDeployCmd = `anchor deploy \
+      const anchorDeployCmd = `anchor deploy -p ${programName} \
         --provider.wallet ${containerWalletPath} \
         --provider.cluster devnet`;
       
@@ -671,7 +674,7 @@ export const startAnchorDeployTask = async (
         console.error(`[EPHEMERAL_DEBUG] Error checking Anchor.toml: ${tomlErr.message}`);
       }
       
-      const deployCmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && anchor deploy --provider.wallet ${containerWalletPath} --provider.cluster devnet 2>&1"`;
+      const deployCmd = `docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && anchor deploy -p ${programName} --provider.wallet ${containerWalletPath} --provider.cluster devnet 2>&1"`;
       console.log(`[DEPLOY_DEBUG] Running command: ${deployCmd}`);
       
       const result = await runCommand(deployCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true }).catch(async (error: any) => {
@@ -821,11 +824,13 @@ export const startAnchorTestTask = async (
       }
       
       const rootPath = await getProjectRootPath(projectId);
+      let programName = rootPath.replace(/-/g, '_');
+      if (/^[0-9]/.test(programName)) programName = 'p' + programName;
       
       const testCmd=`
         docker exec ${containerName} bash -c '
           cd /usr/src/${rootPath} &&
-          anchor test -- --jobs 1
+                      anchor test -p ${programName} -- --jobs 1
         '
       `;
       await runCommand(testCmd.trim(), '.', taskId);
