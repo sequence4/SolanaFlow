@@ -165,6 +165,7 @@ export function ProgramDeployer({
           ephemeralKeypair: authorityEphem as any,
               programId: candidatePk,
           verifyTimeoutMs: 120_000,
+          relayToBackend: true,                 // NEW – keep secret on server
           onProgress: (raw: number, message: string) => {
             const pct = raw <= 1 ? Math.round(raw * 100) : Math.round(raw);
             setProgress(Math.max(1, Math.min(pct, 100)));

@@ -85,8 +85,8 @@ export interface EphemeralDeployOptions {
   wallet: WalletContextState;           // fee-payer (Phantom)
   /** The **already-generated** Keypair that must become program upgrade authority (ephemeral buffer key) */
   ephemeralKeypair: Keypair;
-  /** Optionally, a deterministic program Keypair (local dev only – the
-   *  secret key never leaves the backend in prod) */
+  /** Optionally, a deterministic program Keypair (to reuse a known program ID).  
+   *  _Do not_ pass this from the browser when you want the backend to hold the key. */
   programKeypair?: Keypair;
   /** progress ∈ [0-100], plus human log line */
   onProgress?: (progress: number, message: string) => void;
@@ -131,8 +131,8 @@ export async function deployWithEphemeralKey(
     onProgress = () => {},
     programId: userProvidedProgramId,
     programKeypair: providedProgramKeypair,
+    /* NEW */ relayToBackend,
     verifyTimeoutMs = 60_000,
-    relayToBackend,
     projectId,
   } = options;
   
@@ -194,33 +194,28 @@ export async function deployWithEphemeralKey(
     //  1. providedProgramKeypair   → new deploy (local/dev)
     //  2. relayToBackend && programId → new deploy (backend will sign)
     //  3. userProvidedProgramId    → upgrade
-    //  4. Generate a new keypair   → new deploy (no relay)
+    //  3. Generate a new keypair (new deployment)   (only when **not** relaying)
     let programKeypair: Keypair | null = null;
     if (providedProgramKeypair) {
       programKeypair = providedProgramKeypair;
       programId = programKeypair.publicKey;
       resolvedProgramId = programId;
-    } else if (relayToBackend && userProvidedProgramId) {
-      // ✨ brand‑new program, but the backend will add the real signature
-      programId      = userProvidedProgramId;
-      resolvedProgramId = programId;
-      // leave programKeypair === null
     } else if (userProvidedProgramId) {
-      // upgrade path
-      programId      = userProvidedProgramId;
+      /* NEW ⟶ when relayToBackend=true this is a **fresh deploy**
+         whose Program account will be signed later by the backend. */
+      programId = userProvidedProgramId;
       resolvedProgramId = programId;
     } else {
-      // no predetermined key; generate a new program keypair
+      // no predetermined key; generate a new program keypair (browser‑side only)
       if (relayToBackend) {
-        throw new Error('Program ID must be provided when relaying to backend');
+        throw new Error('Program ID is required when relayToBackend=true');
       }
       programKeypair = Keypair.generate();
       programId      = programKeypair.publicKey;
       resolvedProgramId = programId;
     }
 
-    const isNewDeploy = !!programKeypair || (relayToBackend && !programKeypair);
-    const programPubkey = programKeypair ? programKeypair.publicKey : programId!;
+    const isNewProgram = Boolean(programKeypair) || relayToBackend;
 
     // Inform the caller about the chosen programId
     onProgress(1, `Using programId ${programId.toBase58()}`);
@@ -528,11 +523,13 @@ export async function deployWithEphemeralKey(
     let encodedTx: string | undefined;
     let relayPending: boolean | undefined;
 
-    if (isNewDeploy) {
+    if (isNewProgram) {
       // ------- NEW PROGRAM (DeployWithMaxDataLen) ---------------------------
       const createProgramAcct = SystemProgram.createAccount({
         fromPubkey: bufferKp.publicKey,
-        newAccountPubkey: programPubkey,
+        newAccountPubkey: programKeypair
+          ? programKeypair.publicKey
+          : programId,                       // backend will sign this key
         lamports: Number(programRent),
         space: PROGRAM_ACCOUNT_SPACE,
         programId: BPF_UPGRADE_LOADER_ID,
@@ -543,7 +540,8 @@ export async function deployWithEphemeralKey(
         keys: [
           { pubkey: bufferKp.publicKey,  isSigner: true,  isWritable: true },  // payer
           { pubkey: programDataPubkey,       isSigner: false, isWritable: true },
-          { pubkey: programPubkey,           isSigner: true,  isWritable: true },  // Program
+          { pubkey: (programKeypair ? programKeypair.publicKey : programId),
+            isSigner: true,  isWritable: true },  // Program (signed later if relaying)
           { pubkey: bufferKey.publicKey,     isSigner: false, isWritable: true },
           { pubkey: SYSVAR_RENT_PUBKEY,      isSigner: false, isWritable: false },
           { pubkey: SYSVAR_CLOCK_PUBKEY,     isSigner: false, isWritable: false },
@@ -620,7 +618,7 @@ export async function deployWithEphemeralKey(
           signature: deployOrUpgradeSig,
         });
       }
-    } else {
+    } else { /* === upgrade path === */
       // ------- EXISTING PROGRAM (Upgrade) ------------------------------------
       const spillPubkey = walletPublicKey;   // lamports refund destination
       const upgradeIx = new TransactionInstruction({
