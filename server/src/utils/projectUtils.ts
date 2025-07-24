@@ -333,8 +333,9 @@ export const startAnchorBuildTask = async (
         throw new Error(`No container found for project ${projectId}`);
       }
       
-      const rootPath = await getProjectRootPath(projectId);
-      let programName = rootPath.replace(/-/g, '_');
+      const rootPath   = await getProjectRootPath(projectId);
+      const rootStem   = rootPath.replace(/-[a-f0-9]{8}$/, '');
+      let programName  = rootStem.replace(/-/g, '_');
       if (/^[0-9]/.test(programName)) programName = 'p' + programName;
       
       console.log(`[BUILD] Running anchor build in ${containerName} (root=${rootPath}) for project ${projectId}`);
@@ -517,8 +518,9 @@ export const startAnchorDeployTask = async (
         throw new Error(`No container found for project ${projectId}`);
       }
 
-      const rootPath = await getProjectRootPath(projectId);
-      let programName = rootPath.replace(/-/g, '_');
+      const rootPath   = await getProjectRootPath(projectId);
+      const rootStem   = rootPath.replace(/-[a-f0-9]{8}$/, '');
+      let programName  = rootStem.replace(/-/g, '_');
       if (/^[0-9]/.test(programName)) programName = 'p' + programName;
 
       /* ──────────────────────────────────────────────────────────
@@ -823,14 +825,15 @@ export const startAnchorTestTask = async (
         throw new Error(`No container found for project ${projectId}`);
       }
       
-      const rootPath = await getProjectRootPath(projectId);
-      let programName = rootPath.replace(/-/g, '_');
+      const rootPath   = await getProjectRootPath(projectId);
+      const rootStem   = rootPath.replace(/-[a-f0-9]{8}$/, '');
+      let programName  = rootStem.replace(/-/g, '_');
       if (/^[0-9]/.test(programName)) programName = 'p' + programName;
       
       const testCmd=`
         docker exec ${containerName} bash -c '
           cd /usr/src/${rootPath} &&
-                      anchor test -p ${programName} -- --jobs 1
+            anchor test -p ${programName} -- --jobs 1
         '
       `;
       await runCommand(testCmd.trim(), '.', taskId);

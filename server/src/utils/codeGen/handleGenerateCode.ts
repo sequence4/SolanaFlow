@@ -410,7 +410,14 @@ EOF'`,
 
         // ───────────────────────── write graph-derived Rust sources ──────────────
         // Derive program name from project context (fallback to 'my_program' if not found)
-        let programName = workspace.rootPath.replace(/-/g, '_');
+        /* -----------------------------------------------------------
+         * Derive the **crate name** from the workspace's root folder:
+         *   untitled-project-<uid>  →  untitled_project
+         * This keeps the name identical to programs/<crate>/ and
+         * prevents "<name> is not part of the workspace" errors.
+         * ----------------------------------------------------------- */
+        const rootStem   = workspace.rootPath.replace(/-[a-f0-9]{8}$/, '');
+        let programName  = rootStem.replace(/-/g, '_');       // ⇒ snake_case
         if (/^[0-9]/.test(programName)) programName = 'p' + programName;
         try {
           const nameRes = await pool.query('SELECT name FROM solanaproject WHERE id = $1', [projectId]);
