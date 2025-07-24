@@ -87,9 +87,6 @@ export interface EphemeralDeployOptions {
   ephemeralKeypair: Keypair;
   /** Optionally, a deterministic program Keypair (to reuse a known program ID) */
   programKeypair?: Keypair;
-  /** Raw 64-byte secret key array produced at build-time.  
-   *  Lets callers avoid instantiating Keypair on their side. */
-  programSecretKey?: number[];
   /** progress ∈ [0-100], plus human log line */
   onProgress?: (progress: number, message: string) => void;
   /** If provided instead of programKeypair, an existing program ID to upgrade */
@@ -131,7 +128,6 @@ export async function deployWithEphemeralKey(
     onProgress = () => {},
     programId: userProvidedProgramId,
     programKeypair: providedProgramKeypair,
-    programSecretKey,
     verifyTimeoutMs = 60_000,
     relayToBackend,
     projectId,
@@ -204,11 +200,6 @@ export async function deployWithEphemeralKey(
     } else if (userProvidedProgramId) {
       // upgrade path: use existing program id
       programId = userProvidedProgramId;
-      resolvedProgramId = programId;
-    } else if (programSecretKey?.length === 64) {
-      // derive program keypair from secret key
-      programKeypair = Keypair.fromSecretKey(Uint8Array.from(programSecretKey));
-      programId      = programKeypair.publicKey;
       resolvedProgramId = programId;
     } else {
       // no predetermined key; generate a new program keypair

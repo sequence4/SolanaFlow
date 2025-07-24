@@ -74,9 +74,7 @@ export async function runDeployPipeline({
   walletSigned = false,
   devMode = false,
 }: PipelineArgs): Promise<void> {
-  // Prepare variables for the generated program keypair
   let programKeypair: Keypair | null = null;
-  /* programSecretKey has been removed – never expose it to the client */
   let programIdStr: string | null = null;
   
   sendProgress(<ProgressEvent>{
@@ -135,7 +133,6 @@ export async function runDeployPipeline({
       workspace.rootPath ??
       (await import("../fileUtils").then(m => m.getProjectRootPath(projectId)));
     programKeypair = Keypair.generate();
-    /* secret key deliberately **not** saved in a variable that leaks */
     programIdStr = programKeypair.publicKey.toBase58();
     /**
      * Write the key-pair **directly to the global warm-cache**
