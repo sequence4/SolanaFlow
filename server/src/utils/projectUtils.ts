@@ -284,19 +284,15 @@ export const getBuildArtifactTask = async (projectId: string): Promise<{ status:
     
     console.log(`[ARTIFACT] ✓ Successfully encoded .so file to base64 (${base64So.length} bytes)`);
     
-    // 1️⃣ First look in the project sub‑folder
+    // 🔍 Only look in the project's *own* target folder – a global search can
+  // surface unrelated warm‑cache files (e.g. my_program‑keypair.json) and
+  // trick Anchor into believing the wrong Program ID.
     let containerKeypairPath = '';
     let locateJsonCmd = `docker exec ${containerName} bash -c 'cd /usr/src/${rootPath} && find target/deploy -maxdepth 1 -name "*-keypair.json" ! -name "anchor_template-*" | head -n 1'`;
     containerKeypairPath = (await runCommand(locateJsonCmd, '.', tempTaskId, { skipSuccessUpdate: true })).trim();
     
-    // 2️⃣ If nothing found, fall back to the monorepo‑root build folder
     if (!containerKeypairPath) {
-      locateJsonCmd = `docker exec ${containerName} bash -c 'find /usr/src/target/deploy -maxdepth 1 -name "*-keypair.json" ! -name "anchor_template-*" | head -n 1'`;
-      containerKeypairPath = (await runCommand(locateJsonCmd, '.', tempTaskId, { skipSuccessUpdate: true })).trim();
-    }
-    
-    if (!containerKeypairPath) {
-      console.error('[ARTIFACT] ❌ No keypair JSON found after global + local search');
+      console.error('[ARTIFACT] ❌ No keypair JSON found in project target/deploy');
       throw new Error('Program keypair not found in container');
     }
     
@@ -333,27 +329,22 @@ export const startAnchorBuildTask = async (
         throw new Error(`No container found for project ${projectId}`);
       }
       
-      const rootPath   = await getProjectRootPath(projectId);
-      const rootStem   = rootPath.replace(/-[a-f0-9]{8}$/, '');
-      let programName  = rootStem.replace(/-/g, '_');
+      const rootPath  = await getProjectRootPath(projectId);
+      const rootStem  = rootPath.replace(/-[a-f0-9]{8}$/, '');
+      let programName = rootStem.replace(/-/g, '_');
       if (/^[0-9]/.test(programName)) programName = 'p' + programName;
       
-      console.log(`[BUILD] Running anchor build in ${containerName} (root=${rootPath}) for project ${projectId}`);
-      
-      // ────────────────────────── Prepare deterministic program key ──────────────────────────
-      const newKeypair = Keypair.generate();
-      const programId = newKeypair.publicKey.toBase58();
-      // Save keypair to host so Anchor can pick it up
-      const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${programId}.json`);
-      fs.writeFileSync(walletPath, JSON.stringify(Array.from(newKeypair.secretKey)));
-      // Verify keypair saved correctly
-      const derivedPubkey = Keypair.fromSecretKey(newKeypair.secretKey).publicKey.toBase58();
-      if (derivedPubkey !== programId) {
-        throw new Error('Keypair self-verification failed');
-      }
-      console.log('[GEN] Generated new program ID:', programId);
-      // Copy keypair into container for Anchor deploy
-      const containerKeyPath = `/usr/src/${rootPath}/target/deploy/${programName}-keypair.json`;
+      // ────────────────────────── Use existing deterministic keypair ──────────────────────────
+      const walletPath = path.join(
+        APP_CONFIG.WALLETS_FOLDER,
+        // handleGenerateCode stored it under NEXT_PUBLIC_PROGRAM_ID
+        fs.readdirSync(APP_CONFIG.WALLETS_FOLDER).find(f => f.endsWith('.json')) || ''
+      );
+      if (!walletPath) throw new Error('No program keypair found in wallets folder');
+
+      const secretArr   = JSON.parse(fs.readFileSync(walletPath, 'utf8'));
+      const programId   = Keypair.fromSecretKey(Uint8Array.from(secretArr)).publicKey.toBase58();
+      const containerKeyPath  = `/usr/src/${rootPath}/target/deploy/${programName}-keypair.json`;
       await runCommand(
         `docker exec ${containerName} bash -c 'mkdir -p /usr/src/${rootPath}/target/deploy'`,
         '.',
@@ -367,8 +358,9 @@ export const startAnchorBuildTask = async (
         projectId,
         { skipSuccessUpdate: true },
       );
+      // copy *once* per build; idempotent ‑f
       await runCommand(
-        `docker cp ${walletPath} ${containerName}:${containerKeyPath}`,
+        `docker cp -f ${walletPath} ${containerName}:${containerKeyPath}`,
         '.',
         projectId,
         { skipSuccessUpdate: true },
