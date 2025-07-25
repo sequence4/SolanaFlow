@@ -300,7 +300,12 @@ export const getBuildArtifactTask = async (projectId: string): Promise<{ status:
     const keypairJson = await runCommand(`docker exec ${containerName} bash -c "cat '${containerKeypairPath}'"`, '.', tempTaskId, { skipSuccessUpdate: true });
     let programId = "";
     try {
-      const secretKeyBytes = JSON.parse(keypairJson.trim());
+      const secretKeyBytes: number[] = JSON.parse(keypairJson.trim());
+      if (!Array.isArray(secretKeyBytes) || secretKeyBytes.length !== 64) {
+        throw new Error(
+          `Invalid keypair json at ${containerKeypairPath} (expected 64‑byte array)`,
+        );
+      }
       const keypair = Keypair.fromSecretKey(Uint8Array.from(secretKeyBytes));
       programId = keypair.publicKey.toBase58();
       console.log(`[ARTIFACT] ✓ Extracted Program ID ${programId} from keypair`);
@@ -348,12 +353,33 @@ export const startAnchorBuildTask = async (
       }
 
       const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${programId}.json`);
-      if (!fs.existsSync(walletPath)) {
-        throw new Error(`Program keypair file not found at ${walletPath}`);
+
+      /* ── 1️⃣ fail‑fast: the file must exist & be readable ── */
+      try {
+        await fs.promises.access(walletPath, fs.constants.R_OK);
+      } catch {
+        throw new Error(`Program keypair file not readable at ${walletPath}`);
       }
 
-      const secretArr = JSON.parse(fs.readFileSync(walletPath, 'utf8'));
-      const containerKeyPath  = `/usr/src/${rootPath}/target/deploy/${programName}-keypair.json`;
+      /* ── 2️⃣ parse + sanity‑check ── */
+      const secretJson  = await fs.promises.readFile(walletPath, 'utf8');
+      const secretArr: number[] = JSON.parse(secretJson);
+      if (!Array.isArray(secretArr) || secretArr.length !== 64) {
+        throw new Error(
+          `Invalid keypair format in ${walletPath} (expected 64‑byte array)`,
+        );
+      }
+      const derivedPubkey = Keypair
+        .fromSecretKey(Uint8Array.from(secretArr))
+        .publicKey
+        .toBase58();
+      if (derivedPubkey !== programId) {
+        throw new Error(
+          `Keypair ${walletPath} pubkey ${derivedPubkey} ≠ expected Program ID ${programId}`,
+        );
+      }
+
+      const containerKeyPath = `/usr/src/${rootPath}/target/deploy/${programName}-keypair.json`;
       await runCommand(
         `docker exec ${containerName} bash -c 'mkdir -p /usr/src/${rootPath}/target/deploy'`,
         '.',
