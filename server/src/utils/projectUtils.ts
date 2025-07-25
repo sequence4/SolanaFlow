@@ -334,16 +334,25 @@ export const startAnchorBuildTask = async (
       let programName = rootStem.replace(/-/g, '_');
       if (/^[0-9]/.test(programName)) programName = 'p' + programName;
       
-      // ────────────────────────── Use existing deterministic keypair ──────────────────────────
-      const walletPath = path.join(
-        APP_CONFIG.WALLETS_FOLDER,
-        // handleGenerateCode stored it under NEXT_PUBLIC_PROGRAM_ID
-        fs.readdirSync(APP_CONFIG.WALLETS_FOLDER).find(f => f.endsWith('.json')) || ''
+      // ────────────────────────── Use **this project's** deterministic keypair ──────────────────────────
+      // The code‑generation step stored the fresh programId in solanaproject.details -> lastProgramId
+      const { rows } = await pool.query(
+        "SELECT details->>'lastProgramId' AS pid FROM solanaproject WHERE id = $1",
+        [projectId]
       );
-      if (!walletPath) throw new Error('No program keypair found in wallets folder');
+      const programId: string | undefined = rows?.[0]?.pid;
+      if (!programId) {
+        throw new Error(
+          "Could not locate `details.lastProgramId` for this project – run the code‑generation step first"
+        );
+      }
 
-      const secretArr   = JSON.parse(fs.readFileSync(walletPath, 'utf8'));
-      const programId   = Keypair.fromSecretKey(Uint8Array.from(secretArr)).publicKey.toBase58();
+      const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${programId}.json`);
+      if (!fs.existsSync(walletPath)) {
+        throw new Error(`Program keypair file not found at ${walletPath}`);
+      }
+
+      const secretArr = JSON.parse(fs.readFileSync(walletPath, 'utf8'));
       const containerKeyPath  = `/usr/src/${rootPath}/target/deploy/${programName}-keypair.json`;
       await runCommand(
         `docker exec ${containerName} bash -c 'mkdir -p /usr/src/${rootPath}/target/deploy'`,
