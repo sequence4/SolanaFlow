@@ -539,6 +539,19 @@ EOF'`,
             `,
             [programId, projectId],
           );
+
+          /* ─────────────────────────────────────────────────────────────
+           * NEW: also save the deterministic ID under details.lastProgramId
+           * so startAnchorBuildTask can locate the correct key‑pair.
+           * ──────────────────────────────────────────────────────────── */
+          await pool.query(
+            "UPDATE solanaproject \
+               SET details = COALESCE(details, '{}'::jsonb) \
+                            || $1::jsonb \
+             WHERE id = $2",
+            [JSON.stringify({ lastProgramId: programId }), projectId],
+          );
+ 
           console.log('[GEN] Program ID persisted to project.details');
           
           // Notify frontend that the programId is now available

@@ -340,15 +340,29 @@ export const startAnchorBuildTask = async (
       if (/^[0-9]/.test(programName)) programName = 'p' + programName;
       
       // ────────────────────────── Use **this project's** deterministic keypair ──────────────────────────
-      // The code‑generation step stored the fresh programId in solanaproject.details -> lastProgramId
-      const { rows } = await pool.query(
-        "SELECT details->>'lastProgramId' AS pid FROM solanaproject WHERE id = $1",
-        [projectId]
+      /* -----------------------------------------------------------------
+       * 1️⃣  primary → details.lastProgramId
+       * 2️⃣  fallback → details.projectState.programId  (legacy field)
+       * ---------------------------------------------------------------- */
+      let res = await pool.query(
+        "SELECT details->>'lastProgramId' AS pid \
+           FROM solanaproject WHERE id = $1",
+        [projectId],
       );
-      const programId: string | undefined = rows?.[0]?.pid;
+      let programId: string | undefined = res?.rows?.[0]?.pid ?? undefined;
+
+      if (!programId) {
+        const alt = await pool.query(
+          "SELECT details->'projectState'->>'programId' AS pid \
+             FROM solanaproject WHERE id = $1",
+          [projectId],
+        );
+        programId = alt?.rows?.[0]?.pid ?? undefined;
+      }
+
       if (!programId) {
         throw new Error(
-          "Could not locate `details.lastProgramId` for this project – run the code‑generation step first"
+          "Could not locate programId in project.details – run the code‑generation step first",
         );
       }
 
