@@ -367,13 +367,14 @@ export const startAnchorBuildTask = async (
         projectId,
         { skipSuccessUpdate: true },
       );
-      // copy *once* per build; idempotent ‑f
+      // copy keypair into container for Anchor deploy
       await runCommand(
-        `docker cp -f ${walletPath} ${containerName}:${containerKeyPath}`,
+        `docker cp ${walletPath} ${containerName}:${containerKeyPath}`,
         '.',
         projectId,
         { skipSuccessUpdate: true },
       );
+      console.log(`[BUILD] ✓ Copied program keypair to container: ${containerKeyPath} (program: ${programId})`);
           // Store program ID in .env and database
       await runCommand(
         `docker exec ${containerName} bash -lc "sed -i '/^NEXT_PUBLIC_PROGRAM_ID=/d' /usr/src/${rootPath}/web/.env && echo NEXT_PUBLIC_PROGRAM_ID=${programId} >> /usr/src/${rootPath}/web/.env"`,
