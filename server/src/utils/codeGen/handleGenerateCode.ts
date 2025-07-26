@@ -732,7 +732,14 @@ EOF'`,
           // always restore under **both** stems so Anchor never regenerates
           `echo '${keyJsonEsc}' | tee ${KEYS_DIR}/${snakeKey} > ${KEYS_DIR}/${kebabKey}`,
           'anchor keys sync',
-          'anchor build'
+          // ────────────────────────────────────────────────────────────────
+          // Skip running the auto‑generated IDL test harness.
+          //   • single "--"  → args to cargo‑build‑sbf
+          //   • second "--"  → args to the final `cargo` invocation
+          // See Cargo's `--no-run` flag :contentReference[oaicite:1]{index=1}
+          // and Anchor issue discussion on avoiding the long‑running test
+          // harness during CI builds. :contentReference[oaicite:2]{index=2}
+          `anchor build -p ${programName} -- -- --no-run`
         ].join(' && ');
 
         await runCommand(
