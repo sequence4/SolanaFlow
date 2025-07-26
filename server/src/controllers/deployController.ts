@@ -44,8 +44,22 @@ export async function deployPipeline(
   });
 
   // Generic helper keeps TypeScript happy for every event payload
+  /**
+   * Stream an SSE event **and** log a compact version to the server console.
+   * Large binary blobs (e.g. the base‑64 .so artefact) are replaced with a
+   * short placeholder so the console stays readable.
+   */
   const send = <T = unknown>(data: T): void => {
-    console.log('[API] Sending SSE event:', data);
+    let safeForLog: unknown = data;
+    if (typeof data === 'object' && data !== null && 'artifact' in (data as any)) {
+      const clone = { ...(data as any) };
+      if (typeof clone.artifact === 'string') {
+        clone.artifact = `<${clone.artifact.length}B artefact omitted>`;
+      }
+      safeForLog = clone;
+    }
+
+    console.log('[API] Sending SSE event:', safeForLog);
     // Allow custom SSE event names (MDN pattern)
     // https://developer.mozilla.org/... → custom events
     if (typeof data === 'object' && data && 'event' in data) {
