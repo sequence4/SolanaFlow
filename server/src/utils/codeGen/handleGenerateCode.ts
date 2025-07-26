@@ -731,15 +731,16 @@ EOF'`,
           `mkdir -p ${KEYS_DIR}`,
           // always restore under **both** stems so Anchor never regenerates
           `echo '${keyJsonEsc}' | tee ${KEYS_DIR}/${snakeKey} > ${KEYS_DIR}/${kebabKey}`,
-          'anchor keys sync',
+          `anchor keys sync`,
           // ────────────────────────────────────────────────────────────────
           // Skip running the auto‑generated IDL test harness.
-          //   • single "--"  → args to cargo‑build‑sbf
-          //   • second "--"  → args to the final `cargo` invocation
-          // See Cargo's `--no-run` flag :contentReference[oaicite:1]{index=1}
-          // and Anchor issue discussion on avoiding the long‑running test
-          // harness during CI builds. :contentReference[oaicite:2]{index=2}
-          `anchor build -p ${programName} -- -- --no-run`
+          //   • the single "--" after the crate name tells *anchor‑cli*
+          //     (really, cargo‑build‑sbf) to pass everything that follows
+          //     straight through to the underlying `cargo` invocation.  
+          //   • `--no-run` is then interpreted by Cargo itself and simply
+          //     builds the test binary without executing it.
+          // References: Anchor CLI pass‑through examples :contentReference[oaicite:0]{index=0}
+          `anchor build -p ${programName} -- --no-run`
         ].join(' && ');
 
         await runCommand(
