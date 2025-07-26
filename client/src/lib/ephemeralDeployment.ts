@@ -312,13 +312,21 @@ export async function deployWithEphemeralKey(
     
     onProgress(5, "Funding ephemeral key...");
     
-    // 2.1 Create a transaction to fund the ephemeral key
+    /* -----------------------------------------------------------
+     * 2.1  Fund the **ephemeral key** in a way Phantom can simulate
+     *      happily: use  SystemProgram.createAccount  instead of a
+     *      plain transfer.  The new account has 0 bytes of data and
+     *      is owned by the System Program, so we still get the full
+     *      lamports balance and can close / sweep it later.  
+     * ---------------------------------------------------------- */
     const fundingTx = new Transaction().add(
-      SystemProgram.transfer({
-        fromPubkey: walletPublicKey,
-        toPubkey: bufferKp.publicKey,
-        lamports: Number(totalNeeded),
-      })
+      SystemProgram.createAccount({
+        fromPubkey:       walletPublicKey,
+        newAccountPubkey: bufferKp.publicKey,
+        lamports:         Number(totalNeeded),
+        space:            0,                       // no data needed
+        programId:        SystemProgram.programId, // owner = system program
+      }),
     );
     
     // 2.2 Get a fresh blockhash

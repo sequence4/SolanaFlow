@@ -1436,7 +1436,22 @@ export async function broadcastSignedTx(
   
   // Broadcast the fully signed transaction
   try {
-    const conn = new Connection('https://api.devnet.solana.com', 'confirmed');
+    /* -----------------------------------------------------------
+     * Robust connection helper: fall back to a sane default
+     * and fail early if the URL is malformed.
+     * ---------------------------------------------------------- */
+    const endpoint =
+      process.env.RPC_ENDPOINT_DEVNET ||
+      "https://api.devnet.solana.com";          // safe default
+
+    if (!/^https?:\/\//.test(endpoint)) {
+      throw new Error(
+        `Invalid RPC endpoint: ${endpoint}. ` +
+          "Set RPC_ENDPOINT_DEVNET to a full https:// URL."
+      );
+    }
+    
+    const conn = new Connection(endpoint, "confirmed");
     console.log(`[broadcastSignedTx] Broadcasting transaction to Solana devnet...`);
     const signature = await sendAndConfirmRawTransaction(conn, tx.serialize());
     console.log(`[broadcastSignedTx] Transaction confirmed with signature: ${signature}`);
@@ -1530,8 +1545,23 @@ export async function signDeployTxAndBroadcast(
   const raw = Buffer.from(encodedTx, 'base64');
   const transaction = Transaction.from(raw);
   transaction.partialSign(programKeypair);
+  /* -----------------------------------------------------------
+   * Robust connection helper: fall back to a sane default
+   * and fail early if the URL is malformed.
+   * ---------------------------------------------------------- */
+  const endpoint =
+    process.env.RPC_ENDPOINT_DEVNET ||
+    "https://api.devnet.solana.com";          // safe default
+
+  if (!/^https?:\/\//.test(endpoint)) {
+    throw new Error(
+      `Invalid RPC endpoint: ${endpoint}. ` +
+        "Set RPC_ENDPOINT_DEVNET to a full https:// URL."
+    );
+  }
+
   // Broadcast the fully signed transaction.
-  const conn = new Connection('https://api.devnet.solana.com', 'confirmed');
+  const conn = new Connection(endpoint, "confirmed");
   
   // ── DEBUG ── try a cheap simulation first so we see on‑chain logs
   const sim = await conn.simulateTransaction(transaction);
