@@ -578,6 +578,23 @@ EOF'`,
           randomUUID(),
           { skipSuccessUpdate: true }
         );
+
+        /*───────────────────────────────────────────────────────────────
+         * 🧹  **NEW:** Immediately remove any leftover *template* keys so
+         *      Anchor can never confuse them with the real program.
+         *      – `anchor_template‑keypair.json`
+         *      – `my_program‑keypair.json`   (old boiler‑plate crate)
+         *───────────────────────────────────────────────────────────────*/
+        await runCommand(
+          `docker exec ${workspace.containerName} bash -lc ` +
+          `'find /usr/src/target/deploy -maxdepth 1 -type f \\( ` +
+            `-name "anchor_template-*-keypair.json" -o ` +
+            `-name "my_program-*-keypair.json"    -o ` +
+            `-name "my-program-*-keypair.json" \\) -delete'`,
+          "." /* cwd (unused) */,
+          randomUUID(),
+          { skipSuccessUpdate: true },
+        );
         
         // Inform client about the program ID for early access
         sendProgress({ stage: 'ephemeralKey', pubkey: programId });
