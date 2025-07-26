@@ -291,18 +291,23 @@ export const getBuildArtifactTask = async (projectId: string): Promise<{ status:
        ---------------------------------------------------------------- */
     let containerKeypairPath = '';
 
+    /* search the project-local target/deploy, but ignore template artefacts */
     const locateJsonCmdProject =
       `docker exec ${containerName} bash -c 'cd /usr/src/${rootPath} && ` +
-      `find target/deploy -maxdepth 1 -name "*-keypair.json" ! -name "anchor_template-*" | head -n 1'`;
+      `find target/deploy -maxdepth 1 -name "*-keypair.json" ` +
+      `! -name "anchor_template-*" ! -name "my_program-*"` +
+      ` | head -n 1'`;
 
     containerKeypairPath = (
       await runCommand(locateJsonCmdProject, '.', tempTaskId, { skipSuccessUpdate: true })
     ).trim();
 
     if (!containerKeypairPath) {
+      /* warm‑cache fallback, same exclusion rules */
       const locateJsonCmdGlobal =
         `docker exec ${containerName} bash -c 'find /usr/src/target/deploy -maxdepth 1 ` +
-        `-name "*-keypair.json" ! -name "anchor_template-*" | head -n 1'`;
+        `-name "*-keypair.json" ! -name "anchor_template-*" ! -name "my_program-*"` +
+        ` | head -n 1'`;
 
       containerKeypairPath = (
         await runCommand(locateJsonCmdGlobal, '.', tempTaskId, { skipSuccessUpdate: true })

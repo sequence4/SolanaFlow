@@ -125,6 +125,8 @@ async function listGeneratedPrograms(
   const programDirs: string[] = [];
   for (const entry of entries) {
     if (entry.type !== 'directory') continue;
+    /* Ignore scaffold/template crates that must never enter the workspace */
+    if (entry.name === 'anchor-template' || entry.name === 'my_program') continue;
 
     /* retry up to 5 × 200 ms in case code-gen writes Cargo.toml a bit late */
     const cargoPath = `programs/${entry.name}/Cargo.toml`;
