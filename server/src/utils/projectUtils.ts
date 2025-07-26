@@ -284,15 +284,33 @@ export const getBuildArtifactTask = async (projectId: string): Promise<{ status:
     
     console.log(`[ARTIFACT] ✓ Successfully encoded .so file to base64 (${base64So.length} bytes)`);
     
-    // 🔍 Only look in the project's *own* target folder – a global search can
-  // surface unrelated warm‑cache files (e.g. my_program‑keypair.json) and
-  // trick Anchor into believing the wrong Program ID.
+    /* ----------------------------------------------------------------
+       Locate the program keypair JSON.
+       ① project‑local   target/deploy/        (fresh build output)
+       ② warm‑cache      /usr/src/target/deploy (persists across builds)
+       ---------------------------------------------------------------- */
     let containerKeypairPath = '';
-    let locateJsonCmd = `docker exec ${containerName} bash -c 'cd /usr/src/${rootPath} && find target/deploy -maxdepth 1 -name "*-keypair.json" ! -name "anchor_template-*" | head -n 1'`;
-    containerKeypairPath = (await runCommand(locateJsonCmd, '.', tempTaskId, { skipSuccessUpdate: true })).trim();
-    
+
+    const locateJsonCmdProject =
+      `docker exec ${containerName} bash -c 'cd /usr/src/${rootPath} && ` +
+      `find target/deploy -maxdepth 1 -name "*-keypair.json" ! -name "anchor_template-*" | head -n 1'`;
+
+    containerKeypairPath = (
+      await runCommand(locateJsonCmdProject, '.', tempTaskId, { skipSuccessUpdate: true })
+    ).trim();
+
     if (!containerKeypairPath) {
-      console.error('[ARTIFACT] ❌ No keypair JSON found in project target/deploy');
+      const locateJsonCmdGlobal =
+        `docker exec ${containerName} bash -c 'find /usr/src/target/deploy -maxdepth 1 ` +
+        `-name "*-keypair.json" ! -name "anchor_template-*" | head -n 1'`;
+
+      containerKeypairPath = (
+        await runCommand(locateJsonCmdGlobal, '.', tempTaskId, { skipSuccessUpdate: true })
+      ).trim();
+    }
+
+    if (!containerKeypairPath) {
+      console.error('[ARTIFACT] ❌ No keypair JSON found in project or warm‑cache target/deploy');
       throw new Error('Program keypair not found in container');
     }
     
