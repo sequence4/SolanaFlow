@@ -128,27 +128,23 @@ export async function runDeployPipeline({
     const { sentinelId, programName } =
           await handleGenerateCode({ projectId, graph, workspace, sendProgress, userId });
 
-    // ✅ Code generation is done – generate a program keypair for immediate use
+    // ✅ Code generation is done – **re‑use** the deterministic key‑pair that
+    // was written during code‑gen. Never generate a second one.
     const projectFolder =
       workspace.rootPath ??
       (await import("../fileUtils").then(m => m.getProjectRootPath(projectId)));
-    programKeypair = Keypair.generate();
-    programIdStr = programKeypair.publicKey.toBase58();
-    /**
-     * Write the key-pair **directly to the global warm-cache**
-     * (/usr/src/target/deploy) so the file survives the later
-     *   rm -rf target/deploy && ln -sfnT /usr/src/target/deploy target/deploy
-     * step.  This guarantees Anchor re-uses the same key-pair it sees
-     * during code-gen, eliminating the phantom "second" Program ID.
-     */
-    const keypairJson = JSON.stringify(Array.from(programKeypair.secretKey));
-    await runCommand(
-      `docker exec ${workspace.containerName} bash -c 'mkdir -p /usr/src/target/deploy && echo ${JSON.stringify(keypairJson)} > /usr/src/target/deploy/${programName}-keypair.json'`,
-      ".",
-      uuidv4(),
-      { skipSuccessUpdate: true }
-    );
-    // Notify the frontend of the Program ID before starting the build
+
+    // Read the existing keypair JSON from the warm‑cache
+    const keypairPath = `/usr/src/target/deploy/${programName}-keypair.json`;
+    const secretJson  = execSync(
+      `docker exec ${workspace.containerName} cat '${keypairPath}'`,
+      { encoding: "utf8" }
+    ).trim();
+
+    const secretArr   = JSON.parse(secretJson);
+    programKeypair    = Keypair.fromSecretKey(Uint8Array.from(secretArr));
+    programIdStr      = programKeypair.publicKey.toBase58();
+    // Notify the frontend of the re‑used Program ID
     sendProgress(<ProgressEvent>{
       stage: "code-gen",
       status: "completed",
