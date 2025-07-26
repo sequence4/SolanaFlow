@@ -383,7 +383,7 @@ export async function deployWithEphemeralKey(
     // Send and confirm buffer creation
     const bufferSig = await connection.sendRawTransaction(
       createBufferTx.serialize(),
-      SEND_WITH_PREFLIGHT,
+      SEND_NO_PREFLIGHT,          // ← skip on‑chain simulation
     );
     signatures.push(bufferSig);
     
@@ -620,7 +620,7 @@ export async function deployWithEphemeralKey(
         
         deployOrUpgradeSig = await connection.sendRawTransaction(
           deployTx.serialize(),
-          SEND_WITH_PREFLIGHT,
+          SEND_NO_PREFLIGHT,      // ← skip pre‑flight for DeployWithMaxDataLen
         );
         signatures.push(deployOrUpgradeSig);
 
@@ -699,7 +699,7 @@ export async function deployWithEphemeralKey(
 
         deployOrUpgradeSig = await connection.sendRawTransaction(
           upgradeTx.serialize(),
-          SEND_WITH_PREFLIGHT,
+          SEND_NO_PREFLIGHT,      // ← skip pre‑flight for Upgrade
         );
         signatures.push(deployOrUpgradeSig);
 
@@ -742,7 +742,7 @@ export async function deployWithEphemeralKey(
       
       const authSig = await connection.sendRawTransaction(
         setAuthTx.serialize(),
-        SEND_WITH_PREFLIGHT,
+        SEND_NO_PREFLIGHT,        // ← skip pre‑flight for SetAuthority
       );
       signatures.push(authSig);
       
