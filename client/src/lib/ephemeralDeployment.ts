@@ -341,11 +341,13 @@ export async function deployWithEphemeralKey(
     const signedFundingTx = await wallet.signTransaction(fundingTx);
     
     // 2.4 Send and confirm the funding transaction
-    const fundingSig = await connection.sendRawTransaction(signedFundingTx.serialize());
+    const fundingSig = await connection.sendRawTransaction(
+      signedFundingTx.serialize(),
+      SEND_NO_PREFLIGHT // skip Phantom's pre‑flight simulation
+    );
     signatures.push(fundingSig);
     
-    // Wait for confirmation ­– use signature‑only form to avoid
-    // "TransactionExpiredBlockheightExceededError" on slow networks
+    // Confirm by signature only to avoid TransactionExpiredBlockheightExceededError
     await connection.confirmTransaction(fundingSig, 'confirmed');
     
     console.log(`[EPHEMERAL_DEPLOY] Funded ephemeral key with ${totalNeeded} lamports`);
@@ -391,7 +393,7 @@ export async function deployWithEphemeralKey(
     // Send and confirm buffer creation
     const bufferSig = await connection.sendRawTransaction(
       createBufferTx.serialize(),
-      SEND_NO_PREFLIGHT,          // ← skip on‑chain simulation
+      SEND_NO_PREFLIGHT,          // skip on-chain simulation for buffer creation
     );
     signatures.push(bufferSig);
     

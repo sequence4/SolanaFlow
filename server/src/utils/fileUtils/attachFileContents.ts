@@ -31,7 +31,14 @@ export async function attachFileContents(
     try {
       const stat = await fs.promises.stat(abs);
       if (stat.size > 1_048_576) continue;          // >1 MiB ➜ skip
-      node.content = await fs.promises.readFile(abs, "utf8");
+      let text = await fs.promises.readFile(abs, "utf8");
+      // If the text contains non‑printable characters, it is likely binary.
+      // Store a stub with the byte size instead of corrupting the DB.
+      if (!/^[\u0009\u000A\u000D\u0020-\u007E]*$/.test(text)) {
+        node.content = `<${Buffer.byteLength(text)} bytes omitted>`;
+      } else {
+        node.content = text;
+      }
     } catch (err: any) {
       // Host path not present ➜ pull it straight from the workspace container
       if (err.code !== "ENOENT" || !containerName) throw err;
