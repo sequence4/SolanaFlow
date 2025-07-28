@@ -20,9 +20,8 @@ export async function deployPipeline(
   const userId = (req.user as { id?: string } | undefined)?.id; // keep optional-chaining safe
   const walletSigned = requestWalletSigned === true;
 
-  console.log(`[API] Deploy pipeline called for project: ${id}, userId: ${userId}`);
-  console.log(`[API] Graph data received:`, JSON.stringify(graph).substring(0, 200) + '…');
-  console.log(`[API] Wallet-signed deployment: ${walletSigned}`);
+  console.log(`[DEPLOY] Starting deployment pipeline for project: ${id}`);
+  console.log(`[DEPLOY] Wallet-signed deployment: ${walletSigned ? 'Yes' : 'No'}`);
 
   /* ------------------------------------------------------------------ *
    * Guards – bail out fast on bad input
@@ -50,18 +49,58 @@ export async function deployPipeline(
    * short placeholder so the console stays readable.
    */
   const send = <T = unknown>(data: T): void => {
-    let safeForLog: unknown = data;
-    if (typeof data === 'object' && data !== null && 'artifact' in (data as any)) {
+    // Clean up the data for logging
+    let safeForLog: unknown;
+    
+    // Handle different types of data for cleaner logs
+    if (typeof data === 'object' && data !== null) {
       const clone = { ...(data as any) };
-      if (typeof clone.artifact === 'string') {
-        clone.artifact = `<${clone.artifact.length}B artefact omitted>`;
+      
+      // Handle artifacts (compiled programs)
+      if ('artifact' in clone && typeof clone.artifact === 'string') {
+        clone.artifact = `<${clone.artifact.length}B compiled program>`;
       }
+      
+      // Handle file trees
+      if ('fileTree' in clone && Array.isArray(clone.fileTree)) {
+        clone.fileTree = `<file tree with ${clone.fileTree.length} root items>`;
+      }
+      
+      // Handle IDLs
+      if ('idl' in clone) {
+        clone.idl = '<IDL data>';
+      }
+      if ('idls' in clone && Array.isArray(clone.idls)) {
+        clone.idls = `<${clone.idls.length} IDLs>`;
+      }
+      
+      // Handle content in file-written events
+      if ('content' in clone && typeof clone.content === 'string') {
+        clone.content = `<${clone.content.length}B content>`;
+      }
+      
       safeForLog = clone;
+    } else {
+      safeForLog = data;
     }
 
-    console.log('[API] Sending SSE event:', safeForLog);
+    // Log a clean, human-readable version of the event
+    if (typeof data === 'object' && data !== null) {
+      const eventObj = data as any;
+      if (eventObj.stage && eventObj.message) {
+        console.log(`[SSE] ${eventObj.stage}: ${eventObj.message}`);
+      } else if (eventObj.stage) {
+        console.log(`[SSE] ${eventObj.stage}`);
+      } else if (eventObj.event) {
+        console.log(`[SSE] Event: ${eventObj.event}`);
+      } else {
+        console.log('[SSE] Sending event:', safeForLog);
+      }
+    } else {
+      console.log('[SSE] Sending event:', safeForLog);
+    }
+    
     // Allow custom SSE event names (MDN pattern)
-    // https://developer.mozilla.org/... → custom events
     if (typeof data === 'object' && data && 'event' in data) {
       const { event, ...payload } = data as any;
       res.write(`event: ${event}\n`);
@@ -86,10 +125,12 @@ export async function deployPipeline(
 
     // let the client know we're done, then close the SSE stream
     send({ stage: 'completed', message: 'Pipeline finished' });
+    console.log(`[DEPLOY] Pipeline completed successfully for project: ${id}`);
     res.end();
   } catch (err) {
-    console.error('[API] Deploy pipeline error:', err);
-    send({ stage: 'error', message: (err as Error).message });
+    const errorMessage = (err as Error).message;
+    console.error(`[DEPLOY] Pipeline failed: ${errorMessage}`);
+    send({ stage: 'error', message: errorMessage });
     res.end();
     if (!res.headersSent) next(err);
   }
