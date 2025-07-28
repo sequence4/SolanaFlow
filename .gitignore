@@ -44,6 +44,7 @@ landing-prod.tgz
 solanaflow-landing
 build.log
 /.env*
+!/.env.example
 
 .yarn/*
 !.yarn/releases
