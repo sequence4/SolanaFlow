@@ -27,8 +27,13 @@ import {
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { connection } from "@/utils/connection";
+
 import { createAndRegisterEphemeral } from "@/utils/ephemeral/ephemeralKey";
 import { BPF_LOADER_CHUNK_SIZE } from "@/utils/constants";
+
+// Toggle verbose client-side logs by setting NEXT_PUBLIC_DEBUG_LOGS=true in your
+// environment.  This reduces noisy console output in production.
+const DEBUG_LOGS = process.env.NEXT_PUBLIC_DEBUG_LOGS === 'true';
 
 interface ProgramDeployerProps {
   projectId: string;
@@ -73,7 +78,7 @@ export function ProgramDeployer({
     if (!projectId) return;
 
     setIsLoading(true);
-    console.log("🔍 Fetching compiled program…");
+    if (DEBUG_LOGS) console.log("🔍 Fetching compiled program…");
 
     try {
       const raw: any = await downloadArtifact(projectId); // string | ArrayBuffer | Uint8Array
@@ -102,7 +107,7 @@ export function ProgramDeployer({
       ) {
         console.warn("[DEPLOY] Unexpected ELF magic", bytes.slice(0, 4));
       } else {
-        console.log(
+        if (DEBUG_LOGS) console.log(
           "[DEPLOY] Valid ELF magic verified:",
           Array.from(bytes.slice(0, 4))
         );
@@ -112,7 +117,7 @@ export function ProgramDeployer({
       setByteLength(bytes.byteLength);
       setBytesLoaded(true);
 
-      console.log(`✅ Program fetched: ${bytes.byteLength.toLocaleString()} bytes`);
+      if (DEBUG_LOGS) console.log(`✅ Program fetched: ${bytes.byteLength.toLocaleString()} bytes`);
     } catch (err) {
       console.error("Failed to load program bytes:", err);
       toast.error("Failed to load program", {
@@ -156,7 +161,7 @@ export function ProgramDeployer({
           if (acctInfo) {
             /* UPGRADE path (unchanged) */
         const authorityEphem = Keypair.generate();
-            console.log("🔑 Ephemeral authority key:", authorityEphem.publicKey.toBase58());
+            if (DEBUG_LOGS) console.log("🔑 Ephemeral authority key:", authorityEphem.publicKey.toBase58());
 
         const deployOptions: EphemeralDeployOptions = {
           soBytes: programBytes as unknown as ArrayBuffer,
@@ -170,7 +175,7 @@ export function ProgramDeployer({
             const pct = raw <= 1 ? Math.round(raw * 100) : Math.round(raw);
             setProgress(Math.max(1, Math.min(pct, 100)));
             setDeployStage(message ?? "");
-            console.log("[DEPLOY]", pct + "%", message);
+            if (DEBUG_LOGS) console.log("[DEPLOY]", pct + "%", message);
           },
         };
 
@@ -199,7 +204,7 @@ export function ProgramDeployer({
         // 1. Request an ephemeral keypair from the backend
         const ephemPubkeyStr = await createAndRegisterEphemeral(projectId);
         const ephemeralPubkey = new PublicKey(ephemPubkeyStr);
-        console.log(`🔑 Ephemeral key (server-generated): ${ephemeralPubkey.toBase58()}`);
+        if (DEBUG_LOGS) console.log(`🔑 Ephemeral key (server-generated): ${ephemeralPubkey.toBase58()}`);
 
         // 2. Fund the ephemeral account from the wallet (if needed)
         const bufferSpace = 37 + programBytes.byteLength;
@@ -212,7 +217,7 @@ export function ProgramDeployer({
         const existingBalance = await connection.getBalance(ephemeralPubkey);
         if (BigInt(existingBalance) < lamportsNeeded) {
           const additional = lamportsNeeded - BigInt(existingBalance);
-          console.log(`Ephemeral account needs ${Number(additional) / LAMPORTS_PER_SOL} SOL; funding from wallet...`);
+          if (DEBUG_LOGS) console.log(`Ephemeral account needs ${Number(additional) / LAMPORTS_PER_SOL} SOL; funding from wallet...`);
           const fundIx = SystemProgram.transfer({
             fromPubkey: wallet.publicKey!,
             toPubkey: ephemeralPubkey,
@@ -230,11 +235,16 @@ export function ProgramDeployer({
           fundTx.feePayer = wallet.publicKey!;
 
           const signedFundTx = await wallet.signTransaction!(fundTx);
+          
+          // Add logging to show the base64 transaction
+          const fundTxBase64 = signedFundTx.serialize().toString('base64');
+          console.log('⚡ TX-BASE64 (ProgramDeployer Funding):', fundTxBase64);
+          
           const fundSig = await connection.sendRawTransaction(signedFundTx.serialize());
           await connection.confirmTransaction(fundSig, 'confirmed');
-          console.log(`✅ Funded ephemeral key with ${Number(additional) / LAMPORTS_PER_SOL} SOL (tx: ${fundSig})`);
+          if (DEBUG_LOGS) console.log(`✅ Funded ephemeral key with ${Number(additional) / LAMPORTS_PER_SOL} SOL (tx: ${fundSig})`);
         } else {
-          console.log('Ephemeral account already sufficiently funded.');
+          if (DEBUG_LOGS) console.log('Ephemeral account already sufficiently funded.');
         }
 
         // 3. Trigger the backend deployment process

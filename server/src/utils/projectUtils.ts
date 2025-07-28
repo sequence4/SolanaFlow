@@ -54,7 +54,7 @@ export async function runCommand(
   command: string,
   cwd: string,
   taskId: string,
-  options: { skipSuccessUpdate?: boolean, ensureDir?: string } = {}
+  options: { skipSuccessUpdate?: boolean, ensureDir?: string, silent?: boolean } = {}
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     if (options.ensureDir) {
@@ -73,9 +73,11 @@ export async function runCommand(
       async (error: ExecException | null, stdout: string, stderr: string) => {
         let result = '';
 
-        console.log('!COMMAND:', command);
-        console.log('STDOUT:', stdout);
-        console.log('STDERR:', stderr);
+        if (!options.silent) {
+          console.log('!COMMAND:', command);
+          console.log('STDOUT:', stdout);
+          console.log('STDERR:', stderr);
+        }
 
         if (error) {
           result = `Error: ${error.message}\n\nStdout: ${stdout}\n\nStderr: ${stderr}`;
@@ -262,8 +264,6 @@ export const getBuildArtifactTask = async (projectId: string): Promise<{ status:
       throw new Error(`No container found for project ${projectId}`);
     }
     
-    console.log(`[ARTIFACT] Looking for compiled .so file in container ${containerName} for project ${projectId}`);
-    
     // Create a temporary task ID for the command execution
     const tempTaskId = uuidv4();
     
@@ -276,13 +276,14 @@ export const getBuildArtifactTask = async (projectId: string): Promise<{ status:
       throw new Error('Built artifact not found in container');
     }
     
-    console.log(`[ARTIFACT] ✓ Found .so file at ${containerSoPath}, extracting...`);
-    
     // Read and encode the file directly from the container
     const base64Cmd = `docker exec ${containerName} bash -c "cat '${containerSoPath}' | base64 -w 0"`;
-    const base64So = await runCommand(base64Cmd, '.', tempTaskId, { skipSuccessUpdate: true });
-    
-    console.log(`[ARTIFACT] ✓ Successfully encoded .so file to base64 (${base64So.length} bytes)`);
+    const base64So = await runCommand(
+      base64Cmd,
+      '.',
+      tempTaskId,
+      { skipSuccessUpdate: true, silent: true }
+    );
     
     /* ----------------------------------------------------------------
        Locate the program keypair JSON.
@@ -319,7 +320,6 @@ export const getBuildArtifactTask = async (projectId: string): Promise<{ status:
       throw new Error('Program keypair not found in container');
     }
     
-    console.log(`[ARTIFACT] ✓ Found keypair file at ${containerKeypairPath}, reading...`);
     const keypairJson = await runCommand(`docker exec ${containerName} bash -c "cat '${containerKeypairPath}'"`, '.', tempTaskId, { skipSuccessUpdate: true });
     let programId = "";
     try {
@@ -331,7 +331,6 @@ export const getBuildArtifactTask = async (projectId: string): Promise<{ status:
       }
       const keypair = Keypair.fromSecretKey(Uint8Array.from(secretKeyBytes));
       programId = keypair.publicKey.toBase58();
-      console.log(`[ARTIFACT] ✓ Extracted Program ID ${programId} from keypair`);
     } catch (e) {
       console.error('[ARTIFACT] Failed to parse keypair or derive programId:', e);
     }

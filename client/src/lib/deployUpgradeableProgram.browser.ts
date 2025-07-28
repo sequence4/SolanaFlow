@@ -492,6 +492,11 @@ export async function deployUpgradeableProgram(
           extendTx.recentBlockhash = blockhash;
 
           const signed = await wallet.signTransaction(extendTx);
+          
+          // Add logging to show the base64 transaction
+          const extendTxBase64 = signed.serialize().toString('base64');
+          console.log('⚡ TX-BASE64 (ExtendProgram):', extendTxBase64);
+          
           const sig = await connection.sendRawTransaction(signed.serialize(), TX_OPTS);
           await confirmWithBlockhash(
             connection,

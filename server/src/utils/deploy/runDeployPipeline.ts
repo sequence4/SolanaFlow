@@ -212,12 +212,12 @@ export async function runDeployPipeline({
     console.log("[PIPELINE] ✅ build task", buildTask, "completed");
 
     /* 3b ─ fetch artefact ------------------------------------------------ */
-    console.log("[PIPELINE] 📦 fetching artefact (.so) from container");
+    //console.log("[PIPELINE] 📦 fetching artefact (.so) from container");
     const { base64So } = await getBuildArtifactTask(projectId);
     if (!base64So) {
       throw new Error('Anchor built with warnings but produced no .so – check build log');
     }
-    console.log("[PIPELINE] 📦 artefact length:", base64So.length);
+    //console.log("[PIPELINE] 📦 artefact length:", base64So.length);
     
     /* ---------------------------------------------------------------- *
      * 3c ─ build finished → gather file-tree with eager code

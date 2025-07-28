@@ -142,6 +142,21 @@ export async function deployWithEphemeralKey(
   
   // Cache the payer's public key to avoid repeated null checks
   const walletPublicKey = wallet.publicKey;
+  // --------------------------------------------------------------------------
+  // Debug: print the RPC endpoint and wallet used for deployment. These logs
+  // help diagnose mismatched RPCs between Phantom and our client.
+  // --------------------------------------------------------------------------
+  try {
+    // rpcEndpoint is private on Connection in @solana/web3.js; use fallback.
+    const endpoint =
+      (connection as any).rpcEndpoint ??
+      (connection as any)._rpcEndpoint ??
+      undefined;
+    console.log('[DEBUG] RPC endpoint:', endpoint);
+    console.log('[DEBUG] Wallet public key:', walletPublicKey.toBase58());
+  } catch (e) {
+    // ignore failures; debug logging only
+  }
   const signatures: string[] = [];
   let programId: PublicKey | null = null;
   
@@ -299,16 +314,20 @@ export async function deployWithEphemeralKey(
     const SAFETY_LAMPORTS = BigInt(100_000_000);            // 0.1 SOL
     
     const totalNeeded = bufferRent + rentForProg + programDataRent + totalFees + SAFETY_LAMPORTS;
-    
-    console.table({
-      bufferRent:         bufferRent.toString(),
-      programRentForFunding: rentForProg.toString(),
-      programDataRent:    programDataRent.toString(),
-      programAccountSpace: PROGRAM_ACCOUNT_SPACE,
-      totalFees:          totalFees.toString(),
-      SAFETY_LAMPORTS:    SAFETY_LAMPORTS.toString(),
-      totalNeeded:        totalNeeded.toString(),
-    });
+
+    // ------------------------------------------------------------------------
+    // Note: The following console.table caused noisy logs in the browser.
+    // It has been commented out to reduce output.  Uncomment for detailed
+    // rent/fee breakdown.
+    // console.table({
+    //   bufferRent:         bufferRent.toString(),
+    //   programRentForFunding: rentForProg.toString(),
+    //   programDataRent:    programDataRent.toString(),
+    //   programAccountSpace: PROGRAM_ACCOUNT_SPACE,
+    //   totalFees:          totalFees.toString(),
+    //   SAFETY_LAMPORTS:    SAFETY_LAMPORTS.toString(),
+    //   totalNeeded:        totalNeeded.toString(),
+    // });
     
     onProgress(5, "Funding ephemeral key...");
     
@@ -333,12 +352,35 @@ export async function deployWithEphemeralKey(
     const blockHashInfo = await connection.getLatestBlockhash('confirmed');
     const blockhash = blockHashInfo.blockhash;
     const lastValidBlockHeight = blockHashInfo.lastValidBlockHeight;
+
+    // Debug: show the blockhash used for the funding transaction
+    console.log('[DEBUG] fundingTx blockhash', blockhash, 'lastValidBlockHeight', lastValidBlockHeight);
     
     fundingTx.recentBlockhash = blockhash;
     fundingTx.feePayer = walletPublicKey;
     
     // 2.3 Have the wallet sign the funding transaction
     const signedFundingTx = await wallet.signTransaction(fundingTx);
+    
+    // Add logging to show the base64 transaction
+    const fundingTxBase64 = signedFundingTx.serialize().toString('base64');
+    console.log('⚡ TX-BASE64 (Funding):', fundingTxBase64);
+
+    // ------------------------------------------------------------------------
+    // Debug: simulate the funding transaction locally to surface any errors
+    // before it hits the network. Logs are truncated to the first 10 entries.
+    // ------------------------------------------------------------------------
+    try {
+      const fundingSim = await connection.simulateTransaction(signedFundingTx);
+      console.log(
+        '[SIM-FUNDING] err',
+        fundingSim.value.err,
+        'logs',
+        fundingSim.value.logs?.slice(0, 10),
+      );
+    } catch (err) {
+      console.error('[SIM-FUNDING] simulation failed:', err);
+    }
     
     // 2.4 Send and confirm the funding transaction
     const fundingSig = await connection.sendRawTransaction(
@@ -383,12 +425,35 @@ export async function deployWithEphemeralKey(
     const bufferBlockhashInfo = await connection.getLatestBlockhash('confirmed');
     const bufferHash = bufferBlockhashInfo.blockhash;
     const bufferHeight = bufferBlockhashInfo.lastValidBlockHeight;
+
+    // Debug: show the blockhash used for the buffer creation
+    console.log('[DEBUG] bufferTx blockhash', bufferHash, 'lastValidBlockHeight', bufferHeight);
       
     createBufferTx.recentBlockhash = bufferHash;
     createBufferTx.feePayer = bufferKp.publicKey;
     
     // Sign with both the ephemeral key and buffer key
     createBufferTx.sign(bufferKp, bufferKey);
+
+    // Add logging to show the base64 transaction
+    const bufferTxBase64 = createBufferTx.serialize().toString('base64');
+    console.log('⚡ TX-BASE64 (Buffer Creation):', bufferTxBase64);
+
+    // ------------------------------------------------------------------------
+    // Debug: simulate the buffer creation transaction to catch any missing
+    // accounts or ownership issues. Only the first 10 log lines are shown.
+    // ------------------------------------------------------------------------
+    try {
+      const bufferSim = await connection.simulateTransaction(createBufferTx);
+      console.log(
+        '[SIM-BUFFER] err',
+        bufferSim.value.err,
+        'logs',
+        bufferSim.value.logs?.slice(0, 10),
+      );
+    } catch (err) {
+      console.error('[SIM-BUFFER] simulation failed:', err);
+    }
     
     // Send and confirm buffer creation
     const bufferSig = await connection.sendRawTransaction(
@@ -406,10 +471,10 @@ export async function deployWithEphemeralKey(
     console.log(`[EPHEMERAL_DEPLOY] Writing program in ${numChunks} chunks`);
     
     if (RATE_LIMIT_MS < 50) {
-      console.warn(
-        `[DEPLOY] RATE_LIMIT_MS=${RATE_LIMIT_MS} may exceed QuickNode free burst limits; ` +
-        `consider raising it in client/src/utils/connection.ts`
-      );
+      // console.warn(
+      //   `[DEPLOY] RATE_LIMIT_MS=${RATE_LIMIT_MS} may exceed QuickNode free burst limits; ` +
+      //   `consider raising it in client/src/utils/connection.ts`
+      // );
     }
     
     const writeSigs: string[] = [];
@@ -418,8 +483,12 @@ export async function deployWithEphemeralKey(
     // Set up WebSocket subscription for live logs
     const subId = connection.onLogs(
       bufferKey.publicKey,
-      (l) => console.log('[ON-LOGS]', l.logs.join('\n')),
-      'confirmed'
+      (l) => {
+        // Truncate logs to avoid flooding the console.
+        const trimmed = l.logs?.slice(0, 5) ?? [];
+        console.log('[ON-LOGS]', trimmed.join('\n'));
+      },
+      'confirmed',
     );
 
     // Handle SIGINT to remove the log listener
@@ -489,6 +558,12 @@ export async function deployWithEphemeralKey(
       // Sign with the ephemeral key
       writeTx.sign(bufferKp);
       
+      // Add logging to show the base64 transaction (only for the first chunk)
+      if (i === 0) {
+        const writeTxBase64 = writeTx.serialize().toString('base64');
+        console.log('⚡ TX-BASE64 (First Write):', writeTxBase64);
+      }
+      
       // Send raw transaction without waiting for confirmation
       // We'll send them all quickly
       const writeSig = await connection.sendRawTransaction(
@@ -511,8 +586,11 @@ export async function deployWithEphemeralKey(
     );
     const statuses = await connection.getSignatureStatuses(writeSigs);
     statuses.value.forEach((st, idx) => {
-      console.log('[WRITE-STATUS]', idx, st?.slot, st?.confirmations, st?.err);
-      if (st && st.err) throw new Error(`Write TX #${idx} failed: ${JSON.stringify(st.err)}`);
+      // Only surface errors; avoid printing every status row.
+      if (st && st.err) {
+        console.error(`[WRITE-STATUS] Write TX ${idx} error:`, st.err);
+        throw new Error(`Write TX #${idx} failed: ${JSON.stringify(st.err)}`);
+      }
     });
     
     // Clean up WebSocket subscription
@@ -579,6 +657,11 @@ export async function deployWithEphemeralKey(
 
       const { blockhash: deployHash, lastValidBlockHeight: deployHeight } =
             await connection.getLatestBlockhash('confirmed');
+
+      // Debug: show the blockhash used for the deploy transaction
+      console.log('[DEBUG] deployTx blockhash', deployHash, 'lastValidBlockHeight', deployHeight);
+
+      // Re-apply recent blockhash & fee-payer after debug log insertion
       deployTx.recentBlockhash = deployHash;
       deployTx.feePayer = bufferKp.publicKey;
       
@@ -588,6 +671,9 @@ export async function deployWithEphemeralKey(
             during the Anchor build. */
         deployTx.partialSign(bufferKp);
         const encodedTx = deployTx.serialize({ requireAllSignatures: false }).toString('base64');
+        
+        // Add logging to show the base64 transaction
+        console.log('⚡ TX-BASE64 (Deploy - Relay):', encodedTx);
         
         // ❸ send to backend for program‑key signature & broadcast
         if (!projectId) {
@@ -622,9 +708,19 @@ export async function deployWithEphemeralKey(
         );
         console.log('DEBUG feePayer =', deployTx.feePayer?.toBase58());
         console.log('DEBUG signers  =', signerKeys);
+        
+        // Add logging to show the base64 transaction
+        const deployTxBase64 = deployTx.serialize().toString('base64');
+        console.log('⚡ TX-BASE64 (Deploy):', deployTxBase64);
+        
         const sim = await connection.simulateTransaction(deployTx);
         if (sim.value.err) {
-          console.error('Simulation failure', sim.value.logs);
+          console.error(
+            'Deploy simulation failure:',
+            sim.value.err,
+            'logs',
+            sim.value.logs?.slice(0, 10),
+          );
           throw new Error('Final deploy simulation failed');
         }
         
@@ -660,6 +756,11 @@ export async function deployWithEphemeralKey(
       const upgradeTx = new Transaction().add(upgradeIx);
       const { blockhash: upHash, lastValidBlockHeight: upHeight } =
             await connection.getLatestBlockhash('confirmed');
+
+      // Debug: show the blockhash used for the upgrade transaction
+      console.log('[DEBUG] upgradeTx blockhash', upHash, 'lastValidBlockHeight', upHeight);
+
+      // Re-apply recent blockhash & fee-payer after debug log insertion
       upgradeTx.recentBlockhash = upHash;
       upgradeTx.feePayer = bufferKp.publicKey;
       
@@ -690,6 +791,10 @@ export async function deployWithEphemeralKey(
       } else {
         upgradeTx.sign(bufferKp);          // wallet already signed buffer writes
 
+        // Add logging to show the base64 transaction
+        const upgradeTxBase64 = upgradeTx.serialize().toString('base64');
+        console.log('⚡ TX-BASE64 (Upgrade):', upgradeTxBase64);
+
         // Simulate the transaction first to catch any potential issues
         // ── DEBUG ── print all account keys & signer status
         const msgUpgrade = upgradeTx.compileMessage();
@@ -703,7 +808,12 @@ export async function deployWithEphemeralKey(
         console.log('DEBUG signers  =', signerKeysUpgrade);
         const sim = await connection.simulateTransaction(upgradeTx);
         if (sim.value.err) {
-          console.error('Simulation failure', sim.value.logs);
+          console.error(
+            'Upgrade simulation failure:',
+            sim.value.err,
+            'logs',
+            sim.value.logs?.slice(0, 10),
+          );
           throw new Error('Final upgrade simulation failed');
         }
 
@@ -738,15 +848,30 @@ export async function deployWithEphemeralKey(
       const setAuthTx = new Transaction().add(setAuthIx);
       const { blockhash: authHash, lastValidBlockHeight: authHeight } = 
             await connection.getLatestBlockhash('confirmed');
-      setAuthTx.recentBlockhash = authHash;
-      setAuthTx.feePayer       = bufferKp.publicKey;
-      
-      setAuthTx.sign(bufferKp);
+
+    // Debug: show the blockhash used for the SetAuthority transaction
+    console.log('[DEBUG] setAuthTx blockhash', authHash, 'lastValidBlockHeight', authHeight);
+
+    // Re-apply recent blockhash & fee-payer after debug log insertion
+    setAuthTx.recentBlockhash = authHash;
+    setAuthTx.feePayer       = bufferKp.publicKey;
+    
+    // Sign with the ephemeral key
+    setAuthTx.sign(bufferKp);
+    
+    // Add logging to show the base64 transaction
+    const setAuthTxBase64 = setAuthTx.serialize().toString('base64');
+    console.log('⚡ TX-BASE64 (SetAuthority):', setAuthTxBase64);
       
       // Simulate the transaction first to catch any potential issues
       const simResult = await connection.simulateTransaction(setAuthTx);
       if (simResult.value.err) {
-        console.error('SetAuthority simulation failure:', simResult.value.logs);
+        console.error(
+          'SetAuthority simulation failure:',
+          simResult.value.err,
+          'logs',
+          simResult.value.logs?.slice(0, 10),
+        );
         throw new Error('SetAuthority simulation failed');
       }
       
