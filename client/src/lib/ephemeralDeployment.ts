@@ -348,6 +348,10 @@ export async function deployWithEphemeralKey(
       }),
     );
     
+    // NEW ➜ the created account (bufferKp) must sign this tx;
+    // without it the simulator returns "signature verification failed".
+    fundingTx.partialSign(bufferKp);
+    
     // 2.2 Get a fresh blockhash
     const blockHashInfo = await connection.getLatestBlockhash('confirmed');
     const blockhash = blockHashInfo.blockhash;
