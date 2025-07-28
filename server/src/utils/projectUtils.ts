@@ -272,7 +272,7 @@ export const getBuildArtifactTask = async (projectId: string): Promise<{ status:
     const containerSoPath = (await runCommand(locateCmd, '.', tempTaskId, { skipSuccessUpdate: true })).trim();
 
     if (!containerSoPath) {
-      console.error('[ARTIFACT] ❌  No .so produced by build');
+      console.error('[ARTIFACT] No program artifact (.so) found in container');
       throw new Error('Built artifact not found in container');
     }
     
@@ -316,7 +316,7 @@ export const getBuildArtifactTask = async (projectId: string): Promise<{ status:
     }
 
     if (!containerKeypairPath) {
-      console.error('[ARTIFACT] ❌ No keypair JSON found in project or warm‑cache target/deploy');
+      console.error('[ARTIFACT] No program keypair found in container');
       throw new Error('Program keypair not found in container');
     }
     
@@ -325,14 +325,12 @@ export const getBuildArtifactTask = async (projectId: string): Promise<{ status:
     try {
       const secretKeyBytes: number[] = JSON.parse(keypairJson.trim());
       if (!Array.isArray(secretKeyBytes) || secretKeyBytes.length !== 64) {
-        throw new Error(
-          `Invalid keypair json at ${containerKeypairPath} (expected 64‑byte array)`,
-        );
+        throw new Error('Invalid keypair format (expected 64-byte array)');
       }
       const keypair = Keypair.fromSecretKey(Uint8Array.from(secretKeyBytes));
       programId = keypair.publicKey.toBase58();
     } catch (e) {
-      console.error('[ARTIFACT] Failed to parse keypair or derive programId:', e);
+      console.error('[ARTIFACT] Failed to parse keypair or derive programId');
     }
     
     return { status: 'success', base64So, programId, programKeypair: keypairJson.trim() };
@@ -436,7 +434,7 @@ export const startAnchorBuildTask = async (
         projectId,
         { skipSuccessUpdate: true },
       );
-      console.log(`[BUILD] ✓ Copied program keypair to container: ${containerKeyPath} (program: ${programId})`);
+      console.log(`[BUILD] Copied program keypair to container for program ${programId}`);
           // Store program ID in .env and database
       await runCommand(
         `docker exec ${containerName} bash -lc "sed -i '/^NEXT_PUBLIC_PROGRAM_ID=/d' /usr/src/${rootPath}/web/.env && echo NEXT_PUBLIC_PROGRAM_ID=${programId} >> /usr/src/${rootPath}/web/.env"`,
@@ -483,12 +481,12 @@ echo "BUILD_SUCCESS: $SO_PATH"
       
       console.log(`[BUILD] Created build script locally at ${tempDir}`);
 
-      console.log(`[BUILD] Starting anchor build for project ${projectId}...`);
+      console.log(`[BUILD] Starting anchor build for project ${projectId}`);
       
       try {
         await updateTaskStatus(sanitizedTaskId, 'doing', 'Anchor build in progress...');
         
-        console.log(`[BUILD] Copying build script to container ${containerName}...`);
+        // Prepare build script
         await runCommand(
           `docker cp ${buildScriptPath} ${containerName}:/tmp/build.sh`,
           '.',
@@ -496,7 +494,6 @@ echo "BUILD_SUCCESS: $SO_PATH"
           { skipSuccessUpdate: true }
         );
         
-        console.log(`[BUILD] Making build script executable...`);
         await runCommand(
           `docker exec ${containerName} chmod +x /tmp/build.sh`,
           '.',
@@ -504,7 +501,7 @@ echo "BUILD_SUCCESS: $SO_PATH"
           { skipSuccessUpdate: true }
         );
         
-        console.log(`[BUILD] Executing build script in container ${containerName} (stream)…`);
+        console.log(`[BUILD] Executing anchor build in container`);
         const buildOutput = await runSpawn(
           `docker exec ${containerName} /bin/bash /tmp/build.sh`,
           '.',
@@ -527,16 +524,15 @@ echo "BUILD_SUCCESS: $SO_PATH"
         }
         
         if (soFileCheck.includes('BUILD_SUCCESS')) {
-          console.log("[BUILD] ✔️  anchor build finished & .so produced");
+          console.log("[BUILD] Anchor build completed successfully");
           await updateTaskStatus(sanitizedTaskId, 'succeed', `Build completed successfully. .so file was created.`);
         } else if (soFileCheck.includes('BUILD_FAILURE')) {
-          const fullBuildError = `[BUILD] ❌  Build finished but no .so was created.\n\nBuild output:\n${buildOutput}`;
-          console.error(fullBuildError);
-          await updateTaskStatus(sanitizedTaskId, 'failed', fullBuildError);
+          console.error("[BUILD] Build finished but no .so file was created");
+          await updateTaskStatus(sanitizedTaskId, 'failed', `Build finished but no .so file was created`);
         }
         // no 'else' – runSpawn already set 'warning' when appropriate
       } catch (buildError: any) {
-        console.error(`[BUILD] Anchor build failed with error: ${buildError.message}`);
+        console.error(`[BUILD] Anchor build failed`);
         await updateTaskStatus(
           sanitizedTaskId,
           'failed',
@@ -618,8 +614,8 @@ export const startAnchorDeployTask = async (
       
       if (ephemeralPubkey) {
         walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${ephemeralPubkey}.json`);
-        console.log(`[DEPLOY_DEBUG] Using ephemeral key for deployment: ${ephemeralPubkey}`);
-        console.log(`[DEPLOY_DEBUG] Ephemeral key file path: ${walletPath}`);
+        //console.log(`[DEPLOY_DEBUG] Using ephemeral key for deployment: ${ephemeralPubkey}`);
+        //console.log(`[DEPLOY_DEBUG] Ephemeral key file path: ${walletPath}`);
         
         if (!fs.existsSync(walletPath)) {
           console.error(`[DEPLOY_DEBUG] ERROR: Ephemeral key file not found at ${walletPath}`);
@@ -628,38 +624,35 @@ export const startAnchorDeployTask = async (
         
         try {
           const fileStats = fs.statSync(walletPath);
-          console.log(`[DEPLOY_DEBUG] Key file exists: ${walletPath}, size: ${fileStats.size} bytes`);
+          console.log(`[DEPLOY] Ephemeral key file verified (${fileStats.size} bytes)`);
           
           const keyContent = fs.readFileSync(walletPath, 'utf8');
           const keyArray = JSON.parse(keyContent);
-          console.log(`[DEPLOY_DEBUG] Key array length: ${keyArray.length}, first few bytes: [${keyArray.slice(0, 3).join(', ')}...]`);
           if (keyArray.length !== 64) {
-            console.warn(`[DEPLOY_DEBUG] WARNING: Key file does not contain a 64-byte array! Found ${keyArray.length} bytes.`);
+            console.warn(`[DEPLOY] Warning: Ephemeral key file does not contain a 64-byte array`);
           }
         } catch (err: any) {
-          console.error(`[DEPLOY_DEBUG] ERROR reading key file: ${err.message}`);
+          console.error(`[DEPLOY] Error reading ephemeral key file`);
           throw new Error(`Error reading ephemeral key file: ${err.message}`);
         }
         
         containerWalletPath = `/tmp/${ephemeralPubkey}.json`;
-        console.log(`[DEPLOY_DEBUG] Copying ephemeral key to container path: ${containerWalletPath}`);
+        console.log(`[DEPLOY] Copying ephemeral key to container`);
         
         await runCommand(`docker cp ${walletPath} ${containerName}:${containerWalletPath}`, '.', sanitizedTaskId, { skipSuccessUpdate: true });
         
         try {
           const fileCheckCmd = `docker exec ${containerName} ls -la ${containerWalletPath}`;
-          const fileCheckResult = await runCommand(fileCheckCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
-          console.log(`[DEPLOY_DEBUG] Container key file check: ${fileCheckResult}`);
+          await runCommand(fileCheckCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
           
           const pubkeyCmd = `docker exec ${containerName} bash -c "solana-keygen pubkey ${containerWalletPath} || echo 'KEYGEN_FAILED'"`;
           const pubkeyResult = await runCommand(pubkeyCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
-          console.log(`[DEPLOY_DEBUG] Solana-keygen pubkey result: ${pubkeyResult.trim()}`);
           
           if (pubkeyResult.trim() !== ephemeralPubkey) {
-            console.error(`[DEPLOY_DEBUG] ERROR: Key verification failed! Expected: ${ephemeralPubkey}, Got: ${pubkeyResult.trim()}`);
+            console.error(`[DEPLOY] Key verification failed - public key mismatch`);
             throw new Error(`Ephemeral key verification failed. Expected: ${ephemeralPubkey}, Got: ${pubkeyResult.trim()}`);
           } else {
-            console.log(`[DEPLOY_DEBUG] Key verification SUCCESS: ${pubkeyResult.trim()}`);
+            console.log(`[DEPLOY] Ephemeral key verified successfully`);
           }
           
           const anchorTomlCmd = `docker exec ${containerName} bash -c "cat /usr/src/${rootPath}/Anchor.toml || echo 'ANCHOR_TOML_NOT_FOUND'"`;
@@ -1389,9 +1382,8 @@ export async function broadcastSignedTx(
   programId: string,
   encodedTx: string,
 ): Promise<string> {
-  console.log(
-    `[broadcastSignedTx] project ${projectId} signing and relaying for program ${programId}…`,
-  );
+  console.log(`[BROADCAST] Signing and relaying transaction for program ${programId}`);
+  
   // Decode the serialized transaction
   const rawBuffer = Buffer.from(encodedTx, 'base64');
   const tx = Transaction.from(rawBuffer);
@@ -1401,9 +1393,9 @@ export async function broadcastSignedTx(
   try {
     const secretKey = await getProgramSecret(programId);
     signer = Keypair.fromSecretKey(secretKey);
-    console.log(`[broadcastSignedTx] Retrieved program secret key from AWS Secrets Manager for ${programId}`);
+    console.log(`[BROADCAST] Retrieved program key from AWS Secrets Manager`);
   } catch (e: any) {
-    console.log(`[broadcastSignedTx] AWS retrieval failed, falling back to local file: ${e.message}`);
+    console.log(`[BROADCAST] AWS retrieval failed, falling back to local file`);
     // Fallback when AWS disabled or creds invalid
     if (awsSecretsEnabled() && e.message !== 'AWS credentials invalid') {
       throw e;
@@ -1411,15 +1403,15 @@ export async function broadcastSignedTx(
     // Fallback: read the cached keypair JSON written during build
     const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${programId}.json`);
     if (!fs.existsSync(walletPath)) {
-      console.error(`[broadcastSignedTx] ERROR: Program keypair file not found at ${walletPath}`);
+      console.error(`[BROADCAST] Program keypair file not found at ${walletPath}`);
       throw new Error(`Program keypair not found at ${walletPath}`);
     }
     try {
       const secretArr = JSON.parse(fs.readFileSync(walletPath, 'utf-8'));
       signer = Keypair.fromSecretKey(Uint8Array.from(secretArr));
-      console.log(`[broadcastSignedTx] Using locally stored keypair for ${programId}`);
+      console.log(`[BROADCAST] Using locally stored keypair for program`);
     } catch (err: any) {
-      console.error(`[broadcastSignedTx] ERROR: Failed to parse program keypair from ${walletPath}: ${err.message}`);
+      console.error(`[BROADCAST] Failed to parse program keypair from file`);
       throw new Error(`Failed to parse program keypair: ${err.message}`);
     }
   }
@@ -1427,9 +1419,9 @@ export async function broadcastSignedTx(
   // Sign the transaction with the program keypair
   try {
     tx.partialSign(signer);
-    console.log(`[broadcastSignedTx] Successfully signed transaction with program keypair ${programId}`);
+    console.log(`[BROADCAST] Successfully signed transaction with program keypair`);
   } catch (err: any) {
-    console.error(`[broadcastSignedTx] ERROR: Failed to sign transaction with program key: ${err.message}`);
+    console.error(`[BROADCAST] Failed to sign transaction with program key`);
     throw new Error(`Failed to sign transaction with program key: ${err.message}`);
   }
   
@@ -1451,12 +1443,12 @@ export async function broadcastSignedTx(
     }
     
     const conn = new Connection(endpoint, "confirmed");
-    console.log(`[broadcastSignedTx] Broadcasting transaction to Solana devnet...`);
+    console.log(`[BROADCAST] Sending transaction to Solana devnet...`);
     const signature = await sendAndConfirmRawTransaction(conn, tx.serialize());
-    console.log(`[broadcastSignedTx] Transaction confirmed with signature: ${signature}`);
+    console.log(`[BROADCAST] Transaction confirmed with signature: ${signature}`);
     return signature;
   } catch (err: any) {
-    console.error(`[broadcastSignedTx] ERROR: Failed to broadcast transaction: ${err.message}`);
+    console.error(`[BROADCAST] Failed to broadcast transaction: ${err.message}`);
     throw new Error(`Failed to broadcast transaction: ${err.message}`);
   }
 }
@@ -1510,7 +1502,7 @@ export async function signDeployTxAndBroadcast(
     throw new Error('No *-keypair.json files found after global + local search');
   }
   
-  console.log(`[SIGNING] Found ${candidates.length} keypair candidate(s): ${candidates.join(', ')}`);
+  console.log(`[SIGNING] Found ${candidates.length} keypair candidate(s)`);
   
   let programKeypair: Keypair | null = null;
   for (const candidate of candidates) {
@@ -1525,15 +1517,14 @@ export async function signDeployTxAndBroadcast(
       if (Array.isArray(arr) && arr.length === 64) {
         const kp = Keypair.fromSecretKey(Uint8Array.from(arr));
         const pubkey = kp.publicKey.toBase58();
-        console.log(`[SIGNING] Candidate ${candidate} has public key ${pubkey}`);
         if (pubkey === programId) {
-          console.log(`[SIGNING] ✓ Found matching keypair at ${candidate}`);
+          console.log(`[SIGNING] Found matching keypair for program ${programId}`);
           programKeypair = kp;
           break;
         }
       }
     } catch (err) {
-      console.log(`[SIGNING] Error processing ${candidate}: ${err}`);
+      // Silently continue to next candidate
       continue;
     }
   }
@@ -1541,44 +1532,20 @@ export async function signDeployTxAndBroadcast(
     throw new Error(`No keypair matches program ID ${programId} after checking ${candidates.length} candidates`);
   }
   
-  // Log the base64 transaction before decoding
-  console.log(`⚡ TX-BASE64 (Server Received):`, encodedTx);
+  // Log a simplified message about the transaction
+  console.log(`[SIGNING] Received transaction for program ${programId} from project ${projectId}`);
   
   // Decode the partial transaction and add the program signature.
   const raw = Buffer.from(encodedTx, 'base64');
   const transaction = Transaction.from(raw);
   
-  // Log transaction details before signing
-  console.log(`[SIGNING] Transaction before signing:`, {
-    recentBlockhash: transaction.recentBlockhash,
-    feePayer: transaction.feePayer?.toBase58(),
-    signers: transaction.signatures.map(s => ({
-      pubkey: s.publicKey.toBase58(),
-      isSigned: !!s.signature
-    })),
-    instructions: transaction.instructions.map(ix => ({
-      programId: ix.programId.toBase58(),
-      keys: ix.keys.map(k => ({
-        pubkey: k.pubkey.toBase58(),
-        isSigner: k.isSigner,
-        isWritable: k.isWritable
-      }))
-    }))
-  });
+  // Log simplified transaction info
+  console.log(`[SIGNING] Transaction has ${transaction.signatures.length} signatures and ${transaction.instructions.length} instructions`);
   
   transaction.partialSign(programKeypair);
   
-  // Log transaction after signing
-  console.log(`[SIGNING] Transaction after signing:`, {
-    signers: transaction.signatures.map(s => ({
-      pubkey: s.publicKey.toBase58(),
-      isSigned: !!s.signature
-    }))
-  });
-  
-  // Log the fully signed transaction in base64
-  const fullySignedTxBase64 = transaction.serialize().toString('base64');
-  console.log(`⚡ TX-BASE64 (Server Fully Signed):`, fullySignedTxBase64);
+  // Log simplified signing info
+  console.log(`[SIGNING] Transaction signed with program keypair ${programId}`);
   
   /* -----------------------------------------------------------
    * Robust connection helper: fall back to a sane default
@@ -1598,18 +1565,20 @@ export async function signDeployTxAndBroadcast(
   // Broadcast the fully signed transaction.
   const conn = new Connection(endpoint, "confirmed");
   
-  // ── DEBUG ── try a cheap simulation first so we see on‑chain logs
+  // Simulate transaction before sending
   console.log(`[SIGNING] Simulating transaction on ${endpoint}...`);
   const sim = await conn.simulateTransaction(transaction);
-  console.log('[SIGNING] Simulation result:', {
-    err: sim.value.err,
-    unitsConsumed: sim.value.unitsConsumed
-  });
-  console.log('[SIGNING] Simulation logs:', sim.value.logs);
   
   if (sim.value.err) {
-    console.error('[SIGNING] Simulation FAILED →', sim.value.err);
-    throw new Error(`Simulation failed: ${JSON.stringify(sim.value.err)}`);
+    console.error(`[SIGNING] Simulation failed: ${typeof sim.value.err === 'string' ? sim.value.err : 'Transaction error'}`);
+    throw new Error(`Simulation failed: ${typeof sim.value.err === 'string' ? sim.value.err : 'Transaction error'}`);
+  }
+  
+  console.log(`[SIGNING] Simulation successful (${sim.value.unitsConsumed || 0} compute units consumed)`);
+  
+  // Only log the number of log lines, not their content
+  if (sim.value.logs && sim.value.logs.length > 0) {
+    console.log(`[SIGNING] Simulation produced ${sim.value.logs.length} log lines`);
   }
   
   console.log(`[SIGNING] Sending transaction to ${endpoint}...`);
