@@ -18,7 +18,7 @@ export async function insertSrcFiles(
     { node: rootNode },
   ];
 
-  console.log(`[DEBUG_INSERT_SRC] Starting insertion for project: ${projectId}`);
+  console.log(`[INSERT] Starting file insertion for project ${projectId}`);
 
   while (queue.length > 0) {
     const { node } = queue.shift()!;
@@ -27,7 +27,7 @@ export async function insertSrcFiles(
     const projectRelativePath = node.path.replace(/^\.?\//, ''); 
 
     if (node.type === 'directory') {
-      console.log(`[DEBUG_INSERT_SRC] Processing directory: ${projectRelativePath}`);
+      console.log(`[INSERT] Processing directory: ${projectRelativePath}`);
       // ── ensure empty dir is materialised ──
       if (!node.children?.length) {
         await updateOrCreateFile(
@@ -48,13 +48,12 @@ export async function insertSrcFiles(
         }
       }
     } else if (node.type === 'file') {
-      console.log(`[DEBUG_INSERT_SRC] Processing file: ${projectRelativePath}`);
-      // Don't log file content, just log the file size
-      const contentSize = node.code ? Buffer.byteLength(node.code) : 0;
-      console.log(`[DEBUG_INSERT_SRC] File size: ${contentSize} bytes`);
-
+      // Log only file path without content
+      console.log(`[INSERT] Processing file: ${projectRelativePath}`);
+      
+      // Special handling for tsconfig.json
       if (projectRelativePath === "web/tsconfig.json") {
-        console.log("[DEBUG_INSERT_SRC] About to process tsconfig.json - exists in paths?", existingFilePaths.has(projectRelativePath));
+        console.log("[INSERT] Processing tsconfig.json file");
       }
 
       const taskId = await updateOrCreateFile(
@@ -65,11 +64,7 @@ export async function insertSrcFiles(
         creatorId
       );
       if (taskId) {
-        console.log(`[DEBUG_INSERT_SRC] Added taskId ${taskId} for file: ${projectRelativePath}`);
-        
-        if (projectRelativePath === "web/tsconfig.json") {
-          console.log("[DEBUG_INSERT_SRC] taskId for tsconfig.json =", taskId);
-        }
+        console.log(`[INSERT] File task created for: ${projectRelativePath}`);
         
         // stream the file *now* – don't block the queue
         if (onFile) onFile(projectRelativePath, node.code || '');
@@ -79,6 +74,6 @@ export async function insertSrcFiles(
     }
   }
 
-  console.log(`[DEBUG_INSERT_SRC] Completed. Returning ${fileTaskIds.length} task IDs.`);
+  console.log(`[INSERT] Completed file insertion with ${fileTaskIds.length} tasks`);
   return fileTaskIds;
 }

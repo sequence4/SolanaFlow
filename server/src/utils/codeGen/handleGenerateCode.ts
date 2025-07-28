@@ -154,11 +154,7 @@ export const handleGenerateCode = async ({
     /* Dev-mode flag set by dev.sh or CI: container already runs `next dev` */
     const isDevServer = process.env.SF_DEV_SERVER === '1';
 
-    console.log('[GEN] projectId   =', projectId);
-    console.log('[GEN] userId      =', userId);
-    console.log('[GEN] workspace   =', workspace);
-    console.log('[GEN] nodes.len   =', graph.nodes.length);
-    //console.log('[GEN] first node  =', graph.nodes[0]);
+    console.log('[GEN] Starting code generation for project:', projectId);
     
     try {
         // --------------------------------------------------------------------
@@ -184,25 +180,19 @@ export const handleGenerateCode = async ({
           })
           .filter(Boolean) as string[];
 
-        console.log('[GEN] raw snippet count =', functionParts.length);
-        if (functionParts.length) {
-            //console.log('[GEN] first 200 chars of combined code:\n',
-            //    functionParts.join('\n\n').slice(0, 200));
-        }
+        console.log(`[GEN] Processing ${functionParts.length} code snippets from graph nodes`);
 
         if (functionParts.length > 0) functionCode = functionParts.join('\n\n');
-        else console.log('No valid function code found in nodes');
-
-        console.log('DEBUG handleGenerateCode functionCode:', functionCode);
+        else console.log('[GEN] No valid function code found in nodes');
         
         sendProgress({ stage: 'file-tree', message: 'Refreshing file tree…' });
         const fileTreeTaskIds = await refreshWorkspaceTree(projectId, userId);
-        console.log('[GEN] refreshWorkspaceTree triggered, taskIds =', fileTreeTaskIds);
+        console.log('[GEN] File tree refresh initiated');
         sendProgress({ stage: 'file-tree', message: 'Waiting for file-tree refresh…' });
 
         const { succeeded, failed } = await waitForAll(fileTreeTaskIds);
 
-        console.log('[GEN] file-tree tasks done → ok:', succeeded, 'fail:', failed);
+        console.log(`[GEN] File tree tasks completed: ${succeeded.length} succeeded, ${failed.length} failed`);
         sendProgress({
           stage: failed.length ? 'file-tree-failed' : 'file-tree-done',
           message: failed.length
@@ -235,10 +225,6 @@ export const handleGenerateCode = async ({
         ]) {
           existingFilePaths.delete(f);
         }
-        
-        console.log("[GEN] after delete, has package.json?",
-                    existingFilePaths.has("./web/package.json") ||
-                    existingFilePaths.has("web/package.json"));
 
         /* ─────────────────────  A)  stream *existing* web/ directory  ───────────────────── */
         sendProgress({ stage: 'ui-gen', message: 'Streaming existing web/ files…' });
@@ -263,7 +249,7 @@ export const handleGenerateCode = async ({
               content: code, // Include actual content for frontend
             });
             if (path.endsWith('tsconfig.json'))
-              console.log('[GEN] wrote tsconfig');
+              console.log('[GEN] Wrote tsconfig.json file');
           },
         );
 
@@ -445,7 +431,7 @@ EOF'`,
         if (awsSecretsEnabled()) {
           await saveProgramSecret(programId, programKeypair.secretKey);
         } else {
-          console.warn('[handleGenerateCode] AWS secrets disabled – keypair kept only on disk');
+          console.warn('[GEN] AWS secrets disabled – keypair kept only on disk');
         }
 
         // Save the keypair to a file for later use (e.g. Anchor deploy or upgrades)
@@ -523,7 +509,7 @@ EOF'`,
         if (derivedPubkey !== programId) {
           throw new Error('Keypair self-verification failed');
         }
-        console.log('[GEN] Generated deterministic program ID:', programId);
+        console.log('[GEN] Generated program ID:', programId);
 
         /* ──────────────────────────────────────────────────────────────
          * Persist programId inside solanaproject.details.projectState
@@ -557,7 +543,7 @@ EOF'`,
             [JSON.stringify({ lastProgramId: programId }), projectId],
           );
  
-          console.log('[GEN] Program ID persisted to project.details');
+          console.log('[GEN] Program ID saved to database');
           
           // Notify frontend that the programId is now available
           sendProgress({ stage: 'programIdPersisted', programId });
@@ -644,8 +630,7 @@ EOF'`,
          * write the src tree into the workspace
          * --------------------------------------------------------------- */
         sendProgress({ stage: 'src-gen', message: 'Generating Rust sources…' });
-        // Remove the verbose src tree logging to reduce console bloat
-        console.log('[GEN] Generating source tree...');
+        console.log('[GEN] Generating Rust source files');
         
         function writeFilesAndEmitTree(
           rootNode: FileTreeItem,
@@ -672,7 +657,7 @@ EOF'`,
 
             // now it is safe to raise the sentinel
             const sentinelId = await markWriteDone(projectId);
-            console.log('[GEN] write-done sentinel:', sentinelId);
+            console.log('[GEN] Write operations completed, sentinel ID:', sentinelId);
             return sentinelId;
           })();
         }
@@ -691,7 +676,7 @@ EOF'`,
 
 
         // ─────────── Run static lint on Cargo manifests before amending ───────────
-        console.log('[GEN] Running static Cargo.toml linter...');
+        console.log('[GEN] Running Cargo.toml linter');
         lintWorkspaceManifests({ projectId, userId, workspace })
           .then(() =>
             sendProgress({ stage: "lint-done", message: "Cargo manifests validated" }),

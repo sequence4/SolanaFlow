@@ -209,15 +209,13 @@ export async function runDeployPipeline({
                        ".", symlinkTaskId, { skipSuccessUpdate: true });
     }
     
-    console.log("[PIPELINE] ✅ build task", buildTask, "completed");
+    console.log("[PIPELINE] Build task completed successfully");
 
     /* 3b ─ fetch artefact ------------------------------------------------ */
-    //console.log("[PIPELINE] 📦 fetching artefact (.so) from container");
     const { base64So } = await getBuildArtifactTask(projectId);
     if (!base64So) {
       throw new Error('Anchor built with warnings but produced no .so – check build log');
     }
-    //console.log("[PIPELINE] 📦 artefact length:", base64So.length);
     
     /* ---------------------------------------------------------------- *
      * 3c ─ build finished → gather file-tree with eager code
@@ -367,7 +365,7 @@ export async function runDeployPipeline({
     };
     
     findIdls(fileTree);
-    console.log(`[pipeline] Found ${idls.length} IDLs`);
+    console.log(`[PIPELINE] Found ${idls.length} IDL file(s)`);
     
     /* ──────────────────────────────────────────────────────────────
      * Patch   idl.metadata.address  →  compiled program public key
@@ -383,12 +381,12 @@ export async function runDeployPipeline({
           ...(idlContent.metadata ?? {}),
           address: programId,
         };
-        console.log(`[pipeline] Patched IDL metadata.address → ${programId}`);
+        console.log(`[PIPELINE] Updated IDL metadata with program ID: ${programId}`);
 
         /* ---------- ensure the front-end sees the Program ID ---------- */
         try {
           await writeProgramIdEnv(programId, absRoot);
-          console.log(`[pipeline] Program ID written to .env file`);
+          console.log(`[PIPELINE] Program ID written to .env file`);
 
           /* ----------------------------------------------------------
            * The file change happens *after* the Next.js dev server
@@ -402,17 +400,17 @@ export async function runDeployPipeline({
               uuidv4(),               // fresh task-ID
               { skipSuccessUpdate: true }   // don't spam progress
             );
-            console.log("[pipeline] Restarted container to reload env vars");
+            console.log("[PIPELINE] Restarted container to reload environment variables");
           } catch (restartErr) {
             console.warn(
-              `[pipeline] Could not restart container: ${restartErr}`
+              `[PIPELINE] Could not restart container: ${restartErr}`
             );
           }
         } catch (envErr) {
-          console.warn(`[pipeline] Failed to write .env(.local): ${envErr}`);
+          console.warn(`[PIPELINE] Failed to write .env(.local): ${envErr}`);
         }
       } catch (err) {
-        console.warn(`[pipeline] Could not patch metadata.address automatically: ${err}`);
+        console.warn(`[PIPELINE] Could not patch metadata.address automatically: ${err}`);
       }
     }
     
@@ -440,7 +438,7 @@ export async function runDeployPipeline({
      * ---------------------------------------------------------------- */
     if (workspace) {
       await markContainerForCleanup(projectId, workspace.containerName);
-      console.log(`[pipeline] queued ${workspace.containerName} for later cleanup`);
+      console.log(`[PIPELINE] Container ${workspace.containerName} queued for later cleanup`);
     }
     
     // Clear keep-alive interval
