@@ -146,16 +146,57 @@ export async function deployWithEphemeralKey(
   // Debug: print the RPC endpoint and wallet used for deployment. These logs
   // help diagnose mismatched RPCs between Phantom and our client.
   // --------------------------------------------------------------------------
+  // Extract the RPC endpoint for both debugging and cluster-check
+  const endpoint = (() => {
+    try {
+      // rpcEndpoint is private on Connection in @solana/web3.js; use fallback.
+      return (connection as any).rpcEndpoint ??
+        (connection as any)._rpcEndpoint ??
+        undefined;
+    } catch (e) {
+      return undefined;
+    }
+  })();
+  
   try {
-    // rpcEndpoint is private on Connection in @solana/web3.js; use fallback.
-    const endpoint =
-      (connection as any).rpcEndpoint ??
-      (connection as any)._rpcEndpoint ??
-      undefined;
     console.log('[DEBUG] RPC endpoint:', endpoint);
     console.log('[DEBUG] Wallet public key:', walletPublicKey.toBase58());
   } catch (e) {
     // ignore failures; debug logging only
+  }
+
+  /** -------------------------------------------------------------------
+   * 🔒 Cluster‑mismatch guard
+   * --------------------------------------------------------------------
+   * If Phantom is on *mainnet‑beta* while our Connection hits *devnet*
+   * (or the opposite), **every** transaction will revert during the
+   * wallet‑side simulation with the classic
+   *   "attempt to debit an account but found no prior credit"
+   * error.  Detect that early and abort with a clear message.
+   * ------------------------------------------------------------------*/
+  try {
+    /* `@solana/wallet‑adapter` ≥ 0.27 exposes `adapter.network`
+       (`'mainnet-beta' | 'testnet' | 'devnet'`).                     */
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore – runtime guard for older adapters
+    const walletCluster: string | undefined = wallet?.adapter?.network;
+
+    const connCluster =
+      endpoint?.includes('devnet')
+        ? 'devnet'
+        : endpoint?.includes('testnet')
+        ? 'testnet'
+        : 'mainnet-beta';
+
+    if (walletCluster && walletCluster !== connCluster) {
+      throw new Error(
+        `Wallet is on **${walletCluster}** but RPC endpoint points to ` +
+        `**${connCluster}**.  Switch Phantom to *${connCluster}* (or ` +
+        `create the Connection against ${walletCluster}) before deploying.`,
+      );
+    }
+  } catch (err) {
+    console.warn('[CLUSTER‑CHECK] could not determine wallet cluster:', err);
   }
   const signatures: string[] = [];
   let programId: PublicKey | null = null;
