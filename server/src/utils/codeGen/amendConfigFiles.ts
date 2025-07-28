@@ -45,7 +45,7 @@ async function startListDirTask(
       
       if (containerName) {
         try {
-          console.log(`Listing directory ${dirPath} from container ${containerName}`);
+          console.log(`[AMEND] Listing directory ${dirPath}`);
           const lsCmd = `docker exec ${containerName} find /usr/src/${projectRootPath}/${dirPath} -maxdepth 1 -mindepth 1 -printf '%y %f\\n'`;
           const output = await runCommand(lsCmd, '.', taskId, { skipSuccessUpdate: true });
           
@@ -342,9 +342,7 @@ async function patchProgramCargoToml(
   const newCargo = cargoLines.join('\n');
   
   // Log preview of the outgoing Cargo.toml
-  console.log('\n──── outgoing Cargo.toml preview ────\n' +
-    newCargo.split('\n').slice(0, 30).join('\n') +
-    '\n─────────────────────────────────────\n');
+  console.log('[AMEND] Updated Cargo.toml content');
   
   console.log(`[AMEND] Writing to workspace-relative path: ${cargoPath}`);
   const taskId = await startUpdateFileTask(projectId, cargoPath, newCargo, userId);

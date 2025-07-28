@@ -121,7 +121,7 @@ export function getLibRsTemplate(
     fileDetails: LibFileDetail[],
     hasState: boolean = false
   ): string {
-    console.log("Lib fileDetails", fileDetails);
+    console.log("[TEMPLATE] Generated file details");
   
     const programFunctions = fileDetails
       .map(({ instruction_name, context, params }) => {

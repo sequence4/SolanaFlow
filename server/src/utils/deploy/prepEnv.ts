@@ -84,7 +84,7 @@ export async function prepEnv(
       }
       containerUrl = container.containerUrl;
     } catch (err: any) {
-      console.error('[prepEnv] Cold-start failed:', err.message);
+      console.error('[ENV] Container cold-start failed');
       throw new Error(`Container creation failed: ${err.message}`);
     }
   }
@@ -124,7 +124,7 @@ export async function prepEnv(
     // ─── bootstrap workspace if Cargo.toml is missing ──────────────────────
     const hasCargo = await folderExists(containerName, `${projectDir}/Cargo.toml`);
     if (!hasCargo) {
-      console.log(`[prepEnv] Bootstrapping workspace in ${projectDir}`);
+      console.log(`[ENV] Bootstrapping workspace in container`);
 
       // ─── thin-copy constants ────────────────────────────────────────────────
       const FREE_BYTES_NEEDED = 500 * 1024 * 1024;      // 500 MB safety margin
@@ -133,7 +133,7 @@ export async function prepEnv(
       try {
         hasRoom = getWorkspaceFreeBytes(containerName) >= FREE_BYTES_NEEDED;
       } catch (e) {
-        console.warn("[prepEnv] free-space probe failed:", e);
+        console.warn("[ENV] Free space check failed");
         hasRoom = false;           // default to safe path
       }
 
@@ -151,10 +151,10 @@ export async function prepEnv(
           );
           copied = true;
         } catch (copyErr) {
-          console.warn("[prepEnv] Template copy failed, will fall back to anchor init:", copyErr);
+          console.warn("[ENV] Template copy failed, falling back to anchor init");
         }
       } else {
-        console.warn("[prepEnv] Workspace almost full – skipping template copy");
+        console.warn("[ENV] Workspace almost full - skipping template copy");
       }
 
       if (!copied) {
@@ -174,63 +174,56 @@ export async function prepEnv(
       const probeTaskId = uuidv4();
       
       // 1) show container status
-      console.time('[probe-status]');
       const psOutput = await runCommand(
         `docker ps --filter "name=${containerName}" --format "{{.Names}}|{{.Status}}"`,
         '.',
         probeTaskId,
         { skipSuccessUpdate: true }
       );
-      console.timeEnd('[probe-status]');
-      console.log(`[ENV] container ${containerName} status:`, psOutput.trim());
+      console.log(`[ENV] Container status: ${psOutput.trim()}`);
 
       // 2) check solana / anchor versions inside
-      console.time('[probe-solana]');
       const solanaVer = await runCommand(
         `docker exec ${containerName} solana --version`,
         '.',
         probeTaskId,
         { skipSuccessUpdate: true }
       );
-      console.timeEnd('[probe-solana]');
       
-      console.time('[probe-anchor]');
       const anchorVer = await runCommand(
         `docker exec ${containerName} anchor --version`,
         '.',
         probeTaskId,
         { skipSuccessUpdate: true }
       );
-      console.timeEnd('[probe-anchor]');
-      console.log('[ENV] solana:', solanaVer.trim(), '| anchor:', anchorVer.trim());
+      console.log('[ENV] Toolchain: Solana and Anchor verified');
 
       // 3) quick rust+cargo sanity
-      console.time('[probe-rustc]');
       const rustcVer = await runCommand(
         `docker exec ${containerName} rustc --version`,
         '.',
         probeTaskId,
         { skipSuccessUpdate: true }
       );
-      console.timeEnd('[probe-rustc]');
       
-      console.time('[probe-cargo]');
       const cargoVer = await runCommand(
         `docker exec ${containerName} cargo --version`,
         '.',
         probeTaskId,
         { skipSuccessUpdate: true }
       );
-      console.timeEnd('[probe-cargo]');
-      console.log('[ENV] rustc:', rustcVer.trim(), '| cargo:', cargoVer.trim());
+      console.log('[ENV] Rust toolchain verified');
     } catch (probeErr) {
-      console.warn('[ENV] health-probe failed:', probeErr);
+      console.warn('[ENV] Environment health check failed');
     }
     // ────────────────────────────────────────────────────────────
 
     return { rootPath, containerName, containerUrl };
   } catch (err) {
-    if (rented) await releaseContainerToPool(rented.name);
+    if (rented) {
+      await releaseContainerToPool(rented.name);
+      console.log('[ENV] Released container back to pool due to error');
+    }
     throw err;
   }
 }
