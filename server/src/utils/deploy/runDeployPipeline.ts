@@ -305,7 +305,8 @@ export async function runDeployPipeline({
     
     // Modify attachFileContents to skip adding content to the tree nodes
     const skipContentAttachment = true;
-    await attachFileContents(rawTree, absRoot, workspace.containerName, skipContentAttachment);
+    const skipLogging = true; // Don't log file contents to console
+    await attachFileContents(rawTree, absRoot, workspace.containerName, skipContentAttachment, skipLogging);
     const fileTree = rawTree;  // now populated
 
     /* Program ID was determined pre-build */

@@ -144,7 +144,6 @@ export const codeInjection = {
           const finalPath = getDestinationFolder(originalPath);
           
           console.log(`Creating file: ${finalPath} (originally ${originalPath})`);
-          console.log(`File content length: ${file.content?.length || 0} characters`);
           
           if (!file.content) {
             console.warn(`Warning: Empty content for file ${finalPath}`);

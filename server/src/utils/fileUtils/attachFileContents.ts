@@ -17,16 +17,18 @@ const BIN_PATTERN = /\.(png|jpe?g|gif|ico|wasm|so|ttf|woff2?)$/i;
  * @param absRoot Absolute path to the root directory
  * @param containerName Optional container name for docker operations
  * @param skipContent If true, will not attach file contents to reduce console bloat
+ * @param skipLogging If true, will not log file contents to console (default: true)
  */
 export async function attachFileContents(
   nodes: FileNode[],
   absRoot: string,
   containerName?: string,
-  skipContent?: boolean
+  skipContent?: boolean,
+  skipLogging: boolean = true
 ): Promise<void> {
   for (const node of nodes) {
     if (node.type === "directory" && node.children) {
-      await attachFileContents(node.children, absRoot, containerName, skipContent);
+      await attachFileContents(node.children, absRoot, containerName, skipContent, skipLogging);
       continue;
     }
 
@@ -50,6 +52,11 @@ export async function attachFileContents(
         node.content = `<${Buffer.byteLength(text)} bytes omitted>`;
       } else {
         node.content = text;
+        
+        // Log file path but not content
+        if (!skipLogging) {
+          console.log(`[attachFileContents] Attached content for ${node.path} (${Buffer.byteLength(text)} bytes)`);
+        }
       }
     } catch (err: any) {
       // Host path not present ➜ pull it straight from the workspace container
@@ -67,6 +74,11 @@ export async function attachFileContents(
       }
 
       node.content = await readFileFromContainer(containerName, dockerPath);
+      
+      // Log file path but not content
+      if (!skipLogging) {
+        console.log(`[attachFileContents] Attached content for ${node.path} from container (${Buffer.byteLength(node.content)} bytes)`);
+      }
     }
   }
 }
