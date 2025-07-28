@@ -219,7 +219,7 @@ export function genSrcFiles(
 
     return srcDir;
   } catch (error) {
-    console.error("Error in genSrcFiles:", error);
+    console.error("[GEN] Failed to generate source files");
     return null;
   }
 }
