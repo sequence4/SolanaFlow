@@ -1540,10 +1540,46 @@ export async function signDeployTxAndBroadcast(
   if (!programKeypair) {
     throw new Error(`No keypair matches program ID ${programId} after checking ${candidates.length} candidates`);
   }
+  
+  // Log the base64 transaction before decoding
+  console.log(`⚡ TX-BASE64 (Server Received):`, encodedTx);
+  
   // Decode the partial transaction and add the program signature.
   const raw = Buffer.from(encodedTx, 'base64');
   const transaction = Transaction.from(raw);
+  
+  // Log transaction details before signing
+  console.log(`[SIGNING] Transaction before signing:`, {
+    recentBlockhash: transaction.recentBlockhash,
+    feePayer: transaction.feePayer?.toBase58(),
+    signers: transaction.signatures.map(s => ({
+      pubkey: s.publicKey.toBase58(),
+      isSigned: !!s.signature
+    })),
+    instructions: transaction.instructions.map(ix => ({
+      programId: ix.programId.toBase58(),
+      keys: ix.keys.map(k => ({
+        pubkey: k.pubkey.toBase58(),
+        isSigner: k.isSigner,
+        isWritable: k.isWritable
+      }))
+    }))
+  });
+  
   transaction.partialSign(programKeypair);
+  
+  // Log transaction after signing
+  console.log(`[SIGNING] Transaction after signing:`, {
+    signers: transaction.signatures.map(s => ({
+      pubkey: s.publicKey.toBase58(),
+      isSigned: !!s.signature
+    }))
+  });
+  
+  // Log the fully signed transaction in base64
+  const fullySignedTxBase64 = transaction.serialize().toString('base64');
+  console.log(`⚡ TX-BASE64 (Server Fully Signed):`, fullySignedTxBase64);
+  
   /* -----------------------------------------------------------
    * Robust connection helper: fall back to a sane default
    * and fail early if the URL is malformed.
@@ -1563,14 +1599,22 @@ export async function signDeployTxAndBroadcast(
   const conn = new Connection(endpoint, "confirmed");
   
   // ── DEBUG ── try a cheap simulation first so we see on‑chain logs
+  console.log(`[SIGNING] Simulating transaction on ${endpoint}...`);
   const sim = await conn.simulateTransaction(transaction);
-  console.log('SIM logs:', sim.value.logs);
+  console.log('[SIGNING] Simulation result:', {
+    err: sim.value.err,
+    unitsConsumed: sim.value.unitsConsumed
+  });
+  console.log('[SIGNING] Simulation logs:', sim.value.logs);
+  
   if (sim.value.err) {
-    console.error('Simulation FAILED →', sim.value.err);
+    console.error('[SIGNING] Simulation FAILED →', sim.value.err);
     throw new Error(`Simulation failed: ${JSON.stringify(sim.value.err)}`);
   }
   
+  console.log(`[SIGNING] Sending transaction to ${endpoint}...`);
   const sig = await sendAndConfirmRawTransaction(conn, transaction.serialize());
+  console.log(`[SIGNING] Transaction confirmed with signature: ${sig}`);
   return sig;
 }
 

@@ -599,22 +599,33 @@ export const deployProject = async (
   try {
     const { id: projectId } = req.params;
     const { walletPubkey }  = req.body;                  // sent by ProgramDeployer
+    
+    console.log(`[DEPLOY] Starting deployment for project ${projectId} with wallet ${walletPubkey}`);
+    
     if (!walletPubkey) {
       return next(new AppError('walletPubkey missing', 400));
     }
 
     /* ① fetch artefact (base‑64) and secret key */
+    console.log(`[DEPLOY] Fetching build artifact for project ${projectId}`);
     const { base64So } = await getBuildArtifactTask(projectId);           // 259 kB string
+    console.log(`[DEPLOY] Retrieved build artifact, size: ${base64So.length} characters`);
+    
     // For now, simulate getting the secret from AWS - in a real implementation,
     // this would call getProgramSecret(projectId) from awsSecrets
     const secretArr = new Uint8Array(64); // Placeholder for the actual secret
     const soBytes = Uint8Array.from(atob(base64So), c => c.charCodeAt(0)).buffer;
+    console.log(`[DEPLOY] Converted base64 to binary, size: ${soBytes.byteLength} bytes`);
 
     /* ② run deployWithEphemeralKey on the server */
-    const connection = new Connection(process.env.SOLANA_RPC_URL!, 'confirmed');
+    const endpoint = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
+    console.log(`[DEPLOY] Using RPC endpoint: ${endpoint}`);
+    
+    const connection = new Connection(endpoint, 'confirmed');
     const feePayer = Keypair.fromSecretKey(
       Uint8Array.from(JSON.parse(process.env.SERVER_FEE_PAYER!))
     );
+    console.log(`[DEPLOY] Using server fee payer: ${feePayer.publicKey.toBase58()}`);
 
     // In a real implementation, this would use the imported deployWithEphemeralKey
     // but for now just simulate the result to avoid linter errors
@@ -642,6 +653,9 @@ export const deployProject = async (
       });
     */
 
+    console.log(`[DEPLOY] Deployment completed successfully for project ${projectId}`);
+    console.log(`[DEPLOY] Program ID: ${programId.toBase58()}, Signatures: ${signatures.join(', ')}`);
+    
     res.json({ success, programId: programId.toBase58(), signatures, warning });
   } catch (err: any) {
     console.error('[deployProject] failed:', err);
