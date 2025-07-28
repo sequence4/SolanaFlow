@@ -57,23 +57,23 @@ export async function ensureAnchorTomlProgram(
     let changed = false;
     // Only set program ID if not using placeholder on non-localnet clusters
     if (programId === '11111111111111111111111111111111' && cluster !== 'localnet') {
-      console.log(`[ENSURE_CONFIG] Skipping program ID for ${cluster}: will use new key at deploy time`);
+      //console.log(`[ENSURE_CONFIG] Skipping program ID for ${cluster}: will use new key at deploy time`);
     } else {
       if (clusterPrograms[programName] !== programId) {
         clusterPrograms[programName] = programId;
         changed = true;
-        console.log(`[ENSURE_CONFIG] Anchor.toml: Setting ${programsClusterKey}.${programName} = ${programId}`);
+        //console.log(`[ENSURE_CONFIG] Anchor.toml: Setting ${programsClusterKey}.${programName} = ${programId}`);
       }
     }
 
     if (changed) {
-      console.log(`[ENSURE_CONFIG] Updating ${anchorTomlPath}`);
+      //console.log(`[ENSURE_CONFIG] Updating ${anchorTomlPath}`);
       await updateFile(ws, anchorTomlPath, iarnaTomlStringify(parsedToml), projectId, creatorId);
     } else {
-      console.log(`[ENSURE_CONFIG] ${anchorTomlPath} already up-to-date for program ${programName}.`);
+      //console.log(`[ENSURE_CONFIG] ${anchorTomlPath} already up-to-date for program ${programName}.`);
     }
   } catch (error) {
-    console.error(`[ENSURE_CONFIG] Error processing ${anchorTomlPath}:`, error);
+    //console.error(`[ENSURE_CONFIG] Error processing ${anchorTomlPath}:`, error);
   }
 }
 
@@ -106,7 +106,7 @@ export async function ensureRootWorkspaceMembers(
   const cargoTomlPath = 'Cargo.toml';
   const cargoTomlContent = await getFileContent(ws, cargoTomlPath, projectId, creatorId);
   if (cargoTomlContent === null) {
-    console.error(`[ENSURE_CONFIG] Could not read ${cargoTomlPath}.`);
+    //console.error(`[ENSURE_CONFIG] Could not read ${cargoTomlPath}.`);
     return;
   }
   
@@ -153,7 +153,7 @@ export async function ensureRootWorkspaceMembers(
     rootLines.splice(wsIdx + 1, 0, ...newMembersBlock);
   }
   
-  console.log('[ENSURE_CONFIG] Cargo.toml: updated workspace.members with multi-line format');
+  //console.log('[ENSURE_CONFIG] Cargo.toml: updated workspace.members with multi-line format');
   
   // --- 4. write back modified content --------------------------------------
   await updateFile(ws, cargoTomlPath, rootLines.join('\n'), projectId, creatorId);

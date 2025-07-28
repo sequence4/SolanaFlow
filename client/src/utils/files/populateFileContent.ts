@@ -10,7 +10,7 @@ export async function populateFileContent(
   const fileContentTaskIds: string[] = [];
 
   const processNode = async (node: FileTreeItemType): Promise<void> => {
-    console.debug(`[populateFileContent] Checking node: ${node.path}, type=${node.type}`);
+    //console.debug(`[populateFileContent] Checking node: ${node.path}, type=${node.type}`);
 
     if (node.type === 'file') {
       try {
@@ -27,24 +27,24 @@ export async function populateFileContent(
         while (content === null && attempts < maxAttempts) {
           attempts++;
           try {
-            console.debug(`[populateFileContent] Attempt #${attempts} for ${node.path}`);
+            //console.debug(`[populateFileContent] Attempt #${attempts} for ${node.path}`);
             const response = await fileApi.getFileContent(projectId, node.path || '');
             const { taskId } = response;
             
             if (taskId) {
-              console.debug(`[populateFileContent] Adding taskId ${taskId} for file ${node.path}`);
+              //console.debug(`[populateFileContent] Adding taskId ${taskId} for file ${node.path}`);
               fileContentTaskIds.push(taskId);
             }
             
             try {
               content = await pollTaskStatus2<string>(taskId);
               node.code = content;
-              console.debug(`[populateFileContent] Loaded content for ${node.path} on attempt #${attempts}`);
+              //console.debug(`[populateFileContent] Loaded content for ${node.path} on attempt #${attempts}`);
             } catch (pollError) {
               console.error(`[populateFileContent] Error polling content for ${node.path} (attempt ${attempts}):`, pollError);
               
               if (attempts < maxAttempts) {
-                console.log(`Waiting before retry for ${node.path}...`);
+                //console.log(`Waiting before retry for ${node.path}...`);
                 await new Promise(resolve => setTimeout(resolve, 1000));
               } else {
                 node.code = `// Error: Could not load file content after ${maxAttempts} attempts.\n// The file may not exist in the container yet.\n// Path: ${node.path}`;
@@ -54,7 +54,7 @@ export async function populateFileContent(
             console.error(`[populateFileContent] Error fetching file ${node.path} (attempt ${attempts}):`, error);
             
             if (attempts < maxAttempts) {
-              console.log(`Waiting before retry for ${node.path}...`);
+              //console.log(`Waiting before retry for ${node.path}...`);
               await new Promise(resolve => setTimeout(resolve, 1000));
             } else {
               node.code = `// Error: Could not load file content after ${maxAttempts} attempts\n// Path: ${node.path}`;
@@ -76,6 +76,6 @@ export async function populateFileContent(
     await processNode(node);
   }
 
-  console.debug(`[populateFileContent] Collected ${fileContentTaskIds.length} file content task IDs`);
+  //console.debug(`[populateFileContent] Collected ${fileContentTaskIds.length} file content task IDs`);
   return fileContentTaskIds;
 }

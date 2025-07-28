@@ -145,14 +145,14 @@ async function findProgramManifests(
         return manifestPaths;
       }
     } catch (error) {
-      console.warn(`[LINT] Error finding Cargo.toml files via docker exec:`, error);
+      //console.warn(`[LINT] Error finding Cargo.toml files via docker exec:`, error);
       // Continue to next fallback
     }
     
     // Final fallback: Just return programs/*/Cargo.toml for amendConfigFiles to find
     return ['programs/*/Cargo.toml'];
   } catch (error) {
-    console.error('[LINT] Error finding program manifests:', error);
+    //console.error('[LINT] Error finding program manifests:', error);
     throw new Error(`Failed to find program manifests: ${error}`);
   }
 }
@@ -359,13 +359,13 @@ export async function lintWorkspaceManifests(
       const rootIssues = validateManifest(rootContent, rootPath, true);
       issues.push(...rootIssues);
     } catch (error) {
-      console.warn(`[LINT] Error reading root Cargo.toml: ${error}`);
+      //console.warn(`[LINT] Error reading root Cargo.toml: ${error}`);
       issues.push(`Failed to read ${rootPath}: ${error}`);
     }
     
     // Find all program Cargo.toml files
     const programManifests = await findProgramManifests(projectId, userId, { projectId, userId, workspace });
-    console.log(`[LINT] Found ${programManifests.length} program manifests to check`);
+    //console.log(`[LINT] Found ${programManifests.length} program manifests to check`);
     
     // Validate each program Cargo.toml
     for (const manifestPath of programManifests) {
@@ -374,7 +374,7 @@ export async function lintWorkspaceManifests(
         const manifestIssues = validateManifest(content, manifestPath, false);
         issues.push(...manifestIssues);
       } catch (error) {
-        console.warn(`[LINT] Error reading ${manifestPath}: ${error}`);
+        //console.warn(`[LINT] Error reading ${manifestPath}: ${error}`);
         issues.push(`Failed to read ${manifestPath}: ${error}`);
       }
     }
@@ -384,9 +384,9 @@ export async function lintWorkspaceManifests(
       throw new Error(`Cargo manifest validation found ${issues.length} issues`);
     }
     
-    console.log('[LINT] All Cargo manifests passed validation');
+    //console.log('[LINT] All Cargo manifests passed validation');
   } catch (error) {
-    console.warn('[LINT] Validation warning:', error);
+    //console.warn('[LINT] Validation warning:', error);
     throw error;
   }
 } 
