@@ -11,9 +11,9 @@ export interface Step {
 }
 
 const INITIAL: Step[] = [
-  { id: 0, stage: "environment", title: "Environment", description: "", status: "pending" },
-  { id: 1, stage: "code-gen"   , title: "Code gen"   , description: "", status: "pending" },
-  { id: 2, stage: "build"      , title: "Build"      , description: "", status: "pending" },
+  { id: 0, stage: "environment", title: "Environment Setup", description: "", status: "pending" },
+  { id: 1, stage: "code-gen"   , title: "Code Generation"   , description: "", status: "pending" },
+  { id: 2, stage: "build"      , title: "Program Build"      , description: "", status: "pending" },
 ];
 
 export function useChecklistProgress() {
