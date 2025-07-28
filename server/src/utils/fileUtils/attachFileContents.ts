@@ -32,10 +32,13 @@ export async function attachFileContents(
       continue;
     }
 
-    // Skip content attachment if skipContent is true
-    if (skipContent) {
-      node.content = "<content omitted>";
-      continue;
+    // Skip content attachment in logs only, but still keep it for the frontend
+    if (skipContent && skipLogging) {
+      // Just for logging purposes, don't actually skip the content
+      if (!skipLogging) {
+        console.log(`[attachFileContents] Skipping content logging for ${node.path}`);
+      }
+      // We continue with the normal flow to attach the actual content
     }
 
     // Skip if binary-looking or already too large

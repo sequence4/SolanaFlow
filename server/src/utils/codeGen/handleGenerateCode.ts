@@ -128,11 +128,11 @@ async function waitForAll(taskIds: string[]): Promise<{
 
 /** Helper to emit progress event when each file is written */
 const emitFileWritten = (sendProgress: (data: unknown) => void): ((path: string, content: string) => void) => (path, content) => {
-  // Only send the path without content to reduce console bloat
+  // Include content for frontend but avoid logging it to console
   sendProgress({
     event: 'file-written',
     path,
-    // content omitted to reduce console bloat
+    content, // Include actual content for frontend
   });
 };
 
@@ -260,7 +260,7 @@ export const handleGenerateCode = async ({
             sendProgress({ 
               event: 'file-written', 
               path,
-              // content omitted to reduce console bloat
+              content: code, // Include actual content for frontend
             });
             if (path.endsWith('tsconfig.json'))
               console.log('[GEN] wrote tsconfig');
@@ -666,9 +666,9 @@ EOF'`,
             const rootBase = process.env.ROOT_FOLDER!;
             const absRoot  = path.join(rootBase, workspace.rootPath);
             const tinyTree = [rootNode];
-            // Skip content attachment to reduce console bloat
-            const skipContent = true;
-            await attachFileContents(tinyTree, absRoot, workspace.containerName, skipContent);
+            // Include real content for frontend but skip logging to console
+            const skipContentLogging = true;
+            await attachFileContents(tinyTree, absRoot, workspace.containerName, false, skipContentLogging);
 
             // now it is safe to raise the sentinel
             const sentinelId = await markWriteDone(projectId);

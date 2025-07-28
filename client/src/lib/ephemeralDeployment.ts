@@ -348,11 +348,7 @@ export async function deployWithEphemeralKey(
       }),
     );
     
-    // NEW ➜ the created account (bufferKp) must sign this tx;
-    // without it the simulator returns "signature verification failed".
-    fundingTx.partialSign(bufferKp);
-    
-    // 2.2 Get a fresh blockhash
+    /* ---------- 2.2 Get a fresh block‑hash ---------- */
     const blockHashInfo = await connection.getLatestBlockhash('confirmed');
     const blockhash = blockHashInfo.blockhash;
     const lastValidBlockHeight = blockHashInfo.lastValidBlockHeight;
@@ -361,9 +357,14 @@ export async function deployWithEphemeralKey(
     console.log('[DEBUG] fundingTx blockhash', blockhash, 'lastValidBlockHeight', lastValidBlockHeight);
     
     fundingTx.recentBlockhash = blockhash;
-    fundingTx.feePayer = walletPublicKey;
-    
-    // 2.3 Have the wallet sign the funding transaction
+    fundingTx.feePayer        = walletPublicKey;
+
+    /* ---------- 2.3 NOW sign with the new account ----------
+       Do it *after* recentBlockhash & fee‑payer are set so the
+       signature stays valid for Phantom's simulation.           */
+    fundingTx.partialSign(bufferKp);
+
+    // 2.4 Have the wallet sign the funding transaction
     const signedFundingTx = await wallet.signTransaction(fundingTx);
     
     // Add logging to show the base64 transaction
