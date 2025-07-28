@@ -702,6 +702,12 @@ export async function deployWithEphemeralKey(
         };
       } else if (programKeypair) {
         /* Local secret available → sign with it right here */
+        // ------------------------------------------------------------------
+        // 🔑 SIGN THE DEPLOY TX – both the buffer authority *and* the new
+        //     program account must sign before simulation & sending.
+        // ------------------------------------------------------------------
+        deployTx.sign(bufferKp, programKeypair);
+
         // Simulate the transaction first to catch any potential issues
         // ── DEBUG ── print all account keys & signer status
         const msg = deployTx.compileMessage();
