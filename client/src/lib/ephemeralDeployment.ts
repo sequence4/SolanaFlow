@@ -348,53 +348,15 @@ export async function deployWithEphemeralKey(
       }),
     );
     
-    /* ---------- 2.2 Get a fresh block‑hash ---------- */
-    const blockHashInfo = await connection.getLatestBlockhash('confirmed');
-    const blockhash = blockHashInfo.blockhash;
-    const lastValidBlockHeight = blockHashInfo.lastValidBlockHeight;
-
-    // Debug: show the blockhash used for the funding transaction
-    console.log('[DEBUG] fundingTx blockhash', blockhash, 'lastValidBlockHeight', lastValidBlockHeight);
-    
-    fundingTx.recentBlockhash = blockhash;
-    fundingTx.feePayer        = walletPublicKey;
-
-    /* ---------- 2.3 NOW sign with the new account ----------
-       Do it *after* recentBlockhash & fee‑payer are set so the
-       signature stays valid for Phantom's simulation.           */
+    // Let Phantom fetch the block‑hash, add its own signature,
+    // simulate, *and* submit — all in one go.
     fundingTx.partialSign(bufferKp);
 
-    // 2.4 Have the wallet sign the funding transaction
-    const signedFundingTx = await wallet.signTransaction(fundingTx);
+    const fundingSig = await wallet.sendTransaction(fundingTx, connection, {
+      skipPreflight: true,          // we still trust our own local simulate
+    });
     
-    // Add logging to show the base64 transaction
-    const fundingTxBase64 = signedFundingTx.serialize().toString('base64');
-    console.log('⚡ TX-BASE64 (Funding):', fundingTxBase64);
-
-    // ------------------------------------------------------------------------
-    // Debug: simulate the funding transaction locally to surface any errors
-    // before it hits the network. Logs are truncated to the first 10 entries.
-    // ------------------------------------------------------------------------
-    try {
-      const fundingSim = await connection.simulateTransaction(signedFundingTx);
-      console.log(
-        '[SIM-FUNDING] err',
-        fundingSim.value.err,
-        'logs',
-        fundingSim.value.logs?.slice(0, 10),
-      );
-    } catch (err) {
-      console.error('[SIM-FUNDING] simulation failed:', err);
-    }
-    
-    // 2.4 Send and confirm the funding transaction
-    const fundingSig = await connection.sendRawTransaction(
-      signedFundingTx.serialize(),
-      SEND_NO_PREFLIGHT // skip Phantom's pre‑flight simulation
-    );
     signatures.push(fundingSig);
-    
-    // Confirm by signature only to avoid TransactionExpiredBlockheightExceededError
     await connection.confirmTransaction(fundingSig, 'confirmed');
     
     console.log(`[EPHEMERAL_DEPLOY] Funded ephemeral key with ${totalNeeded} lamports`);
