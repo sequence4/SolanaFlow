@@ -303,7 +303,9 @@ export async function runDeployPipeline({
 
     /* ---- host copy removed: program ID is read in-container below ---- */
     
-    await attachFileContents(rawTree, absRoot, workspace.containerName);
+    // Modify attachFileContents to skip adding content to the tree nodes
+    const skipContentAttachment = true;
+    await attachFileContents(rawTree, absRoot, workspace.containerName, skipContentAttachment);
     const fileTree = rawTree;  // now populated
 
     /* Program ID was determined pre-build */

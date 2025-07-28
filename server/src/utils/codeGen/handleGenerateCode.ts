@@ -128,10 +128,11 @@ async function waitForAll(taskIds: string[]): Promise<{
 
 /** Helper to emit progress event when each file is written */
 const emitFileWritten = (sendProgress: (data: unknown) => void): ((path: string, content: string) => void) => (path, content) => {
+  // Only send the path without content to reduce console bloat
   sendProgress({
     event: 'file-written',
     path,
-    content,
+    // content omitted to reduce console bloat
   });
 };
 
@@ -256,9 +257,13 @@ export const handleGenerateCode = async ({
           existingFilePaths,
           creatorId,
           (path, code) => {
-            sendProgress({ event: 'file-written', path, content: code });
+            sendProgress({ 
+              event: 'file-written', 
+              path,
+              // content omitted to reduce console bloat
+            });
             if (path.endsWith('tsconfig.json'))
-              console.log('[GEN] wrote tsconfig', code.slice(0, 40));
+              console.log('[GEN] wrote tsconfig');
           },
         );
 
@@ -639,7 +644,8 @@ EOF'`,
          * write the src tree into the workspace
          * --------------------------------------------------------------- */
         sendProgress({ stage: 'src-gen', message: 'Generating Rust sources…' });
-        console.log('[GEN] Generated src tree:', JSON.stringify(srcTree, null, 2));
+        // Remove the verbose src tree logging to reduce console bloat
+        console.log('[GEN] Generating source tree...');
         
         function writeFilesAndEmitTree(
           rootNode: FileTreeItem,
@@ -660,7 +666,9 @@ EOF'`,
             const rootBase = process.env.ROOT_FOLDER!;
             const absRoot  = path.join(rootBase, workspace.rootPath);
             const tinyTree = [rootNode];
-            await attachFileContents(tinyTree, absRoot, workspace.containerName);
+            // Skip content attachment to reduce console bloat
+            const skipContent = true;
+            await attachFileContents(tinyTree, absRoot, workspace.containerName, skipContent);
 
             // now it is safe to raise the sentinel
             const sentinelId = await markWriteDone(projectId);

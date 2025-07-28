@@ -12,15 +12,27 @@ const BIN_PATTERN = /\.(png|jpe?g|gif|ico|wasm|so|ttf|woff2?)$/i;
  *  • is a leaf (no children) AND
  *  • is smaller than 1 MiB AND
  *  • does not match BIN_PATTERN
+ * 
+ * @param nodes Array of FileNode objects to process
+ * @param absRoot Absolute path to the root directory
+ * @param containerName Optional container name for docker operations
+ * @param skipContent If true, will not attach file contents to reduce console bloat
  */
 export async function attachFileContents(
   nodes: FileNode[],
   absRoot: string,
-  containerName?: string
+  containerName?: string,
+  skipContent?: boolean
 ): Promise<void> {
   for (const node of nodes) {
     if (node.type === "directory" && node.children) {
-      await attachFileContents(node.children, absRoot, containerName);
+      await attachFileContents(node.children, absRoot, containerName, skipContent);
+      continue;
+    }
+
+    // Skip content attachment if skipContent is true
+    if (skipContent) {
+      node.content = "<content omitted>";
       continue;
     }
 
