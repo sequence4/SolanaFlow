@@ -313,7 +313,30 @@ export async function deployWithEphemeralKey(
     const rentForProg = programKeypair ? programRent : BigInt(0);
     const SAFETY_LAMPORTS = BigInt(100_000_000);            // 0.1 SOL
     
-    const totalNeeded = bufferRent + rentForProg + programDataRent + totalFees + SAFETY_LAMPORTS;
+    /**
+ * Aggregate required lamports using BigInt; perform a *single*,
+ * bounds‑checked cast to `number` right before it is passed to the
+ * System Program.  Avoids silent precision loss once the amount
+ * grows beyond 2^53‑1 (JS Number's max safe integer). 
+ */
+const totalNeeded =
+  bufferRent +
+  rentForProg +
+  programDataRent +
+  totalFees +
+  SAFETY_LAMPORTS;
+
+const MAX_SAFE_LAMPORTS = BigInt(Number.MAX_SAFE_INTEGER); // 9 007 199 254 740 991 
+
+function toLamports(bi: bigint): number {
+  if (bi > MAX_SAFE_LAMPORTS) {
+    throw new Error(
+      `lamports value ${bi} exceeds JS safe‑integer range; ` +
+      `split the funding into multiple transactions or lower SAFETY_LAMPORTS.`,
+    );
+  }
+  return Number(bi);
+}
 
     // ------------------------------------------------------------------------
     // Note: The following console.table caused noisy logs in the browser.
@@ -342,7 +365,7 @@ export async function deployWithEphemeralKey(
       SystemProgram.createAccount({
         fromPubkey:       walletPublicKey,
         newAccountPubkey: bufferKp.publicKey,
-        lamports:         Number(totalNeeded),
+        lamports:         toLamports(totalNeeded),
         space:            0,                       // no data needed
         programId:        SystemProgram.programId, // owner = system program
       }),
@@ -372,7 +395,7 @@ export async function deployWithEphemeralKey(
           fromPubkey: bufferKp.publicKey,
           newAccountPubkey: bufferKey.publicKey,
           // Only fund with buffer rent, not programDataRent
-          lamports: parseInt(bufferRent.toString()),
+          lamports: toLamports(bufferRent),
           space: bufferSpace,
           programId: BPF_UPGRADE_LOADER_ID,
         })
@@ -595,7 +618,7 @@ export async function deployWithEphemeralKey(
       const createProgramAcct = SystemProgram.createAccount({
         fromPubkey: bufferKp.publicKey,
         newAccountPubkey: programPublicKey!,
-        lamports: Number(programRent),
+        lamports: toLamports(programRent),
         space: PROGRAM_ACCOUNT_SPACE,
         programId: BPF_UPGRADE_LOADER_ID,
       });
