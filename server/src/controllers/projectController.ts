@@ -24,10 +24,13 @@ import {
 import path from 'path';
 import { APP_CONFIG } from '../config/appConfig';
 import fs from 'fs';
-import { Keypair, Connection, Transaction, PublicKey } from '@solana/web3.js';
+import {
+  Keypair,
+  Connection,
+  PublicKey,
+  BpfLoaderUpgradeable,
+} from '@solana/web3.js';
 import { getServerFeePayer } from '../utils/feePayer';
-import { deployWithEphemeralKey } from '../utils/deployWithEphemeral';
-import type { EphemeralDeployOptions } from '../utils/deployWithEphemeral';
 
 /**
  * Try to load the Anchor‑generated `<project>-keypair.json` that was created
@@ -699,27 +702,33 @@ export const deployProject = async (
     const feePayer = getServerFeePayer();
     console.log(`[DEPLOY] Using server fee payer: ${feePayer.publicKey.toBase58()}`);
 
-    const { success, programId, signatures, warning } =
-      await deployWithEphemeralKey({
-        soBytes,
-        connection,
-        wallet: {
-          publicKey: feePayer.publicKey,                // fee payer
-          signTransaction: async (tx: Transaction) => {
-            tx.partialSign(feePayer);
-            return tx;
-          },
-        } as any,
-        // fresh authority; no on‑chain upgrade path in this flow
-        ephemeralKeypair: Keypair.generate(),
-        onProgress: () => {},
-        verifyTimeoutMs: 90_000,
-        ...(programKeypair
-          ? { programKeypair }
-          : existingProgramIdStr
-          ? { programId: new PublicKey(existingProgramIdStr) }
-          : {}),
-      } as EphemeralDeployOptions);
+    /* ----------------------------------------------------------------- */
+    /* REAL DEPLOY 🥳 – uses the upgradeable loader (same path as CLI)   */
+    /* ----------------------------------------------------------------- */
+    const bufferAuthority     = Keypair.generate();          // tmp signer
+    const finalProgramKp      = programKeypair ?? Keypair.generate();
+    const programId           = await BpfLoaderUpgradeable.load(
+      connection,
+      feePayer,                         /* payer of all fees            */
+      bufferAuthority,                  /* buffer authority             */
+      feePayer,                         /* upgrade authority            */
+      finalProgramKp,                   /* deterministic program acct   */
+      new Uint8Array(soBytes),          /* ELF bytes                    */
+    );
+
+    /* Persist newly‑generated key so future upgrades reuse it */
+    if (!programKeypair) {
+      const kpPath = path.join(
+        APP_CONFIG.WALLETS_FOLDER,
+        `${programId.toBase58()}.json`,
+      );
+      fs.writeFileSync(kpPath, JSON.stringify(Array.from(finalProgramKp.secretKey)));
+      console.log(`[DEPLOY] Saved program keypair → ${kpPath}`);
+    }
+
+    const success     = true;
+    const signatures  : string[] = [];   // confirmed inside `load`
+    const warning     = undefined;
 
     // store real programId in project.details
     await pool.query(
