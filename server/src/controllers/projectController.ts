@@ -24,10 +24,63 @@ import {
 import path from 'path';
 import { APP_CONFIG } from '../config/appConfig';
 import fs from 'fs';
-import { Keypair, Connection, Transaction } from '@solana/web3.js';
+import { Keypair, Connection, Transaction, PublicKey } from '@solana/web3.js';
 import { getServerFeePayer } from '../utils/feePayer';
 import { deployWithEphemeralKey } from '../utils/deployWithEphemeral';
 import type { EphemeralDeployOptions } from '../utils/deployWithEphemeral';
+
+/**
+ * Try to load the Anchor‑generated `<project>-keypair.json` that was created
+ * during `anchor init / build`. Returns `null` if it can't be located.
+ */
+async function loadProgramKeypair(projectId: string): Promise<Keypair | null> {
+  try {
+    const containerName = await getContainerName(projectId);
+    if (!containerName) return null;
+
+    const rootPath  = await getProjectRootPath(projectId);
+    const findId    = uuidv4();
+
+    // ① project sub‑folder
+    let keyPath = await runCommand(
+      `docker exec ${containerName} bash -c 'cd /usr/src/${rootPath} && \
+       find target/deploy -maxdepth 1 -name "*-keypair.json" \
+       ! -name "anchor_template-*" | head -n 1'`,
+      '.',
+      findId,
+      { skipSuccessUpdate: true },
+    );
+    keyPath = keyPath.trim();
+
+    // ② monorepo‑root fallback
+    if (!keyPath) {
+      keyPath = await runCommand(
+        `docker exec ${containerName} bash -c 'find /usr/src/target/deploy \
+         -maxdepth 1 -name "*-keypair.json" ! -name "anchor_template-*" | head -n 1'`,
+        '.',
+        findId,
+        { skipSuccessUpdate: true },
+      );
+      keyPath = keyPath.trim();
+    }
+    if (!keyPath) return null;
+
+    const raw = await runCommand(
+      `docker exec ${containerName} bash -c "cat '${keyPath}'"`,
+      '.',
+      uuidv4(),
+      { skipSuccessUpdate: true },
+    );
+    const arr = JSON.parse(raw.trim());
+    if (Array.isArray(arr) && arr.length === 64) {
+      return Keypair.fromSecretKey(Uint8Array.from(arr));
+    }
+  } catch (e) {
+    console.warn('[DEPLOY] loadProgramKeypair failed:', e);
+  }
+  return null;
+}
+
 import { waitForTaskCompletion, updateTaskStatus } from '../utils/taskUtils';
 import { createProject as createProjectDb } from '../utils/project/createProject';
 import { catchAsync } from '../utils/catchAsync';
@@ -620,7 +673,24 @@ export const deployProject = async (
     const soBytes = Uint8Array.from(atob(base64So), c => c.charCodeAt(0)).buffer;
     console.log(`[DEPLOY] Converted base64 to binary, size: ${soBytes.byteLength} bytes`);
 
-    /* ② run deployWithEphemeralKey on the server */
+    /* ② pull existing program context (if any) -------------------------- */
+    const detailsRes = await pool.query(
+      'SELECT details FROM solanaproject WHERE id = $1',
+      [projectId],
+    );
+    let existingProgramIdStr: string | undefined;
+    if (detailsRes.rows.length) {
+      const d =
+        typeof detailsRes.rows[0].details === 'object'
+          ? detailsRes.rows[0].details
+          : JSON.parse(detailsRes.rows[0].details || '{}');
+      existingProgramIdStr =
+        d?.programId ?? d?.projectState?.programId ?? d?.lastProgramId;
+    }
+
+    const programKeypair = await loadProgramKeypair(projectId);
+
+    /* ③ run deployWithEphemeralKey on the server ------------------------ */
     const endpoint = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
     console.log(`[DEPLOY] Using RPC endpoint: ${endpoint}`);
     
@@ -644,6 +714,11 @@ export const deployProject = async (
         ephemeralKeypair: Keypair.generate(),
         onProgress: () => {},
         verifyTimeoutMs: 90_000,
+        ...(programKeypair
+          ? { programKeypair }
+          : existingProgramIdStr
+          ? { programId: new PublicKey(existingProgramIdStr) }
+          : {}),
       } as EphemeralDeployOptions);
 
     // store real programId in project.details
