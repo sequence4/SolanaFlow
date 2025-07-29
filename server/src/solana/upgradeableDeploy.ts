@@ -9,8 +9,16 @@ import {
   SYSVAR_CLOCK_PUBKEY,
   sendAndConfirmTransaction,
   LAMPORTS_PER_SOL,
-  BPF_UPGRADE_LOADER_ID,
+  // ‼️ BPF_UPGRADE_LOADER_ID is **not** exported in web3.js v1.x
 } from '@solana/web3.js';
+
+// ---------------------------------------------------------------------------
+// Upgradeable‑loader program‑ID (hard‑coded; same constant the CLI uses)
+// https://explorer.solana.com/address/BPFLoaderUpgradeab1e11111111111111111111111
+// ---------------------------------------------------------------------------
+export const BPF_UPGRADE_LOADER_ID = new PublicKey(
+  'BPFLoaderUpgradeab1e11111111111111111111111',
+);
 
 const CHUNK = 900;                 // safe write size
 
@@ -121,23 +129,30 @@ export async function deployOrUpgradeUpgradeable(
           data: Buffer.concat([u32(2), u64(BigInt(soBytes.length))]),
         });
 
-  const txFinal = new Transaction().add(
-    // fresh deploy needs a program account first
-    program instanceof PublicKey
-      ? undefined
-      : SystemProgram.createAccount({
-          fromPubkey: feePayer.publicKey,
-          newAccountPubkey: programPk,
-          lamports: progRent,
-          space: 36,
-          programId: BPF_UPGRADE_LOADER_ID,
-        }),
-    deployOrUpIx,
-  ).filter(Boolean);
+  const txFinal = new Transaction();
 
+  // fresh deploy → create the Program account first
+  if (!(program instanceof PublicKey)) {
+    txFinal.add(
+      SystemProgram.createAccount({
+        fromPubkey: feePayer.publicKey,
+        newAccountPubkey: programPk,
+        lamports: progRent,
+        space: 36,
+        programId: BPF_UPGRADE_LOADER_ID,
+      }),
+    );
+  }
+
+  txFinal.add(deployOrUpIx);
   txFinal.feePayer = feePayer.publicKey;
+
+  // --- signers -----------------------------------------------------------
+  const signers: Keypair[] = [feePayer];
+  if (programKp) signers.push(programKp);          // type‑safe – never null
+
   if (programKp) txFinal.partialSign(programKp);
-  await sendAndConfirmTransaction(conn, txFinal, [feePayer, programKp].filter(Boolean));
+  await sendAndConfirmTransaction(conn, txFinal, signers);
 
   return programPk;
 } 
