@@ -250,14 +250,12 @@ export function ProgramDeployer({
           const fundSig: TransactionSignature = await connection.sendRawTransaction(
             signedFundTx.serialize(),
           );
-          /* ────── NEW: surface the signature so you can inspect it in Explorer ────── */
-          if (DEBUG_LOGS) {
+          //if (DEBUG_LOGS) {
             console.log(
-              "%c🚀 Funding tx sent:",
-              "color:#22c55e;font-weight:bold",
+              "🚀 Funding tx sent:",
               fundSig,
             );
-          }
+          //}
           await connection.confirmTransaction(
             {
               signature: fundSig,

@@ -82,12 +82,12 @@ export const Toolbox = () => {
 
     useEffect(() => {
         setProjectName(projectContext.name || "My Token Project");
-        console.log('projectContext programId', projectContext.details?.projectState?.programId);
+        console.log('[Toolbox useEffect] projectContext programId', projectContext.details?.projectState?.programId);
     }, [projectContext.name, projectContext.details?.projectState?.programId, projectContext.details?.projectState?.deployed]);
     
     // Debug: track programId changes to help diagnose context updates
     useEffect(() => {
-        console.log('[Toolbox DEBUG] context programId changed to', projectContext.details?.projectState?.programId);
+        console.log('[Toolbox useEffect] context programId changed to', projectContext.details?.projectState?.programId);
     }, [projectContext.details?.projectState?.programId]);
 
     const handleTabChange = (tab: "on-chain" | "off-chain") => {
@@ -231,7 +231,7 @@ export const Toolbox = () => {
               const m = msg.message.match(/Program ID[: ]+([0-9A-Za-z]+)/);
               if (m) {
                 const programId = m[1];
-                console.log('[BUILD DEBUG] extracted programId', programId);
+                console.log('[Toolbox code-gen stage] extracted programId', programId);
                 setProjectContext(prev => ({
                   ...prev,
                   // ⚠️  shallow‑spread is enough; we only need fresh refs
