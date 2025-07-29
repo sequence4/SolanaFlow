@@ -623,7 +623,7 @@ export const deployProject = async (
     console.log(`[DEPLOY] Using RPC endpoint: ${endpoint}`);
     
     const connection = new Connection(endpoint, 'confirmed');
-    // Re‑use centralised helper – never throws on missing env
+    // Centralised helper: auto‑loads env/file or generates a keypair on first run
     const feePayer = getServerFeePayer();
     console.log(`[DEPLOY] Using server fee payer: ${feePayer.publicKey.toBase58()}`);
 
