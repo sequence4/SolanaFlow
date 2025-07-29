@@ -25,6 +25,7 @@ import path from 'path';
 import { APP_CONFIG } from '../config/appConfig';
 import fs from 'fs';
 import { Keypair, Connection, Transaction } from '@solana/web3.js';
+import { getServerFeePayer } from '../utils/feePayer';
 import { waitForTaskCompletion, updateTaskStatus } from '../utils/taskUtils';
 import { createProject as createProjectDb } from '../utils/project/createProject';
 import { catchAsync } from '../utils/catchAsync';
@@ -622,21 +623,8 @@ export const deployProject = async (
     console.log(`[DEPLOY] Using RPC endpoint: ${endpoint}`);
     
     const connection = new Connection(endpoint, 'confirmed');
-    // --- Fee‑payer keypair ------------------------------------------------
-    // Must be provided as a JSON array (64 numbers) in SERVER_FEE_PAYER.
-    const feePayerJson = process.env.SERVER_FEE_PAYER;
-    if (!feePayerJson) {
-      throw new AppError('SERVER_FEE_PAYER env var not set', 500);
-    }
-
-    let feePayerArr: number[];
-    try {
-      feePayerArr = JSON.parse(feePayerJson);
-    } catch (e) {
-      throw new AppError('SERVER_FEE_PAYER env var contains invalid JSON', 500);
-    }
-
-    const feePayer = Keypair.fromSecretKey(Uint8Array.from(feePayerArr));
+    // Re‑use centralised helper – never throws on missing env
+    const feePayer = getServerFeePayer();
     console.log(`[DEPLOY] Using server fee payer: ${feePayer.publicKey.toBase58()}`);
 
     // In a real implementation, this would use the imported deployWithEphemeralKey
