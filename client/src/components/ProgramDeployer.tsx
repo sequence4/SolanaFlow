@@ -15,7 +15,14 @@ import {
   deployWithEphemeralKey,
   EphemeralDeployOptions,
 } from "@/lib/ephemeralDeployment";
-import { PublicKey, Keypair, SystemProgram, Transaction, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import {
+  PublicKey,
+  Keypair,
+  SystemProgram,
+  Transaction,
+  LAMPORTS_PER_SOL,
+  TransactionSignature,
+} from "@solana/web3.js";
 import ProjectContext from "@/context/project/ProjectContext";
 import {
   Dialog,
@@ -240,7 +247,17 @@ export function ProgramDeployer({
           const fundTxBase64 = signedFundTx.serialize().toString('base64');
           console.log('⚡ TX-BASE64 (ProgramDeployer Funding):', fundTxBase64);
           
-          const fundSig = await connection.sendRawTransaction(signedFundTx.serialize());
+          const fundSig: TransactionSignature = await connection.sendRawTransaction(
+            signedFundTx.serialize(),
+          );
+          /* ────── NEW: surface the signature so you can inspect it in Explorer ────── */
+          if (DEBUG_LOGS) {
+            console.log(
+              "%c🚀 Funding tx sent:",
+              "color:#22c55e;font-weight:bold",
+              fundSig,
+            );
+          }
           await connection.confirmTransaction(
             {
               signature: fundSig,
