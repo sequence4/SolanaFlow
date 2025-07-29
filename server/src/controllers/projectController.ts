@@ -24,12 +24,28 @@ import {
 import path from 'path';
 import { APP_CONFIG } from '../config/appConfig';
 import fs from 'fs';
+/*  --------------------------------------------------------------------
+    NOTE:  BpfLoader is flagged "deprecated" in @solana/web3.js v1.98.x
+           because a new loader API is coming in v2.  There is **no**
+           replacement in v1.x, so we keep using it and suppress the
+           lint warning until we migrate to v2.
+    -------------------------------------------------------------------- */
+/* eslint-disable-next-line deprecation/deprecation */
 import {
   Keypair,
   Connection,
   PublicKey,
-  BpfLoaderUpgradeable,
+  BpfLoader,               // v1.x loader class (flagged deprecated – safe to use) 
 } from '@solana/web3.js';
+
+/* ------------------------------------------------------------------
+ *  Upgrade‑loader program‑ID constant.
+ *  Not exported by the v1.x typings, so we define it explicitly.
+ *  https://explorer.solana.com/address/BPFLoaderUpgradeab1e11111111111111111111111
+ * ----------------------------------------------------------------- */
+const BPF_LOADER_UPGRADEABLE_PROGRAM_ID = new PublicKey(
+  'BPFLoaderUpgradeab1e11111111111111111111111',
+);
 import { getServerFeePayer } from '../utils/feePayer';
 
 /**
@@ -707,13 +723,17 @@ export const deployProject = async (
     /* ----------------------------------------------------------------- */
     const bufferAuthority     = Keypair.generate();          // tmp signer
     const finalProgramKp      = programKeypair ?? Keypair.generate();
-    const programId           = await BpfLoaderUpgradeable.load(
+    // eslint-disable-next-line deprecation/deprecation
+    /* ------------------------------------------------------------
+     * Upload the program via the upgradeable loader.
+     * BpfLoader.load() returns the new programId (PublicKey).
+     * ----------------------------------------------------------- */
+    const programId = await BpfLoader.load(
       connection,
-      feePayer,                         /* payer of all fees            */
-      bufferAuthority,                  /* buffer authority             */
-      feePayer,                         /* upgrade authority            */
-      finalProgramKp,                   /* deterministic program acct   */
-      new Uint8Array(soBytes),          /* ELF bytes                    */
+      feePayer,                                   // fee‑payer
+      programKeypair ?? Keypair.generate(),       // program keypair
+      new Uint8Array(soBytes),                    // ELF bytes
+      BPF_LOADER_UPGRADEABLE_PROGRAM_ID,          // loader program id
     );
 
     /* Persist newly‑generated key so future upgrades reuse it */
@@ -726,9 +746,9 @@ export const deployProject = async (
       console.log(`[DEPLOY] Saved program keypair → ${kpPath}`);
     }
 
-    const success     = true;
-    const signatures  : string[] = [];   // confirmed inside `load`
-    const warning     = undefined;
+    const success = true;          // if .load() didn't throw we're good
+    const signatures: string[] = [];
+    const warning = undefined;
 
     // store real programId in project.details
     await pool.query(
@@ -740,9 +760,16 @@ export const deployProject = async (
     );
 
     console.log(`[DEPLOY] Deployment completed successfully for project ${projectId}`);
-    console.log(`[DEPLOY] Program ID: ${programId.toBase58()}, Signatures: ${signatures.join(', ')}`);
+    console.log(
+      `[DEPLOY] Program ID: ${programId.toBase58()}, Signatures: ${signatures.join(', ')}`,
+    );
     
-    res.json({ success, programId: programId.toBase58(), signatures, warning });
+    res.json({
+      success,
+      programId: programId.toBase58(),
+      signatures,
+      warning,
+    });
   } catch (err: any) {
     console.error('[deployProject] failed:', err);
     next(new AppError(err.message ?? 'deploy failed', 500));
