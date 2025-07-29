@@ -726,21 +726,25 @@ export const deployProject = async (
     // eslint-disable-next-line deprecation/deprecation
     /* ------------------------------------------------------------
      * Upload the program via the upgradeable loader.
-     * BpfLoader.load() returns the new programId (PublicKey).
+     * BpfLoader.load() returns a boolean (not a PublicKey).
      * ----------------------------------------------------------- */
-    const programId = await BpfLoader.load(
+    await BpfLoader.load(
       connection,
       feePayer,                                   // fee‑payer
-      programKeypair ?? Keypair.generate(),       // program keypair
+      finalProgramKp,                             // program keypair
       new Uint8Array(soBytes),                    // ELF bytes
       BPF_LOADER_UPGRADEABLE_PROGRAM_ID,          // loader program id
     );
+
+    // Use the keypair's public key as the real programId
+    const programIdPubkey = finalProgramKp.publicKey;  // PublicKey
+    const programId = programIdPubkey.toBase58();      // string for DB/logs
 
     /* Persist newly‑generated key so future upgrades reuse it */
     if (!programKeypair) {
       const kpPath = path.join(
         APP_CONFIG.WALLETS_FOLDER,
-        `${programId.toBase58()}.json`,
+        `${programId}.json`,
       );
       fs.writeFileSync(kpPath, JSON.stringify(Array.from(finalProgramKp.secretKey)));
       console.log(`[DEPLOY] Saved program keypair → ${kpPath}`);
@@ -756,17 +760,17 @@ export const deployProject = async (
          SET details     = COALESCE(details::jsonb,'{}'::jsonb) || $1::jsonb,
              last_updated = NOW()
        WHERE id = $2`,
-      [JSON.stringify({ programId: programId.toBase58() }), projectId]
+      [JSON.stringify({ programId }), projectId]
     );
 
     console.log(`[DEPLOY] Deployment completed successfully for project ${projectId}`);
     console.log(
-      `[DEPLOY] Program ID: ${programId.toBase58()}, Signatures: ${signatures.join(', ')}`,
+      `[DEPLOY] Program ID: ${programId}, Signatures: ${signatures.join(', ')}`,
     );
     
     res.json({
       success,
-      programId: programId.toBase58(),
+      programId,
       signatures,
       warning,
     });
