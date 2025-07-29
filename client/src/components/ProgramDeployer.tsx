@@ -230,7 +230,7 @@ export function ProgramDeployer({
            *   • recentBlockhash    – so the TX is broadcast‑ready
            *   • feePayer           – so the correct signer set is formed
            * ------------------------------------------------------------ */
-          const { blockhash } = await connection.getLatestBlockhash('confirmed');
+          const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
           fundTx.recentBlockhash = blockhash;
           fundTx.feePayer = wallet.publicKey!;
 
@@ -241,8 +241,15 @@ export function ProgramDeployer({
           console.log('⚡ TX-BASE64 (ProgramDeployer Funding):', fundTxBase64);
           
           const fundSig = await connection.sendRawTransaction(signedFundTx.serialize());
-          await connection.confirmTransaction(fundSig, 'confirmed');
-          if (DEBUG_LOGS) console.log(`✅ Funded ephemeral key with ${Number(additional) / LAMPORTS_PER_SOL} SOL (tx: ${fundSig})`);
+          await connection.confirmTransaction(
+            {
+              signature: fundSig,
+              blockhash,
+              lastValidBlockHeight,
+            },
+            'confirmed'
+          );
+          console.log(`✅ Funded ephemeral key with ${Number(additional) / LAMPORTS_PER_SOL} SOL (tx: ${fundSig})`);
         } else {
           if (DEBUG_LOGS) console.log('Ephemeral account already sufficiently funded.');
         }
