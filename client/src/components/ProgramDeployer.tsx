@@ -247,17 +247,44 @@ export function ProgramDeployer({
           const fundTxBase64 = signedFundTx.serialize().toString('base64');
           console.log('⚡ TX-BASE64 (ProgramDeployer Funding):', fundTxBase64);
           
+          // Simulate transaction to capture detailed logs before sending
+          try {
+            const sim = await connection.simulateTransaction(signedFundTx);
+            console.log('📊 Simulation logs:');
+            console.table(sim.value.logs || []);
+            if (sim.value.err) {
+              console.error('❌ Simulation error:', sim.value.err);
+            }
+          } catch (simErr) {
+            console.error('❌ Simulation failed:', simErr);
+          }
+          
+          // 1️⃣ build and send the TX
           const fundSig: TransactionSignature = await connection.sendRawTransaction(
             signedFundTx.serialize(),
-            { /* skipPreflight:true ← optional */ }
+            { skipPreflight: true }  // Phantom will still simulate internally
           );
-          console.log('[TX‑SIG]', fundSig);            //  always print
+          
+          // 2️⃣ log immediately - guaranteed to appear
+          console.log('[TX‑SIG]', fundSig);
           toast.info(`Funding tx: ${fundSig.slice(0,8)}…`, {
-            action:{label:'Explorer',
-                    onClick:()=>window.open(
-                      `https://explorer.solana.com/tx/${fundSig}?cluster=devnet`,'_blank')}
+            action: {
+              label: 'Explorer',
+              onClick: () => window.open(
+                `https://explorer.solana.com/tx/${fundSig}?cluster=devnet`,
+                '_blank'
+              )
+            }
           });
+          
+          // 3️⃣ subscribe so we still learn the result even if page reloads
+          connection.onSignature(
+            fundSig,
+            (notif, ctx) => console.log('⏹ Final tx status:', notif, ctx),
+            'confirmed'
+          );
 
+          // 4️⃣ modern confirmation strategy
           const res = await connection.confirmTransaction(
             { signature: fundSig, blockhash, lastValidBlockHeight },
             'confirmed',
