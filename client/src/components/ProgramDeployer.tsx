@@ -250,20 +250,16 @@ export function ProgramDeployer({
           const fundSig: TransactionSignature = await connection.sendRawTransaction(
             signedFundTx.serialize(),
           );
-          //if (DEBUG_LOGS) {
-            console.log(
-              "🚀 Funding tx sent:",
-              fundSig,
-            );
-          //}
-          await connection.confirmTransaction(
-            {
-              signature: fundSig,
-              blockhash,
-              lastValidBlockHeight,
-            },
-            'confirmed'
+
+          console.log('[FUND‑SIG]', fundSig);          // ← now visible in console
+
+          const res = await connection.confirmTransaction(
+            { signature: fundSig, blockhash, lastValidBlockHeight },
+            'confirmed',
           );
+          if (res.value.err) {
+            throw new Error(`Funding tx failed: ${JSON.stringify(res.value.err)}`);
+          }
           console.log(`✅ Funded ephemeral key with ${Number(additional) / LAMPORTS_PER_SOL} SOL (tx: ${fundSig})`);
         } else {
           if (DEBUG_LOGS) console.log('Ephemeral account already sufficiently funded.');
