@@ -26,6 +26,8 @@ import { APP_CONFIG } from '../config/appConfig';
 import fs from 'fs';
 import { Keypair, Connection, Transaction } from '@solana/web3.js';
 import { getServerFeePayer } from '../utils/feePayer';
+import { deployWithEphemeralKey } from '../utils/deployWithEphemeral';
+import type { EphemeralDeployOptions } from '../utils/deployWithEphemeral';
 import { waitForTaskCompletion, updateTaskStatus } from '../utils/taskUtils';
 import { createProject as createProjectDb } from '../utils/project/createProject';
 import { catchAsync } from '../utils/catchAsync';
@@ -627,14 +629,6 @@ export const deployProject = async (
     const feePayer = getServerFeePayer();
     console.log(`[DEPLOY] Using server fee payer: ${feePayer.publicKey.toBase58()}`);
 
-    // In a real implementation, this would use the imported deployWithEphemeralKey
-    // but for now just simulate the result to avoid linter errors
-    const success = true;
-    const programId = { toBase58: () => "programIdPlaceholder" };
-    const signatures = ["signaturePlaceholder"];
-    const warning = undefined;
-    
-    /* Simulated result of:
     const { success, programId, signatures, warning } =
       await deployWithEphemeralKey({
         soBytes,
@@ -646,12 +640,20 @@ export const deployProject = async (
             return tx;
           },
         } as any,
+        // fresh authority; no on‑chain upgrade path in this flow
         ephemeralKeypair: Keypair.generate(),
-        programSecretKey: Array.from(secretArr),
         onProgress: () => {},
         verifyTimeoutMs: 90_000,
-      });
-    */
+      } as EphemeralDeployOptions);
+
+    // store real programId in project.details
+    await pool.query(
+      `UPDATE solanaproject
+         SET details     = COALESCE(details::jsonb,'{}'::jsonb) || $1::jsonb,
+             last_updated = NOW()
+       WHERE id = $2`,
+      [JSON.stringify({ programId: programId.toBase58() }), projectId]
+    );
 
     console.log(`[DEPLOY] Deployment completed successfully for project ${projectId}`);
     console.log(`[DEPLOY] Program ID: ${programId.toBase58()}, Signatures: ${signatures.join(', ')}`);
