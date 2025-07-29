@@ -142,6 +142,23 @@ export function ProgramDeployer({
     async (event?: React.MouseEvent<HTMLButtonElement>) => {
       event?.preventDefault();
 
+      // Quick cluster check in UI
+      // (prevents wallet‑side simulation failures)
+      // @ts-ignore
+      const walletCluster = wallet.adapter?.network;
+      const rpcUrl = (connection as any)._rpcEndpoint || (connection as any).rpcEndpoint;
+      const connCluster = rpcUrl?.includes("devnet") ? "devnet"
+        : rpcUrl?.includes("testnet") ? "testnet"
+        : "mainnet‑beta";
+      if (walletCluster && walletCluster !== connCluster) {
+        toast.error(
+          `Cluster mismatch: wallet=${walletCluster}, rpc=${connCluster}.`,
+          { description: "Switch Phantom network or RPC before deploying." }
+        );
+        setIsLoading(false);
+        return;
+      }
+
       if (backendRunningRef.current || backendStartedRef.current) return;
       backendRunningRef.current = true;
       backendStartedRef.current = true;
