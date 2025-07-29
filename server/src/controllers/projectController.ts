@@ -622,9 +622,21 @@ export const deployProject = async (
     console.log(`[DEPLOY] Using RPC endpoint: ${endpoint}`);
     
     const connection = new Connection(endpoint, 'confirmed');
-    const feePayer = Keypair.fromSecretKey(
-      Uint8Array.from(JSON.parse(process.env.SERVER_FEE_PAYER!))
-    );
+    // --- Fee‑payer keypair ------------------------------------------------
+    // Must be provided as a JSON array (64 numbers) in SERVER_FEE_PAYER.
+    const feePayerJson = process.env.SERVER_FEE_PAYER;
+    if (!feePayerJson) {
+      throw new AppError('SERVER_FEE_PAYER env var not set', 500);
+    }
+
+    let feePayerArr: number[];
+    try {
+      feePayerArr = JSON.parse(feePayerJson);
+    } catch (e) {
+      throw new AppError('SERVER_FEE_PAYER env var contains invalid JSON', 500);
+    }
+
+    const feePayer = Keypair.fromSecretKey(Uint8Array.from(feePayerArr));
     console.log(`[DEPLOY] Using server fee payer: ${feePayer.publicKey.toBase58()}`);
 
     // In a real implementation, this would use the imported deployWithEphemeralKey
