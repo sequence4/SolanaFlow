@@ -35,7 +35,6 @@ import {
   Keypair,
   Connection,
   PublicKey,
-  BpfLoader,               // v1.x loader class (flagged deprecated – safe to use) 
   LAMPORTS_PER_SOL,          // <-- NEW
 } from '@solana/web3.js';
 
@@ -47,6 +46,8 @@ import {
 const BPF_LOADER_UPGRADEABLE_PROGRAM_ID = new PublicKey(
   'BPFLoaderUpgradeab1e11111111111111111111111',
 );
+
+import { deployOrUpgradeUpgradeable } from '../solana/upgradeableDeploy';
 
 /**
  * Ensure the server fee‑payer has enough lamports on‑chain before any
@@ -762,21 +763,18 @@ export const deployProject = async (
     /* ----------------------------------------------------------------- */
     const bufferAuthority     = Keypair.generate();          // tmp signer
     const finalProgramKp      = programKeypair ?? Keypair.generate();
-    // eslint-disable-next-line deprecation/deprecation
-    /* ------------------------------------------------------------
-     * Upload the program via the upgradeable loader.
-     * BpfLoader.load() returns a boolean (not a PublicKey).
-     * ----------------------------------------------------------- */
     
     // ─── NEW: guarantee fee‑payer is funded (Devnet/Testnet auto‑airdrop) ───
     await ensureFeePayerBalance(connection, feePayer);
-    
-    await BpfLoader.load(
+
+    // Decide: new deploy or upgrade based on whether the program already exists
+    const existing = await connection.getAccountInfo(finalProgramKp.publicKey, 'confirmed');
+
+    await deployOrUpgradeUpgradeable(
       connection,
-      feePayer,                                   // fee‑payer
-      finalProgramKp,                             // program keypair
-      new Uint8Array(soBytes),                    // ELF bytes
-      BPF_LOADER_UPGRADEABLE_PROGRAM_ID,          // loader program id
+      feePayer,
+      new Uint8Array(soBytes),
+      existing ? finalProgramKp.publicKey : finalProgramKp,
     );
 
     // Use the keypair's public key as the real programId
