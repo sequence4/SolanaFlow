@@ -249,9 +249,14 @@ export function ProgramDeployer({
           
           const fundSig: TransactionSignature = await connection.sendRawTransaction(
             signedFundTx.serialize(),
+            { /* skipPreflight:true ← optional */ }
           );
-
-          console.log('[FUND‑SIG]', fundSig);          // ← now visible in console
+          console.log('[TX‑SIG]', fundSig);            //  always print
+          toast.info(`Funding tx: ${fundSig.slice(0,8)}…`, {
+            action:{label:'Explorer',
+                    onClick:()=>window.open(
+                      `https://explorer.solana.com/tx/${fundSig}?cluster=devnet`,'_blank')}
+          });
 
           const res = await connection.confirmTransaction(
             { signature: fundSig, blockhash, lastValidBlockHeight },
