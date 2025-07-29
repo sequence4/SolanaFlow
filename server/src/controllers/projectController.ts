@@ -36,6 +36,7 @@ import {
   Connection,
   PublicKey,
   BpfLoader,               // v1.x loader class (flagged deprecated – safe to use) 
+  LAMPORTS_PER_SOL,          // <-- NEW
 } from '@solana/web3.js';
 
 /* ------------------------------------------------------------------
@@ -46,6 +47,44 @@ import {
 const BPF_LOADER_UPGRADEABLE_PROGRAM_ID = new PublicKey(
   'BPFLoaderUpgradeab1e11111111111111111111111',
 );
+
+/**
+ * Ensure the server fee‑payer has enough lamports on‑chain before any
+ * `BpfLoader.load()` call.  On Devnet/Testnet we transparently airdrop;
+ * on Mainnet we throw with a clear message so the operator can fund the key.
+ */
+async function ensureFeePayerBalance(
+  connection: Connection,
+  feePayer: Keypair,
+  minLamports = 2 * LAMPORTS_PER_SOL,   // ≈2 SOL default cushion
+): Promise<void> {
+  const current = await connection.getBalance(
+    feePayer.publicKey,
+    'confirmed',
+  );
+
+  if (current >= minLamports) return; // already funded
+
+  const rpc = connection.rpcEndpoint ?? '';
+  const canAirdrop =
+    rpc.includes('devnet') || rpc.includes('testnet') || rpc.includes('localhost');
+
+  if (!canAirdrop) {
+    throw new Error(
+      `Fee‑payer ${feePayer.publicKey.toBase58()} has only ${current} lamports. ` +
+      `Fund this account before deploying programs on ${rpc}.`,
+    );
+  }
+
+  const needed = minLamports - current;
+  const sig = await connection.requestAirdrop(feePayer.publicKey, needed);
+  await connection.confirmTransaction(sig, 'finalized');
+  console.log(
+    `[DEPLOY] Airdropped ${(needed / LAMPORTS_PER_SOL).toFixed(2)} SOL ` +
+      `to fee‑payer ${feePayer.publicKey.toBase58()} (tx: ${sig})`,
+  );
+}
+
 import { getServerFeePayer } from '../utils/feePayer';
 
 /**
@@ -728,6 +767,10 @@ export const deployProject = async (
      * Upload the program via the upgradeable loader.
      * BpfLoader.load() returns a boolean (not a PublicKey).
      * ----------------------------------------------------------- */
+    
+    // ─── NEW: guarantee fee‑payer is funded (Devnet/Testnet auto‑airdrop) ───
+    await ensureFeePayerBalance(connection, feePayer);
+    
     await BpfLoader.load(
       connection,
       feePayer,                                   // fee‑payer
