@@ -3,7 +3,7 @@ import { createHash } from "crypto";
 
 /** Solana's built-in upgradeable loader program ID */
 export const BPF_LOADER_UPGRADEABLE_PROGRAM_ID = new PublicKey(
-  "BPFLoaderUpgradeab11111111111111111111111111"
+  "BPFLoaderUpgradeab1e11111111111111111111111"
 );
 
 /**

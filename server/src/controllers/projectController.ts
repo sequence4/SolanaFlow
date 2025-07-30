@@ -41,10 +41,10 @@ import {
 /* ------------------------------------------------------------------
  *  Upgrade‑loader program‑ID constant.
  *  Not exported by the v1.x typings, so we define it explicitly.
- *  https://explorer.solana.com/address/BPFLoaderUpgradeab11111111111111111111111111
+ *  https://explorer.solana.com/address/BPFLoaderUpgradeab1e11111111111111111111111
  * ----------------------------------------------------------------- */
 const BPF_LOADER_UPGRADEABLE_PROGRAM_ID = new PublicKey(
-  'BPFLoaderUpgradeab11111111111111111111111111',
+  'BPFLoaderUpgradeab1e11111111111111111111111',
 );
 
 import { deployOrUpgradeUpgradeable } from '../solana/upgradeableDeploy';

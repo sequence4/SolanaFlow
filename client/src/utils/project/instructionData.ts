@@ -1,7 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 import { Buffer } from 'buffer';
 
-export const BPF_UPGRADE_LOADER_ID = new PublicKey('BPFLoaderUpgradeab11111111111111111111111111');
+export const BPF_UPGRADE_LOADER_ID = new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111');
 
 function createInitializeBufferData(): Buffer {
     return Buffer.from([0, 0, 0, 0]);
