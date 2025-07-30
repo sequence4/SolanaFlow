@@ -65,7 +65,9 @@ export async function deployOrUpgradeUpgradeable(
     await conn.confirmTransaction(sig, 'finalized');
   }
 
-  // -------------------------------- step 1 – create & init buffer ----------------
+  // ──────────────────────────────────────────────────────────────────
+  // 1️⃣  CREATE & INIT BUFFER  (tx1)
+  // ------------------------------------------------------------------
   const tx1 = new Transaction().add(
     SystemProgram.createAccount({
       fromPubkey: feePayer.publicKey,
@@ -83,9 +85,14 @@ export async function deployOrUpgradeUpgradeable(
       data: u32(0),
     }),
   );
-  tx1.feePayer = feePayer.publicKey;
-  tx1.partialSign(bufferKp);
-  await sendAndConfirmTransaction(conn, tx1, [feePayer, bufferKp]);
+
+  /* The helper will inject a recent block‑hash and sign with the
+     provided signers – no manual partialSign() needed here. */
+  const sigCreate = await sendAndConfirmTransaction(
+    conn,
+    tx1,
+    [feePayer, bufferKp],
+  );
 
   // -------------------------------- step 2 – write chunks ------------------------
   for (let off = 0; off < soBytes.length; off += CHUNK) {
