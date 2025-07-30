@@ -41,13 +41,16 @@ import {
 /* ------------------------------------------------------------------
  *  Upgrade‑loader program‑ID constant.
  *  Not exported by the v1.x typings, so we define it explicitly.
- *  https://explorer.solana.com/address/BPFLoaderUpgradeab1e11111111111111111111111
+ *  https://explorer.solana.com/address/BPFLoaderUpgradeab11111111111111111111111111
  * ----------------------------------------------------------------- */
 const BPF_LOADER_UPGRADEABLE_PROGRAM_ID = new PublicKey(
-  'BPFLoaderUpgradeab1e11111111111111111111111',
+  'BPFLoaderUpgradeab11111111111111111111111111',
 );
 
 import { deployOrUpgradeUpgradeable } from '../solana/upgradeableDeploy';
+
+// In-memory storage for ephemeral keypairs
+const ephemeralKeys = new Map<string, Keypair>();
 
 /**
  * Ensure the server fee‑payer has enough lamports on‑chain before any
@@ -627,78 +630,20 @@ export const getBuildArtifact = async (
 
 export const createEphemeralKeypair = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { secretKey } = req.body;
-    let ephem: Keypair;
-    if (secretKey && Array.isArray(secretKey)) {
-      console.log(`[ARTIFACT] Using provided secret key for ephemeral Keypair`);
-      ephem = Keypair.fromSecretKey(Uint8Array.from(secretKey));
-    } else {
-      const projectId = req.params.id;
-      // Attempt to use Anchor-generated program keypair if available
-      let secretArr: number[] | null = null;
-      const containerName = await getContainerName(projectId);
-      if (containerName) {
-        const rootPath = await getProjectRootPath(projectId);
-        const findTaskId = uuidv4();
-        // 1️⃣ look in the project sub‑folder first …
-        let keyPath = await runCommand(
-          `docker exec ${containerName} bash -c 'cd /usr/src/${rootPath} && find target/deploy -maxdepth 1 -name "*-keypair.json" ! -name "anchor_template-*" | head -n 1'`,
-          ".",
-          findTaskId,
-          { skipSuccessUpdate: true },
-        );
-        keyPath = keyPath.trim();
-
-        // 2️⃣ … if nothing found, fall back to the monorepo‑root build folder
-        if (!keyPath) {
-          keyPath = await runCommand(
-            `docker exec ${containerName} bash -c 'find /usr/src/target/deploy -maxdepth 1 -name "*-keypair.json" ! -name "anchor_template-*" | head -n 1'`,
-            ".",
-            findTaskId,
-            { skipSuccessUpdate: true },
-          );
-          keyPath = keyPath.trim();
-        }
-
-        if (keyPath) {
-          console.log(`[ARTIFACT] ✓ Found keypair file at ${keyPath}, reading…`);
-          const readTaskId = uuidv4();
-          const keyContent = await runCommand(
-            `docker exec ${containerName} bash -c "cat '${keyPath}'"`,
-            ".",
-            readTaskId,
-            { skipSuccessUpdate: true }
-          );
-                     const parsedArr = JSON.parse(keyContent.trim());
-           if (Array.isArray(parsedArr) && parsedArr.length === 64) {
-             secretArr = parsedArr;
-             const programPubkey = Keypair.fromSecretKey(Uint8Array.from(secretArr)).publicKey.toBase58();
-             console.log(`[ARTIFACT] ✓ Extracted Program ID ${programPubkey} from keypair`);
-           }
-         } else {
-          console.log(`[ARTIFACT] ❌ No keypair JSON found after global + local search for project ${projectId}`);
-         }
-       }
-       if (secretArr && Array.isArray(secretArr)) {
-         ephem = Keypair.fromSecretKey(Uint8Array.from(secretArr));
-       } else {
-        ephem = Keypair.generate();
-        console.log(`[ARTIFACT] Generated new ephemeral keypair (no existing program ID)`);
-      }
-    }
+    const projectId = req.params.id;
+    
+    // Generate a new ephemeral keypair
+    const ephem = Keypair.generate();
     const pubkey = ephem.publicKey.toBase58();
-    // Save the keypair to the wallets folder
-    const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${pubkey}.json`);
-    fs.writeFileSync(walletPath, JSON.stringify(Array.from(ephem.secretKey)));
-    // Self-verify the keypair
-    const derived = Keypair.fromSecretKey(ephem.secretKey).publicKey.toBase58();
-    if (derived !== pubkey) {
-      throw new Error('Keypair self-verification failed');
-    }
+    
+    // Store the keypair in memory only
+    ephemeralKeys.set(pubkey, ephem);
+    console.log(`[EPHEMERAL] Generated new ephemeral keypair: ${pubkey}`);
+    
+    // Return only the public key to the client
     res.status(200).json({
       message: 'Ephemeral keypair created successfully',
-      pubkey,
-      secretKey: Array.from(ephem.secretKey)
+      pubkey
     });
   } catch (error) {
     console.error('Error creating ephemeral keypair:', error);
@@ -713,12 +658,14 @@ export const deployProject = async (
 ): Promise<void> => {
   try {
     const { id: projectId } = req.params;
-    const { walletPubkey }  = req.body;                  // sent by ProgramDeployer
+    const { walletPubkey, bufferAuthority }  = req.body;
     
     console.log(`[DEPLOY] Starting deployment for project ${projectId} with wallet ${walletPubkey}`);
     
-    if (!walletPubkey) {
-      return next(new AppError('walletPubkey missing', 400));
+    // Get the buffer authority keypair from memory
+    const bufferAuthorityKp = ephemeralKeys.get(bufferAuthority);
+    if (!walletPubkey || !bufferAuthorityKp) {
+      return next(new AppError('walletPubkey or bufferAuthority missing', 400));
     }
 
     /* ① fetch artefact (base‑64) and secret key */
@@ -726,9 +673,6 @@ export const deployProject = async (
     const { base64So } = await getBuildArtifactTask(projectId);           // 259 kB string
     console.log(`[DEPLOY] Retrieved build artifact, size: ${base64So.length} characters`);
     
-    // For now, simulate getting the secret from AWS - in a real implementation,
-    // this would call getProgramSecret(projectId) from awsSecrets
-    const secretArr = new Uint8Array(64); // Placeholder for the actual secret
     const soBytes = Uint8Array.from(atob(base64So), c => c.charCodeAt(0)).buffer;
     console.log(`[DEPLOY] Converted base64 to binary, size: ${soBytes.byteLength} bytes`);
 
@@ -761,11 +705,13 @@ export const deployProject = async (
     /* ----------------------------------------------------------------- */
     /* REAL DEPLOY 🥳 – uses the upgradeable loader (same path as CLI)   */
     /* ----------------------------------------------------------------- */
-    const bufferAuthority     = Keypair.generate();          // tmp signer
-    const finalProgramKp      = programKeypair ?? Keypair.generate();
+    const finalProgramKp = programKeypair ?? Keypair.generate();
     
-    // ─── NEW: guarantee fee‑payer is funded (Devnet/Testnet auto‑airdrop) ───
-    await ensureFeePayerBalance(connection, feePayer);
+    // Check if fee payer has enough balance (no airdrop)
+    const min = 100_000; // 0.0001 SOL
+    if ((await connection.getBalance(feePayer.publicKey, 'confirmed')) < min) {
+      return next(new AppError('Server fee payer unfunded (<0.0001 SOL)', 402));
+    }
 
     // Decide: new deploy or upgrade based on whether the program already exists
     const existing = await connection.getAccountInfo(finalProgramKp.publicKey, 'confirmed');
@@ -779,8 +725,12 @@ export const deployProject = async (
       feePayer,
       new Uint8Array(soBytes),
       existing ? finalProgramKp.publicKey : finalProgramKp,
-      walletPublicKey  // becomes *new* upgrade authority
+      walletPublicKey,
+      bufferAuthorityKp
     );
+    
+    // Clean up the ephemeral key from memory
+    ephemeralKeys.delete(bufferAuthority);
 
     // Use the keypair's public key as the real programId
     const programIdPubkey = finalProgramKp.publicKey;  // PublicKey
@@ -796,12 +746,6 @@ export const deployProject = async (
       console.log(`[DEPLOY] Saved program keypair → ${kpPath}`);
     }
 
-    // When using wallet pubkey, we're returning before the transaction is sent
-    // The client will need to sign and submit the transaction
-    const success = true;
-    const signatures: string[] = [];
-    const warning = undefined;
-
     // store real programId in project.details
     await pool.query(
       `UPDATE solanaproject
@@ -811,14 +755,12 @@ export const deployProject = async (
       [JSON.stringify({ programId }), projectId]
     );
 
-    console.log(`[DEPLOY] Deployment transaction prepared for project ${projectId}`);
-    console.log(`[DEPLOY] Program ID: ${programId}, awaiting wallet signature`);
+    console.log(`[DEPLOY] Deployment completed successfully for project ${projectId}`);
+    console.log(`[DEPLOY] Program ID: ${programId}`);
     
     res.json({
-      success,
-      programId,
-      signatures,
-      warning,
+      success: true,
+      programId
     });
   } catch (err: any) {
     console.error('[deployProject] failed:', err);

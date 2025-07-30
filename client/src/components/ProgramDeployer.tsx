@@ -11,10 +11,7 @@ import { downloadArtifact } from "@/api/projectArtifact";
 import { projectApi } from "@/api/projectApi";
 import { Button } from "@/components/ui/button";
 import { Rocket, AlertTriangle } from "lucide-react";
-import {
-  deployWithEphemeralKey,
-  EphemeralDeployOptions,
-} from "@/lib/ephemeralDeployment";
+// No longer using client-side deployment
 import {
   PublicKey,
   Keypair,
@@ -37,6 +34,7 @@ import { connection } from "@/utils/connection";
 
 import { createAndRegisterEphemeral } from "@/utils/ephemeral/ephemeralKey";
 import { BPF_LOADER_CHUNK_SIZE } from "@/utils/constants";
+import { deployWithEphemeralKey, EphemeralDeployOptions } from "@/lib/ephemeralDeployment";
 
 // Toggle verbose client-side logs by setting NEXT_PUBLIC_DEBUG_LOGS=true in your
 // environment.  This reduces noisy console output in production.
@@ -315,21 +313,31 @@ export function ProgramDeployer({
         }
 
         // 3. Trigger the backend deployment process
-        setDeployStage('Deploying program on backend...');
-        const server = await projectApi.deployProject(
+        setDeployStage('Deploying program on backend…');
+        const { success } = await projectApi.deployProject(
           projectId,
-          wallet.publicKey!.toBase58()
+          wallet.publicKey!.toBase58(),
+          ephemeralPubkey.toBase58()
         );
-        if (!server.success) throw new Error('Server deploy failed');
-        onSuccess(server.programId);
+        if (!success) throw new Error('Server deploy failed');
+
+        // 4. Poll for program ID
+        while (true) {
+          const { programId } = await projectApi.getProgramId(projectId);
+          if (programId) { 
+            onSuccess(programId); 
+            break; 
+          }
+          await new Promise(r => setTimeout(r, 3000));
+        }
 
         toast.success('Program deployed', {
-          description: `Program ID: ${server.programId}`,
+          description: `Program ID obtained from server`,
           action: {
             label: 'Explorer',
-            onClick: () =>
+            onClick: (programId) =>
               window.open(
-                `https://explorer.solana.com/address/${server.programId}?cluster=devnet`,
+                `https://explorer.solana.com/address/${programId}?cluster=devnet`,
                 '_blank'
               ),
           },

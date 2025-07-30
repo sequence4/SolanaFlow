@@ -232,17 +232,13 @@ export const projectApi = {
   },
 
   /**
-   * POST the 64-byte secret key array so the backend can register the keypair.
-   * Returns the new ephemeral pubkey and the program's secret key if available.
-   * If no secretKey provided, attempts to use the Anchor-generated program keypair.
+   * Create an ephemeral keypair on the server side.
+   * Returns the public key of the generated keypair.
    */
-  createEphemeral: async (
-    projectId: string,
-    pubkey: string
-  ): Promise<{ status: string }> => {
+  createEphemeral: async (projectId: string): Promise<{ pubkey: string }> => {
     try {
-      const response = await api.post(`/projects/${projectId}/ephemeral`, { pubkey });
-      return response.data;
+      const { data } = await api.post(`/projects/${projectId}/ephemeral`);
+      return data as { pubkey: string };
     } catch (err) {
       console.error('Error creating ephemeral:', err);
       throw err;
@@ -251,13 +247,15 @@ export const projectApi = {
 
   deployProject: async (
     projectId: string,
-    walletPubkey: string
-  ): Promise<{ success: boolean; programId: string; signatures: string[]; warning?: string }> => {
+    walletPubkey: string,
+    bufferAuthority: string
+  ): Promise<{ success: boolean; programId: string }> => {
     try {
-      const response = await api.post(`/projects/${projectId}/deploy`, {
+      const { data } = await api.post(`/projects/${projectId}/deploy`, {
         walletPubkey,
+        bufferAuthority,
       });
-      return response.data;
+      return data as { success: boolean; programId: string };
     } catch (error) {
       console.error('Error deploying project:', error);
       throw error;
