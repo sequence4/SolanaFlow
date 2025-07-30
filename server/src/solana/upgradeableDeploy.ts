@@ -157,31 +157,36 @@ export async function deployOrUpgradeUpgradeable(
   }
 
   txFinal.add(deployOrUpIx);
-  
-  // Get a recent blockhash to ensure the transaction is valid
+
+  // 1️⃣  Fetch fresh block‑hash *before* the first signature
   const { blockhash } = await conn.getLatestBlockhash('confirmed');
   txFinal.recentBlockhash = blockhash;
-  
-  // Set the fee payer - use wallet if provided, otherwise use server fee payer
-  txFinal.feePayer = walletPubkey || feePayer.publicKey;
 
-  // --- signers -----------------------------------------------------------
-  const signers: Keypair[] = [feePayer];
-  if (programKp) signers.push(programKp);          // type‑safe – never null
+  // 2️⃣  Set fee‑payer and collect *all* required signatures
+  txFinal.feePayer = feePayer.publicKey;
+  const signers: Keypair[] = [feePayer, bufferKp];
+  if (programKp) signers.push(programKp);
 
-  // Always sign with the program keypair if available
-  if (programKp) txFinal.partialSign(programKp);
-  
-  // If using a wallet as fee payer, return after partial signing
-  // The wallet will complete the signing process
+  // 3️⃣  Send & confirm in one step (no wallet signature needed here)
+  await sendAndConfirmTransaction(conn, txFinal, signers, { skipPreflight: true });
+
+  // Hand upgrade authority from buffer‑auth → wallet (if supplied)
   if (walletPubkey) {
-    console.log(`Transaction prepared for wallet signing. Program ID: ${programPk.toBase58()}`);
-    // Return the program ID without sending the transaction
-    return programPk;
+    const setAuthIx = new TransactionInstruction({
+      programId: BPF_UPGRADE_LOADER_ID,
+      keys: [
+        { pubkey: programDataPk,     isSigner: false, isWritable: true },
+        { pubkey: bufferKp.publicKey,isSigner: true,  isWritable: false },
+        { pubkey: walletPubkey,      isSigner: false, isWritable: false },
+      ],
+      data: Buffer.from(Uint8Array.of(4, 0, 0, 0)), // SetAuthority enum = 4
+    });
+    const txAuth   = new Transaction().add(setAuthIx);
+    txAuth.feePayer = feePayer.publicKey;
+    const { blockhash: h2 } = await conn.getLatestBlockhash('confirmed');
+    txAuth.recentBlockhash = h2;
+    await sendAndConfirmTransaction(conn, txAuth, [feePayer, bufferKp], { skipPreflight: true });
   }
-  
-  // Otherwise, send and confirm the transaction with server signers
-  await sendAndConfirmTransaction(conn, txFinal, signers);
 
   return programPk;
 } 

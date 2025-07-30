@@ -773,13 +773,13 @@ export const deployProject = async (
     // Convert walletPubkey string to PublicKey object for the deploy function
     const walletPublicKey = new PublicKey(walletPubkey);
     
-    // Pass the wallet public key to the deploy function
+    // Back‑end performs full deploy/upgrade + authority transfer
     await deployOrUpgradeUpgradeable(
       connection,
       feePayer,
       new Uint8Array(soBytes),
       existing ? finalProgramKp.publicKey : finalProgramKp,
-      walletPublicKey // Pass wallet pubkey as fee payer
+      walletPublicKey  // becomes *new* upgrade authority
     );
 
     // Use the keypair's public key as the real programId
@@ -819,7 +819,6 @@ export const deployProject = async (
       programId,
       signatures,
       warning,
-      requiresWalletSignature: true,
     });
   } catch (err: any) {
     console.error('[deployProject] failed:', err);
