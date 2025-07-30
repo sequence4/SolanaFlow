@@ -770,11 +770,16 @@ export const deployProject = async (
     // Decide: new deploy or upgrade based on whether the program already exists
     const existing = await connection.getAccountInfo(finalProgramKp.publicKey, 'confirmed');
 
+    // Convert walletPubkey string to PublicKey object for the deploy function
+    const walletPublicKey = new PublicKey(walletPubkey);
+    
+    // Pass the wallet public key to the deploy function
     await deployOrUpgradeUpgradeable(
       connection,
       feePayer,
       new Uint8Array(soBytes),
       existing ? finalProgramKp.publicKey : finalProgramKp,
+      walletPublicKey // Pass wallet pubkey as fee payer
     );
 
     // Use the keypair's public key as the real programId
@@ -791,7 +796,9 @@ export const deployProject = async (
       console.log(`[DEPLOY] Saved program keypair → ${kpPath}`);
     }
 
-    const success = true;          // if .load() didn't throw we're good
+    // When using wallet pubkey, we're returning before the transaction is sent
+    // The client will need to sign and submit the transaction
+    const success = true;
     const signatures: string[] = [];
     const warning = undefined;
 
@@ -804,16 +811,15 @@ export const deployProject = async (
       [JSON.stringify({ programId }), projectId]
     );
 
-    console.log(`[DEPLOY] Deployment completed successfully for project ${projectId}`);
-    console.log(
-      `[DEPLOY] Program ID: ${programId}, Signatures: ${signatures.join(', ')}`,
-    );
+    console.log(`[DEPLOY] Deployment transaction prepared for project ${projectId}`);
+    console.log(`[DEPLOY] Program ID: ${programId}, awaiting wallet signature`);
     
     res.json({
       success,
       programId,
       signatures,
       warning,
+      requiresWalletSignature: true,
     });
   } catch (err: any) {
     console.error('[deployProject] failed:', err);

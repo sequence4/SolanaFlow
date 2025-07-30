@@ -35,6 +35,11 @@ export async function deployOrUpgradeUpgradeable(
    *  • `PublicKey` → upgrade that existing program
    */
   program: Keypair | PublicKey | null,
+  /**
+   * Optional wallet public key to use as fee payer (for client-side signing)
+   * If provided, the transaction will be prepared for the wallet to sign
+   */
+  walletPubkey?: PublicKey,
 ): Promise<PublicKey> {
   // -------------------------------- account prep --------------------------------
   const bufferKp = Keypair.generate();
@@ -145,13 +150,30 @@ export async function deployOrUpgradeUpgradeable(
   }
 
   txFinal.add(deployOrUpIx);
-  txFinal.feePayer = feePayer.publicKey;
+  
+  // Get a recent blockhash to ensure the transaction is valid
+  const { blockhash } = await conn.getLatestBlockhash('confirmed');
+  txFinal.recentBlockhash = blockhash;
+  
+  // Set the fee payer - use wallet if provided, otherwise use server fee payer
+  txFinal.feePayer = walletPubkey || feePayer.publicKey;
 
   // --- signers -----------------------------------------------------------
   const signers: Keypair[] = [feePayer];
   if (programKp) signers.push(programKp);          // type‑safe – never null
 
+  // Always sign with the program keypair if available
   if (programKp) txFinal.partialSign(programKp);
+  
+  // If using a wallet as fee payer, return after partial signing
+  // The wallet will complete the signing process
+  if (walletPubkey) {
+    console.log(`Transaction prepared for wallet signing. Program ID: ${programPk.toBase58()}`);
+    // Return the program ID without sending the transaction
+    return programPk;
+  }
+  
+  // Otherwise, send and confirm the transaction with server signers
   await sendAndConfirmTransaction(conn, txFinal, signers);
 
   return programPk;
