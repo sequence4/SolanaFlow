@@ -16,9 +16,7 @@ import {
 // Upgradeable‑loader program‑ID (hard‑coded; same constant the CLI uses)
 // https://explorer.solana.com/address/BPFLoaderUpgradeab1e11111111111111111111111
 // ---------------------------------------------------------------------------
-export const BPF_UPGRADE_LOADER_ID = new PublicKey(
-  'BPFLoaderUpgradeab1e11111111111111111111111',
-);
+const BPF_UPGRADE_LOADER_ID = new PublicKey('BPFLoaderUpgradeab11111111111111111111111111');
 
 const CHUNK = 900;                 // safe write size
 
