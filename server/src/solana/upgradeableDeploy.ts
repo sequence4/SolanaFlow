@@ -72,23 +72,29 @@ export async function deployOrUpgradeUpgradeable(
     programId: BPF_UPGRADE_LOADER_ID,
   });
   
+  /* -----------------------------------------------------------------
+     InitializeBuffer takes ▸ (buffer acct, rent sysvar) ◂ as accounts.
+     The optional authority is encoded in the instruction data:
+       4‑byte tag = 0   +   1‑byte option = 0 (None)            ⇒ 5 bytes
+     We pass "None" here because we immediately SetAuthority to
+     wallet later on.
+  ----------------------------------------------------------------- */
   const initBufferIx = new TransactionInstruction({
-    programId: BPF_UPGRADE_LOADER_ID,                 // InitializeBuffer
+    programId: BPF_UPGRADE_LOADER_ID,
     keys: [
-      { pubkey: bufferKp.publicKey, isSigner: false, isWritable: true },
-      { pubkey: bufferAuthorityKp.publicKey, isSigner: true,  isWritable: false },
+      { pubkey: bufferKp.publicKey, isSigner: true,  isWritable: true },
+      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
     ],
-    data: u32(0),
+    data: Buffer.concat([u32(0), Buffer.from([0])]),     // tag 0 + None
   });
   
   const tx1 = new Transaction().add(createBufferIx, initBufferIx);
   
-  /* The helper will inject a recent block‑hash and sign with the
-     provided signers – no manual partialSign() needed here. */
-  const sigCreate = await sendAndConfirmTransaction(
+  /* Signers: fee‑payer (= bufferAuthorityKp) + bufferKp itself          */
+  await sendAndConfirmTransaction(
     conn,
     tx1,
-    [feePayer, bufferKp, bufferAuthorityKp],
+    [feePayer, bufferKp],
   );
 
   // -------------------------------- step 2 – write chunks ------------------------
