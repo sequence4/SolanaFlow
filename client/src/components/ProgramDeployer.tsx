@@ -18,6 +18,10 @@ import {
   SystemProgram,
   Transaction,
   LAMPORTS_PER_SOL,
+  SendTransactionError,
+  TransactionInstruction,
+  SYSVAR_RENT_PUBKEY,
+  SYSVAR_CLOCK_PUBKEY,
 } from "@solana/web3.js";
 import ProjectContext from "@/context/project/ProjectContext";
 import {
@@ -31,9 +35,8 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { connection } from "@/utils/connection";
 
-import { createAndRegisterEphemeral } from "@/utils/ephemeral/ephemeralKey";
+import { createEphemeralKey, deployBackend, EphemeralDeployOptions, deployWithEphemeralKey } from "@/api/projectDeploy";
 import { BPF_LOADER_CHUNK_SIZE } from "@/utils/constants";
-import { deployWithEphemeralKey, EphemeralDeployOptions } from "@/lib/ephemeralDeployment";
 
 // Toggle verbose client-side logs by setting NEXT_PUBLIC_DEBUG_LOGS=true in your
 // environment.  This reduces noisy console output in production.
@@ -185,25 +188,14 @@ export function ProgramDeployer({
             if (DEBUG_LOGS) console.log("🔑 Ephemeral authority key:", authorityEphem.publicKey.toBase58());
 
         const deployOptions: EphemeralDeployOptions = {
-          soBytes: programBytes as unknown as ArrayBuffer,
-          connection: connection as any,
-          wallet: wallet as any,
-          ephemeralKeypair: authorityEphem as any,
-              programId: candidatePk,
-          verifyTimeoutMs: 120_000,
-          relayToBackend: true,                 // NEW – keep secret on server
-          onProgress: (raw: number, message: string) => {
-            const pct = raw <= 1 ? Math.round(raw * 100) : Math.round(raw);
-            setProgress(Math.max(1, Math.min(pct, 100)));
-            setDeployStage(message ?? "");
-            if (DEBUG_LOGS) console.log("[DEPLOY]", pct + "%", message);
-          },
+          programData: programBytes.toString(),
+          programArgs: [],
+          programEnv: {},
+          programId: candidatePk.toBase58(),
         };
 
-            const deployResult = await deployWithEphemeralKey(deployOptions);
-            if (deployResult.success) onSuccess(candidatePk.toBase58());
-
-            if (deployResult.warning) toast.warning(deployResult.warning);
+            const deployResult = await deployWithEphemeralKey(projectId, authorityEphem.publicKey.toBase58(), deployOptions);
+            if (deployResult.taskId) onSuccess(candidatePk.toBase58());
 
             toast.success("Program upgraded successfully", {
               description: `Program ID: ${candidatePk.toBase58()}`,
@@ -221,83 +213,187 @@ export function ProgramDeployer({
           }
         }
 
-        /* ───────────── NEW: fresh deploy handled on server ───────────── */
-        // 1. Request an ephemeral keypair from the backend
-        const ephemPubkeyStr = await createAndRegisterEphemeral(projectId);
-        const ephemeralPubkey = new PublicKey(ephemPubkeyStr);
-        if (DEBUG_LOGS) console.log(`🔑 Ephemeral key (server-generated): ${ephemeralPubkey.toBase58()}`);
+        /* ───────────── NEW: wallet-first signing flow ───────────── */
+        // 1. Create an ephemeral keypair on the backend (secret stays on server)
+        const ephemeralPubkeyStr = await createEphemeralKey(projectId);
+        const ephemeralPubkey = new PublicKey(ephemeralPubkeyStr);
+        if (DEBUG_LOGS) console.log(`🔑 Ephemeral key (server-side): ${ephemeralPubkey.toBase58()}`);
 
-        // 2. Fund the ephemeral account from the wallet (if needed)
+        // 2. Tell backend which key it should expect to sign with
+        const { taskId } = await deployBackend(projectId, ephemeralPubkey.toBase58());
+        setDeployStage('Building transaction...');
+        setProgress(10);
+
+        // 3. Generate a new program keypair
+        const programKeypair = Keypair.generate();
+        const programId = programKeypair.publicKey;
+        if (DEBUG_LOGS) console.log(`📦 Generated new program ID: ${programId.toBase58()}`);
+
+        // Find PDA for program data
+        const [programDataPk] = PublicKey.findProgramAddressSync(
+          [programId.toBuffer()],
+          new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111')
+        );
+
+        // Calculate rent amounts
         const bufferSpace = 37 + programBytes.byteLength;
         const bufferRent = await connection.getMinimumBalanceForRentExemption(bufferSpace);
-        const programDataRent = await connection.getMinimumBalanceForRentExemption(36);
-        const chunkCount = Math.ceil(programBytes.byteLength / BPF_LOADER_CHUNK_SIZE);
-        const feeEstimate = (chunkCount + 2) * 10000; // create-buffer + deploy + chunk TXs
-        const marginLamports = 0.02 * LAMPORTS_PER_SOL;
-        const lamportsNeeded = BigInt(bufferRent) + BigInt(programDataRent) + BigInt(feeEstimate) + BigInt(marginLamports);
-        const existingBalance = await connection.getBalance(ephemeralPubkey);
-        if (BigInt(existingBalance) < lamportsNeeded) {
-          const additional = lamportsNeeded - BigInt(existingBalance);
-          if (DEBUG_LOGS) console.log(`Ephemeral account needs ${Number(additional) / LAMPORTS_PER_SOL} SOL; funding from wallet...`);
-          const fundIx = SystemProgram.transfer({
-            fromPubkey: wallet.publicKey!,
-            toPubkey: ephemeralPubkey,
-            lamports: Number(additional),
+        const programRent = await connection.getMinimumBalanceForRentExemption(36);
+        
+        // 4. Create buffer account
+        const bufferAccount = Keypair.generate();
+        setDeployStage('Creating buffer account...');
+        setProgress(20);
+        
+        // Create and initialize buffer transaction
+        const createBufferIx = SystemProgram.createAccount({
+          fromPubkey: wallet.publicKey!,
+          lamports: bufferRent,
+          newAccountPubkey: bufferAccount.publicKey,
+          space: bufferSpace,
+          programId: new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111'),
+        });
+        
+        // Initialize buffer with wallet as authority
+        const bufferInitIx = new TransactionInstruction({
+          programId: new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111'),
+          keys: [
+            { pubkey: bufferAccount.publicKey, isSigner: false, isWritable: true },
+            { pubkey: wallet.publicKey!, isSigner: true, isWritable: false },
+          ],
+          data: Buffer.from([0, 0, 0, 0]), // InitializeBuffer tag
+        });
+        
+        // Set buffer authority to ephemeral key
+        const setAuthorityIx = new TransactionInstruction({
+          programId: new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111'),
+          keys: [
+            { pubkey: bufferAccount.publicKey, isSigner: false, isWritable: true },
+            { pubkey: wallet.publicKey!, isSigner: true, isWritable: false },
+            { pubkey: ephemeralPubkey, isSigner: false, isWritable: false },
+          ],
+          data: Buffer.from([4, 0, 0, 0]), // SetAuthority tag
+        });
+        
+        // Prepare write instructions for program bytes
+        const writeInstructions: TransactionInstruction[] = [];
+        const CHUNK = 900;
+        for (let off = 0; off < programBytes.length; off += CHUNK) {
+          const slice = programBytes.slice(off, off + CHUNK);
+          const writeIx = new TransactionInstruction({
+            programId: new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111'),
+            keys: [
+              { pubkey: bufferAccount.publicKey, isSigner: false, isWritable: true },
+              { pubkey: ephemeralPubkey,        isSigner: true,  isWritable: false },
+            ],
+            data: Buffer.concat([
+              Buffer.from([1, 0, 0, 0]),              // Write tag
+              (() => { const b = Buffer.alloc(4); b.writeUInt32LE(off, 0); return b; })(),
+              (() => { const b = Buffer.alloc(8); b.writeBigUInt64LE(BigInt(slice.length), 0); return b; })(),
+              slice,
+            ]),
           });
-          const fundTx = new Transaction().add(fundIx);
+          writeInstructions.push(writeIx);
+        }
+        
+        // Create program account
+        const createProgramAcct = SystemProgram.createAccount({
+          fromPubkey: wallet.publicKey!,
+          newAccountPubkey: programId,
+          lamports: programRent,
+          space: 36,
+          programId: new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111'),
+        });
+        
+        // Deploy instruction
+        const deployIx = new TransactionInstruction({
+          programId: new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111'),
+          keys: [
+            { pubkey: wallet.publicKey!, isSigner: true, isWritable: true },
+            { pubkey: programDataPk, isSigner: false, isWritable: true },
+            { pubkey: programId, isSigner: false, isWritable: true },
+            { pubkey: bufferAccount.publicKey, isSigner: false, isWritable: true },
+            { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
+            { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
+            { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+            { pubkey: ephemeralPubkey, isSigner: true, isWritable: false }, // server co-signs later
+          ],
+          // DeployWithMaxDataLen { max_data_len = programBytes.length } – u32 tag + le-u64
+          data: Buffer.concat([
+            Buffer.from([2, 0, 0, 0]),
+            (() => {
+              const b = Buffer.alloc(8);
+              b.writeBigUInt64LE(BigInt(programBytes.byteLength), 0);
+              return b;
+            })(),
+          ]),
+        });
+        
+        // Build FULL transaction *before* any signature is added
+        const deployTx = new Transaction()
+          .add(createBufferIx)
+          .add(bufferInitIx)
+          .add(setAuthorityIx)
+          // all write-chunk instructions
+          .add(...writeInstructions)
+          // program account + deploy instruction
+          .add(createProgramAcct)
+          .add(deployIx);
 
-          /* ------------------------------------------------------------ *
-           * Let Phantom sign **and** broadcast the single‑instruction
-           * transfer.  Because the TX contains nothing else, Phantom's
-           * internal simulation will succeed and the red banner vanishes.
-           * ------------------------------------------------------------ */
-          const { blockhash } = await connection.getLatestBlockhash(
-            "confirmed"
-          );
-          fundTx.recentBlockhash = blockhash;
-          fundTx.feePayer = wallet.publicKey!;
+        // Recent block-hash & fee-payer
+        const { blockhash } = await connection.getLatestBlockhash("confirmed");
+        deployTx.recentBlockhash = blockhash;
+        deployTx.feePayer = wallet.publicKey!;
 
-          const fundSig = await wallet.sendTransaction(fundTx, connection, {
-            preflightCommitment: "confirmed",
-          });
-
-          await connection.confirmTransaction(fundSig, "confirmed");
-
-          console.log(
-            `✅ Funded ephemeral key with ${
-              Number(additional) / LAMPORTS_PER_SOL
-            } SOL (tx: ${fundSig})`
-          );
-        } else {
-          if (DEBUG_LOGS) console.log('Ephemeral account already sufficiently funded.');
+        /* ---------- OPTIONAL size-guard ---------- */
+        if (deployTx.serialize({ requireAllSignatures: false }).length > 1200) {
+          throw new Error("Transaction too large; split writes into separate TXs");
         }
 
-        // 3. Trigger the backend deployment process
-        setDeployStage('Deploying program on backend…');
-        const { success } = await projectApi.deployProject(
-          projectId,
-          wallet.publicKey!.toBase58(),
-          ephemeralPubkey.toBase58()
-        );
-        if (!success) throw new Error('Server deploy failed');
-
-        // 4. Poll for program ID
-        while (true) {
-          const { programId } = await projectApi.getProgramId(projectId);
-          if (programId) { 
-            onSuccess(programId); 
-            break; 
+        // Wallet signs AFTER every instruction is already present
+        setDeployStage('Awaiting wallet signature…');
+        setProgress(40);
+        if (!wallet.signTransaction) throw new Error("Wallet can't sign");
+        await wallet.signTransaction(deployTx);
+        
+        // Program keypair and buffer account sign
+        deployTx.partialSign(bufferAccount);
+        deployTx.partialSign(programKeypair);
+        
+        // 5. Send the partially-signed transaction to backend for co-signing and broadcast
+        setDeployStage('Sending to server for co-signing...');
+        setProgress(60);
+        const encodedTx = deployTx.serialize({ requireAllSignatures: false }).toString('base64');
+        
+        try {
+          const { signature } = await projectApi.relaySignedTx(
+            projectId,
+            encodedTx,
+            programId.toBase58(),
+            taskId
+          );
+          
+          if (DEBUG_LOGS) console.log(`✅ Transaction confirmed with signature: ${signature}`);
+          setDeployStage('Transaction confirmed!');
+          setProgress(90);
+          
+          // Update project with new program ID
+          onSuccess(programId.toBase58());
+        } catch (err) {
+          if (err instanceof SendTransactionError) {
+            console.error('Transaction simulation failed:', err);
+            console.error('Sim logs:', err.logs);
           }
-          await new Promise(r => setTimeout(r, 3000));
+          throw err;
         }
 
-        toast.success('Program deployed', {
-          description: `Program ID obtained from server`,
+        toast.success('Program deployment submitted', {
+          description: `Program ID: ${programId.toBase58()}`,
           action: {
             label: 'Explorer',
-            onClick: (programId) =>
+            onClick: () =>
               window.open(
-                `https://explorer.solana.com/address/${programId}?cluster=devnet`,
+                `https://explorer.solana.com/address/${programId.toBase58()}?cluster=devnet`,
                 '_blank'
               ),
           },

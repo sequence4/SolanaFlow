@@ -1562,6 +1562,21 @@ export async function signDeployTxAndBroadcast(
     );
   }
 
+  // Check for any missing signatures from server-resident keys
+  for (const { publicKey, signature } of transaction.signatures) {
+    if (!signature && publicKey && !publicKey.equals(programKeypair.publicKey)) {
+      const keyPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${publicKey.toBase58()}.json`);
+      if (fs.existsSync(keyPath)) {
+        console.log(`[SIGNING] Found server key for ${publicKey.toBase58()}, adding signature`);
+        const secretBytes = JSON.parse(fs.readFileSync(keyPath, 'utf8'));
+        const keypair = Keypair.fromSecretKey(Uint8Array.from(secretBytes));
+        transaction.partialSign(keypair);
+      } else {
+        console.warn(`[SIGNING] No server key for signer ${publicKey.toBase58()}`);
+      }
+    }
+  }
+
   // Broadcast the fully signed transaction.
   const conn = new Connection(endpoint, "confirmed");
   

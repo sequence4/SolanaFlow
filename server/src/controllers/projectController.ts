@@ -23,6 +23,7 @@ import {
 } from '../utils/projectUtils';
 import path from 'path';
 import { APP_CONFIG } from '../config/appConfig';
+import { Buffer } from 'buffer';
 import fs from 'fs';
 /*  --------------------------------------------------------------------
     NOTE:  BpfLoader is flagged "deprecated" in @solana/web3.js v1.98.x
@@ -35,7 +36,9 @@ import {
   Keypair,
   Connection,
   PublicKey,
-  LAMPORTS_PER_SOL,          // <-- NEW
+  LAMPORTS_PER_SOL,
+  SendTransactionError,
+  Transaction,
 } from '@solana/web3.js';
 
 /* ------------------------------------------------------------------
@@ -643,7 +646,7 @@ export const createEphemeralKeypair = async (req: Request, res: Response, next: 
     // Return only the public key to the client
     res.status(200).json({
       message: 'Ephemeral keypair created successfully',
-      pubkey
+      ephemeralPubkey: pubkey
     });
   } catch (error) {
     console.error('Error creating ephemeral keypair:', error);
@@ -714,14 +717,32 @@ export const deployProject = async (
     const walletPublicKey = new PublicKey(walletPubkey);
     
     // Back‑end performs full deploy/upgrade + authority transfer
-    await deployOrUpgradeUpgradeable(
-      connection,
-      feePayer,
-      new Uint8Array(soBytes),
-      existing ? finalProgramKp.publicKey : finalProgramKp,
-      walletPublicKey,
-      bufferAuthorityKp
-    );
+    try {
+      // Create a signAndSend function that signs with the buffer authority keypair
+      const signAndSend = async (tx: Transaction, signers?: Keypair[]): Promise<string> => {
+        const allSigners = [feePayer, ...(signers || [])];
+        return await connection.sendTransaction(tx, allSigners, { skipPreflight: true });
+      };
+      
+      // Use the proven implementation with correct authority handling
+      const programId = await deployOrUpgradeUpgradeable(
+        connection,
+        walletPublicKey,
+        signAndSend,
+        Buffer.from(soBytes),
+        'delegated'
+      );
+      
+      // Store the returned programId for later use
+      const programIdPubkey = programId;
+    } catch (err) {
+      if (err instanceof SendTransactionError) {
+        // Get logs from the error object
+        const logs = err.logs || [];
+        console.error('SendTransactionError logs:', logs);
+      }
+      throw err;
+    }
     
     // Clean up the ephemeral key from memory
     ephemeralKeys.delete(bufferAuthority);

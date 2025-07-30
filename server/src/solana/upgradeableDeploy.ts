@@ -7,187 +7,256 @@ import {
   TransactionInstruction,
   SYSVAR_RENT_PUBKEY,
   SYSVAR_CLOCK_PUBKEY,
-  sendAndConfirmTransaction,
+  SendTransactionError,
   LAMPORTS_PER_SOL,
-  // ‼️ BPF_UPGRADE_LOADER_ID is **not** exported in web3.js v1.x
 } from '@solana/web3.js';
+import { Buffer } from 'buffer';
 
-// ---------------------------------------------------------------------------
-// Upgradeable‑loader program‑ID (hard‑coded; same constant the CLI uses)
-// https://explorer.solana.com/address/BPFLoaderUpgradeab1e11111111111111111111111
-// ---------------------------------------------------------------------------
+// BPF Upgrade Loader ID - same as in the client code
 const BPF_UPGRADE_LOADER_ID = new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111');
 
-const CHUNK = 900;                 // safe write size
+// Helper functions for instruction data
+function u32LE(n: number): Buffer {
+  const b = Buffer.alloc(4);
+  b.writeUInt32LE(n, 0);
+  return b;
+}
 
-function u32(n: number) { const b = Buffer.alloc(4); b.writeUInt32LE(n, 0); return b; }
-function u64(n: bigint) { const b = Buffer.alloc(8); b.writeBigUInt64LE(n, 0); return b; }
+function u64LE(n: bigint): Buffer {
+  const b = Buffer.alloc(8);
+  b.writeBigUInt64LE(n, 0);
+  return b;
+}
 
+// Create instruction data helpers
+function createInitializeBufferData(): Buffer {
+  return u32LE(0); // InitializeBuffer tag
+}
+
+function createWriteBufferData(offset: number, data: Buffer): Buffer {
+  const offsetBuf = u32LE(offset);
+  const lenBuf = u64LE(BigInt(data.length));
+  return Buffer.concat([u32LE(1), offsetBuf, lenBuf, data]);
+}
+
+function createDeployInstructionData(maxDataLen: number): Buffer {
+  return Buffer.concat([u32LE(2), u64LE(BigInt(maxDataLen))]);
+}
+
+function createUpgradeInstructionData(): Buffer {
+  return u32LE(3);
+}
+
+function createSetAuthorityInstructionData(): Buffer {
+  return u32LE(4);
+}
+
+// Check buffer authority helper
+async function checkBufferAuthority(
+  connection: Connection,
+  bufferPubkey: PublicKey
+): Promise<PublicKey | null> {
+  try {
+    const accountInfo = await connection.getAccountInfo(bufferPubkey);
+    if (!accountInfo) return null;
+    
+    // Buffer header = 4-byte state enum + 1-byte COption + 32-byte authority = 37 bytes
+    // If COption (at offset 4) is 0, there's no authority
+    if (accountInfo.data[4] === 0) return null;
+    
+    // Otherwise, extract the authority pubkey from the buffer
+    return new PublicKey(accountInfo.data.slice(5, 37));
+  } catch (err) {
+    console.error('Error checking buffer authority:', err);
+    return null;
+  }
+}
+
+/**
+ * Deploy or upgrade a Solana program using the upgradeable loader
+ * This implementation properly handles buffer authority transfers and signing
+ * 
+ * @param connection - Solana connection
+ * @param walletPk - Wallet public key (final upgrade authority)
+ * @param signAndSend - Function to sign and send transactions
+ * @param programData - Program binary data (.so file)
+ * @param deployOption - Whether to use delegated authority for faster writes
+ * @returns The program's public key
+ */
 export async function deployOrUpgradeUpgradeable(
-  conn: Connection,
-  feePayer: Keypair,               // also the upgrade authority
-  soBytes: Uint8Array,
-  /**
-   *  • `null`  → fresh deploy (a new Keypair is created and returned)  
-   *  • `Keypair` → fresh deploy with deterministic pubkey  
-   *  • `PublicKey` → upgrade that existing program
-   */
-  program: Keypair | PublicKey | null,
-  /**
-   * Wallet public key to set as the final upgrade authority
-   */
-  walletPubkey: PublicKey,
-  /**
-   * Buffer authority keypair provided by the client
-   */
-  bufferAuthorityKp: Keypair,
+  connection: Connection,
+  walletPk: PublicKey,
+  signAndSend: (tx: Transaction, signers?: Keypair[]) => Promise<string>,
+  programData: Buffer,
+  deployOption: 'fullWallet' | 'delegated' = 'delegated'
 ): Promise<PublicKey> {
-  // -------------------------------- account prep --------------------------------
-  const bufferKp = Keypair.generate();
-  const programKp = program instanceof Keypair
-    ? program
-    : program === null
-      ? Keypair.generate()
-      : null;
-  const programPk = programKp ? programKp.publicKey : program as PublicKey;
-
-  const [programDataPk] = PublicKey.findProgramAddressSync(
-    [programPk.toBuffer()],
-    BPF_UPGRADE_LOADER_ID,
-  );
-
-  const bufferRent = await conn.getMinimumBalanceForRentExemption(soBytes.length + 37);
-  const progRent   = await conn.getMinimumBalanceForRentExemption(36);
-
-  // fee‑payer is the already‑funded buffer‑authority keypair – no airdrop
-
-  // ──────────────────────────────────────────────────────────────────
-  // 1️⃣  CREATE & INIT BUFFER  (tx1)
-  // ------------------------------------------------------------------
+  console.log('Starting deployOrUpgradeUpgradeable');
+  
+  // Create buffer account
+  const bufferAccount = Keypair.generate();
+  const bufferSpace = 37 + programData.length; // Buffer header + program data
+  const rentExemptionAmt = await connection.getMinimumBalanceForRentExemption(bufferSpace);
+  
+  // Create and initialize buffer
   const createBufferIx = SystemProgram.createAccount({
-    fromPubkey: feePayer.publicKey,
-    newAccountPubkey: bufferKp.publicKey,
-    lamports: bufferRent,
-    space: soBytes.length + 37,
+    fromPubkey: walletPk,
+    lamports: rentExemptionAmt,
+    newAccountPubkey: bufferAccount.publicKey,
+    space: bufferSpace,
     programId: BPF_UPGRADE_LOADER_ID,
   });
   
-  /* -----------------------------------------------------------------
-     InitializeBuffer takes ▸ (buffer acct, rent sysvar) ◂ as accounts.
-     The optional authority is encoded in the instruction data:
-       4‑byte tag = 0   +   1‑byte option = 0 (None)            ⇒ 5 bytes
-     We pass "None" here because we immediately SetAuthority to
-     wallet later on.
-  ----------------------------------------------------------------- */
-  const initBufferIx = new TransactionInstruction({
+  const bufferInitIx = new TransactionInstruction({
     programId: BPF_UPGRADE_LOADER_ID,
     keys: [
-      { pubkey: bufferKp.publicKey, isSigner: true,  isWritable: true },
-      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
+      { pubkey: bufferAccount.publicKey, isSigner: false, isWritable: true },
+      { pubkey: walletPk, isSigner: true, isWritable: false },
     ],
-    data: Buffer.concat([u32(0), Buffer.from([0])]),     // tag 0 + None
+    data: createInitializeBufferData(),
   });
   
-  const tx1 = new Transaction().add(createBufferIx, initBufferIx);
+  let transaction = new Transaction().add(createBufferIx, bufferInitIx);
+  try {
+    // The wallet (phantom) is a signer here, so use signAndSendTransaction to collect its signature
+    await signAndSend(transaction, [bufferAccount]);
+    console.log('Buffer created and initialized');
+  } catch (err) {
+    if (err instanceof SendTransactionError) {
+      console.error('Buffer creation error logs:', err.logs);
+    }
+    throw err;
+  }
   
-  /* Signers: fee‑payer (= bufferAuthorityKp) + bufferKp itself          */
-  await sendAndConfirmTransaction(
-    conn,
-    tx1,
-    [feePayer, bufferKp],
-  );
-
-  // -------------------------------- step 2 – write chunks ------------------------
-  for (let off = 0; off < soBytes.length; off += CHUNK) {
-    const chunk = soBytes.slice(off, off + CHUNK);
+  // Track the current buffer authority
+  let currentBufferAuthority = walletPk;
+  let ephemeralKeypair: Keypair | undefined;
+  
+  // Optionally delegate authority to ephemeral keypair for faster writes
+  if (deployOption === 'delegated') {
+    ephemeralKeypair = Keypair.generate();
+    console.log('Using ephemeral keypair for buffer writes:', ephemeralKeypair.publicKey.toBase58());
+    
+    // Transfer authority to ephemeral keypair
+    const setAuthorityIx = new TransactionInstruction({
+      programId: BPF_UPGRADE_LOADER_ID,
+      keys: [
+        { pubkey: bufferAccount.publicKey, isSigner: false, isWritable: true },
+        { pubkey: currentBufferAuthority, isSigner: true, isWritable: false },
+        { pubkey: ephemeralKeypair.publicKey, isSigner: false, isWritable: false },
+      ],
+      data: createSetAuthorityInstructionData(),
+    });
+    
+    transaction = new Transaction().add(setAuthorityIx);
+    // Wallet must sign the SetAuthority instruction; call signAndSend
+    await signAndSend(transaction);
+    console.log('Authority transferred to ephemeral key');
+    
+    // Update current authority
+    currentBufferAuthority = ephemeralKeypair.publicKey;
+  }
+  
+  // Write program data in chunks
+  const CHUNK_SIZE = 900; // Safe size for instructions
+  for (let offset = 0; offset < programData.length; offset += CHUNK_SIZE) {
+    const end = Math.min(offset + CHUNK_SIZE, programData.length);
+    const chunk = programData.slice(offset, end);
+    
     const writeIx = new TransactionInstruction({
       programId: BPF_UPGRADE_LOADER_ID,
       keys: [
-        { pubkey: bufferKp.publicKey, isSigner: false, isWritable: true },
-        { pubkey: bufferAuthorityKp.publicKey, isSigner: true,  isWritable: false },
+        { pubkey: bufferAccount.publicKey, isSigner: false, isWritable: true },
+        { pubkey: currentBufferAuthority, isSigner: true, isWritable: false },
       ],
-      data: Buffer.concat([u32(1), u32(off), u64(BigInt(chunk.length)), Buffer.from(chunk)]),
+      data: createWriteBufferData(offset, chunk),
     });
-    const t = new Transaction().add(writeIx);
-    t.feePayer = feePayer.publicKey;
-    await sendAndConfirmTransaction(conn, t, [feePayer, bufferAuthorityKp]);
+    
+    transaction = new Transaction().add(writeIx);
+    
+    if (deployOption === 'delegated') {
+      // For write instructions with ephemeral key, the wallet is not a signer
+      // Use connection.sendRawTransaction with only the buffer authority
+      transaction.feePayer = ephemeralKeypair!.publicKey;
+      transaction.recentBlockhash = (await connection.getLatestBlockhash('confirmed')).blockhash;
+      transaction.sign(ephemeralKeypair!);
+      await connection.sendRawTransaction(transaction.serialize(), { 
+        skipPreflight: false, 
+        preflightCommitment: 'confirmed' 
+      });
+    } else {
+      // For wallet-only mode, the wallet needs to sign
+      await signAndSend(transaction);
+    }
+    
+    console.log(`Wrote chunk at offset ${offset}, size ${chunk.length}`);
   }
-
-  // -------------- final deploy / upgrade ------------------
-  const deployOrUpIx =
-    program instanceof PublicKey
-      ? new TransactionInstruction({
-          programId: BPF_UPGRADE_LOADER_ID,             // Upgrade
-          keys: [
-            { pubkey: programDataPk,   isSigner: false, isWritable: true },
-            { pubkey: programPk,       isSigner: false, isWritable: true },
-            { pubkey: bufferKp.publicKey, isSigner: false, isWritable: true },
-            { pubkey: feePayer.publicKey, isSigner: false, isWritable: true }, // spill
-            { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
-            { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
-            { pubkey: bufferAuthorityKp.publicKey,  isSigner: true,  isWritable: false },
-          ],
-          data: u32(3),
-        })
-      : new TransactionInstruction({
-          programId: BPF_UPGRADE_LOADER_ID,             // DeployWithMaxDataLen
-          keys: [
-            { pubkey: feePayer.publicKey, isSigner: true,  isWritable: true },
-            { pubkey: programDataPk,      isSigner: false, isWritable: true },
-            { pubkey: programPk,          isSigner: true,  isWritable: true },
-            { pubkey: bufferKp.publicKey, isSigner: false, isWritable: true },
-            { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
-            { pubkey: SYSVAR_CLOCK_PUBKEY,isSigner: false, isWritable: false },
-            { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-            { pubkey: bufferAuthorityKp.publicKey, isSigner: true,  isWritable: false },
-          ],
-          data: Buffer.concat([u32(2), u64(BigInt(soBytes.length))]),
-        });
-
-  const txFinal = new Transaction();
-
-  // fresh deploy → create the Program account first
-  if (!(program instanceof PublicKey)) {
-    txFinal.add(
-      SystemProgram.createAccount({
-        fromPubkey: feePayer.publicKey,
-        newAccountPubkey: programPk,
-        lamports: progRent,
-        space: 36,
-        programId: BPF_UPGRADE_LOADER_ID,
-      }),
-    );
+  
+  // If we used delegated authority, transfer it back to wallet
+  if (deployOption === 'delegated' && ephemeralKeypair) {
+    const revertAuthorityIx = new TransactionInstruction({
+      programId: BPF_UPGRADE_LOADER_ID,
+      keys: [
+        { pubkey: bufferAccount.publicKey, isSigner: false, isWritable: true },
+        { pubkey: currentBufferAuthority, isSigner: true, isWritable: false },
+        { pubkey: walletPk, isSigner: false, isWritable: false },
+      ],
+      data: createSetAuthorityInstructionData(),
+    });
+    
+    transaction = new Transaction().add(revertAuthorityIx);
+    // Both the wallet (new authority) and the current buffer authority must sign
+    await signAndSend(transaction, [ephemeralKeypair]);
+    console.log('Authority reverted to wallet');
+    
+    // Update current authority
+    currentBufferAuthority = walletPk;
   }
-
-  txFinal.add(deployOrUpIx);
-
-  // 1️⃣  Fetch fresh block‑hash *before* the first signature
-  const { blockhash } = await conn.getLatestBlockhash('confirmed');
-  txFinal.recentBlockhash = blockhash;
-
-  // 2️⃣  Set fee‑payer and collect *all* required signatures
-  txFinal.feePayer = feePayer.publicKey;
-  const signers: Keypair[] = [feePayer, bufferAuthorityKp];
-  if (programKp) signers.push(programKp);
-
-  // 3️⃣  Send & confirm in one step (no wallet signature needed here)
-  await sendAndConfirmTransaction(conn, txFinal, signers, { skipPreflight: true });
-
-  // Hand upgrade authority from buffer‑auth → wallet
-  const setAuthIx = new TransactionInstruction({
+  
+  // Generate program keypair
+  const programKeypair = Keypair.generate();
+  const programPk = programKeypair.publicKey;
+  
+  // Find PDA for program data
+  const [programDataPk] = PublicKey.findProgramAddressSync(
+    [programPk.toBuffer()],
+    BPF_UPGRADE_LOADER_ID
+  );
+  
+  // Create program account
+  const programRent = await connection.getMinimumBalanceForRentExemption(36);
+  const createProgramAcct = SystemProgram.createAccount({
+    fromPubkey: walletPk,
+    newAccountPubkey: programPk,
+    lamports: programRent,
+    space: 36,
+    programId: BPF_UPGRADE_LOADER_ID,
+  });
+  
+  // Deploy with max data length
+  const deployIx = new TransactionInstruction({
     programId: BPF_UPGRADE_LOADER_ID,
     keys: [
-      { pubkey: programDataPk,     isSigner: false, isWritable: true },
-      { pubkey: bufferAuthorityKp.publicKey, isSigner: true,  isWritable: false },
-      { pubkey: walletPubkey,      isSigner: false, isWritable: false },
+      { pubkey: walletPk, isSigner: true, isWritable: true },
+      { pubkey: programDataPk, isSigner: false, isWritable: true },
+      { pubkey: programPk, isSigner: false, isWritable: true },
+      { pubkey: bufferAccount.publicKey, isSigner: false, isWritable: true },
+      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
+      { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      // The current buffer authority must sign here
+      { pubkey: currentBufferAuthority, isSigner: true, isWritable: false },
     ],
-    data: Buffer.from([4, 0, 0, 0]),   // LoaderIx::SetAuthority (u32 LE)
+    data: createDeployInstructionData(programData.length),
   });
-  const txAuth = new Transaction().add(setAuthIx);
-  txAuth.feePayer = feePayer.publicKey;
-  const { blockhash: h2 } = await conn.getLatestBlockhash('confirmed');
-  txAuth.recentBlockhash = h2;
-  await sendAndConfirmTransaction(conn, txAuth, [feePayer, bufferAuthorityKp], { skipPreflight: true });
-
+  
+  // Create final transaction
+  const deployTx = new Transaction()
+    .add(createProgramAcct)
+    .add(deployIx);
+  
+  // Wallet must sign along with programKeypair; use signAndSend
+  await signAndSend(deployTx, [programKeypair]);
+  console.log('Program deployed successfully:', programPk.toBase58());
+  
   return programPk;
-} 
+}
