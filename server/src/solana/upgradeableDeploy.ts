@@ -59,12 +59,7 @@ export async function deployOrUpgradeUpgradeable(
   const bufferRent = await conn.getMinimumBalanceForRentExemption(soBytes.length + 37);
   const progRent   = await conn.getMinimumBalanceForRentExemption(36);
 
-  // -------------------------------- step 0 – fund fee‑payer (safety) -------------
-  const minFeePayerBal = 2 * LAMPORTS_PER_SOL;
-  if ((await conn.getBalance(feePayer.publicKey)) < minFeePayerBal) {
-    const sig = await conn.requestAirdrop(feePayer.publicKey, minFeePayerBal);
-    await conn.confirmTransaction(sig, 'finalized');
-  }
+  // fee‑payer is the already‑funded buffer‑authority keypair – no airdrop
 
   // ──────────────────────────────────────────────────────────────────
   // 1️⃣  CREATE & INIT BUFFER  (tx1)

@@ -89,7 +89,7 @@ async function ensureFeePayerBalance(
   );
 }
 
-import { getServerFeePayer } from '../utils/feePayer';
+// fee‑payer will be the buffer‑authority keypair (funded by the wallet)
 
 /**
  * Try to load the Anchor‑generated `<project>-keypair.json` that was created
@@ -698,20 +698,14 @@ export const deployProject = async (
     console.log(`[DEPLOY] Using RPC endpoint: ${endpoint}`);
     
     const connection = new Connection(endpoint, 'confirmed');
-    // Centralised helper: auto‑loads env/file or generates a keypair on first run
-    const feePayer = getServerFeePayer();
-    console.log(`[DEPLOY] Using server fee payer: ${feePayer.publicKey.toBase58()}`);
+    // Use buffer-authority as fee-payer (wallet already funded it)
+    const feePayer = bufferAuthorityKp;
+    console.log(`[DEPLOY] Using buffer‑authority as fee‑payer: ${feePayer.publicKey.toBase58()}`);
 
     /* ----------------------------------------------------------------- */
     /* REAL DEPLOY 🥳 – uses the upgradeable loader (same path as CLI)   */
     /* ----------------------------------------------------------------- */
     const finalProgramKp = programKeypair ?? Keypair.generate();
-    
-    // Check if fee payer has enough balance (no airdrop)
-    const min = 100_000; // 0.0001 SOL
-    if ((await connection.getBalance(feePayer.publicKey, 'confirmed')) < min) {
-      return next(new AppError('Server fee payer unfunded (<0.0001 SOL)', 402));
-    }
 
     // Decide: new deploy or upgrade based on whether the program already exists
     const existing = await connection.getAccountInfo(finalProgramKp.publicKey, 'confirmed');
