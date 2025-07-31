@@ -219,8 +219,8 @@ export function ProgramDeployer({
         const ephemeralPubkey = new PublicKey(ephemeralPubkeyStr);
         if (DEBUG_LOGS) console.log(`🔑 Ephemeral key (server-side): ${ephemeralPubkey.toBase58()}`);
 
-        // 2. Tell backend which key it should expect to sign with
-        const { taskId } = await deployBackend(projectId, ephemeralPubkey.toBase58());
+        // 2. Register the ephemeral key with the backend
+        await deployBackend(projectId, ephemeralPubkey.toBase58());
         setDeployStage('Building transaction...');
         setProgress(10);
 
@@ -322,8 +322,10 @@ export function ProgramDeployer({
           data: Buffer.concat([
             Buffer.from([2, 0, 0, 0]),
             (() => {
+              // Ensure we're using the correct approach for encoding the program length
               const b = Buffer.alloc(8);
-              b.writeBigUInt64LE(BigInt(programBytes.byteLength), 0);
+              // Explicitly use 0 as the offset to avoid "index out of range" error
+              b.writeBigUInt64LE(BigInt(programBytes.length), 0);
               return b;
             })(),
           ]),
@@ -370,7 +372,7 @@ export function ProgramDeployer({
             projectId,
             encodedTx,
             programId.toBase58(),
-            taskId
+            undefined                   // taskId is now optional but still expected by type
           );
           
           if (DEBUG_LOGS) console.log(`✅ Transaction confirmed with signature: ${signature}`);

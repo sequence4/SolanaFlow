@@ -369,13 +369,13 @@ export const projectApi = {
     projectId: string,
     encodedTx: string,
     programId: string,
-    taskId: string,
+    taskId?: string,
   ): Promise<{ signature: string; programId: string }> => {
     try {
       const response = await api.post(`/projects/${projectId}/relay-tx`, {
         encodedTx,
         programId,
-        taskId,
+        ...(taskId ? { taskId } : {}),
       });
       return response.data;
     } catch (error) {

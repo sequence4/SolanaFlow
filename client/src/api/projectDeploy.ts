@@ -8,11 +8,12 @@ export const createEphemeralKey = (projectId: string) =>
   api.post<{ ephemeralPubkey: string; pubkey?: string }>(`/projects/${projectId}/ephemeral`)
      .then(r => r.data.ephemeralPubkey ?? r.data.pubkey);
 
-/* 2 – wrapper: start backend deploy; returns { taskId } */
-export const deployBackend = (projectId: string, ephemeralPubkey: string) =>
-  api.post<{ taskId: string; message: string }>(
-      `/projects/${projectId}/deploy-ephemeral`,
-      { ephemeralPubkey },                 // backend uses this to look up the key
+/* 2 – wrapper: tell backend which pubkey it should later sign with.
+      Server route is POST /projects/:id/ephemeral and returns { status: 'ok' } */
+export const deployBackend = (projectId: string, pubkey: string) =>
+  api.post<{ status: string }>(
+    `/projects/${projectId}/ephemeral`,
+    { pubkey },                           // server expects `pubkey`
   ).then(r => r.data);
 
 /* 3 – wrapper: REST fallback polling */
