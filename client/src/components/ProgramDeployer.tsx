@@ -47,6 +47,15 @@ const DEBUG_LOGS = process.env.NEXT_PUBLIC_DEBUG_LOGS === 'true';
    They wrap Buffer.writeXXLE so we can see which
    value/offset causes "index out of range".
 ──────────────────────────────────────────── */
+// Global trap so ANY uncaught error prints a stack (esp. "index out of range")
+if (typeof window !== 'undefined') {
+  window.onerror = (msg, src, line, col, err) => {
+    console.error('[window.onerror]', msg, 'at', src, line + ':' + col, err);
+  };
+  window.addEventListener('unhandledrejection', ev => {
+    console.error('[unhandledrejection]', ev.reason);
+  });
+}
 function u32LE(n: number): Buffer {
   const b = Buffer.alloc(4);
   try {
@@ -307,19 +316,25 @@ export function ProgramDeployer({
         const CHUNK = 900;
         for (let off = 0; off < programBytes.length; off += CHUNK) {
           const slice = programBytes.slice(off, off + CHUNK);
-          const writeIx = new TransactionInstruction({
-            programId: new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111'),
-            keys: [
-              { pubkey: bufferAccount.publicKey, isSigner: false, isWritable: true },
-              { pubkey: ephemeralPubkey,        isSigner: true,  isWritable: false },
-            ],
-            data: Buffer.concat([
-              Buffer.from([1, 0, 0, 0]),  // Write tag
-              u32LE(off),
-              u64LE(BigInt(slice.length)),
-              slice,
-            ]),
-          });
+          let writeIx: TransactionInstruction;
+          try {
+            writeIx = new TransactionInstruction({
+              programId: new PublicKey('BPFLoaderUpgradeab1e11111111111111111111'),
+              keys: [
+                { pubkey: bufferAccount.publicKey, isSigner: false, isWritable: true },
+                { pubkey: ephemeralPubkey,        isSigner: true,  isWritable: false },
+              ],
+              data: Buffer.concat([
+                Buffer.from([1, 0, 0, 0]),  // Write tag
+                u32LE(off),
+                u64LE(BigInt(slice.length)),
+                Buffer.from(slice),         // ensure Buffer, not Uint8Array
+              ]),
+            });
+          } catch (e) {
+            console.error(`[STEP-WRITE offset=${off}] failed`, e);
+            throw e;
+          }
           writeInstructions.push(writeIx);
         }
         
@@ -333,24 +348,29 @@ export function ProgramDeployer({
         });
         
         // Deploy instruction
-        const deployIx = new TransactionInstruction({
-          programId: new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111'),
-          keys: [
-            { pubkey: wallet.publicKey!, isSigner: true, isWritable: true },
-            { pubkey: programDataPk, isSigner: false, isWritable: true },
-            { pubkey: programId, isSigner: false, isWritable: true },
-            { pubkey: bufferAccount.publicKey, isSigner: false, isWritable: true },
-            { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
-            { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
-            { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-            { pubkey: ephemeralPubkey, isSigner: true, isWritable: false }, // server co-signs later
-          ],
-          // DeployWithMaxDataLen { max_data_len = programBytes.length } – u32 tag + le-u64
-          data: Buffer.concat([
-            Buffer.from([2, 0, 0, 0]),
-            u64LE(BigInt(programBytes.length)),
-          ]),
-        });
+        let deployIx: TransactionInstruction;
+        try {
+          deployIx = new TransactionInstruction({
+            programId: new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111'),
+            keys: [
+              { pubkey: wallet.publicKey!, isSigner: true, isWritable: true },
+              { pubkey: programDataPk, isSigner: false, isWritable: true },
+              { pubkey: programId, isSigner: false, isWritable: true },
+              { pubkey: bufferAccount.publicKey, isSigner: false, isWritable: true },
+              { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
+              { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
+              { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+              { pubkey: ephemeralPubkey, isSigner: true, isWritable: false },
+            ],
+            data: Buffer.concat([
+              Buffer.from([2, 0, 0, 0]),
+              u64LE(BigInt(programBytes.length)),
+            ]),
+          });
+        } catch (e) {
+          console.error('[STEP-DEPLOY] failed', e);
+          throw e;
+        }
         
         // Build FULL transaction *before* any signature is added
         const deployTx = new Transaction()
