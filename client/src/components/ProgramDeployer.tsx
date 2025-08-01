@@ -42,6 +42,33 @@ import { BPF_LOADER_CHUNK_SIZE } from "@/utils/constants";
 // environment.  This reduces noisy console output in production.
 const DEBUG_LOGS = process.env.NEXT_PUBLIC_DEBUG_LOGS === 'true';
 
+/* ────────────────────────────────────────────
+   TEMP instrumentation helpers
+   They wrap Buffer.writeXXLE so we can see which
+   value/offset causes "index out of range".
+──────────────────────────────────────────── */
+function u32LE(n: number): Buffer {
+  const b = Buffer.alloc(4);
+  try {
+    b.writeUInt32LE(n, 0);
+  } catch (e) {
+    console.error('[u32LE] failed – value', n, 'buffer len', b.length, e);
+    throw e;
+  }
+  return b;
+}
+
+function u64LE(n: bigint): Buffer {
+  const b = Buffer.alloc(8);
+  try {
+    b.writeBigUInt64LE(n, 0);
+  } catch (e) {
+    console.error('[u64LE] failed – value', n.toString(), 'buffer len', b.length, e);
+    throw e;
+  }
+  return b;
+}
+
 interface ProgramDeployerProps {
   projectId: string;
   isOpen: boolean;
@@ -287,9 +314,9 @@ export function ProgramDeployer({
               { pubkey: ephemeralPubkey,        isSigner: true,  isWritable: false },
             ],
             data: Buffer.concat([
-              Buffer.from([1, 0, 0, 0]),              // Write tag
-              (() => { const b = Buffer.alloc(4); b.writeUInt32LE(off, 0); return b; })(),
-              (() => { const b = Buffer.alloc(8); b.writeBigUInt64LE(BigInt(slice.length), 0); return b; })(),
+              Buffer.from([1, 0, 0, 0]),  // Write tag
+              u32LE(off),
+              u64LE(BigInt(slice.length)),
               slice,
             ]),
           });
@@ -321,13 +348,7 @@ export function ProgramDeployer({
           // DeployWithMaxDataLen { max_data_len = programBytes.length } – u32 tag + le-u64
           data: Buffer.concat([
             Buffer.from([2, 0, 0, 0]),
-            (() => {
-              // Ensure we're using the correct approach for encoding the program length
-              const b = Buffer.alloc(8);
-              // Explicitly use 0 as the offset to avoid "index out of range" error
-              b.writeBigUInt64LE(BigInt(programBytes.length), 0);
-              return b;
-            })(),
+            u64LE(BigInt(programBytes.length)),
           ]),
         });
         
@@ -404,7 +425,7 @@ export function ProgramDeployer({
         return;
       } catch (err: any) {
         console.error(err);
-        toast.error("Deployment failed", { description: err.message });
+        toast.error("Deployment failed", { description: err.message ?? err.toString() });
       } finally {
         setIsLoading(false);
         setTimeout(() => {
