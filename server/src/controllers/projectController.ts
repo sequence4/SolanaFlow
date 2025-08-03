@@ -149,7 +149,6 @@ async function loadProgramKeypair(projectId: string): Promise<Keypair | null> {
 import { waitForTaskCompletion, updateTaskStatus } from '../utils/taskUtils';
 import { createProject as createProjectDb } from '../utils/project/createProject';
 import { catchAsync } from '../utils/catchAsync';
-import { getProgramSecret } from '../utils/awsSecrets';
 import { ensureNonceAccount } from '../utils/nonceUtils';
 /* -------------------------------------------------------------------------- */
 /*                              Nonce endpoint                                */
@@ -174,60 +173,27 @@ export const getNonceAccount = async (
       return next(new AppError('walletPubkey required', 400));
     }
 
-    /**
-     * Resolve durable‑nonce fee‑payer secret key:
-     *   ① dev  – <APP_CONFIG.WALLETS_FOLDER>/nonce-fee-payer.json
-     *   ② prod – AWS Secrets Manager  ("NONCE_FEE_PAYER" secret)
-     */
-    let feePayer: Keypair | null = null;
 
-    /* ── 1️⃣  local file (development) ────────────────────────────── */
-    try {
-      const localPath = path.join(
-        APP_CONFIG.WALLETS_FOLDER,
-        'nonce-fee-payer.json',
-      );
-      if (fs.existsSync(localPath)) {
-        const arr = JSON.parse(fs.readFileSync(localPath, 'utf8'));
-        if (Array.isArray(arr) && arr.length === 64) {
-          feePayer = Keypair.fromSecretKey(Uint8Array.from(arr));
-          console.log('[NONCE] Loaded fee‑payer from local file');
-        }
-      }
-    } catch (e) {
-      console.warn('[NONCE] Failed to load local fee‑payer file:', (e as Error).message);
-    }
-
-    /* ── 2️⃣  AWS Secrets Manager (production) ────────────────────── */
-    if (!feePayer) {
-      try {
-        const secret = await getProgramSecret('NONCE_FEE_PAYER'); // returns Uint8Array
-        feePayer = Keypair.fromSecretKey(secret);
-        console.log('[NONCE] Loaded fee‑payer from AWS Secrets Manager');
-      } catch (e: any) {
-        console.warn('[NONCE] AWS secret lookup failed:', e.message);
-      }
-    }
-
-    /* ── 3️⃣  hard‑fail if none found ─────────────────────────────── */
-    if (!feePayer) {
-      return next(
-        new AppError(
-          'Durable‑nonce fee‑payer keypair not found (neither local file nor AWS secret).',
-          500,
-        ),
-      );
-    }
     const connection = new Connection(
       process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com',
       'confirmed',
     );
 
-    const { noncePubkey, nonceHash } = await ensureNonceAccount(
-      connection,
-      new PublicKey(walletPubkey),
-      feePayer,
-    );
+    let noncePubkey: PublicKey;
+    let nonceHash: string;
+    try {
+      ({ noncePubkey, nonceHash } = await ensureNonceAccount(
+        connection,
+        new PublicKey(walletPubkey),
+      ));
+    } catch (e) {
+      return next(
+        new AppError(
+          'No durable‑nonce account found for this wallet. Create one and try again.',
+          404,
+        ),
+      );
+    }
 
     res.json({
       noncePubkey: noncePubkey.toBase58(),

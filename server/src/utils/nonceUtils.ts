@@ -1,6 +1,5 @@
 import {
   Connection,
-  Keypair,
   PublicKey,
   SystemProgram,
   NONCE_ACCOUNT_LENGTH,
@@ -8,14 +7,14 @@ import {
 
 /**
  * Ensure a nonce‑account exists whose authority is `authorizedPubkey`.
- * If none is found, create one funded by `feePayer`.
+ * If none is found **we no longer create it on the server** –  
+ * the caller's wallet must create & fund the account itself.
  *
  * Returns `{ noncePubkey, nonceHash }`.
  */
 export async function ensureNonceAccount(
   connection: Connection,
   authorizedPubkey: PublicKey,
-  feePayer: Keypair,
 ): Promise<{ noncePubkey: PublicKey; nonceHash: string }> {
   /* 1️⃣ look for any existing nonce‑account owned by `authorizedPubkey` */
   const nonceAccts = await connection.getProgramAccounts(SystemProgram.programId, {
@@ -31,30 +30,13 @@ export async function ensureNonceAccount(
     ],
   });
 
-  let noncePubkey: PublicKey;
-
-  if (nonceAccts.length) {
-    noncePubkey = nonceAccts[0].pubkey;
-  } else {
-    /* 2️⃣ create a brand‑new nonce account */
-    const nonceKp = Keypair.generate();
-    noncePubkey = nonceKp.publicKey;
-
-    const lamports = await connection.getMinimumBalanceForRentExemption(
-      NONCE_ACCOUNT_LENGTH,
+  if (!nonceAccts.length) {
+    throw new Error(
+      'No durable‑nonce account found for this wallet (please create & fund one).',
     );
-
-    const tx = SystemProgram.createNonceAccount({
-      fromPubkey: feePayer.publicKey,
-      noncePubkey,
-      authorizedPubkey,
-      lamports,
-    });
-
-    await connection.sendTransaction(tx, [feePayer, nonceKp], {
-      skipPreflight: true,
-    });
   }
+
+  const noncePubkey = nonceAccts[0].pubkey;
 
   /* 3️⃣ fetch current hash stored in the nonce account */
   const nonceAccount = await connection.getNonce(noncePubkey, 'confirmed');
