@@ -291,6 +291,8 @@ export function ProgramDeployer({
           space: bufferSpace,
           programId: new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111'),
         });
+
+        console.log("createBufferIx", createBufferIx);
         
         // Initialize buffer with wallet as authority
         const bufferInitIx = new TransactionInstruction({
@@ -301,6 +303,8 @@ export function ProgramDeployer({
           ],
           data: Buffer.from([0, 0, 0, 0]), // InitializeBuffer tag
         });
+
+        console.log("bufferInitIx", bufferInitIx);
         
         // Set buffer authority to ephemeral key
         const setAuthorityIx = new TransactionInstruction({
@@ -312,6 +316,8 @@ export function ProgramDeployer({
           ],
           data: Buffer.from([4, 0, 0, 0]), // SetAuthority tag
         });
+
+        console.log("setAuthorityIx", setAuthorityIx);
         
         // Prepare write instructions for program bytes
         const writeInstructions: TransactionInstruction[] = [];
@@ -333,12 +339,15 @@ export function ProgramDeployer({
                 Buffer.from(slice),         // ensure Buffer, not Uint8Array
               ]),
             });
+            console.log("writeIx", writeIx);
           } catch (e) {
             console.error(`[STEP-WRITE offset=${off}] failed`, e);
             throw e;
           }
           writeInstructions.push(writeIx);
         }
+
+        console.log("writeInstructions", writeInstructions);
         
         // Create program account
         const createProgramAcct = SystemProgram.createAccount({
@@ -348,6 +357,8 @@ export function ProgramDeployer({
           space: 36,
           programId: new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111'),
         });
+
+        console.log("createProgramAcct", createProgramAcct);
         
         // Deploy instruction
         let deployIx: TransactionInstruction;
@@ -373,6 +384,8 @@ export function ProgramDeployer({
           console.error('[STEP-DEPLOY] failed', e);
           throw e;
         }
+
+        console.log("deployIx", deployIx);
         
         // Build FULL transaction *before* any signature is added
         const deployTx = new Transaction()
@@ -384,6 +397,8 @@ export function ProgramDeployer({
           // program account + deploy instruction
           .add(createProgramAcct)
           .add(deployIx);
+
+        console.log("deployTx", deployTx);
 
         // Recent block-hash & fee-payer
         const { blockhash } = await connection.getLatestBlockhash("confirmed");
@@ -409,6 +424,8 @@ export function ProgramDeployer({
         setDeployStage('Sending to server for co-signing...');
         setProgress(60);
         const encodedTx = deployTx.serialize({ requireAllSignatures: false }).toString('base64');
+
+        console.log("encodedTx", encodedTx);
         
         try {
           const { signature } = await projectApi.relaySignedTx(
