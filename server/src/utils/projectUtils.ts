@@ -1528,24 +1528,48 @@ export async function signDeployTxAndBroadcast(
       continue;
     }
   }
-  if (!programKeypair) {
-    throw new Error(`No keypair matches program ID ${programId} after checking ${candidates.length} candidates`);
-  }
-  
   // Log a simplified message about the transaction
   console.log(`[SIGNING] Received transaction for program ${programId} from project ${projectId}`);
   
-  // Decode the partial transaction and add the program signature.
-  const raw = Buffer.from(encodedTx, 'base64');
+  // Decode the incoming (part-signed) transaction **once**
+  const raw         = Buffer.from(encodedTx, "base64");
   const transaction = Transaction.from(raw);
   
   // Log simplified transaction info
   console.log(`[SIGNING] Transaction has ${transaction.signatures.length} signatures and ${transaction.instructions.length} instructions`);
+
+  // ------------------------------------------------------------------
+  // Do we actually still need the program-id signature?
+  //  • If the client already signed with `programKeypair`, we can skip
+  //    any key-lookup on the server.
+  //  • Otherwise we fall back to the legacy behaviour (load the secret
+  //    and append the missing signature, if we can find it).
+  // ------------------------------------------------------------------
+  const needsProgramSig = transaction.signatures.some(
+    ({ publicKey, signature }) =>
+      publicKey.toBase58() === programId && !signature               // signature is null / undefined
+  );
+
+  if (!needsProgramSig) {
+    console.log(
+      `[SIGNING] Program signature already present – skipping server-side signing`
+    );
+  } else if (programKeypair) {
+    transaction.partialSign(programKeypair);
+    console.log(
+      `[SIGNING] Added program signature using server keypair ${programId}`
+    );
+  } else {
+    console.warn(
+      `[SIGNING] No server keypair for program ${programId}; assuming client signature is sufficient`
+    );
+  }
   
-  transaction.partialSign(programKeypair);
-  
-  // Log simplified signing info
-  console.log(`[SIGNING] Transaction signed with program keypair ${programId}`);
+  // Log compact transaction statistics
+  console.log(
+    `[SIGNING] Transaction now has ${transaction.signatures.filter(s => s.signature).length
+    } signed signature(s) across ${transaction.signatures.length} signer(s)`
+  );
   
   /* -----------------------------------------------------------
    * Robust connection helper: fall back to a sane default
@@ -1564,7 +1588,7 @@ export async function signDeployTxAndBroadcast(
 
   // Check for any missing signatures from server-resident keys
   for (const { publicKey, signature } of transaction.signatures) {
-    if (!signature && publicKey && !publicKey.equals(programKeypair.publicKey)) {
+    if (!signature && publicKey && (programKeypair === null || !publicKey.equals(programKeypair.publicKey))) {
       const keyPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${publicKey.toBase58()}.json`);
       if (fs.existsSync(keyPath)) {
         console.log(`[SIGNING] Found server key for ${publicKey.toBase58()}, adding signature`);
