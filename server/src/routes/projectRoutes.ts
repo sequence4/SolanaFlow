@@ -20,6 +20,7 @@ import {
   listProjects,
   getProgramId,
   relaySignedTx,
+  getNonceAccount,
 } from '../controllers/projectController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { buildProject, testProject, getBuildArtifact } from '../controllers/projectController';
@@ -56,6 +57,7 @@ router.post('/:id/deploy-ephemeral', authMiddleware, deployProjectEphemeral);
 
 router.get('/:id/program-id', authMiddleware, getProgramId);
 router.post('/:id/relay-tx', authMiddleware, relaySignedTx);
+router.post('/:id/nonce', authMiddleware, getNonceAccount);
 router.post('/:id/test', authMiddleware, testProject);
 router.post('/:id/run-command', authMiddleware, runProjectCommand);
 router.post('/:id/run-script', authMiddleware, runProjectCommand);

@@ -150,6 +150,62 @@ import { waitForTaskCompletion, updateTaskStatus } from '../utils/taskUtils';
 import { createProject as createProjectDb } from '../utils/project/createProject';
 import { catchAsync } from '../utils/catchAsync';
 import { getProgramSecret } from '../utils/awsSecrets';
+import { ensureNonceAccount } from '../utils/nonceUtils';
+/* -------------------------------------------------------------------------- */
+/*                              Nonce endpoint                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * POST /projects/:id/nonce
+ *
+ * Creates (or retrieves) a durable nonce account controlled by the caller's
+ * wallet (fee‑payer = server).  Returns `{ noncePubkey, nonceHash }`.
+ */
+export const getNonceAccount = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id: projectId } = req.params;
+    const { walletPubkey } = req.body;
+
+    if (!walletPubkey) {
+      return next(new AppError('walletPubkey required', 400));
+    }
+
+    const feePayerSecret = process.env.NONCE_FEE_PAYER ?? '';
+    if (!feePayerSecret) {
+      return next(
+        new AppError(
+          'Server env var NONCE_FEE_PAYER (64‑byte secret‑key JSON) is missing',
+          500,
+        ),
+      );
+    }
+
+    const feePayer = Keypair.fromSecretKey(
+      Uint8Array.from(JSON.parse(feePayerSecret)),
+    );
+    const connection = new Connection(
+      process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com',
+      'confirmed',
+    );
+
+    const { noncePubkey, nonceHash } = await ensureNonceAccount(
+      connection,
+      new PublicKey(walletPubkey),
+      feePayer,
+    );
+
+    res.json({
+      noncePubkey: noncePubkey.toBase58(),
+      nonceHash,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
 
 export const runCommandController = async (
   req: Request,

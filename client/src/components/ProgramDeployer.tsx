@@ -257,6 +257,16 @@ export function ProgramDeployer({
         }
         if (DEBUG_LOGS) console.log(`🔑 Ephemeral key (server-side): ${ephemeralPubkeyStr}`);
 
+        // 2. Ask backend for a durable nonce we can anchor the final tx to
+        const { noncePubkey, nonceHash } = await projectApi.getNonce(
+          projectId,
+          wallet.publicKey!.toBase58(),
+        );
+        if (DEBUG_LOGS)
+          console.log(
+            `⏳ Durable nonce acquired – acct ${noncePubkey}, hash ${nonceHash}`,
+          );
+
         // Construct PublicKey with the string returned from the server
         const ephemeralPubkey = new PublicKey(ephemeralPubkeyStr);
         setDeployStage('Building transaction...');
@@ -409,15 +419,21 @@ export function ProgramDeployer({
         /* ──────────────────────────────────────────────
            Stage 3 – program account + deploy
         ────────────────────────────────────────────── */
+        const advanceIx = SystemProgram.nonceAdvance({
+          noncePubkey: new PublicKey(noncePubkey),
+          authorizedPubkey: wallet.publicKey!,
+        });
+
         const deployTx = new Transaction()
+          .add(advanceIx)            /* must be FIRST for durable nonce   */
           .add(createProgramAcct)
           .add(deployIx);
 
         console.log("deployTx", deployTx);
 
         // Recent block-hash & fee-payer
-        const { blockhash } = await connection.getLatestBlockhash("confirmed");
-        deployTx.recentBlockhash = blockhash;
+        /* Use the durable nonce instead of a recent block‑hash */
+        deployTx.recentBlockhash = nonceHash;
         deployTx.feePayer = wallet.publicKey!;
 
         /* Size guard – should now be well below the 1 232 B ceiling */
@@ -427,8 +443,8 @@ export function ProgramDeployer({
 
         /* Helper used above */
         async function signAndRelay(tx: Transaction, extras: Keypair[]) {
+          /* re‑anchor intermediate txs to fresh *standard* block‑hashes */
           const { blockhash } = await connection.getLatestBlockhash("confirmed");
-          tx.recentBlockhash = blockhash;
           tx.feePayer = wallet.publicKey!;
           await wallet.signTransaction!(tx);
           tx.partialSign(...extras);

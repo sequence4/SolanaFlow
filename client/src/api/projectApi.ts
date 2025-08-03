@@ -397,4 +397,15 @@ export const projectApi = {
     }
   },
 
+  /** Durable‑nonce helper */
+  getNonce: async (
+    projectId: string,
+    walletPubkey: string,
+  ): Promise<{ noncePubkey: string; nonceHash: string }> => {
+    const { data } = await api.post(`/projects/${projectId}/nonce`, {
+      walletPubkey,
+    });
+    return data;
+  },
+
 };
