@@ -4,20 +4,15 @@ import { streamTaskStatus } from "./taskStream";
 import { TaskEvent } from "./taskStream";
 
 /* 1 – wrapper: create an ephemeral key (already exists via projectApi) */
+// Request an ephemeral authority key and return its base‑58 string
 export const createEphemeralKey = (projectId: string): Promise<string> =>
-  api.post<{ ephemeralPubkey: string, pubkey?: string }>(`/projects/${projectId}/ephemeral`)
-     .then(r => {
-       // Debug logging to help diagnose issues
-       const DEBUG_LOGS = process.env.NEXT_PUBLIC_DEBUG_LOGS === 'true';
-       if (DEBUG_LOGS) console.log('[createEphemeralKey] Response:', r.data);
-       
-       // Return ephemeralPubkey if available, otherwise fall back to pubkey
-       const key = r.data.ephemeralPubkey || r.data.pubkey;
-       if (!key) {
-         throw new Error('Server did not return a valid ephemeral public key');
-       }
-       return key;
-     });
+  api
+    .post<{ ephemeralPubkey: string; pubkey?: string }>(`/projects/${projectId}/ephemeral`)
+    .then((r) => {
+      const key = r.data.ephemeralPubkey || r.data.pubkey;
+      if (!key) throw new Error("Server did not return a valid ephemeral public key");
+      return key;
+    });
 
 /* 2 – wrapper: tell backend which pubkey it should later sign with.
       Server route is POST /projects/:id/ephemeral and returns { status: 'ok' } */

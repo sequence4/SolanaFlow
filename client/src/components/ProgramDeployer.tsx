@@ -252,18 +252,15 @@ export function ProgramDeployer({
         /* ───────────── NEW: wallet-first signing flow ───────────── */
         // 1. Create an ephemeral keypair on the backend (secret stays on server)
         const ephemeralPubkeyStr = await createEphemeralKey(projectId);
-        
         if (!ephemeralPubkeyStr) {
           throw new Error("Failed to get ephemeral public key from server");
         }
-        
         if (DEBUG_LOGS) console.log(`🔑 Ephemeral key (server-side): ${ephemeralPubkeyStr}`);
-        
-        // 2. Register the ephemeral key with the backend
-        // Pass the string directly - don't call toBase58() on a string
+
+        // 2. Register the ephemeral key with the backend using the base‑58 string
         await deployBackend(projectId, ephemeralPubkeyStr);
-        
-        // Create PublicKey object from the string after backend call
+
+        // Construct PublicKey only after the backend call
         const ephemeralPubkey = new PublicKey(ephemeralPubkeyStr);
         setDeployStage('Building transaction...');
         setProgress(10);
