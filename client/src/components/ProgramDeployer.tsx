@@ -35,7 +35,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { connection } from "@/utils/connection";
 
-import { createEphemeralKey, deployBackend, EphemeralDeployOptions, deployWithEphemeralKey } from "@/api/projectDeploy";
+import { createEphemeralKey, EphemeralDeployOptions, deployWithEphemeralKey } from "@/api/projectDeploy";
 import { BPF_LOADER_CHUNK_SIZE } from "@/utils/constants";
 
 // Toggle verbose client-side logs by setting NEXT_PUBLIC_DEBUG_LOGS=true in your
@@ -257,10 +257,7 @@ export function ProgramDeployer({
         }
         if (DEBUG_LOGS) console.log(`🔑 Ephemeral key (server-side): ${ephemeralPubkeyStr}`);
 
-        // 2. Register the ephemeral key with the backend using the base‑58 string
-        await deployBackend(projectId, ephemeralPubkeyStr);
-
-        // Construct PublicKey only after the backend call
+        // Construct PublicKey with the string returned from the server
         const ephemeralPubkey = new PublicKey(ephemeralPubkeyStr);
         setDeployStage('Building transaction...');
         setProgress(10);
