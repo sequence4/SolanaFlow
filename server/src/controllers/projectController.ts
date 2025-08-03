@@ -646,6 +646,7 @@ export const createEphemeralKeypair = async (req: Request, res: Response, next: 
     // Return only the public key to the client
     res.status(200).json({
       message: 'Ephemeral keypair created successfully',
+      pubkey,
       ephemeralPubkey: pubkey
     });
   } catch (error) {
