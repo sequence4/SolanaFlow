@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { connection } from "@/utils/connection";
+import { useWalletSigner, createNonceAccount } from "@/utils/wallet";
 
 import { createEphemeralKey, EphemeralDeployOptions, deployWithEphemeralKey } from "@/api/projectDeploy";
 import { BPF_LOADER_CHUNK_SIZE, BPF_UPGRADE_LOADER_ID } from "@/utils/constants";
@@ -92,6 +93,7 @@ export function ProgramDeployer({
   onSuccess,
 }: ProgramDeployerProps) {
   const wallet = useWallet();
+  const walletSigner = useWalletSigner();
   const { projectContext } = useContext(ProjectContext);
   const existingProgramId = projectContext?.details?.projectState?.programId;
 
@@ -258,14 +260,58 @@ export function ProgramDeployer({
         if (DEBUG_LOGS) console.log(`🔑 Ephemeral key (server-side): ${ephemeralPubkeyStr}`);
 
         // 2. Ask backend for a durable nonce we can anchor the final tx to
-        const { noncePubkey, nonceHash } = await projectApi.getNonce(
-          projectId,
-          wallet.publicKey!.toBase58(),
-        );
-        if (DEBUG_LOGS)
-          console.log(
-            `⏳ Durable nonce acquired – acct ${noncePubkey}, hash ${nonceHash}`,
+        let noncePubkey: string;
+        let nonceHash: string;
+        
+        try {
+          // First try to get an existing nonce account
+          const nonceResult = await projectApi.getNonce(
+            projectId,
+            wallet.publicKey!.toBase58(),
           );
+          noncePubkey = nonceResult.noncePubkey;
+          nonceHash = nonceResult.nonceHash;
+          
+          if (DEBUG_LOGS)
+            console.log(
+              `⏳ Existing durable nonce found – acct ${noncePubkey}, hash ${nonceHash}`,
+            );
+        } catch (error) {
+          // If we get NO_NONCE_ACCOUNT, create one with the user's wallet
+          if (error instanceof Error && error.message === "NO_NONCE_ACCOUNT") {
+            setDeployStage('Creating durable nonce account...');
+            if (DEBUG_LOGS) console.log('⏳ No nonce account found, creating one with wallet...');
+            
+            try {
+              // Create a new nonce account
+              const { noncePubkey: newNoncePubkey, signature } = await walletSigner.createNonce(connection);
+              
+              if (DEBUG_LOGS) 
+                console.log(`✅ Created nonce account ${newNoncePubkey.toBase58()} (tx: ${signature})`);
+              
+              // Try getting the nonce again now that we've created an account
+              const nonceResult = await projectApi.getNonce(
+                projectId,
+                wallet.publicKey!.toBase58(),
+              );
+              
+              noncePubkey = nonceResult.noncePubkey;
+              nonceHash = nonceResult.nonceHash;
+              
+              if (DEBUG_LOGS)
+                console.log(
+                  `⏳ Durable nonce acquired – acct ${noncePubkey}, hash ${nonceHash}`,
+                );
+            } catch (createError) {
+              console.error('Failed to create nonce account:', createError);
+              throw new Error('Failed to create durable nonce account. Please try again.');
+            }
+          } else {
+            // Rethrow any other errors
+            console.error('Error getting nonce account:', error);
+            throw error;
+          }
+        }
 
         // Construct PublicKey with the string returned from the server
         const ephemeralPubkey = new PublicKey(ephemeralPubkeyStr);

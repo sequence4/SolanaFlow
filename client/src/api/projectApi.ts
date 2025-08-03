@@ -347,8 +347,16 @@ export const projectApi = {
       const full = withDappPath(raw, projectId);
       return { containerUrl: full };
     } catch (error) {
-      console.error('[DEBUG_API] Error fetching container URL:', error);
-      throw error;
+      // Only surface "not found" errors in development (for debugging)
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[DEBUG_API] Container URL not found (404) for project', projectId);
+        }
+        return { containerUrl: "" };
+      } else {
+        console.error('[DEBUG_API] Error fetching container URL:', error);
+        throw error;
+      }
     }
   },
   
@@ -402,10 +410,18 @@ export const projectApi = {
     projectId: string,
     walletPubkey: string,
   ): Promise<{ noncePubkey: string; nonceHash: string }> => {
-    const { data } = await api.post(`/projects/${projectId}/nonce`, {
-      walletPubkey,
-    });
-    return data;
+    try {
+      const { data } = await api.post(`/projects/${projectId}/nonce`, {
+        walletPubkey,
+      });
+      return data;
+    } catch (error) {
+      // If we get a 404, the server is telling us no nonce account exists for this wallet
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        throw new Error("NO_NONCE_ACCOUNT");
+      }
+      throw error;
+    }
   },
 
 };

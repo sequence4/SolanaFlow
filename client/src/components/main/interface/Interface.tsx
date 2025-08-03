@@ -320,7 +320,9 @@ const Interface = () => {
                     console.log("Container URL unchanged – iframe reloading");
                 }
             } else {
-                console.warn("No containerUrl found after refresh attempt");
+                if (process.env.NODE_ENV === 'development') {
+                    console.warn("No containerUrl found after refresh attempt");
+                }
             }
         } catch (error) {
             console.error("Error refreshing container URL:", error);
