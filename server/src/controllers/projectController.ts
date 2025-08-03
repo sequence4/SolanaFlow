@@ -174,19 +174,50 @@ export const getNonceAccount = async (
       return next(new AppError('walletPubkey required', 400));
     }
 
-    const feePayerSecret = process.env.NONCE_FEE_PAYER ?? '';
-    if (!feePayerSecret) {
+    /**
+     * Resolve durable‑nonce fee‑payer secret key:
+     *   ① dev  – <APP_CONFIG.WALLETS_FOLDER>/nonce-fee-payer.json
+     *   ② prod – AWS Secrets Manager  ("NONCE_FEE_PAYER" secret)
+     */
+    let feePayer: Keypair | null = null;
+
+    /* ── 1️⃣  local file (development) ────────────────────────────── */
+    try {
+      const localPath = path.join(
+        APP_CONFIG.WALLETS_FOLDER,
+        'nonce-fee-payer.json',
+      );
+      if (fs.existsSync(localPath)) {
+        const arr = JSON.parse(fs.readFileSync(localPath, 'utf8'));
+        if (Array.isArray(arr) && arr.length === 64) {
+          feePayer = Keypair.fromSecretKey(Uint8Array.from(arr));
+          console.log('[NONCE] Loaded fee‑payer from local file');
+        }
+      }
+    } catch (e) {
+      console.warn('[NONCE] Failed to load local fee‑payer file:', (e as Error).message);
+    }
+
+    /* ── 2️⃣  AWS Secrets Manager (production) ────────────────────── */
+    if (!feePayer) {
+      try {
+        const secret = await getProgramSecret('NONCE_FEE_PAYER'); // returns Uint8Array
+        feePayer = Keypair.fromSecretKey(secret);
+        console.log('[NONCE] Loaded fee‑payer from AWS Secrets Manager');
+      } catch (e: any) {
+        console.warn('[NONCE] AWS secret lookup failed:', e.message);
+      }
+    }
+
+    /* ── 3️⃣  hard‑fail if none found ─────────────────────────────── */
+    if (!feePayer) {
       return next(
         new AppError(
-          'Server env var NONCE_FEE_PAYER (64‑byte secret‑key JSON) is missing',
+          'Durable‑nonce fee‑payer keypair not found (neither local file nor AWS secret).',
           500,
         ),
       );
     }
-
-    const feePayer = Keypair.fromSecretKey(
-      Uint8Array.from(JSON.parse(feePayerSecret)),
-    );
     const connection = new Connection(
       process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com',
       'confirmed',
