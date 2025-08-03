@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { connection } from "@/utils/connection";
-import { useWalletSigner, createNonceAccount } from "@/utils/wallet";
+import { useWalletSigner } from "@/utils/wallet";
 
 import { createEphemeralKey, EphemeralDeployOptions, deployWithEphemeralKey } from "@/api/projectDeploy";
 import { BPF_LOADER_CHUNK_SIZE, BPF_UPGRADE_LOADER_ID } from "@/utils/constants";
@@ -276,20 +276,18 @@ export function ProgramDeployer({
             console.log(
               `⏳ Existing durable nonce found – acct ${noncePubkey}, hash ${nonceHash}`,
             );
-        } catch (error) {
-          // If we get NO_NONCE_ACCOUNT, create one with the user's wallet
-          if (error instanceof Error && error.message === "NO_NONCE_ACCOUNT") {
-            setDeployStage('Creating durable nonce account...');
-            if (DEBUG_LOGS) console.log('⏳ No nonce account found, creating one with wallet...');
+        } catch (error: any) {
+          /* Backend 404 ⇒ wallet has no nonce‑account yet */
+          if (error?.response?.status === 404) {
+            setDeployStage('Creating durable nonce account…');
+            if (DEBUG_LOGS) console.log('⏳ No nonce account found, creating one with wallet…');
             
             try {
-              // Create a new nonce account
-              const { noncePubkey: newNoncePubkey, signature } = await walletSigner.createNonce(connection);
+              const newNoncePk = await walletSigner.createNonce(connection);
+              if (DEBUG_LOGS)
+                console.log(`✅ Created nonce account ${newNoncePk.toBase58()}`);
               
-              if (DEBUG_LOGS) 
-                console.log(`✅ Created nonce account ${newNoncePubkey.toBase58()} (tx: ${signature})`);
-              
-              // Try getting the nonce again now that we've created an account
+              // Retry now that we have a nonce account
               const nonceResult = await projectApi.getNonce(
                 projectId,
                 wallet.publicKey!.toBase58(),
@@ -307,8 +305,7 @@ export function ProgramDeployer({
               throw new Error('Failed to create durable nonce account. Please try again.');
             }
           } else {
-            // Rethrow any other errors
-            console.error('Error getting nonce account:', error);
+            // Any other error => re‑throw
             throw error;
           }
         }

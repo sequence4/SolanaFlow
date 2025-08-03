@@ -1,56 +1,40 @@
-import { Connection, Transaction, Keypair, PublicKey, SystemProgram, NONCE_ACCOUNT_LENGTH } from "@solana/web3.js";
+import {
+  Connection,
+  Transaction,
+  PublicKey,
+  Keypair,
+  SystemProgram,
+  NONCE_ACCOUNT_LENGTH
+} from "@solana/web3.js";
 import { useWallet } from "@solana/wallet-adapter-react";
 
 /**
  * React hook for wallet transaction signing and utilities
  */
 /**
- * Creates a new durable nonce account for the given wallet
- * 
- * @param connection Solana connection
- * @param walletPublicKey Public key of the wallet that will be the nonce authority
- * @param signTransaction Function to sign transactions with the wallet
- * @returns Object containing the nonce public key and transaction signature
+ * Create a **durable‑nonce** account owned (and paid) by the connected wallet.
+ * Returns the new nonce‑account public key once the tx is confirmed.
  */
 export async function createNonceAccount(
   connection: Connection,
-  walletPublicKey: PublicKey,
-  signTransaction: (transaction: Transaction) => Promise<Transaction>
-): Promise<{ noncePubkey: PublicKey; signature: string }> {
-  // Generate a new keypair for the nonce account
-  const nonceKeypair = Keypair.generate();
-  const noncePubkey = nonceKeypair.publicKey;
-  
-  // Calculate minimum rent exemption for the nonce account
-  const lamports = await connection.getMinimumBalanceForRentExemption(NONCE_ACCOUNT_LENGTH);
-  
-  // Create the nonce account transaction
+  walletPubkey: PublicKey,
+  sendTx: (tx: Transaction, connection: Connection) => Promise<string>
+): Promise<PublicKey> {
+  const nonceKey = Keypair.generate();
+  const lamports = await connection.getMinimumBalanceForRentExemption(
+    NONCE_ACCOUNT_LENGTH
+  );
+
   const tx = SystemProgram.createNonceAccount({
-    fromPubkey: walletPublicKey,
-    noncePubkey,
-    authorizedPubkey: walletPublicKey,
+    fromPubkey: walletPubkey,
+    noncePubkey: nonceKey.publicKey,
+    authorizedPubkey: walletPubkey,
     lamports,
   });
-  
-  // Get recent blockhash
-  const { blockhash } = await connection.getLatestBlockhash('confirmed');
-  tx.recentBlockhash = blockhash;
-  tx.feePayer = walletPublicKey;
-  
-  // Sign the transaction with both the wallet and the nonce keypair
-  const partialSigned = await signTransaction(tx);
-  partialSigned.partialSign(nonceKeypair);
-  
-  // Send the transaction
-  const signature = await connection.sendRawTransaction(partialSigned.serialize(), {
-    skipPreflight: false,
-    preflightCommitment: 'confirmed',
-  });
-  
-  // Wait for confirmation
-  await connection.confirmTransaction(signature, 'confirmed');
-  
-  return { noncePubkey, signature };
+
+  tx.partialSign(nonceKey);              // sign with new account
+  await sendTx(tx, connection);          // wallet pays rent + fee
+  return nonceKey.publicKey;
 }
 
 export function useWalletSigner() {
@@ -96,16 +80,13 @@ export function useWalletSigner() {
   };
   
   /**
-   * Create a new durable nonce account for this wallet
+   * Values exposed to consumers
    */
-  const createNonce = async (connection: Connection): Promise<{ noncePubkey: PublicKey; signature: string }> => {
-    if (!wallet.signTransaction || !wallet.publicKey) {
-      throw new Error("Wallet not connected or doesn't support signing");
-    }
-    
-    return createNonceAccount(connection, wallet.publicKey, wallet.signTransaction);
+  const createNonce = async (connection: Connection): Promise<PublicKey> => {
+    if (!wallet.publicKey) throw new Error("Wallet not connected");
+    return await createNonceAccount(connection, wallet.publicKey, sendTransaction);
   };
-  
+
   return {
     sendTransaction,
     createNonce,
