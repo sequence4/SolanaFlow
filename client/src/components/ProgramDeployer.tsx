@@ -36,7 +36,7 @@ import { Progress } from "@/components/ui/progress";
 import { connection } from "@/utils/connection";
 
 import { createEphemeralKey, EphemeralDeployOptions, deployWithEphemeralKey } from "@/api/projectDeploy";
-import { BPF_LOADER_CHUNK_SIZE } from "@/utils/constants";
+import { BPF_LOADER_CHUNK_SIZE, BPF_UPGRADE_LOADER_ID } from "@/utils/constants";
 
 // Toggle verbose client-side logs by setting NEXT_PUBLIC_DEBUG_LOGS=true in your
 // environment.  This reduces noisy console output in production.
@@ -270,7 +270,7 @@ export function ProgramDeployer({
         // Find PDA for program data
         const [programDataPk] = PublicKey.findProgramAddressSync(
           [programId.toBuffer()],
-          new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111')
+          BPF_UPGRADE_LOADER_ID
         );
 
         // Calculate rent amounts
@@ -289,14 +289,14 @@ export function ProgramDeployer({
           lamports: bufferRent,
           newAccountPubkey: bufferAccount.publicKey,
           space: bufferSpace,
-          programId: new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111'),
+          programId: BPF_UPGRADE_LOADER_ID,
         });
 
         console.log("createBufferIx", createBufferIx);
         
         // Initialize buffer with wallet as authority
         const bufferInitIx = new TransactionInstruction({
-          programId: new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111'),
+          programId: BPF_UPGRADE_LOADER_ID,
           keys: [
             { pubkey: bufferAccount.publicKey, isSigner: false, isWritable: true },
             { pubkey: wallet.publicKey!, isSigner: true, isWritable: false },
@@ -308,7 +308,7 @@ export function ProgramDeployer({
         
         // Set buffer authority to ephemeral key
         const setAuthorityIx = new TransactionInstruction({
-          programId: new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111'),
+          programId: BPF_UPGRADE_LOADER_ID,
           keys: [
             { pubkey: bufferAccount.publicKey, isSigner: false, isWritable: true },
             { pubkey: wallet.publicKey!, isSigner: true, isWritable: false },
@@ -327,7 +327,7 @@ export function ProgramDeployer({
           let writeIx: TransactionInstruction;
           try {
             writeIx = new TransactionInstruction({
-              programId: new PublicKey('BPFLoaderUpgradeab1e11111111111111111111'),
+              programId: BPF_UPGRADE_LOADER_ID,
               keys: [
                 { pubkey: bufferAccount.publicKey, isSigner: false, isWritable: true },
                 { pubkey: ephemeralPubkey,        isSigner: true,  isWritable: false },
@@ -355,7 +355,7 @@ export function ProgramDeployer({
           newAccountPubkey: programId,
           lamports: programRent,
           space: 36,
-          programId: new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111'),
+          programId: BPF_UPGRADE_LOADER_ID,
         });
 
         console.log("createProgramAcct", createProgramAcct);
@@ -364,7 +364,7 @@ export function ProgramDeployer({
         let deployIx: TransactionInstruction;
         try {
           deployIx = new TransactionInstruction({
-            programId: new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111'),
+            programId: BPF_UPGRADE_LOADER_ID,
             keys: [
               { pubkey: wallet.publicKey!, isSigner: true, isWritable: true },
               { pubkey: programDataPk, isSigner: false, isWritable: true },
@@ -387,14 +387,29 @@ export function ProgramDeployer({
 
         console.log("deployIx", deployIx);
         
-        // Build FULL transaction *before* any signature is added
-        const deployTx = new Transaction()
+        /* ──────────────────────────────────────────────
+           Stage 1 – buffer create + authority
+        ────────────────────────────────────────────── */
+        const initTx = new Transaction()
           .add(createBufferIx)
           .add(bufferInitIx)
-          .add(setAuthorityIx)
-          // all write-chunk instructions
-          .add(...writeInstructions)
-          // program account + deploy instruction
+          .add(setAuthorityIx);
+        await signAndRelay(initTx, [bufferAccount]);
+
+        /* ──────────────────────────────────────────────
+           Stage 2 – upload bytes in batches
+        ────────────────────────────────────────────── */
+        const MAX_WRITES_PER_TX = 12;          // keeps tx < ≈1 100 B
+        for (let i = 0; i < writeInstructions.length; i += MAX_WRITES_PER_TX) {
+          const tx = new Transaction().add(...writeInstructions.slice(i, i + MAX_WRITES_PER_TX));
+          await signAndRelay(tx, []);
+          setProgress(p => (p ?? 20) + 1);     // cheap visual feedback
+        }
+
+        /* ──────────────────────────────────────────────
+           Stage 3 – program account + deploy
+        ────────────────────────────────────────────── */
+        const deployTx = new Transaction()
           .add(createProgramAcct)
           .add(deployIx);
 
@@ -405,9 +420,20 @@ export function ProgramDeployer({
         deployTx.recentBlockhash = blockhash;
         deployTx.feePayer = wallet.publicKey!;
 
-        /* ---------- OPTIONAL size-guard ---------- */
+        /* Size guard – should now be well below the 1 232 B ceiling */
         if (deployTx.serialize({ requireAllSignatures: false }).length > 1200) {
-          throw new Error("Transaction too large; split writes into separate TXs");
+          throw new Error("Finalise tx unexpectedly large; investigate batching");
+        }
+
+        /* Helper used above */
+        async function signAndRelay(tx: Transaction, extras: Keypair[]) {
+          const { blockhash } = await connection.getLatestBlockhash("confirmed");
+          tx.recentBlockhash = blockhash;
+          tx.feePayer = wallet.publicKey!;
+          await wallet.signTransaction!(tx);
+          tx.partialSign(...extras);
+          const encoded = tx.serialize({ requireAllSignatures: false }).toString("base64");
+          await projectApi.relaySignedTx(projectId, encoded, programId.toBase58());
         }
 
         // Wallet signs AFTER every instruction is already present
