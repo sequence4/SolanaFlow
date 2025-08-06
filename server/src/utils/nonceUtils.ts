@@ -22,8 +22,9 @@ export async function ensureNonceAccount(
       { dataSize: NONCE_ACCOUNT_LENGTH },
       {
         memcmp: {
-          /** authorised‑pubkey starts at offset 4 */
-          offset: 4,
+          /** Authority pubkey lives in bytes 8‑40 of the nonce account
+           *  (see Solana Stack Exchange answer) */
+          offset: 8,
           bytes: authorizedPubkey.toBase58(),
         },
       },
