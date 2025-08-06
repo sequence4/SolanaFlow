@@ -304,9 +304,24 @@ export function ProgramDeployer({
                 console.log(
                   `⏳ Durable nonce acquired – acct ${noncePubkey}, hash ${nonceHash}`,
                 );
-            } catch (createError) {
-              console.error('Failed to create nonce account:', createError);
-              throw new Error('Failed to create durable nonce account. Please try again.');
+            } catch (createError: any) {
+              /* Emit detailed diagnostics so we can read response body,
+                 Phantom rejections, RPC errors, etc. */
+              console.error(
+                "[DEPLOY] durable-nonce creation failed:",
+                createError?.response?.data ?? createError,
+              );
+
+              /* Bubble up original error text to toast for easier reading */
+              const msg =
+                createError?.response?.data?.message ??
+                (createError instanceof Error
+                  ? createError.message
+                  : String(createError));
+
+              throw new Error(
+                "Failed to create durable nonce account → " + msg,
+              );
             }
           } else {
             // Any other error => re‑throw

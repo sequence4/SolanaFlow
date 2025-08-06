@@ -45,8 +45,26 @@ export async function createNonceAccount(
   tx.partialSign(nonceKey);              // sign with new account
   /* send and **wait for confirmation** so the backend can see the
    * new durable-nonce account before it queries → avoids 404 */
-  const sig = await sendTx(tx, connection);   // wallet pays rent + fee
-  await connection.confirmTransaction(sig, "confirmed");
+  /* ─────── diagnostics ─────────────────────────────────────────── */
+  const sig = await sendTx(tx, connection);        // wallet pays rent + fee
+  console.log("[NONCE] createNonceAccount – tx signature:", sig);
+
+  try {
+    const confirmation = await connection.confirmTransaction(
+      sig,
+      "confirmed",
+    );
+    console.log(
+      "[NONCE] confirmTransaction result:",
+      JSON.stringify(confirmation),
+    );
+  } catch (confirmErr) {
+    console.error(
+      "[NONCE] confirmTransaction threw:",
+      confirmErr instanceof Error ? confirmErr.message : confirmErr,
+    );
+    throw confirmErr;        // surface to caller
+  }
 
   return nonceKey.publicKey;
 }
