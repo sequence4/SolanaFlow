@@ -507,8 +507,9 @@ export function ProgramDeployer({
         async function signAndRelay(tx: Transaction, extras: Keypair[]) {
           /* re‑anchor intermediate txs to fresh *standard* block‑hashes */
           const { blockhash } = await connection.getLatestBlockhash("confirmed");
+          tx.recentBlockhash = blockhash;     // 🔑  <<< missing field
           tx.feePayer = wallet.publicKey!;
-          await wallet.signTransaction!(tx);
+          await wallet.signTransaction!(tx);  // now wallet accepts
           tx.partialSign(...extras);
           const encoded = tx.serialize({ requireAllSignatures: false }).toString("base64");
           await projectApi.relaySignedTx(projectId, encoded, programId.toBase58());
