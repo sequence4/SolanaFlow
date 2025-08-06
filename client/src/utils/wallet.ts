@@ -32,6 +32,16 @@ export async function createNonceAccount(
     lamports,
   });
 
+  /* ── REQUIRED before partialSign ───────────────────────────────
+   * Creating the nonce account is still a *regular* transaction, so
+   * it needs a fresh recentBlockhash and explicit fee‑payer before
+   * we call partialSign — otherwise web3.js throws
+   * "Transaction recentBlockhash required". See SO answers & docs. */
+  tx.recentBlockhash = (
+    await connection.getLatestBlockhash({ commitment: "confirmed" })
+  ).blockhash;                    /* stackoverflow.com/q/71021177 */
+  tx.feePayer = walletPubkey;     /* Solana core tx format docs */
+
   tx.partialSign(nonceKey);              // sign with new account
   await sendTx(tx, connection);          // wallet pays rent + fee
   return nonceKey.publicKey;
