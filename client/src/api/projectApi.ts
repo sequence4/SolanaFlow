@@ -416,11 +416,13 @@ export const projectApi = {
       });
       return data;
     } catch (error) {
-      // If we get a 404, the server is telling us no nonce account exists for this wallet
+      /* Keep the original AxiosError so callers can read
+       * `error.response.status`.  Converting to a plain Error removes
+       * that field and breaks the fallback that creates the nonce. */
       if (axios.isAxiosError(error) && error.response?.status === 404) {
-        throw new Error("NO_NONCE_ACCOUNT");
+        throw error;              // bubble up unchanged
       }
-      throw error;
+      throw error;                // propagate anything else
     }
   },
 

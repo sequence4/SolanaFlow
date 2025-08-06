@@ -277,8 +277,12 @@ export function ProgramDeployer({
               `⏳ Existing durable nonce found – acct ${noncePubkey}, hash ${nonceHash}`,
             );
         } catch (error: any) {
-          /* Backend 404 ⇒ wallet has no nonce‑account yet */
-          if (error?.response?.status === 404) {
+          /* Backend 404 *or* propagated "NO_NONCE_ACCOUNT"
+             ⇒ wallet has no durable‑nonce yet – create one */
+          if (
+            error?.response?.status === 404 ||
+            (error instanceof Error && error.message === 'NO_NONCE_ACCOUNT')
+          ) {
             setDeployStage('Creating durable nonce account…');
             if (DEBUG_LOGS) console.log('⏳ No nonce account found, creating one with wallet…');
             
