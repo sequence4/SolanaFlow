@@ -43,7 +43,11 @@ export async function createNonceAccount(
   tx.feePayer = walletPubkey;     /* Solana core tx format docs */
 
   tx.partialSign(nonceKey);              // sign with new account
-  await sendTx(tx, connection);          // wallet pays rent + fee
+  /* send and **wait for confirmation** so the backend can see the
+   * new durable-nonce account before it queries → avoids 404 */
+  const sig = await sendTx(tx, connection);   // wallet pays rent + fee
+  await connection.confirmTransaction(sig, "confirmed");
+
   return nonceKey.publicKey;
 }
 
