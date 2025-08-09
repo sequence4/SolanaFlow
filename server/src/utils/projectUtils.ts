@@ -9,11 +9,17 @@ import { normalizeProjectName } from './stringUtils';
 import pool from 'src/config/database';
 import { pruneContainerResources } from './container/pruneContainer';
 import { startProjectContainer } from './container/startProjectContainer';
-import { Connection, sendAndConfirmRawTransaction, Transaction, Keypair } from '@solana/web3.js';
+import { Connection, PublicKey, sendAndConfirmRawTransaction, Transaction, Keypair } from '@solana/web3.js';
 import { spawn, SpawnOptions } from 'child_process';
 import { getProgramSecret, awsSecretsEnabled } from './awsSecrets';
 
 //const USER_WORKSPACE_IMAGE = "ghcr.io/sequence4/solanaflow:latest";
+
+export function findMissingSigners(tx: Transaction): PublicKey[] {
+  return tx.signatures
+    .filter(s => !s.signature)
+    .map(s => s.publicKey);
+}
 
 function hasWarning(output: string): boolean {
   const lowercasedOutput = output.toLowerCase();
@@ -1473,7 +1479,7 @@ export async function signDeployTxAndBroadcast(
   projectId: string,
   encodedTx: string,
   programId: string
-): Promise<string> {
+): Promise<{ signature?: string; txForWallet?: string; missing?: string[] }> {
   // Find the container for this project.
   const containerName = await getContainerName(projectId);
   if (!containerName) {
@@ -1601,6 +1607,16 @@ export async function signDeployTxAndBroadcast(
     }
   }
 
+  // If user or other non-server signers are still missing, return tx for wallet to sign
+  const missing = findMissingSigners(transaction).map(pk => pk.toBase58());
+  if (missing.length > 0) {
+    console.warn(`[SIGNING] Missing signatures for ${missing.join(", ")}`);
+    const txForWallet = transaction
+      .serialize({ requireAllSignatures: false, verifySignatures: false })
+      .toString("base64");
+    return { txForWallet, missing };
+  }
+
   // Broadcast the fully signed transaction.
   const conn = new Connection(endpoint, "confirmed");
   
@@ -1623,7 +1639,7 @@ export async function signDeployTxAndBroadcast(
   console.log(`[SIGNING] Sending transaction to ${endpoint}...`);
   const sig = await sendAndConfirmRawTransaction(conn, transaction.serialize());
   console.log(`[SIGNING] Transaction confirmed with signature: ${sig}`);
-  return sig;
+  return { signature: sig };
 }
 
 /**
