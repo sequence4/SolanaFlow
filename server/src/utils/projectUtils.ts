@@ -16,9 +16,16 @@ import { getProgramSecret, awsSecretsEnabled } from './awsSecrets';
 //const USER_WORKSPACE_IMAGE = "ghcr.io/sequence4/solanaflow:latest";
 
 export function findMissingSigners(tx: Transaction): PublicKey[] {
-  return tx.signatures
-    .filter(s => !s.signature)
-    .map(s => s.publicKey);
+  const msg = tx.compileMessage();
+  const required = msg.header.numRequiredSignatures;
+  const missing: PublicKey[] = [];
+  for (let i = 0; i < required; i++) {
+    const sigPresent = Boolean(tx.signatures[i]?.signature);
+    if (!sigPresent) {
+      missing.push(msg.accountKeys[i]);
+    }
+  }
+  return missing;
 }
 
 function hasWarning(output: string): boolean {
@@ -1480,69 +1487,68 @@ export async function signDeployTxAndBroadcast(
   encodedTx: string,
   programId: string
 ): Promise<{ signature?: string; txForWallet?: string; missing?: string[] }> {
-  // Find the container for this project.
-  const containerName = await getContainerName(projectId);
-  if (!containerName) {
-    throw new Error(`No container found for project ${projectId}`);
-  }
-  
-  // Get project root path for project-specific search
-  const rootPath = await getProjectRootPath(projectId);
-  
-  // Use a temporary task ID to avoid polluting the task database.
-  const tempTaskId = uuidv4();
-  
-  // 1️⃣ First search in the project sub-folder
-  let listCmd = `docker exec ${containerName} bash -c 'cd /usr/src/${rootPath} && find target/deploy -maxdepth 1 -name "*-keypair.json" ! -name "anchor_template-*" -print'`;
-  let listOutput = await runCommand(listCmd, '.', tempTaskId, { skipSuccessUpdate: true });
-  let candidates = listOutput.split(/\r?\n/).filter(Boolean);
-  
-  // 2️⃣ If nothing found in project folder, search in the global folder
-  if (candidates.length === 0) {
-    listCmd = `docker exec ${containerName} bash -c 'find /usr/src/target/deploy -maxdepth 1 -name "*-keypair.json" ! -name "anchor_template-*" -print'`;
-    listOutput = await runCommand(listCmd, '.', tempTaskId, { skipSuccessUpdate: true });
-    candidates = listOutput.split(/\r?\n/).filter(Boolean);
-  }
-  
-  if (candidates.length === 0) {
-    throw new Error('No *-keypair.json files found after global + local search');
-  }
-  
-  console.log(`[SIGNING] Found ${candidates.length} keypair candidate(s)`);
-  
-  let programKeypair: Keypair | null = null;
-  for (const candidate of candidates) {
-    try {
-      const content = await runCommand(
-        `docker exec ${containerName} bash -c "cat '${candidate}'"`,
-        '.',
-        tempTaskId,
-        { skipSuccessUpdate: true },
-      );
-      const arr = JSON.parse(content.trim());
-      if (Array.isArray(arr) && arr.length === 64) {
-        const kp = Keypair.fromSecretKey(Uint8Array.from(arr));
-        const pubkey = kp.publicKey.toBase58();
-        if (pubkey === programId) {
-          console.log(`[SIGNING] Found matching keypair for program ${programId}`);
-          programKeypair = kp;
-          break;
-        }
-      }
-    } catch (err) {
-      // Silently continue to next candidate
-      continue;
-    }
-  }
-  // Log a simplified message about the transaction
-  console.log(`[SIGNING] Received transaction for program ${programId} from project ${projectId}`);
-  
-  // Decode the incoming (part-signed) transaction **once**
-  const raw         = Buffer.from(encodedTx, "base64");
+  // Decode incoming tx
+  const raw = Buffer.from(encodedTx, 'base64');
   const transaction = Transaction.from(raw);
-  
-  // Log simplified transaction info
-  console.log(`[SIGNING] Transaction has ${transaction.signatures.length} signatures and ${transaction.instructions.length} instructions`);
+
+  // Attempt to sign with server-side program keypair if required
+  let programKeypair: Keypair | null = null;
+  try {
+    // Try to locate the program keypair for this project (existing helper path retained)
+    // We'll reuse the earlier search logic by calling getContainerName/getProjectRootPath if needed
+    const containerName = await getContainerName(projectId);
+    if (containerName) {
+      const rootPath = await getProjectRootPath(projectId);
+      const tempTaskId = uuidv4();
+      let listCmd = `docker exec ${containerName} bash -c 'cd /usr/src/${rootPath} && find target/deploy -maxdepth 1 -name "*-keypair.json" ! -name "anchor_template-*" -print'`;
+      let out = await runCommand(listCmd, '.', tempTaskId, { skipSuccessUpdate: true });
+      let candidates = out.split(/\r?\n/).filter(Boolean);
+      if (!candidates.length) {
+        listCmd = `docker exec ${containerName} bash -c 'find /usr/src/target/deploy -maxdepth 1 -name "*-keypair.json" ! -name "anchor_template-*" -print'`;
+        out = await runCommand(listCmd, '.', tempTaskId, { skipSuccessUpdate: true });
+        candidates = out.split(/\r?\n/).filter(Boolean);
+      }
+      for (const c of candidates) {
+        try {
+          const content = await runCommand(
+            `docker exec ${containerName} bash -c "cat '${c}'"`,
+            '.',
+            tempTaskId,
+            { skipSuccessUpdate: true },
+          );
+          const arr = JSON.parse(content.trim());
+          if (Array.isArray(arr) && arr.length === 64) {
+            const kp = Keypair.fromSecretKey(Uint8Array.from(arr));
+            if (kp.publicKey.toBase58() === programId) {
+              programKeypair = kp;
+              break;
+            }
+          }
+        } catch {}
+      }
+    }
+  } catch (e) {
+    console.warn('[SIGNING] Failed to locate program keypair for server-side signing:', (e as any)?.message);
+  }
+
+  const beforeCount = transaction.signatures.filter(s => s.signature).length;
+  try {
+    if (programKeypair) {
+      const msg = transaction.compileMessage();
+      const signerCount = msg.header.numRequiredSignatures;
+      const signerKeys = msg.accountKeys.slice(0, signerCount).map(k => k.toBase58());
+      if (signerKeys.includes(programKeypair.publicKey.toBase58())) {
+        transaction.partialSign(programKeypair);
+        console.log('[SIGNING] Program signature applied by server');
+      } else {
+        console.log('[SIGNING] Program key is not required for this tx');
+      }
+    }
+  } catch (e) {
+    console.warn('[SIGNING] partialSign with program keypair failed:', (e as any)?.message);
+  }
+  const afterCount = transaction.signatures.filter(s => s.signature).length;
+  console.log(`[SIGNING] Signatures before=${beforeCount}, after=${afterCount}`);
 
   // ------------------------------------------------------------------
   // Do we actually still need the program-id signature?
@@ -1577,32 +1583,22 @@ export async function signDeployTxAndBroadcast(
     } signed signature(s) across ${transaction.signatures.length} signer(s)`
   );
   
-  /* -----------------------------------------------------------
-   * Robust connection helper: fall back to a sane default
-   * and fail early if the URL is malformed.
-   * ---------------------------------------------------------- */
-  const endpoint =
-    process.env.RPC_ENDPOINT_DEVNET ||
-    "https://api.devnet.solana.com";          // safe default
-
+  /* Robust connection helper */
+  const endpoint = process.env.RPC_ENDPOINT_DEVNET || 'https://api.devnet.solana.com';
   if (!/^https?:\/\//.test(endpoint)) {
-    throw new Error(
-      `Invalid RPC endpoint: ${endpoint}. ` +
-        "Set RPC_ENDPOINT_DEVNET to a full https:// URL."
-    );
+    throw new Error(`Invalid RPC endpoint: ${endpoint}. Set RPC_ENDPOINT_DEVNET to a full https:// URL.`);
   }
-
-  // Check for any missing signatures from server-resident keys
+  // Attempt to sign with any server-resident keys for other missing signers
   for (const { publicKey, signature } of transaction.signatures) {
-    if (!signature && publicKey && (programKeypair === null || !publicKey.equals(programKeypair.publicKey))) {
+    if (!signature && publicKey && (!programKeypair || !publicKey.equals(programKeypair.publicKey))) {
       const keyPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${publicKey.toBase58()}.json`);
       if (fs.existsSync(keyPath)) {
-        console.log(`[SIGNING] Found server key for ${publicKey.toBase58()}, adding signature`);
-        const secretBytes = JSON.parse(fs.readFileSync(keyPath, 'utf8'));
-        const keypair = Keypair.fromSecretKey(Uint8Array.from(secretBytes));
-        transaction.partialSign(keypair);
-      } else {
-        console.warn(`[SIGNING] No server key for signer ${publicKey.toBase58()}`);
+        try {
+          const secretBytes = JSON.parse(fs.readFileSync(keyPath, 'utf8'));
+          const keypair = Keypair.fromSecretKey(Uint8Array.from(secretBytes));
+          transaction.partialSign(keypair);
+          console.log(`[SIGNING] Added server key signature for ${publicKey.toBase58()}`);
+        } catch {}
       }
     }
   }
@@ -1620,6 +1616,14 @@ export async function signDeployTxAndBroadcast(
   // Broadcast the fully signed transaction.
   const conn = new Connection(endpoint, "confirmed");
   
+  // If still missing required signatures, return tx for wallet to sign (409 path)
+  const missing = findMissingSigners(transaction).map(pk => pk.toBase58());
+  if (missing.length > 0) {
+    console.warn(`[SIGNING] Missing required signatures: ${missing.join(', ')}`);
+    const txForWallet = transaction.serialize({ requireAllSignatures: false, verifySignatures: false }).toString('base64');
+    return { txForWallet, missing };
+  }
+
   // Simulate transaction before sending
   console.log(`[SIGNING] Simulating transaction on ${endpoint}...`);
   const sim = await conn.simulateTransaction(transaction);
