@@ -39,13 +39,20 @@ router.post('/:projectId/relayDeployTx', catchAsync(async (req: Request, res: Re
   
   try {
     console.log(`[RELAY_DEPLOY_TX] Calling signDeployTxAndBroadcast for project ${req.params.projectId}`);
-    const sig = await signDeployTxAndBroadcast(
+    const out = await signDeployTxAndBroadcast(
       req.params.projectId,
       encodedTx,
       programId,
     );
-    console.log(`[RELAY_DEPLOY_TX] Transaction signed and broadcast successfully, signature: ${sig}`);
-    res.json({ signature: sig });
+    if (out?.txForWallet) {
+      return res.status(409).json({
+        code: 'WALLET_SIGNATURE_REQUIRED',
+        missing: out.missing ?? [],
+        txBase64: out.txForWallet,
+      });
+    }
+    console.log(`[RELAY_DEPLOY_TX] Transaction signed and broadcast successfully, signature: ${out.signature}`);
+    res.json({ signature: out.signature });
   } catch (e: any) {
     console.error('[relayDeployTx] failed', e);
     res.status(500).json({ error: e.message });

@@ -39,6 +39,8 @@ import {
   LAMPORTS_PER_SOL,
   SendTransactionError,
   Transaction,
+  SystemProgram,
+  NONCE_ACCOUNT_LENGTH,
 } from '@solana/web3.js';
 
 /* ------------------------------------------------------------------
@@ -186,19 +188,46 @@ export const getNonceAccount = async (
         connection,
         new PublicKey(walletPubkey),
       ));
+      // Found existing nonce account
+      res.json({
+        noncePubkey: noncePubkey.toBase58(),
+        nonceHash,
+      });
+      return;
     } catch (e) {
-      return next(
-        new AppError(
-          'No durable‑nonce account found for this wallet. Create one and try again.',
-          404,
-        ),
-      );
-    }
+      // Build a wallet-signed nonce creation tx and return 409 handshake
+      const wallet = new PublicKey(walletPubkey);
+      const nonceKp = Keypair.generate();
+      const lamports = await connection.getMinimumBalanceForRentExemption(NONCE_ACCOUNT_LENGTH);
 
-    res.json({
-      noncePubkey: noncePubkey.toBase58(),
-      nonceHash,
-    });
+      const createIx = SystemProgram.createAccount({
+        fromPubkey: wallet,
+        newAccountPubkey: nonceKp.publicKey,
+        lamports,
+        space: NONCE_ACCOUNT_LENGTH,
+        programId: SystemProgram.programId,
+      });
+
+      const initIx = SystemProgram.nonceInitialize({
+        noncePubkey: nonceKp.publicKey,
+        authorizedPubkey: wallet,
+      });
+
+      const { blockhash } = await connection.getLatestBlockhash('finalized');
+      const tx = new Transaction({ feePayer: wallet, recentBlockhash: blockhash })
+        .add(createIx, initIx);
+      tx.partialSign(nonceKp);
+      const txBase64 = tx.serialize({ requireAllSignatures: false }).toString('base64');
+
+      res.status(409).json({
+        code: 'WALLET_SIGNATURE_REQUIRED',
+        reason: 'CREATE_NONCE',
+        noncePubkey: nonceKp.publicKey.toBase58(),
+        txBase64,
+        missing: [wallet.toBase58()],
+      });
+      return;
+    }
   } catch (err) {
     next(err);
   }
@@ -1317,8 +1346,16 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
   }
   
   try {
-    // Add program signature and broadcast
-    const txSignature = await signDeployTxAndBroadcast(id, encodedTx, programId);
+    // Add any server signatures, and either request wallet sign or broadcast
+    const out = await signDeployTxAndBroadcast(id, encodedTx, programId);
+    if (out?.txForWallet) {
+      return res.status(409).json({
+        code: 'WALLET_SIGNATURE_REQUIRED',
+        missing: out.missing ?? [],
+        txBase64: out.txForWallet,
+      });
+    }
+    const txSignature = out.signature as string;
     
     const client = await pool.connect();
     try {

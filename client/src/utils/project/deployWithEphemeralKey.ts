@@ -53,11 +53,29 @@ export async function handleEphemeralDeploy(
 
     onProgress(80, 'Sending partial deploy transaction to backend for signature...');
 
-    // 4. Ask the backend to sign the deploy transaction with the program keypair and broadcast it
-    const relayRes = await projectApi.relayTx(projectId, {
+    // 4. Ask the backend to sign; if wallet signature required, sign and retry
+    const firstRelay = await projectApi.relayTx(projectId, {
       encodedTx: deployResult.encodedTx,
       programId: storedProgramId,
     });
+    let finalSig: string | undefined;
+    if ('signature' in firstRelay) {
+      finalSig = firstRelay.signature;
+    } else if (firstRelay.code === 'WALLET_SIGNATURE_REQUIRED' && firstRelay.txBase64) {
+      const tx = Transaction.from(Buffer.from(firstRelay.txBase64, 'base64'));
+      const signed = await wallet.signTransaction!(tx);
+      const secondRelay = await projectApi.relayTx(projectId, {
+        encodedTx: signed.serialize({ requireAllSignatures: false }).toString('base64'),
+        programId: storedProgramId,
+      });
+      if ('signature' in secondRelay) {
+        finalSig = secondRelay.signature;
+      } else {
+        throw new Error(`Still missing signatures: ${secondRelay.missing?.join(', ')}`);
+      }
+    } else {
+      throw new Error('Unexpected relay response; wallet-sign not requested');
+    }
 
     onProgress(90, 'Backend signed deploy transaction; transferring upgrade authority…');
 
@@ -107,7 +125,7 @@ export async function handleEphemeralDeploy(
     return {
       success: true,
       programId: storedProgramId,
-      signatures: [...deployResult.signatures, relayRes.signature, setSig],
+      signatures: [...deployResult.signatures, finalSig!, setSig],
     };
   } catch (error: any) {
     console.error('Ephemeral deployment failed:', error);

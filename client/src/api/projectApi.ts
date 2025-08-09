@@ -282,10 +282,12 @@ export const projectApi = {
   relayTx: async (
     projectId: string,
     payload: { encodedTx: string; programId: string }
-  ): Promise<{ signature: string; programId: string }> => {
+  ): Promise<{ signature: string } | { code: 'WALLET_SIGNATURE_REQUIRED'; txBase64: string; missing: string[]; reason?: string; noncePubkey?: string } > => {
     try {
-      const response = await api.post(`/projects/${projectId}/relay-tx`, payload);
-      return response.data;
+      const response = await api.post(`/projects/${projectId}/relay-tx`, payload, { validateStatus: () => true });
+      if (response.status === 409) return response.data;
+      if (response.status >= 200 && response.status < 300) return response.data;
+      throw new Error(`relay-tx failed: ${response.status} ${JSON.stringify(response.data)}`);
     } catch (error) {
       console.error('Error relaying transaction:', error);
       throw error;
@@ -411,17 +413,14 @@ export const projectApi = {
     walletPubkey: string,
   ): Promise<{ noncePubkey: string; nonceHash: string }> => {
     try {
-      const { data } = await api.post(`/projects/${projectId}/nonce`, {
-        walletPubkey,
-      });
-      return data;
+      const response = await api.post(`/projects/${projectId}/nonce`, { walletPubkey }, { validateStatus: () => true });
+      if (response.status === 409) return response.data; // WALLET_SIGNATURE_REQUIRED for nonce creation
+      if (response.status >= 200 && response.status < 300) return response.data;
+      throw new Error(`nonce failed: ${response.status} ${JSON.stringify(response.data)}`);
     } catch (error) {
       /* Keep the original AxiosError so callers can read
        * `error.response.status`.  Converting to a plain Error removes
        * that field and breaks the fallback that creates the nonce. */
-      if (axios.isAxiosError(error) && error.response?.status === 404) {
-        throw error;              // bubble up unchanged
-      }
       throw error;                // propagate anything else
     }
   },

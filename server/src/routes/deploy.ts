@@ -14,12 +14,19 @@ router.post('/:projectId/relayDeployTx', catchAsync(async (req: Request, res: Re
   }
 
   try {
-    const sig = await signDeployTxAndBroadcast(
+    const out = await signDeployTxAndBroadcast(
       req.params.projectId,
       encodedTx,
       programId,
     );
-    res.json({ signature: sig });
+    if (out?.txForWallet) {
+      return res.status(409).json({
+        code: 'WALLET_SIGNATURE_REQUIRED',
+        missing: out.missing ?? [],
+        txBase64: out.txForWallet,
+      });
+    }
+    res.json({ signature: out.signature });
   } catch (e: any) {
     console.error('[relayDeployTx] failed', e);
     res.status(500).json({ error: e.message });
