@@ -1531,7 +1531,9 @@ export async function signDeployTxAndBroadcast(
     console.warn('[SIGNING] Failed to locate program keypair for server-side signing:', (e as any)?.message);
   }
 
-  const beforeCount = transaction.signatures.filter(s => s.signature).length;
+  let signedCount = transaction.signatures.filter(s => s.signature).length;
+  console.log(`[SIGNING] Initial signature count: ${signedCount}`);
+
   try {
     if (programKeypair) {
       const msg = transaction.compileMessage();
@@ -1547,8 +1549,9 @@ export async function signDeployTxAndBroadcast(
   } catch (e) {
     console.warn('[SIGNING] partialSign with program keypair failed:', (e as any)?.message);
   }
-  const afterCount = transaction.signatures.filter(s => s.signature).length;
-  console.log(`[SIGNING] Signatures before=${beforeCount}, after=${afterCount}`);
+
+  signedCount = transaction.signatures.filter(s => s.signature).length;
+  console.log(`[SIGNING] After program key: ${signedCount} signatures`);
 
   // ------------------------------------------------------------------
   // Do we actually still need the program-id signature?
@@ -1578,9 +1581,8 @@ export async function signDeployTxAndBroadcast(
   }
   
   // Log compact transaction statistics
-  const beforeCount = transaction.signatures.filter(s => s.signature).length;
   console.log(
-    `[SIGNING] Transaction has ${transaction.instructions.length} instruction(s); signatures before=${beforeCount}`
+    `[SIGNING] Transaction has ${transaction.instructions.length} instruction(s); signatures=${signedCount}`
   );
   
   /* Robust connection helper */
@@ -1615,8 +1617,8 @@ export async function signDeployTxAndBroadcast(
       }
     }
   }
-  const afterCount = transaction.signatures.filter(s => s.signature).length;
-  console.log(`[SIGNING] Signatures after server keys: ${afterCount}`);
+  signedCount = transaction.signatures.filter(s => s.signature).length;
+  console.log(`[SIGNING] After server keys: ${signedCount} signatures`);
 
   // If user or other non-server signers are still missing, return tx for wallet to sign
   const missing = findMissingSigners(transaction).map(pk => pk.toBase58());
