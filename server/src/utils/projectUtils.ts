@@ -1578,9 +1578,9 @@ export async function signDeployTxAndBroadcast(
   }
   
   // Log compact transaction statistics
+  const beforeCount = transaction.signatures.filter(s => s.signature).length;
   console.log(
-    `[SIGNING] Transaction now has ${transaction.signatures.filter(s => s.signature).length
-    } signed signature(s) across ${transaction.signatures.length} signer(s)`
+    `[SIGNING] Transaction has ${transaction.instructions.length} instruction(s); signatures before=${beforeCount}`
   );
   
   /* Robust connection helper */
@@ -1589,19 +1589,34 @@ export async function signDeployTxAndBroadcast(
     throw new Error(`Invalid RPC endpoint: ${endpoint}. Set RPC_ENDPOINT_DEVNET to a full https:// URL.`);
   }
   // Attempt to sign with any server-resident keys for other missing signers
+  const msg = transaction.compileMessage();
+  const signerCount = msg.header.numRequiredSignatures;
+  const signerKeys = msg.accountKeys.slice(0, signerCount).map(k => k.toBase58());
+  
   for (const { publicKey, signature } of transaction.signatures) {
     if (!signature && publicKey && (!programKeypair || !publicKey.equals(programKeypair.publicKey))) {
-      const keyPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${publicKey.toBase58()}.json`);
+      const pubkeyStr = publicKey.toBase58();
+      if (!signerKeys.includes(pubkeyStr)) {
+        console.log(`[SIGNING] Skipping ${pubkeyStr} - not a required signer`);
+        continue;
+      }
+      const keyPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${pubkeyStr}.json`);
       if (fs.existsSync(keyPath)) {
         try {
           const secretBytes = JSON.parse(fs.readFileSync(keyPath, 'utf8'));
           const keypair = Keypair.fromSecretKey(Uint8Array.from(secretBytes));
           transaction.partialSign(keypair);
-          console.log(`[SIGNING] Added server key signature for ${publicKey.toBase58()}`);
-        } catch {}
+          console.log(`[SIGNING] Added server key signature for ${pubkeyStr}`);
+        } catch (e) {
+          console.warn(`[SIGNING] Failed to sign with server key ${pubkeyStr}:`, (e as any)?.message);
+        }
+      } else {
+        console.log(`[SIGNING] No server key found for required signer ${pubkeyStr}`);
       }
     }
   }
+  const afterCount = transaction.signatures.filter(s => s.signature).length;
+  console.log(`[SIGNING] Signatures after server keys: ${afterCount}`);
 
   // If user or other non-server signers are still missing, return tx for wallet to sign
   const missing = findMissingSigners(transaction).map(pk => pk.toBase58());
