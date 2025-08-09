@@ -533,14 +533,38 @@ export function ProgramDeployer({
         console.log("encodedTx", encodedTx);
         
         try {
-          const { signature } = await projectApi.relaySignedTx(
+          const firstRelay = await projectApi.relaySignedTx(
             projectId,
             encodedTx,
             programId.toBase58(),
             undefined                   // taskId is now optional but still expected by type
           );
+
+          let finalSig: string | undefined;
+          if ('signature' in firstRelay) {
+            finalSig = firstRelay.signature;
+          } else if (firstRelay.code === 'WALLET_SIGNATURE_REQUIRED' && firstRelay.txBase64) {
+            // Ask wallet to countersign and retry the relay
+            if (!wallet?.signTransaction) {
+              throw new Error('Wallet does not support signTransaction');
+            }
+            const tx = Transaction.from(Buffer.from(firstRelay.txBase64, 'base64'));
+            const signed = await wallet.signTransaction(tx);
+            const secondRelay = await projectApi.relaySignedTx(
+              projectId,
+              signed.serialize({ requireAllSignatures: false }).toString('base64'),
+              programId.toBase58()
+            );
+            if ('signature' in secondRelay) {
+              finalSig = secondRelay.signature;
+            } else {
+              throw new Error(`Still missing signatures: ${secondRelay.missing?.join(', ')}`);
+            }
+          } else {
+            throw new Error('Unexpected relay response');
+          }
           
-          if (DEBUG_LOGS) console.log(`✅ Transaction confirmed with signature: ${signature}`);
+          if (DEBUG_LOGS) console.log(`✅ Transaction confirmed with signature: ${finalSig}`);
           setDeployStage('Transaction confirmed!');
           setProgress(90);
           
