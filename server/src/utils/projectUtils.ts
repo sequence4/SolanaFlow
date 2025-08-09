@@ -1615,14 +1615,6 @@ export async function signDeployTxAndBroadcast(
 
   // Broadcast the fully signed transaction.
   const conn = new Connection(endpoint, "confirmed");
-  
-  // If still missing required signatures, return tx for wallet to sign (409 path)
-  const missing = findMissingSigners(transaction).map(pk => pk.toBase58());
-  if (missing.length > 0) {
-    console.warn(`[SIGNING] Missing required signatures: ${missing.join(', ')}`);
-    const txForWallet = transaction.serialize({ requireAllSignatures: false, verifySignatures: false }).toString('base64');
-    return { txForWallet, missing };
-  }
 
   // Simulate transaction before sending
   console.log(`[SIGNING] Simulating transaction on ${endpoint}...`);
