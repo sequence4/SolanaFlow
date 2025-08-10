@@ -15,16 +15,16 @@ export APP_ID=${APP_ID:-demo}
 export APP_BASE_PATH="/dapp/${APP_ID}"
 export FORCE_REMOTE_DOCKER=0
 export SF_DEV_SERVER=1
+export REGISTRY_DOMAIN=${REGISTRY_DOMAIN:-ghcr.io}
 
-# ─── Use an isolated Docker config for this session (avoids credsStore/gpg) ──
-# We create a temporary DOCKER_CONFIG with no credsStore so docker login writes
-# plain auth for this run only (and we remove it at exit).
-TMP_DOCKER_CONFIG="$(mktemp -d -t sf-docker-XXXXXX)"
-export DOCKER_CONFIG="$TMP_DOCKER_CONFIG"
+# ─── Use a repo-local Docker config (no credsStore/gpg) ──────────────────────
+# This prevents the global helper (e.g. "desktop.exe" / gpg) from being used.
+REPO_DOCKER_CONFIG="$(cd "$(dirname "$0")/.." && pwd)/scripts/docker-config"
+export DOCKER_CONFIG="$REPO_DOCKER_CONFIG"
 mkdir -p "$DOCKER_CONFIG"
-printf '{"auths":{}}\n' > "$DOCKER_CONFIG/config.json"
-cleanup_docker_config () { rm -rf "$TMP_DOCKER_CONFIG"; }
-trap cleanup_docker_config EXIT
+if [ ! -f "$DOCKER_CONFIG/config.json" ]; then
+  printf '{"auths":{}}\n' > "$DOCKER_CONFIG/config.json"
+fi
 
 # Wrapper that forces all docker commands to use the isolated config.
 # We pick the docker binary now; if we later detect Windows docker.exe we’ll
@@ -89,6 +89,24 @@ if ! DOCKER info >/dev/null 2>&1; then
   fi
 fi
 
+# ─── Auth to private registry BEFORE any pull ────────────────────────────────
+# Require GHCR credentials when images are private.
+if [ -n "${GHCR_PAT:-}" ] && [ "${GHCR_PAT}" != "unset" ]; then
+  echo "🔐 Logging in to ${REGISTRY_DOMAIN} (scoped to repo config)…"
+  if ! echo "${GHCR_PAT}" | DOCKER login "${REGISTRY_DOMAIN}" \
+        -u "${GHCR_USER:-github}" --password-stdin 1>/dev/null ; then
+    echo "❌  Login to ${REGISTRY_DOMAIN} failed. Check GHCR_USER / GHCR_PAT."
+    exit 1
+  fi
+else
+  echo "❗ Private images expected but GHCR_PAT is not set."
+  echo "   Export GHCR_USER and GHCR_PAT (classic PAT with 'read:packages') and re-run:"
+  echo "     export GHCR_USER=<your_github_username>"
+  echo "     export GHCR_PAT=<your_pat_with_read_packages>"
+  echo "   Aborting before docker compose pull to avoid gpg/pinentry."
+  exit 1
+fi
+
 # ─── Docker stack ───────────────────────────────────
 unset DOCKER_HOST DOCKER_TLS_VERIFY DOCKER_CERT_PATH DOCKER_CLI_EXPERIMENTAL
 
@@ -107,13 +125,7 @@ DOCKER compose              \
   -f docker-compose.db.yaml \
   up -d
 
-# ─── GitHub Container Registry login (scoped to this isolated config) ──
-# Only attempt if a token is provided; otherwise skip quietly.
-if [ -n "${GHCR_PAT:-}" ] && [ "${GHCR_PAT}" != "unset" ]; then
-  echo "${GHCR_PAT}" | DOCKER login ghcr.io \
-    -u "${GHCR_USER:-github}" \
-    --password-stdin 2>/dev/null || true
-fi
+# (login already completed above)
 
 # ─── Kill any lingering dev processes so we don't double-spawn ───
 pkill -f 'src/app.ts'  2>/dev/null || true
