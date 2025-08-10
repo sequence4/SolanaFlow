@@ -692,39 +692,22 @@ function toLamports(bi: bigint): number {
       // Debug: show the blockhash used for the deploy transaction
       console.log('[DEBUG] deployTx blockhash', deployHash, 'lastValidBlockHeight', deployHeight);
 
-      // Re-apply recent blockhash & fee-payer after debug log insertion
+      // Re-apply recent blockhash & set the wallet as fee payer so wallets are required signers
       deployTx.recentBlockhash = deployHash;
-      deployTx.feePayer = bufferKp.publicKey;
+      deployTx.feePayer = walletPublicKey;
       
       if (relayToBackend) {
-        /*  Front‑end signs only with buffer authority; backend will add
-            the Program‑account signature using the secret key cached
-            during the Anchor build. */
+        // Handshake mode: return a partially signed tx to caller. Backend will co-sign and may return 409.
         deployTx.partialSign(bufferKp);
         const encodedTx = deployTx.serialize({ requireAllSignatures: false }).toString('base64');
-        
         // Add logging to show the base64 transaction
         console.log('⚡ TX-BASE64 (Deploy - Relay):', encodedTx);
-        
-        // ❸ send to backend for program‑key signature & broadcast
-        if (!projectId) {
-          throw new Error("Project ID required for relay to backend");
-        }
-        
-        const relayRes = await fetch(`/api/projects/${projectId}/relayDeployTx`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ encodedTx, programId: programId.toBase58() })
-        }).then(r => r.json());
-        
-        // relayRes.signature is the final on‑chain tx id
-        signatures.push(relayRes.signature);
-        
         return {
           programId,
           signatures,
           success: true,
-          relayPending: false,
+          encodedTx,
+          relayPending: true,
         };
       } else if (programKeypair) {
         /* Local secret available → sign with it right here */
@@ -797,33 +780,19 @@ function toLamports(bi: bigint): number {
       // Debug: show the blockhash used for the upgrade transaction
       console.log('[DEBUG] upgradeTx blockhash', upHash, 'lastValidBlockHeight', upHeight);
 
-      // Re-apply recent blockhash & fee-payer after debug log insertion
+      // Re-apply recent blockhash & set wallet as fee payer so wallet is a required signer for upgrades
       upgradeTx.recentBlockhash = upHash;
-      upgradeTx.feePayer = bufferKp.publicKey;
+      upgradeTx.feePayer = walletPublicKey;
       
       if (relayToBackend) {
         upgradeTx.partialSign(bufferKp);
         const encodedTx = upgradeTx.serialize({ requireAllSignatures: false }).toString('base64');
-        
-        // ❸ send to backend for program‑key signature & broadcast
-        if (!projectId) {
-          throw new Error("Project ID required for relay to backend");
-        }
-        
-        const relayRes = await fetch(`/api/projects/${projectId}/relayDeployTx`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ encodedTx, programId: programId.toBase58() })
-        }).then(r => r.json());
-        
-        // relayRes.signature is the final on‑chain tx id
-        signatures.push(relayRes.signature);
-        
         return {
           programId,
           signatures,
           success: true,
-          relayPending: false,
+          encodedTx,
+          relayPending: true,
         };
       } else {
         upgradeTx.sign(bufferKp);          // wallet already signed buffer writes

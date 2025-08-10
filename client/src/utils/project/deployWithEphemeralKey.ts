@@ -63,6 +63,16 @@ export async function handleEphemeralDeploy(
       finalSig = firstRelay.signature;
     } else if (firstRelay.code === 'WALLET_SIGNATURE_REQUIRED' && firstRelay.txBase64) {
       const tx = Transaction.from(Buffer.from(firstRelay.txBase64, 'base64'));
+      // Ensure wallet is among required signers (first numRequiredSignatures)
+      const msg = tx.compileMessage();
+      const required = msg.accountKeys.slice(0, msg.header.numRequiredSignatures);
+      const walletIsRequired = required.some((k) => k.equals(wallet.publicKey!));
+      if (!walletIsRequired) {
+        throw new Error(
+          'Server 409 payload does not include the wallet as a required signer. ' +
+          'Fix: ensure tx.feePayer = walletPublicKey before returning the 409.'
+        );
+      }
       const signed = await wallet.signTransaction!(tx);
       const secondRelay = await projectApi.relayTx(projectId, {
         encodedTx: signed.serialize({ requireAllSignatures: false }).toString('base64'),
