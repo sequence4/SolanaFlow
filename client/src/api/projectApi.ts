@@ -380,13 +380,14 @@ export const projectApi = {
     encodedTx: string,
     programId: string,
     taskId?: string,
+    serverSignFor?: string[],
   ): Promise<
     { signature: string; programId: string } |
     { code: 'WALLET_SIGNATURE_REQUIRED'; txBase64: string; missing: string[] }
   > => {
     const response = await api.post(
       `/projects/${projectId}/relay-tx`,
-      { encodedTx, programId, ...(taskId ? { taskId } : {}) },
+      { encodedTx, programId, ...(taskId ? { taskId } : {}), ...(serverSignFor?.length ? { serverSignFor } : {}) },
       { validateStatus: () => true }
     );
     if (response.status === 409) return response.data;
@@ -394,6 +395,25 @@ export const projectApi = {
     const err = new Error(`relaySignedTx failed: ${response.status} ${JSON.stringify(response.data)}`);
     console.error('Error relaying signed transaction:', err);
     throw err;
+  },
+
+  /**
+   * Ask backend to sign & send using an ephemeral server-held key.
+   */
+  relayEphemeralTx: async (
+    projectId: string,
+    encodedTx: string,
+    programId: string,
+    ephemeralPubkey: string,
+  ): Promise<{ signature?: string } | { code: 'WALLET_SIGNATURE_REQUIRED'; txBase64: string; missing: string[] }> => {
+    const response = await api.post(
+      `/projects/${projectId}/relay-tx`,
+      { encodedTx, programId, signerHint: { type: 'ephemeral', pubkey: ephemeralPubkey } },
+      { validateStatus: () => true }
+    );
+    if (response.status === 409) return response.data;
+    if (response.status >= 200 && response.status < 300) return response.data;
+    throw new Error(`relayEphemeralTx failed: ${response.status} ${JSON.stringify(response.data)}`);
   },
 
   relayDeployTx: async (
