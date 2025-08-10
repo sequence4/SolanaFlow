@@ -1340,15 +1340,31 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
   const { id } = req.params;
   const userId = req.user?.id;
   const orgId = req.user?.org_id;
-  const { encodedTx, programId } = req.body;
+  const { encodedTx, programId, serverSignFor = [], signerHint } = req.body;
   
   if (!encodedTx || !programId) {
     return next(new AppError('Missing encodedTx or programId', 400));
   }
   
   try {
+    // Collect extra server-side signers (ephemeral etc.)
+    const extraSigners: Keypair[] = [];
+
+    // From explicit list
+    if (Array.isArray(serverSignFor)) {
+      for (const pk of serverSignFor) {
+        const kp = (ephemeralKeys as Map<string, Keypair>).get(pk);
+        if (kp) extraSigners.push(kp);
+      }
+    }
+    // From signer hint
+    if (signerHint?.type === 'ephemeral' && signerHint?.pubkey) {
+      const kp = (ephemeralKeys as Map<string, Keypair>).get(signerHint.pubkey);
+      if (kp) extraSigners.push(kp);
+    }
+
     // Add any server signatures, and either request wallet sign or broadcast
-    const out = await signDeployTxAndBroadcast(id, encodedTx, programId);
+    const out = await signDeployTxAndBroadcast(id, encodedTx, programId, { extraSigners });
     if (out?.txForWallet) {
       return res.status(409).json({
         code: 'WALLET_SIGNATURE_REQUIRED',

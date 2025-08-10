@@ -9,7 +9,7 @@ import { normalizeProjectName } from './stringUtils';
 import pool from 'src/config/database';
 import { pruneContainerResources } from './container/pruneContainer';
 import { startProjectContainer } from './container/startProjectContainer';
-import { Connection, PublicKey, sendAndConfirmRawTransaction, Transaction, Keypair } from '@solana/web3.js';
+import { Connection, PublicKey, sendAndConfirmRawTransaction, Transaction, Keypair, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { spawn, SpawnOptions } from 'child_process';
 import { getProgramSecret, awsSecretsEnabled } from './awsSecrets';
 
@@ -1485,7 +1485,8 @@ export async function broadcastSignedTx(
 export async function signDeployTxAndBroadcast(
   projectId: string,
   encodedTx: string,
-  programId: string
+  programId: string,
+  opts?: { extraSigners?: Keypair[] }
 ): Promise<{ signature?: string; txForWallet?: string; missing?: string[] }> {
   // Decode incoming tx
   const raw = Buffer.from(encodedTx, 'base64');
@@ -1552,6 +1553,24 @@ export async function signDeployTxAndBroadcast(
 
   signedCount = transaction.signatures.filter(s => s.signature).length;
   console.log(`[SIGNING] After program key: ${signedCount} signatures`);
+
+  // Add any extra (controller-supplied) signers – e.g., ephemeral buffer authority
+  try {
+    const extras = opts?.extraSigners ?? [];
+    if (extras.length) {
+      const msg = transaction.compileMessage();
+      const signerCount = msg.header.numRequiredSignatures;
+      const signerKeys = msg.accountKeys.slice(0, signerCount);
+      for (const kp of extras) {
+        if (signerKeys.some(k => k.equals(kp.publicKey))) {
+          transaction.partialSign(kp);
+          console.log(`[SIGNING] Added extra signer ${kp.publicKey.toBase58()}`);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[SIGNING] extraSigners failed:', (e as any)?.message);
+  }
 
   // ------------------------------------------------------------------
   // Do we actually still need the program-id signature?
@@ -1632,6 +1651,24 @@ export async function signDeployTxAndBroadcast(
 
   // Broadcast the fully signed transaction.
   const conn = new Connection(endpoint, "confirmed");
+
+  // If fee-payer is one of our extras (e.g., ephemeral), ensure it's funded on dev/test/local
+  try {
+    if (transaction.feePayer) {
+      const feePayer = (opts?.extraSigners ?? []).find(k => k.publicKey.equals(transaction.feePayer!));
+      if (feePayer) {
+        const bal = await conn.getBalance(feePayer.publicKey, 'confirmed');
+        const min = 0.05 * LAMPORTS_PER_SOL;
+        if (bal < min && (endpoint.includes('devnet') || endpoint.includes('testnet') || endpoint.includes('localhost'))) {
+          console.log(`[SIGNING] Airdropping to fee-payer ${feePayer.publicKey.toBase58()}…`);
+          const sig = await conn.requestAirdrop(feePayer.publicKey, Math.ceil(min - bal));
+          await conn.confirmTransaction(sig, 'finalized');
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[SIGNING] fee-payer funding check failed:', (e as any)?.message);
+  }
 
   // Simulate transaction before sending
   console.log(`[SIGNING] Simulating transaction on ${endpoint}...`);
