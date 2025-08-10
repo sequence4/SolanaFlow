@@ -80,16 +80,11 @@ function u64LE(n: number): Buffer {
   return b;
 }
 
-/**
- * Ensure a legacy Transaction has a fee payer and a recentBlockhash (or durable nonce)
- * before any serialize() / sign() calls.
- */
-async function ensureLegacyTxReady(
+/** Ensure a legacy Transaction has a recentBlockhash (or durable nonce) */
+async function ensureLegacyTxBlockhash(
   tx: Transaction,
   conn: typeof connection,
-  walletPubkey: PublicKey,
 ): Promise<void> {
-  if (!tx.feePayer) tx.feePayer = walletPubkey;
   if (!tx.recentBlockhash) {
     let nonceValue: string | null = null;
     const ix0 = tx.instructions?.[0];
@@ -103,9 +98,7 @@ async function ensureLegacyTxReady(
             nonceValue = NonceAccount.fromAccountData(info.data).nonce;
           }
         }
-      } catch {
-        // ignore decode failures
-      }
+      } catch {}
     }
     tx.recentBlockhash = nonceValue ?? (await conn.getLatestBlockhash('confirmed')).blockhash;
   }
@@ -498,7 +491,7 @@ export function ProgramDeployer({
           .add(createBufferIx)
           .add(bufferInitIx)
           .add(setAuthorityIx);
-        await signAndRelay(initTx, [bufferAccount]);
+        await signAndRelayWithWallet(initTx, [bufferAccount]);
 
         /* ──────────────────────────────────────────────
            Stage 2 – upload bytes in batches
@@ -506,18 +499,20 @@ export function ProgramDeployer({
         const MAX_WRITES_PER_TX = 1;           // keep each tx well under the 1,232B cap
         for (let i = 0; i < writeInstructions.length; i += MAX_WRITES_PER_TX) {
           const tx = new Transaction().add(...writeInstructions.slice(i, i + MAX_WRITES_PER_TX));
-          // Ensure ready before any serialize/sign
-          await ensureLegacyTxReady(tx, connection, wallet.publicKey!);
           // WRITE txs are server-signed by ephemeral: set feePayer + blockhash here
           tx.feePayer = new PublicKey(ephemeralPubkeyStr);
-          tx.recentBlockhash = (await connection.getLatestBlockhash('confirmed')).blockhash;
+          await ensureLegacyTxBlockhash(tx, connection);
           // size guard pre-send
           const probe = tx.serialize({ requireAllSignatures: false });
           if (probe.length > 1200) {
             throw new Error(`Tx too large (${probe.length} bytes). Reduce CHUNK or writes/tx.`);
           }
           // Relay unsigned for server to sign with ephemeral (no wallet popups)
-          await signAndRelay(tx, [], { serverSignsEphemeral: true, ephemeralPubkeyStr });
+          // Server relay without wallet signature
+          {
+            const encoded = tx.serialize({ requireAllSignatures: false }).toString("base64");
+            await projectApi.relayTx(projectId, { encodedTx: encoded, programId: programId.toBase58() });
+          }
           setProgress(p => (p ?? 20) + 1);     // cheap visual feedback
         }
 
@@ -546,23 +541,16 @@ export function ProgramDeployer({
           throw new Error("Finalise tx unexpectedly large; investigate batching");
         }
 
-        /* Helper used above */
-        type RelayHints = { serverSignFor?: string[]; serverSignsEphemeral?: boolean; ephemeralPubkeyStr?: string };
-        async function signAndRelay(tx: Transaction, extras: Keypair[], hints?: RelayHints) {
-          // Always prepare legacy tx before any serialize/sign
-          await ensureLegacyTxReady(tx, connection, wallet.publicKey!);
+        /* Helpers */
+        async function signAndRelayWithWallet(tx: Transaction, extras: Keypair[]) {
+          tx.feePayer = wallet.publicKey!;
+          await ensureLegacyTxBlockhash(tx, connection);
           await wallet.signTransaction!(tx);
-          if (extras && extras.length > 0) {
+          if (extras && extras.length) {
             tx.partialSign(...extras);
           }
           const encoded = tx.serialize({ requireAllSignatures: false }).toString("base64");
-          await projectApi.relaySignedTx(
-            projectId,
-            encoded,
-            programId.toBase58(),
-            undefined,
-            hints?.serverSignFor
-          );
+          await projectApi.relayTx(projectId, { encodedTx: encoded, programId: programId.toBase58() });
         }
 
         // Wallet signs AFTER every instruction is already present
@@ -626,7 +614,8 @@ export function ProgramDeployer({
               throw new Error('WALLET_NOT_REQUIRED_SIGNER');
             }
             if (tx instanceof Transaction) {
-              await ensureLegacyTxReady(tx, connection, wallet.publicKey!);
+              await ensureLegacyTxBlockhash(tx, connection);
+              tx.feePayer = wallet.publicKey!;
             }
             const signed = await wallet.signTransaction(tx as any);
             const secondRelay = await projectApi.relaySignedTx(
