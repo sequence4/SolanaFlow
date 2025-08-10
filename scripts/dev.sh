@@ -21,6 +21,21 @@ export REGISTRY_DOMAIN=${REGISTRY_DOMAIN:-ghcr.io}
 # This prevents the global helper (e.g. "desktop.exe" / gpg) from being used.
 REPO_DOCKER_CONFIG="$(cd "$(dirname "$0")/.." && pwd)/scripts/docker-config"
 export DOCKER_CONFIG="$REPO_DOCKER_CONFIG"
+
+# --- Load GHCR creds from local env files (if present) -----------------------
+# We do this before attempting registry login so developers can keep a
+# GHCR_PAT in .env.local which is gitignored.
+load_env () {
+  local f="$1"
+  [ -f "$f" ] || return 0
+  set -a
+  # shellcheck disable=SC1090
+  . "$f"
+  set +a
+}
+load_env ".env"
+load_env ".env.local"
+
 mkdir -p "$DOCKER_CONFIG"
 if [ ! -f "$DOCKER_CONFIG/config.json" ]; then
   printf '{"auths":{}}\n' > "$DOCKER_CONFIG/config.json"

@@ -1,4 +1,4 @@
-import { Connection, PublicKey, Keypair, TransactionInstruction, Transaction } from '@solana/web3.js';
+import { Connection, PublicKey, Keypair, TransactionInstruction, Transaction, VersionedTransaction } from '@solana/web3.js';
 import type { WalletContextState } from '@solana/wallet-adapter-react';
 import { deployWithEphemeralKey } from '../../lib/ephemeralDeployment';
 import bs58 from 'bs58';
@@ -62,18 +62,23 @@ export async function handleEphemeralDeploy(
     if ('signature' in firstRelay) {
       finalSig = firstRelay.signature;
     } else if (firstRelay.code === 'WALLET_SIGNATURE_REQUIRED' && firstRelay.txBase64) {
-      const tx = Transaction.from(Buffer.from(firstRelay.txBase64, 'base64'));
-      // Ensure wallet is among required signers (first numRequiredSignatures)
-      const msg = tx.compileMessage();
+      // Deserialize as versioned or legacy
+      const raw = Buffer.from(firstRelay.txBase64, 'base64');
+      const tx: Transaction | VersionedTransaction = (raw[0] === 0x80)
+        ? VersionedTransaction.deserialize(raw)
+        : Transaction.from(raw);
+      // Compute message for both legacy and versioned transactions
+      const msg = (tx as any).message ?? (tx as Transaction).compileMessage();
       const required = msg.accountKeys.slice(0, msg.header.numRequiredSignatures);
-      const walletIsRequired = required.some((k) => k.equals(wallet.publicKey!));
+      const walletIsRequired = required.some((k: PublicKey) => k.equals(wallet.publicKey!));
       if (!walletIsRequired) {
         throw new Error(
           'Server 409 payload does not include the wallet as a required signer. ' +
           'Fix: ensure tx.feePayer = walletPublicKey before returning the 409.'
         );
       }
-      const signed = await wallet.signTransaction!(tx);
+      // Ensure wallet is among required signers (first numRequiredSignatures)
+      const signed = await wallet.signTransaction!(tx as any);
       const secondRelay = await projectApi.relayTx(projectId, {
         encodedTx: signed.serialize({ requireAllSignatures: false }).toString('base64'),
         programId: storedProgramId,

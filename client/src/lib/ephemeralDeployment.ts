@@ -698,6 +698,20 @@ function toLamports(bi: bigint): number {
       
       if (relayToBackend) {
         // Handshake mode: return a partially signed tx to caller. Backend will co-sign and may return 409.
+        // Ensure the wallet is a required signer by verifying it's within the first numRequiredSignatures
+        // (feePayer has been set to walletPublicKey above)
+        {
+          const msg = deployTx.compileMessage();
+          const required = msg.accountKeys.slice(0, msg.header.numRequiredSignatures);
+          const walletRequired = required.some((k) => k.equals(walletPublicKey));
+          if (!walletRequired) {
+            console.error('Deploy TX missing wallet as required signer:', {
+              numRequired: msg.header.numRequiredSignatures,
+              feePayer: deployTx.feePayer?.toBase58()
+            });
+            throw new Error('Invalid relay TX: wallet must be in required signatures');
+          }
+        }
         deployTx.partialSign(bufferKp);
         const encodedTx = deployTx.serialize({ requireAllSignatures: false }).toString('base64');
         // Add logging to show the base64 transaction
@@ -785,6 +799,19 @@ function toLamports(bi: bigint): number {
       upgradeTx.feePayer = walletPublicKey;
       
       if (relayToBackend) {
+        // Ensure the wallet is a required signer for upgrades too
+        {
+          const msg = upgradeTx.compileMessage();
+          const required = msg.accountKeys.slice(0, msg.header.numRequiredSignatures);
+          const walletRequired = required.some((k) => k.equals(walletPublicKey));
+          if (!walletRequired) {
+            console.error('Upgrade TX missing wallet as required signer:', {
+              numRequired: msg.header.numRequiredSignatures,
+              feePayer: upgradeTx.feePayer?.toBase58()
+            });
+            throw new Error('Invalid relay TX: wallet must be in required signatures');
+          }
+        }
         upgradeTx.partialSign(bufferKp);
         const encodedTx = upgradeTx.serialize({ requireAllSignatures: false }).toString('base64');
         return {

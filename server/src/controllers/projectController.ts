@@ -224,6 +224,7 @@ export const getNonceAccount = async (
         reason: 'CREATE_NONCE',
         noncePubkey: nonceKp.publicKey.toBase58(),
         txBase64,
+        txForWallet: txBase64,
         missing: [wallet.toBase58()],
       });
       return;
@@ -1353,6 +1354,7 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
         code: 'WALLET_SIGNATURE_REQUIRED',
         missing: out.missing ?? [],
         txBase64: out.txForWallet,
+        txForWallet: out.txForWallet,
       });
     }
     const txSignature = out.signature as string;

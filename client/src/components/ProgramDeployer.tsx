@@ -17,6 +17,7 @@ import {
   Keypair,
   SystemProgram,
   Transaction,
+  VersionedTransaction,
   LAMPORTS_PER_SOL,
   SendTransactionError,
   TransactionInstruction,
@@ -68,14 +69,12 @@ function u32LE(n: number): Buffer {
   return b;
 }
 
-function u64LE(n: bigint): Buffer {
+function u64LE(n: number): Buffer {
   const b = Buffer.alloc(8);
-  try {
-    b.writeBigUInt64LE(n, 0);
-  } catch (e) {
-    console.error('[u64LE] failed – value', n.toString(), 'buffer len', b.length, e);
-    throw e;
-  }
+  const lo = n >>> 0;                                  // low 32 bits
+  const hi = Math.floor(n / Math.pow(2, 32)) >>> 0;    // high 32 bits
+  b.writeUInt32LE(lo, 0);
+  b.writeUInt32LE(hi, 4);
   return b;
 }
 
@@ -407,7 +406,7 @@ export function ProgramDeployer({
               data: Buffer.concat([
                 Buffer.from([1, 0, 0, 0]),  // Write tag
                 u32LE(off),
-                u64LE(BigInt(slice.length)),
+                u64LE(slice.length),
                 Buffer.from(slice),         // ensure Buffer, not Uint8Array
               ]),
             });
@@ -449,7 +448,7 @@ export function ProgramDeployer({
             ],
             data: Buffer.concat([
               Buffer.from([2, 0, 0, 0]),
-              u64LE(BigInt(programBytes.length)),
+              u64LE(programBytes.length),
             ]),
           });
         } catch (e) {
@@ -471,9 +470,16 @@ export function ProgramDeployer({
         /* ──────────────────────────────────────────────
            Stage 2 – upload bytes in batches
         ────────────────────────────────────────────── */
-        const MAX_WRITES_PER_TX = 12;          // keeps tx < ≈1 100 B
+        const MAX_WRITES_PER_TX = 1;           // keep each tx well under the 1,232B cap
         for (let i = 0; i < writeInstructions.length; i += MAX_WRITES_PER_TX) {
           const tx = new Transaction().add(...writeInstructions.slice(i, i + MAX_WRITES_PER_TX));
+          // size guard pre-send
+          {
+            const probe = tx.serialize({ requireAllSignatures: false });
+            if (probe.length > 1200) {
+              throw new Error(`Tx too large (${probe.length} bytes). Reduce CHUNK or writes/tx.`);
+            }
+          }
           await signAndRelay(tx, []);
           setProgress(p => (p ?? 20) + 1);     // cheap visual feedback
         }
@@ -548,8 +554,33 @@ export function ProgramDeployer({
             if (!wallet?.signTransaction) {
               throw new Error('Wallet does not support signTransaction');
             }
-            const tx = Transaction.from(Buffer.from(firstRelay.txBase64, 'base64'));
-            const signed = await wallet.signTransaction(tx);
+            const raw = Buffer.from(firstRelay.txBase64, 'base64');
+            const tx: Transaction | VersionedTransaction = (raw[0] === 0x80)
+              ? VersionedTransaction.deserialize(raw)
+              : Transaction.from(raw);
+            // Defensive: for legacy tx ensure feePayer = wallet so wallet is a required signer
+            if (tx instanceof Transaction && !tx.feePayer && wallet.publicKey) {
+              tx.feePayer = wallet.publicKey;
+            }
+            // Guard: verify wallet is among required signers before asking to sign
+            const message: any = (tx as any).message ?? (tx as Transaction).compileMessage();
+            const required = (message.staticAccountKeys ?? message.accountKeys)
+              .slice(0, message.header.numRequiredSignatures);
+            const walletIsRequired = wallet.publicKey
+              ? required.some((k: PublicKey) => k.equals(wallet.publicKey!))
+              : false;
+            if (!walletIsRequired) {
+              console.error('[relay] Wallet is not a required signer of the 409 tx', {
+                required: required.map((k: PublicKey) => k.toBase58()),
+                wallet: wallet.publicKey?.toBase58(),
+              });
+              toast.error(
+                'Server returned a tx that does not require your wallet signature. ' +
+                'Ask the backend to set feePayer = wallet before returning 409.'
+              );
+              throw new Error('WALLET_NOT_REQUIRED_SIGNER');
+            }
+            const signed = await wallet.signTransaction(tx as any);
             const secondRelay = await projectApi.relaySignedTx(
               projectId,
               signed.serialize({ requireAllSignatures: false }).toString('base64'),
