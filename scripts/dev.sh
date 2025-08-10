@@ -14,6 +14,16 @@ export APP_BASE_PATH="/dapp/${APP_ID}"
 export FORCE_REMOTE_DOCKER=0
 export SF_DEV_SERVER=1
 
+# ─── Use an isolated Docker config for this session (avoids credsStore/gpg) ──
+# We create a temporary DOCKER_CONFIG with no credsStore so docker login writes
+# plain auth for this run only (and we remove it at exit).
+TMP_DOCKER_CONFIG="$(mktemp -d -t sf-docker-XXXXXX)"
+export DOCKER_CONFIG="$TMP_DOCKER_CONFIG"
+mkdir -p "$DOCKER_CONFIG"
+printf '{"auths":{}}\n' > "$DOCKER_CONFIG/config.json"
+cleanup_docker_config () { rm -rf "$TMP_DOCKER_CONFIG"; }
+trap cleanup_docker_config EXIT
+
 # ─── Clear stale Windows → WSL port-proxy rules ────────────────────────────────
 # When Windows leaves a v4-to-v4 port-proxy entry after the previous run,
 # the next "localhost" request can hang until you `wsl --shutdown`.  Deleting the
@@ -83,9 +93,13 @@ docker compose              \
   -f docker-compose.db.yaml \
   up -d
 
-# ─── GitHub Container Registry login (NOP if already logged in) ──
-echo "${GHCR_PAT:-unset}" | \
-  docker login ghcr.io -u "${GHCR_USER:-unset}" --password-stdin 2>/dev/null || true
+# ─── GitHub Container Registry login (scoped to this isolated config) ──
+# Only attempt if a token is provided; otherwise skip quietly.
+if [ -n "${GHCR_PAT:-}" ] && [ "${GHCR_PAT}" != "unset" ]; then
+  echo "${GHCR_PAT}" | docker login ghcr.io \
+    -u "${GHCR_USER:-github}" \
+    --password-stdin 2>/dev/null || true
+fi
 
 # ─── Kill any lingering dev processes so we don't double-spawn ───
 pkill -f 'src/app.ts'  2>/dev/null || true
