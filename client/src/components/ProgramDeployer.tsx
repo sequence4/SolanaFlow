@@ -465,7 +465,7 @@ export function ProgramDeployer({
             keys: [
               { pubkey: wallet.publicKey!, isSigner: true, isWritable: true },
               { pubkey: programDataPk, isSigner: false, isWritable: true },
-              { pubkey: programId, isSigner: false, isWritable: true },
+              { pubkey: programId, isSigner: true, isWritable: true }, // Program account needs to sign since it's being created
               { pubkey: bufferAccount.publicKey, isSigner: false, isWritable: true },
               { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
               { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
@@ -741,8 +741,10 @@ export function ProgramDeployer({
         console.log('[DEBUG] Deployment transaction signed by wallet');
         console.log('[DEBUG] Deploy tx signers required:', deployTx.compileMessage().accountKeys.slice(0, deployTx.compileMessage().header.numRequiredSignatures).map(k => k.toBase58()));
         
-        // NOTE: Program keypair should NOT sign the deployment transaction
-        // The deployment transaction only needs: wallet (upgrade authority) + ephemeral (buffer authority)
+        // Actually, the program keypair DOES need to sign the deployment transaction
+        // Required signers: wallet (upgrade authority) + program keypair + ephemeral (buffer authority)
+        deployTx.partialSign(programKeypair);
+        console.log('[DEBUG] Program keypair signed deployment transaction');
         
         // 5. Send the partially-signed transaction to backend for co-signing and broadcast
         setDeployStage('Sending to server for co-signing...');

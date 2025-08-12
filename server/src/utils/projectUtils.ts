@@ -1511,6 +1511,7 @@ export async function signDeployTxAndBroadcast(
       }
       for (const c of candidates) {
         try {
+          console.log(`[SIGNING] Checking keypair file: ${c}`);
           const content = await runCommand(
             `docker exec ${containerName} bash -c "cat '${c}'"`,
             '.',
@@ -1520,12 +1521,26 @@ export async function signDeployTxAndBroadcast(
           const arr = JSON.parse(content.trim());
           if (Array.isArray(arr) && arr.length === 64) {
             const kp = Keypair.fromSecretKey(Uint8Array.from(arr));
+            console.log(`[SIGNING] Found keypair with pubkey: ${kp.publicKey.toBase58()}`);
+            console.log(`[SIGNING] Looking for program ID: ${programId}`);
+            
+            // For deployment transactions, we might need any program keypair, not necessarily matching the programId
+            // Let's use the first valid keypair we find
+            if (!programKeypair) {
+              programKeypair = kp;
+              console.log(`[SIGNING] Using keypair ${kp.publicKey.toBase58()} as program keypair`);
+            }
+            
+            // But if we find an exact match, prefer that
             if (kp.publicKey.toBase58() === programId) {
               programKeypair = kp;
+              console.log(`[SIGNING] Found exact match for program ID: ${programId}`);
               break;
             }
           }
-        } catch {}
+        } catch (e) {
+          console.warn(`[SIGNING] Failed to load keypair from ${c}:`, (e as any)?.message);
+        }
       }
     }
   } catch (e) {
@@ -1540,12 +1555,23 @@ export async function signDeployTxAndBroadcast(
       const msg = transaction.compileMessage();
       const signerCount = msg.header.numRequiredSignatures;
       const signerKeys = msg.accountKeys.slice(0, signerCount).map(k => k.toBase58());
-      if (signerKeys.includes(programKeypair.publicKey.toBase58())) {
+      const programKeyStr = programKeypair.publicKey.toBase58();
+      console.log(`[SIGNING] Program keypair available: ${programKeyStr}`);
+      console.log(`[SIGNING] Required signers: ${signerKeys.join(', ')}`);
+      
+      if (signerKeys.includes(programKeyStr)) {
         transaction.partialSign(programKeypair);
         console.log('[SIGNING] Program signature applied by server');
       } else {
         console.log('[SIGNING] Program key is not required for this tx');
+        // Check if any of the required signers match the program keypair we loaded
+        const matchesAnyRequired = signerKeys.some(sk => sk === programKeyStr);
+        if (!matchesAnyRequired) {
+          console.log(`[SIGNING] Available program key ${programKeyStr} doesn't match any required signer`);
+        }
       }
+    } else {
+      console.log('[SIGNING] No program keypair available for server-side signing');
     }
   } catch (e) {
     console.warn('[SIGNING] partialSign with program keypair failed:', (e as any)?.message);
