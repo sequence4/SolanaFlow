@@ -661,7 +661,7 @@ export function ProgramDeployer({
             console.log(`[DEBUG] Signature ${i}: ${signer} = ${hasSig}`);
           }
           
-          // Ensure all required signatures are present
+          // Handle missing signatures - if only wallet signature is missing, try server handling
           if (currentSigs < finalMsg.header.numRequiredSignatures) {
             const missingSigs = [];
             for (let i = 0; i < finalMsg.header.numRequiredSignatures; i++) {
@@ -669,7 +669,41 @@ export function ProgramDeployer({
                 missingSigs.push(finalMsg.accountKeys[i].toBase58());
               }
             }
+            
             console.error(`[DEBUG] Transaction is missing signatures for: ${missingSigs.join(', ')}`);
+            
+            // If only the wallet signature is missing and it's the first signer, try server approach
+            if (missingSigs.length === 1 && missingSigs[0] === wallet.publicKey!.toBase58()) {
+              console.log(`[DEBUG] Only wallet signature missing, attempting server-side handling...`);
+              
+              // Send partially signed transaction to server and let it handle wallet signature request
+              const encoded = tx.serialize({ requireAllSignatures: false }).toString("base64");
+              console.log(`[DEBUG] Sending partially signed transaction to relay-signed-tx endpoint`);
+              
+              try {
+                const result = await projectApi.relaySignedTx(
+                  projectId,
+                  encoded,
+                  programId.toBase58()
+                );
+                
+                if ('signature' in result) {
+                  console.log(`[DEBUG] Server-side relay successful with signature: ${result.signature}`);
+                  return; // Success, exit the function
+                } else if (result.code === 'WALLET_SIGNATURE_REQUIRED') {
+                  console.log(`[DEBUG] Server requests wallet signature, handling 409 response`);
+                  // Let this fall through to the normal 409 handling below
+                  throw new Error(`Server requests wallet signature: ${result.missing?.join(', ')}`);
+                } else {
+                  console.error(`[DEBUG] Unexpected server response:`, result);
+                  throw new Error('Unexpected response from server');
+                }
+              } catch (error) {
+                console.error(`[DEBUG] Server-side relay failed, falling back to error:`, error);
+                // Fall through to the original error
+              }
+            }
+            
             throw new Error(`Transaction is missing ${finalMsg.header.numRequiredSignatures - currentSigs} signatures: ${missingSigs.join(', ')}`);
           }
           
