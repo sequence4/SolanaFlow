@@ -573,42 +573,64 @@ export function ProgramDeployer({
           const signers = [wallet.publicKey!, ...extras.map(k => k.publicKey)];
           console.log(`[DEBUG] All signers that need to sign:`, signers.map(s => s.toBase58()));
           
-          // Try alternative signing approach - sign all at once
-          console.log(`[DEBUG] Attempting to sign with all signers together...`);
+          // Clean signing approach: sign with wallet first on clean transaction
+          console.log(`[DEBUG] Clean signing approach: wallet first on clean transaction`);
           
-          // Create a new transaction with the same instructions but sign all at once
-          const allSigners = [...extras];
-          if (allSigners.length > 0) {
-            // First partial sign with extras
-            tx.partialSign(...allSigners);
-            console.log(`[DEBUG] Partial signed with ${allSigners.length} extra signers`);
+          // Clone the transaction to ensure clean state
+          const cleanTx = new Transaction();
+          cleanTx.feePayer = tx.feePayer;
+          cleanTx.recentBlockhash = tx.recentBlockhash;
+          cleanTx.lastValidBlockHeight = tx.lastValidBlockHeight;
+          
+          // Add all instructions
+          for (const instruction of tx.instructions) {
+            cleanTx.add(instruction);
           }
           
-          // Then sign with wallet (this should preserve existing signatures)
-          await wallet.signTransaction!(tx);
-          console.log(`[DEBUG] Wallet signed transaction`);
+          console.log(`[DEBUG] Created clean transaction with ${cleanTx.instructions.length} instructions`);
+          
+          // Sign with wallet first on the clean transaction
+          await wallet.signTransaction!(cleanTx);
+          console.log(`[DEBUG] Wallet signed clean transaction`);
+          
+          // Check wallet signature was applied
+          let walletSigCount = cleanTx.signatures.filter(s => s.signature).length;
+          console.log(`[DEBUG] After wallet signature on clean tx: ${walletSigCount} signatures`);
+          
+          // Then apply extra signatures
+          if (extras && extras.length > 0) {
+            console.log(`[DEBUG] Applying ${extras.length} extra signatures to clean transaction...`);
+            cleanTx.partialSign(...extras);
+            console.log(`[DEBUG] Applied ${extras.length} extra signatures to clean transaction`);
+          }
+          
+          // Use the clean transaction for the rest of the process
+          tx = cleanTx;
+          
+          // Recompile message for the clean transaction
+          const finalMsg = tx.compileMessage();
           
           // Final signature count check
           let currentSigs = tx.signatures.filter(s => s.signature).length;
-          console.log(`[DEBUG] Final signature count: ${currentSigs}/${msg.header.numRequiredSignatures} signatures`);
+          console.log(`[DEBUG] Final signature count: ${currentSigs}/${finalMsg.header.numRequiredSignatures} signatures`);
           
           // Debug: show which signatures we have
-          for (let i = 0; i < msg.header.numRequiredSignatures; i++) {
-            const signer = msg.accountKeys[i].toBase58();
+          for (let i = 0; i < finalMsg.header.numRequiredSignatures; i++) {
+            const signer = finalMsg.accountKeys[i].toBase58();
             const hasSig = tx.signatures[i]?.signature ? 'YES' : 'NO';
             console.log(`[DEBUG] Signature ${i}: ${signer} = ${hasSig}`);
           }
           
           // Ensure all required signatures are present
-          if (currentSigs < msg.header.numRequiredSignatures) {
+          if (currentSigs < finalMsg.header.numRequiredSignatures) {
             const missingSigs = [];
-            for (let i = 0; i < msg.header.numRequiredSignatures; i++) {
+            for (let i = 0; i < finalMsg.header.numRequiredSignatures; i++) {
               if (!tx.signatures[i]?.signature) {
-                missingSigs.push(msg.accountKeys[i].toBase58());
+                missingSigs.push(finalMsg.accountKeys[i].toBase58());
               }
             }
             console.error(`[DEBUG] Transaction is missing signatures for: ${missingSigs.join(', ')}`);
-            throw new Error(`Transaction is missing ${msg.header.numRequiredSignatures - currentSigs} signatures: ${missingSigs.join(', ')}`);
+            throw new Error(`Transaction is missing ${finalMsg.header.numRequiredSignatures - currentSigs} signatures: ${missingSigs.join(', ')}`);
           }
           
           const encoded = tx.serialize({ requireAllSignatures: true }).toString("base64");
