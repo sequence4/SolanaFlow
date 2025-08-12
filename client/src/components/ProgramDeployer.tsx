@@ -549,6 +549,9 @@ export function ProgramDeployer({
           tx.feePayer = wallet.publicKey!;
           await ensureLegacyTxBlockhash(tx, connection);
           
+          // Force recompile to ensure fee payer is properly set
+          tx.compileMessage();
+          
           // Debug: log transaction details before signing
           const msg = tx.compileMessage();
           console.log(`[DEBUG] Transaction requires ${msg.header.numRequiredSignatures} signatures`);
@@ -570,23 +573,23 @@ export function ProgramDeployer({
           const signers = [wallet.publicKey!, ...extras.map(k => k.publicKey)];
           console.log(`[DEBUG] All signers that need to sign:`, signers.map(s => s.toBase58()));
           
-          // Sign with wallet first (Phantom will add its signature)
+          // Try alternative signing approach - sign all at once
+          console.log(`[DEBUG] Attempting to sign with all signers together...`);
+          
+          // Create a new transaction with the same instructions but sign all at once
+          const allSigners = [...extras];
+          if (allSigners.length > 0) {
+            // First partial sign with extras
+            tx.partialSign(...allSigners);
+            console.log(`[DEBUG] Partial signed with ${allSigners.length} extra signers`);
+          }
+          
+          // Then sign with wallet (this should preserve existing signatures)
           await wallet.signTransaction!(tx);
           console.log(`[DEBUG] Wallet signed transaction`);
           
-          // Check wallet signature was applied
-          let currentSigs = tx.signatures.filter(s => s.signature).length;
-          console.log(`[DEBUG] After wallet signature: ${currentSigs}/${msg.header.numRequiredSignatures} signatures`);
-          
-          // Then apply extra signatures
-          if (extras && extras.length) {
-            console.log(`[DEBUG] Applying ${extras.length} extra signatures...`);
-            tx.partialSign(...extras);
-            console.log(`[DEBUG] Applied ${extras.length} extra signatures`);
-          }
-          
           // Final signature count check
-          currentSigs = tx.signatures.filter(s => s.signature).length;
+          let currentSigs = tx.signatures.filter(s => s.signature).length;
           console.log(`[DEBUG] Final signature count: ${currentSigs}/${msg.header.numRequiredSignatures} signatures`);
           
           // Debug: show which signatures we have
