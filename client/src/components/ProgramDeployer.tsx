@@ -738,8 +738,11 @@ export function ProgramDeployer({
         if (!wallet.signTransaction) throw new Error("Wallet can't sign");
         await wallet.signTransaction(deployTx);
         
-        // Program keypair signs (buffer account is not a signer for the deploy transaction)
-        deployTx.partialSign(programKeypair);
+        console.log('[DEBUG] Deployment transaction signed by wallet');
+        console.log('[DEBUG] Deploy tx signers required:', deployTx.compileMessage().accountKeys.slice(0, deployTx.compileMessage().header.numRequiredSignatures).map(k => k.toBase58()));
+        
+        // NOTE: Program keypair should NOT sign the deployment transaction
+        // The deployment transaction only needs: wallet (upgrade authority) + ephemeral (buffer authority)
         
         // 5. Send the partially-signed transaction to backend for co-signing and broadcast
         setDeployStage('Sending to server for co-signing...');
@@ -748,13 +751,16 @@ export function ProgramDeployer({
 
         console.log("encodedTx", encodedTx);
         
+        console.log('[DEBUG] Sending deploy transaction to server for ephemeral key signing');
+        console.log('[DEBUG] Ephemeral key that should sign:', ephemeralPubkeyStr);
+        
         try {
           const firstRelay = await projectApi.relaySignedTx(
             projectId,
             encodedTx,
             programId.toBase58(),
             undefined,                 // taskId is now optional but still expected by type
-            [ephemeralPubkeyStr]       // tell server which key it must co-sign
+            [ephemeralPubkeyStr]       // tell server which ephemeral key must co-sign
           );
 
           let finalSig: string | undefined;

@@ -1393,6 +1393,22 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
       console.log(`[RELAY_SIGNED_TX] ${i}: ${signer} = ${hasSig} (${sigLength} bytes)`);
     }
     
+    console.log(`[RELAY_SIGNED_TX] Extra signers provided: ${extraSigners.length}`);
+    extraSigners.forEach((signer, idx) => {
+      console.log(`[RELAY_SIGNED_TX] Extra signer ${idx}: ${signer.publicKey.toBase58()}`);
+    });
+    
+    console.log(`[RELAY_SIGNED_TX] Checking if this is a deployment transaction...`);
+    // Check if this is a BPF upgrade loader deployment (instruction data starts with [2,0,0,0])
+    const firstInstruction = transaction.instructions[0];
+    if (firstInstruction && firstInstruction.data.length >= 4) {
+      const instructionType = Array.from(firstInstruction.data.slice(0, 4));
+      console.log(`[RELAY_SIGNED_TX] First instruction data prefix: [${instructionType.join(',')}]`);
+      if (instructionType[0] === 2 && instructionType[1] === 0 && instructionType[2] === 0 && instructionType[3] === 0) {
+        console.log(`[RELAY_SIGNED_TX] This is a BPF loader deployment transaction`);
+      }
+    }
+    
     let txSignature: string;
     
     if (currentSigs === requiredSigs) {
