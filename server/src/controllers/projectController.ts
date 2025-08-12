@@ -1354,26 +1354,64 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
     if (Array.isArray(serverSignFor)) {
       for (const pk of serverSignFor) {
         const kp = (ephemeralKeys as Map<string, Keypair>).get(pk);
-        if (kp) extraSigners.push(kp);
+        if (kp) {
+          console.log(`[SIGNING] Found ephemeral key for ${pk}`);
+          extraSigners.push(kp);
+        } else {
+          console.log(`[SIGNING] Ephemeral key not found for ${pk}`);
+        }
       }
     }
     // From signer hint
     if (signerHint?.type === 'ephemeral' && signerHint?.pubkey) {
       const kp = (ephemeralKeys as Map<string, Keypair>).get(signerHint.pubkey);
-      if (kp) extraSigners.push(kp);
+      if (kp) {
+        console.log(`[SIGNING] Found ephemeral key from signer hint: ${signerHint.pubkey}`);
+        extraSigners.push(kp);
+      } else {
+        console.log(`[SIGNING] Ephemeral key from signer hint not found: ${signerHint.pubkey}`);
+      }
     }
 
-    // Add any server signatures, and either request wallet sign or broadcast
-    const out = await signDeployTxAndBroadcast(id, encodedTx, programId, { extraSigners });
-    if (out?.txForWallet) {
-      return res.status(409).json({
-        code: 'WALLET_SIGNATURE_REQUIRED',
-        missing: out.missing ?? [],
-        txBase64: out.txForWallet,
-        txForWallet: out.txForWallet,
-      });
+    console.log(`[SIGNING] Total extra signers found: ${extraSigners.length}`);
+
+    // First check if the transaction is already fully signed
+    const raw = Buffer.from(encodedTx, 'base64');
+    const transaction = Transaction.from(raw);
+    const msg = transaction.compileMessage();
+    const requiredSigs = msg.header.numRequiredSignatures;
+    const currentSigs = transaction.signatures.filter(s => s.signature).length;
+    
+    console.log(`[RELAY_SIGNED_TX] Transaction has ${currentSigs}/${requiredSigs} signatures`);
+    
+    let txSignature: string;
+    
+    if (currentSigs === requiredSigs) {
+      // Transaction is fully signed, broadcast directly
+      console.log(`[RELAY_SIGNED_TX] Transaction is fully signed, broadcasting directly`);
+      const endpoint = process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com';
+      const connection = new Connection(endpoint, 'confirmed');
+      
+      txSignature = await connection.sendRawTransaction(
+        transaction.serialize(),
+        { skipPreflight: true }
+      );
+      
+      console.log(`[RELAY_SIGNED_TX] Direct broadcast successful: ${txSignature}`);
+    } else {
+      // Transaction needs additional server signing
+      console.log(`[RELAY_SIGNED_TX] Transaction needs server signatures, processing...`);
+      const out = await signDeployTxAndBroadcast(id, encodedTx, programId, { extraSigners });
+      if (out?.txForWallet) {
+        return res.status(409).json({
+          code: 'WALLET_SIGNATURE_REQUIRED',
+          missing: out.missing ?? [],
+          txBase64: out.txForWallet,
+          txForWallet: out.txForWallet,
+        });
+      }
+      txSignature = out.signature as string;
     }
-    const txSignature = out.signature as string;
     
     const client = await pool.connect();
     try {
@@ -1410,6 +1448,60 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
     console.error('[RELAY_SIGNED_TX] Failed to broadcast signed transaction:', error);
     next(new AppError('Failed to relay signed transaction', 500));
     return;
+  }
+};
+
+export const relayTx = async (req: Request, res: Response, next: NextFunction) => {
+  const { encodedTx, programId } = req.body;
+  
+  if (!encodedTx || !programId) {
+    return next(new AppError('Missing encodedTx or programId', 400));
+  }
+  
+  try {
+    console.log(`[RELAY_TX] Handling unsigned transaction for program ${programId}`);
+    
+    // This is for unsigned write transactions that should be signed by ephemeral key
+    const endpoint = process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com';
+    const connection = new Connection(endpoint, 'confirmed');
+    
+    // Decode the transaction to inspect it
+    const raw = Buffer.from(encodedTx, 'base64');
+    const transaction = Transaction.from(raw);
+    
+    // Find ephemeral key that should sign this transaction
+    let ephemeralKeypair: Keypair | null = null;
+    for (const [pubkeyStr, keypair] of ephemeralKeys) {
+      const msg = transaction.compileMessage();
+      const signerKeys = msg.accountKeys.slice(0, msg.header.numRequiredSignatures);
+      if (signerKeys.some(k => k.equals(keypair.publicKey))) {
+        ephemeralKeypair = keypair;
+        console.log(`[RELAY_TX] Found ephemeral signer: ${pubkeyStr}`);
+        break;
+      }
+    }
+    
+    if (!ephemeralKeypair) {
+      return next(new AppError('No ephemeral key found to sign this transaction', 400));
+    }
+    
+    // Sign with the ephemeral key
+    transaction.sign(ephemeralKeypair);
+    
+    // Send the transaction
+    console.log(`[RELAY_TX] Sending signed transaction...`);
+    const signature = await connection.sendRawTransaction(
+      transaction.serialize(),
+      { skipPreflight: true }
+    );
+    
+    // Don't wait for confirmation for write transactions to avoid timeout
+    console.log(`[RELAY_TX] Transaction sent with signature: ${signature}`);
+    
+    res.status(200).json({ signature });
+  } catch (error: any) {
+    console.error('[RELAY_TX] Error:', error);
+    next(new AppError('Failed to relay transaction', 500));
   }
 };
 

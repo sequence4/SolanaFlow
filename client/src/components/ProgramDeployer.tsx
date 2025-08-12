@@ -543,14 +543,64 @@ export function ProgramDeployer({
 
         /* Helpers */
         async function signAndRelayWithWallet(tx: Transaction, extras: Keypair[]) {
+          console.log(`[DEBUG] signAndRelayWithWallet called with ${extras.length} extra signers`);
+          
           tx.feePayer = wallet.publicKey!;
           await ensureLegacyTxBlockhash(tx, connection);
+          
+          // Debug: log transaction details before signing
+          const msg = tx.compileMessage();
+          console.log(`[DEBUG] Transaction requires ${msg.header.numRequiredSignatures} signatures`);
+          console.log(`[DEBUG] Required signers:`, msg.accountKeys.slice(0, msg.header.numRequiredSignatures).map(k => k.toBase58()));
+          console.log(`[DEBUG] Extra signers provided:`, extras.map(k => k.publicKey.toBase58()));
+          
           await wallet.signTransaction!(tx);
+          console.log(`[DEBUG] Wallet signed transaction`);
+          
           if (extras && extras.length) {
             tx.partialSign(...extras);
+            console.log(`[DEBUG] Applied ${extras.length} extra signatures`);
           }
-          const encoded = tx.serialize({ requireAllSignatures: false }).toString("base64");
-          await projectApi.relayTx(projectId, { encodedTx: encoded, programId: programId.toBase58() });
+          
+          // Debug: check current signatures
+          const currentSigs = tx.signatures.filter(s => s.signature).length;
+          console.log(`[DEBUG] Transaction now has ${currentSigs}/${msg.header.numRequiredSignatures} signatures`);
+          
+          // Ensure all required signatures are present
+          if (currentSigs < msg.header.numRequiredSignatures) {
+            const missingSigs = [];
+            for (let i = 0; i < msg.header.numRequiredSignatures; i++) {
+              if (!tx.signatures[i]?.signature) {
+                missingSigs.push(msg.accountKeys[i].toBase58());
+              }
+            }
+            console.error(`[DEBUG] Transaction is missing signatures for: ${missingSigs.join(', ')}`);
+            throw new Error(`Transaction is missing ${msg.header.numRequiredSignatures - currentSigs} signatures: ${missingSigs.join(', ')}`);
+          }
+          
+          const encoded = tx.serialize({ requireAllSignatures: true }).toString("base64");
+          console.log(`[DEBUG] Sending fully signed transaction to relay-signed-tx endpoint`);
+          
+          try {
+            const result = await projectApi.relaySignedTx(
+              projectId,
+              encoded,
+              programId.toBase58()
+            );
+            
+            if ('signature' in result) {
+              console.log(`[DEBUG] Relay successful with signature: ${result.signature}`);
+            } else if (result.code === 'WALLET_SIGNATURE_REQUIRED') {
+              console.error(`[DEBUG] Server still needs wallet signature. Missing:`, result.missing);
+              throw new Error(`Server requests wallet signature for: ${result.missing?.join(', ')}`);
+            } else {
+              console.error(`[DEBUG] Unexpected relay response:`, result);
+              throw new Error('Unexpected response from relay signed transaction');
+            }
+          } catch (error) {
+            console.error(`[DEBUG] Relay failed:`, error);
+            throw error;
+          }
         }
 
         // Wallet signs AFTER every instruction is already present
@@ -559,8 +609,7 @@ export function ProgramDeployer({
         if (!wallet.signTransaction) throw new Error("Wallet can't sign");
         await wallet.signTransaction(deployTx);
         
-        // Program keypair and buffer account sign
-        deployTx.partialSign(bufferAccount);
+        // Program keypair signs (buffer account is not a signer for the deploy transaction)
         deployTx.partialSign(programKeypair);
         
         // 5. Send the partially-signed transaction to backend for co-signing and broadcast
@@ -609,7 +658,7 @@ export function ProgramDeployer({
               });
               toast.error(
                 'Server returned a tx that does not require your wallet signature. ' +
-                'Ask the backend to set feePayer = wallet before returning 409.'
+                'This might indicate an issue with the transaction structure.'
               );
               throw new Error('WALLET_NOT_REQUIRED_SIGNER');
             }

@@ -386,7 +386,7 @@ export const projectApi = {
     { code: 'WALLET_SIGNATURE_REQUIRED'; txBase64: string; missing: string[] }
   > => {
     const response = await api.post(
-      `/projects/${projectId}/relay-tx`,
+      `/projects/${projectId}/relay-signed-tx`,
       { encodedTx, programId, ...(taskId ? { taskId } : {}), ...(serverSignFor?.length ? { serverSignFor } : {}) },
       { validateStatus: () => true }
     );

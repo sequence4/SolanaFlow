@@ -1643,6 +1643,30 @@ export async function signDeployTxAndBroadcast(
   const missing = findMissingSigners(transaction).map(pk => pk.toBase58());
   if (missing.length > 0) {
     console.warn(`[SIGNING] Missing signatures for ${missing.join(", ")}`);
+    
+    // Debug: show which keys the server has available
+    const availableServerKeys: string[] = [];
+    if (programKeypair) availableServerKeys.push(`program:${programKeypair.publicKey.toBase58()}`);
+    if (opts?.extraSigners?.length) {
+      availableServerKeys.push(...opts.extraSigners.map(k => `extra:${k.publicKey.toBase58()}`));
+    }
+    
+    // Check for server keys in wallets folder
+    const walletsFolderKeys: string[] = [];
+    for (const missingPk of missing) {
+      const keyPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${missingPk}.json`);
+      if (fs.existsSync(keyPath)) {
+        walletsFolderKeys.push(`file:${missingPk}`);
+      }
+    }
+    
+    console.log(`[SIGNING] Server has keys: [${availableServerKeys.join(', ')}]`);
+    console.log(`[SIGNING] Available in wallets folder: [${walletsFolderKeys.join(', ')}]`);
+    console.log(`[SIGNING] Missing keys not found anywhere: [${missing.filter(pk => 
+      !availableServerKeys.some(k => k.endsWith(pk)) && 
+      !walletsFolderKeys.some(k => k.endsWith(pk))
+    ).join(', ')}]`);
+    
     const txForWallet = transaction
       .serialize({ requireAllSignatures: false, verifySignatures: false })
       .toString("base64");
