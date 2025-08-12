@@ -1384,6 +1384,15 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
     
     console.log(`[RELAY_SIGNED_TX] Transaction has ${currentSigs}/${requiredSigs} signatures`);
     
+    // Debug: show signature details
+    console.log(`[RELAY_SIGNED_TX] Required signers:`);
+    for (let i = 0; i < requiredSigs; i++) {
+      const signer = msg.accountKeys[i].toBase58();
+      const hasSig = transaction.signatures[i]?.signature ? 'YES' : 'NO';
+      const sigLength = transaction.signatures[i]?.signature?.length || 0;
+      console.log(`[RELAY_SIGNED_TX] ${i}: ${signer} = ${hasSig} (${sigLength} bytes)`);
+    }
+    
     let txSignature: string;
     
     if (currentSigs === requiredSigs) {

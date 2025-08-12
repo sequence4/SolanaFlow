@@ -545,6 +545,7 @@ export function ProgramDeployer({
         async function signAndRelayWithWallet(tx: Transaction, extras: Keypair[]) {
           console.log(`[DEBUG] signAndRelayWithWallet called with ${extras.length} extra signers`);
           
+          // Set fee payer and blockhash BEFORE compiling message
           tx.feePayer = wallet.publicKey!;
           await ensureLegacyTxBlockhash(tx, connection);
           
@@ -553,18 +554,47 @@ export function ProgramDeployer({
           console.log(`[DEBUG] Transaction requires ${msg.header.numRequiredSignatures} signatures`);
           console.log(`[DEBUG] Required signers:`, msg.accountKeys.slice(0, msg.header.numRequiredSignatures).map(k => k.toBase58()));
           console.log(`[DEBUG] Extra signers provided:`, extras.map(k => k.publicKey.toBase58()));
+          console.log(`[DEBUG] Wallet public key:`, wallet.publicKey!.toBase58());
+          console.log(`[DEBUG] Fee payer:`, tx.feePayer?.toBase58());
           
+          // Verify wallet is first signer
+          const walletIsFirstSigner = msg.accountKeys[0].equals(wallet.publicKey!);
+          console.log(`[DEBUG] Wallet is first signer:`, walletIsFirstSigner);
+          if (!walletIsFirstSigner) {
+            console.error(`[DEBUG] ERROR: Wallet should be first signer but isn't!`);
+            console.error(`[DEBUG] Expected:`, wallet.publicKey!.toBase58());
+            console.error(`[DEBUG] Actual first signer:`, msg.accountKeys[0].toBase58());
+          }
+          
+          // Initialize signatures array properly first
+          const signers = [wallet.publicKey!, ...extras.map(k => k.publicKey)];
+          console.log(`[DEBUG] All signers that need to sign:`, signers.map(s => s.toBase58()));
+          
+          // Sign with wallet first (Phantom will add its signature)
           await wallet.signTransaction!(tx);
           console.log(`[DEBUG] Wallet signed transaction`);
           
+          // Check wallet signature was applied
+          let currentSigs = tx.signatures.filter(s => s.signature).length;
+          console.log(`[DEBUG] After wallet signature: ${currentSigs}/${msg.header.numRequiredSignatures} signatures`);
+          
+          // Then apply extra signatures
           if (extras && extras.length) {
+            console.log(`[DEBUG] Applying ${extras.length} extra signatures...`);
             tx.partialSign(...extras);
             console.log(`[DEBUG] Applied ${extras.length} extra signatures`);
           }
           
-          // Debug: check current signatures
-          const currentSigs = tx.signatures.filter(s => s.signature).length;
-          console.log(`[DEBUG] Transaction now has ${currentSigs}/${msg.header.numRequiredSignatures} signatures`);
+          // Final signature count check
+          currentSigs = tx.signatures.filter(s => s.signature).length;
+          console.log(`[DEBUG] Final signature count: ${currentSigs}/${msg.header.numRequiredSignatures} signatures`);
+          
+          // Debug: show which signatures we have
+          for (let i = 0; i < msg.header.numRequiredSignatures; i++) {
+            const signer = msg.accountKeys[i].toBase58();
+            const hasSig = tx.signatures[i]?.signature ? 'YES' : 'NO';
+            console.log(`[DEBUG] Signature ${i}: ${signer} = ${hasSig}`);
+          }
           
           // Ensure all required signatures are present
           if (currentSigs < msg.header.numRequiredSignatures) {
