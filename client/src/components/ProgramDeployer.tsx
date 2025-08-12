@@ -587,15 +587,55 @@ export function ProgramDeployer({
             cleanTx.add(instruction);
           }
           
+          // Force compilation to set up signatures array properly
+          cleanTx.compileMessage();
+          
           console.log(`[DEBUG] Created clean transaction with ${cleanTx.instructions.length} instructions`);
           
-          // Sign with wallet first on the clean transaction
-          await wallet.signTransaction!(cleanTx);
+          // Debug transaction before wallet signing
+          console.log(`[DEBUG] Transaction before wallet signing:`);
+          console.log(`[DEBUG] - Instructions: ${cleanTx.instructions.length}`);
+          console.log(`[DEBUG] - Fee payer: ${cleanTx.feePayer?.toBase58()}`);
+          console.log(`[DEBUG] - Recent blockhash: ${cleanTx.recentBlockhash}`);
+          console.log(`[DEBUG] - Signatures length: ${cleanTx.signatures.length}`);
+          
+          // Try wallet signing with error handling
+          try {
+            console.log(`[DEBUG] About to call wallet.signTransaction...`);
+            const signedTx = await wallet.signTransaction!(cleanTx);
+            console.log(`[DEBUG] Wallet.signTransaction returned successfully`);
+            console.log(`[DEBUG] Returned tx === original tx:`, signedTx === cleanTx);
+            console.log(`[DEBUG] Returned tx signatures length:`, signedTx.signatures.length);
+            
+            // Always use the returned transaction as it might be a new instance
+            if (signedTx !== cleanTx) {
+              console.log(`[DEBUG] Wallet returned a different transaction object, replacing cleanTx`);
+              // Replace the entire transaction
+              Object.assign(cleanTx, {
+                signatures: signedTx.signatures,
+                feePayer: signedTx.feePayer,
+                recentBlockhash: signedTx.recentBlockhash,
+                lastValidBlockHeight: signedTx.lastValidBlockHeight,
+                instructions: signedTx.instructions
+              });
+            } else {
+              console.log(`[DEBUG] Wallet modified the original transaction in-place`);
+            }
+          } catch (error) {
+            console.error(`[DEBUG] Wallet signing failed:`, error);
+            throw error;
+          }
+          
           console.log(`[DEBUG] Wallet signed clean transaction`);
           
           // Check wallet signature was applied
           let walletSigCount = cleanTx.signatures.filter(s => s.signature).length;
           console.log(`[DEBUG] After wallet signature on clean tx: ${walletSigCount} signatures`);
+          
+          // Debug each signature slot
+          cleanTx.signatures.forEach((sig, idx) => {
+            console.log(`[DEBUG] Signature slot ${idx}: ${sig.publicKey.toBase58()} = ${sig.signature ? 'PRESENT' : 'MISSING'}`);
+          });
           
           // Then apply extra signatures
           if (extras && extras.length > 0) {
