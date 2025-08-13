@@ -778,10 +778,16 @@ export function ProgramDeployer({
         console.log('[DEBUG] Deployment transaction signed by wallet');
         console.log('[DEBUG] Deploy tx signers required:', deployTx.compileMessage().accountKeys.slice(0, deployTx.compileMessage().header.numRequiredSignatures).map(k => k.toBase58()));
         
-        // Actually, the program keypair DOES need to sign the deployment transaction
-        // Required signers: wallet (upgrade authority) + program keypair + ephemeral (buffer authority)
-        deployTx.partialSign(programKeypair);
-        console.log('[DEBUG] Program keypair signed deployment transaction');
+        // Check if we need to sign with the program keypair on the client side
+        // When using existing program ID, the real keypair is on the backend
+        if (!existingProgramId) {
+          // Only sign with program keypair if we generated a new one (fallback case)
+          deployTx.partialSign(programKeypair);
+          console.log('[DEBUG] Program keypair signed deployment transaction (new program)');
+        } else {
+          // For existing program ID, the backend will handle program keypair signing
+          console.log('[DEBUG] Skipping client-side program keypair signing - backend will handle it');
+        }
         
         // 5. Send the partially-signed transaction to backend for co-signing and broadcast
         setDeployStage('Sending to server for co-signing...');
@@ -790,8 +796,22 @@ export function ProgramDeployer({
 
         console.log("encodedTx", encodedTx);
         
+        // Debug: Show current signature status before sending to backend
+        if (DEBUG_LOGS) {
+          const currentSigs = deployTx.signatures.filter(s => s.signature).length;
+          const requiredSigs = deployTx.compileMessage().header.numRequiredSignatures;
+          console.log(`[DEBUG] Transaction signature status: ${currentSigs}/${requiredSigs} signatures`);
+          
+          for (let i = 0; i < deployTx.signatures.length; i++) {
+            const sig = deployTx.signatures[i];
+            const status = sig.signature ? '✅ SIGNED' : '❌ MISSING';
+            console.log(`[DEBUG] Signature ${i}: ${sig.publicKey?.toBase58()} ${status}`);
+          }
+        }
+        
         console.log('[DEBUG] Sending deploy transaction to server for ephemeral key signing');
         console.log('[DEBUG] Ephemeral key that should sign:', ephemeralPubkeyStr);
+        console.log('[DEBUG] Expected program ID for backend signing:', programId.toBase58());
         
         try {
           const firstRelay = await projectApi.relaySignedTx(
