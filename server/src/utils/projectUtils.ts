@@ -298,6 +298,36 @@ export const getBuildArtifactTask = async (projectId: string): Promise<{ status:
       { skipSuccessUpdate: true, silent: true }
     );
     
+    // Validate the binary data integrity
+    const testBinary = Buffer.from(base64So, 'base64');
+    if (testBinary.length < 4 || 
+        testBinary[0] !== 0x7f || 
+        testBinary[1] !== 0x45 || 
+        testBinary[2] !== 0x4c || 
+        testBinary[3] !== 0x46) {
+      console.error(`[ARTIFACT] Invalid ELF file from ${containerSoPath}`);
+      console.error(`[ARTIFACT] Binary header: [${testBinary.slice(0, 4).join(',')}]`);
+      console.error(`[ARTIFACT] Binary size: ${testBinary.length} bytes`);
+      
+      // Also check the raw file in the container for debugging
+      const hexCmd = `docker exec ${containerName} bash -c "head -c 16 '${containerSoPath}' | hexdump -C"`;
+      try {
+        const hexOutput = await runCommand(hexCmd, '.', tempTaskId, { skipSuccessUpdate: true });
+        console.error(`[ARTIFACT] Raw file hex dump: ${hexOutput}`);
+      } catch (e) {
+        console.error(`[ARTIFACT] Could not read raw file: ${e}`);
+      }
+      
+      throw new Error(`Invalid ELF file: corrupted program artifact at ${containerSoPath}`);
+    }
+    
+    // Additional validation: Check if this looks like a minimal valid program
+    if (testBinary.length < 100) {
+      console.warn(`[ARTIFACT] Suspiciously small program: ${testBinary.length} bytes`);
+    }
+    
+    console.log(`[ARTIFACT] Valid ELF artifact verified: ${containerSoPath} (${testBinary.length} bytes)`);
+    
     /* ----------------------------------------------------------------
        Locate the program keypair JSON.
        ① project‑local   target/deploy/        (fresh build output)

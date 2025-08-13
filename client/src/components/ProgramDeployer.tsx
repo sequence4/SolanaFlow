@@ -455,10 +455,22 @@ export function ProgramDeployer({
         const writeInstructions: TransactionInstruction[] = [];
         // Keep each write well under the legacy 1232-byte cap
         const CHUNK = 850;
+        
+        // Verify program bytes integrity before chunking
+        console.log(`[DEBUG] Program bytes integrity check: length=${programBytes.length}, first 4 bytes=[${Array.from(programBytes.slice(0, 4)).join(',')}]`);
+        
         for (let off = 0; off < programBytes.length; off += CHUNK) {
           const slice = programBytes.slice(off, off + CHUNK);
+          
+          // Validate each chunk
+          if (off === 0) {
+            // First chunk should contain ELF magic if it's the start
+            console.log(`[DEBUG] First chunk ELF magic: [${Array.from(slice.slice(0, 4)).join(',')}]`);
+          }
+          
           let writeIx: TransactionInstruction;
           try {
+            const sliceBuffer = Buffer.from(slice);  // Explicit conversion
             writeIx = new TransactionInstruction({
               programId: BPF_UPGRADE_LOADER_ID,
               keys: [
@@ -470,10 +482,10 @@ export function ProgramDeployer({
                 Buffer.from([1, 0, 0, 0]),  // Write tag
                 u32LE(off),
                 u64LE(slice.length),
-                Buffer.from(slice),         // ensure Buffer, not Uint8Array
+                sliceBuffer,                // use explicit buffer conversion
               ]),
             });
-            console.log("writeIx", writeIx);
+            if (DEBUG_LOGS) console.log(`[DEBUG] WriteIx chunk ${off}-${off + slice.length}: ${slice.length} bytes`);
           } catch (e) {
             console.error(`[STEP-WRITE offset=${off}] failed`, e);
             throw e;
