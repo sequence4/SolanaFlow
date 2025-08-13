@@ -593,6 +593,31 @@ export function ProgramDeployer({
           .add(bufferInitIx)
           .add(setAuthorityIx);
         await signAndRelayWithWallet(initTx, [bufferAccount]);
+        
+        // VERIFY BUFFER AUTHORITY IS SET CORRECTLY
+        try {
+          console.log(`[DEBUG] Verifying buffer account authority...`);
+          const bufferAccountInfo = await connection.getAccountInfo(bufferAccount.publicKey);
+          if (bufferAccountInfo?.data) {
+            // Buffer account format: 4 bytes variant + 32 bytes authority + 1 byte authority option + remaining data
+            const authorityBytes = bufferAccountInfo.data.subarray(4, 36);
+            const authorityPubkey = new PublicKey(authorityBytes);
+            console.log(`[DEBUG] Buffer authority set to: ${authorityPubkey.toBase58()}`);
+            console.log(`[DEBUG] Expected ephemeral authority: ${ephemeralPubkeyStr}`);
+            
+            if (authorityPubkey.toBase58() !== ephemeralPubkeyStr) {
+              console.error(`[CRITICAL] Buffer authority mismatch! Expected ${ephemeralPubkeyStr}, got ${authorityPubkey.toBase58()}`);
+              throw new Error(`Buffer authority not set to ephemeral key`);
+            } else {
+              console.log(`[DEBUG] ✅ Buffer authority correctly set to ephemeral key`);
+            }
+          } else {
+            throw new Error("Buffer account has no data after initialization");
+          }
+        } catch (verifyError) {
+          console.error(`[CRITICAL] Buffer authority verification failed:`, verifyError);
+          throw verifyError;
+        }
 
         /* ──────────────────────────────────────────────
            Stage 2 – upload bytes in batches (ATOMICALLY)
@@ -622,8 +647,29 @@ export function ProgramDeployer({
           
           // Relay unsigned for server to sign with ephemeral (no wallet popups)
           const encoded = tx.serialize({ requireAllSignatures: false }).toString("base64");
-          await projectApi.relayTx(projectId, { encodedTx: encoded, programId: programId.toBase58() });
-          console.log(`[DEBUG] Write batch ${Math.floor(i / MAX_WRITES_PER_TX) + 1} completed`);
+          const txResult = await projectApi.relayTx(projectId, { encodedTx: encoded, programId: programId.toBase58() });
+          
+          // Check if this is a successful transaction result
+          if ('signature' in txResult) {
+            console.log(`[DEBUG] Write batch ${Math.floor(i / MAX_WRITES_PER_TX) + 1} completed with signature: ${txResult.signature}`);
+            
+            // Wait a moment for transaction to be processed before continuing
+            try {
+              console.log(`[DEBUG] Confirming write batch transaction: ${txResult.signature}`);
+              await connection.confirmTransaction({
+                signature: txResult.signature,
+                blockhash: tx.recentBlockhash!,
+                lastValidBlockHeight: (await connection.getLatestBlockhash()).lastValidBlockHeight
+              });
+              console.log(`[DEBUG] Write batch transaction confirmed: ${txResult.signature}`);
+            } catch (confirmError) {
+              console.warn(`[DEBUG] Write batch confirmation failed (continuing anyway): ${confirmError}`);
+            }
+          } else {
+            // This is an error response (e.g., WALLET_SIGNATURE_REQUIRED)
+            console.error(`[CRITICAL] Write batch failed:`, txResult);
+            throw new Error(`Write batch transaction failed: ${JSON.stringify(txResult)}`);
+          }
           
           setProgress(p => (p ?? 20) + Math.floor((i + batch.length) / writeInstructions.length * 20));
         }
