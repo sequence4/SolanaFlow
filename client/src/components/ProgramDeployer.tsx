@@ -494,23 +494,30 @@ export function ProgramDeployer({
           let writeIx: TransactionInstruction;
           try {
             const sliceBuffer = Buffer.from(slice);  // Explicit conversion
-            // BPF Loader Write instruction format:
-            // [1, 0, 0, 0] + u32(offset) + u64(length) + data
+            // BPF Upgradeable Loader Write instruction format:
+            // [3, 0, 0, 0] + u32(offset) + u64(length) + data
             const writeData = Buffer.concat([
-              Buffer.from([1, 0, 0, 0]),  // Write instruction tag
+              Buffer.from([3, 0, 0, 0]),  // Write instruction tag (3 for BPF Upgradeable Loader)
               u32LE(off),                 // offset in buffer  
               u64LE(slice.length),        // length of data (BPF Loader uses u64)
               sliceBuffer,                // actual data bytes
             ]);
             
-            // Debug: validate the constructed write data for first chunk
+            // Debug: validate the constructed write data
+            console.log(`[DEBUG] Write instruction data length: ${writeData.length} bytes`);
+            console.log(`[DEBUG] Write instruction format - Tag: [${Array.from(writeData.subarray(0, 4)).join(',')}]`);
+            console.log(`[DEBUG] Write instruction format - Offset: ${off} (bytes 4-7: [${Array.from(writeData.subarray(4, 8)).join(',')}])`);
+            console.log(`[DEBUG] Write instruction format - Length: ${slice.length} (bytes 8-15: [${Array.from(writeData.subarray(8, 16)).join(',')}])`);
+            
             if (off === 0) {
               const dataOffset = 16; // 4 bytes tag + 4 bytes offset + 8 bytes length
-              const dataSection = writeData.slice(dataOffset, dataOffset + 4);
+              const dataSection = writeData.subarray(dataOffset, dataOffset + 4);
               console.log(`[DEBUG] Write instruction data section (first 4 bytes): [${Array.from(dataSection).join(',')}]`);
               
               if (dataSection[0] !== 0x7f || dataSection[1] !== 0x45 || dataSection[2] !== 0x4c || dataSection[3] !== 0x46) {
                 console.error(`[CRITICAL] ELF magic corrupted in write instruction! Got [${Array.from(dataSection).join(',')}]`);
+              } else {
+                console.log(`[DEBUG] ✅ Write instruction contains correct ELF magic`);
               }
             }
             
@@ -615,7 +622,7 @@ export function ProgramDeployer({
           
           // Relay unsigned for server to sign with ephemeral (no wallet popups)
           const encoded = tx.serialize({ requireAllSignatures: false }).toString("base64");
-          const result = await projectApi.relayTx(projectId, { encodedTx: encoded, programId: programId.toBase58() });
+          await projectApi.relayTx(projectId, { encodedTx: encoded, programId: programId.toBase58() });
           console.log(`[DEBUG] Write batch ${Math.floor(i / MAX_WRITES_PER_TX) + 1} completed`);
           
           setProgress(p => (p ?? 20) + Math.floor((i + batch.length) / writeInstructions.length * 20));
