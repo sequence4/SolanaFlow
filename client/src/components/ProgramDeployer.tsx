@@ -773,10 +773,23 @@ export function ProgramDeployer({
         setDeployStage('Awaiting wallet signature…');
         setProgress(40);
         if (!wallet.signTransaction) throw new Error("Wallet can't sign");
-        await wallet.signTransaction(deployTx);
+        
+        const signedTx = await wallet.signTransaction(deployTx);
+        
+        // Check if wallet returned a different transaction object
+        if (signedTx !== deployTx) {
+          console.log('[DEBUG] Wallet returned a different transaction object, replacing deployTx');
+          Object.assign(deployTx, signedTx);  // Update deployTx with signed version
+        }
         
         console.log('[DEBUG] Deployment transaction signed by wallet');
         console.log('[DEBUG] Deploy tx signers required:', deployTx.compileMessage().accountKeys.slice(0, deployTx.compileMessage().header.numRequiredSignatures).map(k => k.toBase58()));
+        
+        // Verify wallet signature is present
+        const walletSigPresent = deployTx.signatures.find(sig => 
+          sig.publicKey?.toBase58() === wallet.publicKey!.toBase58() && sig.signature
+        );
+        console.log('[DEBUG] Wallet signature present:', walletSigPresent ? '✅ YES' : '❌ NO');
         
         // Check if we need to sign with the program keypair on the client side
         // When using existing program ID, the real keypair is on the backend

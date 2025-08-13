@@ -51,6 +51,9 @@ export interface ProjectDetailsType {
   /** Public program ID written by the build/deploy pipeline */
   programId?: string
 
+  /** Function to update the project state */
+  setProjectState?: (updater: ProjectStateUpdater) => void
+
   /** Allow future keys without another type bump */
   [key: string]: unknown
 }

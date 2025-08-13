@@ -1,10 +1,10 @@
 
-import React from 'react';
-import { taskApi } from '../../api/taskApi';
-import { toast } from 'sonner';
-import { getFilesForNodeType, getDependenciesForNodeType, NodeType } from '../../data/nodes/registryManager';
-import { ProjectContextType } from '../../context/project/ProjectContextTypes';
-import { containerFileApi } from '../../api/containerFileApi';
+// import React from 'react';
+// import { taskApi } from '../../api/taskApi';
+// import { toast } from 'sonner';
+// import { getFilesForNodeType, getDependenciesForNodeType, NodeType } from '../../data/nodes/registryManager';
+// import { ProjectContextType } from '../../context/project/ProjectContextTypes';
+// import { containerFileApi } from '../../api/containerFileApi';
 
 function getDestinationFolder(originalPath: string): string {
   const fileName = originalPath.split('/').pop() || '';
@@ -18,6 +18,7 @@ function getDestinationFolder(originalPath: string): string {
   }
 }
 
+/* 
 export const injectCodeForNodeType = async (
   nodeType: string,
   projectId: string,
@@ -242,8 +243,9 @@ export const injectCodeForNodeType = async (
     }
   }
 };
+*/
 
-async function updatePackageJsonInContainer(projectId: string, dependencies: Record<string, string>): Promise<void> {
+/* async function updatePackageJsonInContainer(projectId: string, dependencies: Record<string, string>): Promise<void> {
   try {
     console.log(`[INJECT] Updating package.json with ${Object.keys(dependencies).length} dependencies`);
     
@@ -399,7 +401,7 @@ async function updateIndexExportsInContainer(projectId: string, filePaths: strin
     console.error(`Failed to update index exports:`, error);
     throw error;
   }
-} 
+}
 */
 
 export const placeholder = () => {
