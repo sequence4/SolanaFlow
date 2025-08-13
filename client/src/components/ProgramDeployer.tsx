@@ -458,19 +458,38 @@ export function ProgramDeployer({
         
         // Verify program bytes integrity before chunking
         console.log(`[DEBUG] Program bytes integrity check: length=${programBytes.length}, first 4 bytes=[${Array.from(programBytes.slice(0, 4)).join(',')}]`);
+        console.log(`[DEBUG] Program bytes last 4 bytes=[${Array.from(programBytes.slice(-4)).join(',')}]`);
+        
+        let totalBytesWritten = 0;
+        const chunkSummary: string[] = [];
         
         for (let off = 0; off < programBytes.length; off += CHUNK) {
           const slice = programBytes.slice(off, off + CHUNK);
+          totalBytesWritten += slice.length;
+          chunkSummary.push(`offset:${off} len:${slice.length}`);
           
           // Validate each chunk
           if (off === 0) {
             // First chunk should contain ELF magic if it's the start
             console.log(`[DEBUG] First chunk ELF magic: [${Array.from(slice.slice(0, 4)).join(',')}]`);
           }
+          if (off + slice.length >= programBytes.length) {
+            // Last chunk
+            console.log(`[DEBUG] Last chunk ends at offset ${off + slice.length}, final bytes: [${Array.from(slice.slice(-4)).join(',')}]`);
+          }
           
           let writeIx: TransactionInstruction;
           try {
             const sliceBuffer = Buffer.from(slice);  // Explicit conversion
+            // BPF Loader Write instruction format:
+            // [1, 0, 0, 0] + u32(offset) + u64(length) + data
+            const writeData = Buffer.concat([
+              Buffer.from([1, 0, 0, 0]),  // Write instruction tag
+              u32LE(off),                 // offset in buffer  
+              u64LE(slice.length),        // length of data (BPF Loader uses u64)
+              sliceBuffer,                // actual data bytes
+            ]);
+            
             writeIx = new TransactionInstruction({
               programId: BPF_UPGRADE_LOADER_ID,
               keys: [
@@ -478,12 +497,7 @@ export function ProgramDeployer({
                 // Ephemeral (server-held) is buffer authority during writes
                 { pubkey: ephemeralPubkey,          isSigner: true,  isWritable: false },
               ],
-              data: Buffer.concat([
-                Buffer.from([1, 0, 0, 0]),  // Write tag
-                u32LE(off),
-                u64LE(slice.length),
-                sliceBuffer,                // use explicit buffer conversion
-              ]),
+              data: writeData,
             });
             if (DEBUG_LOGS) console.log(`[DEBUG] WriteIx chunk ${off}-${off + slice.length}: ${slice.length} bytes`);
           } catch (e) {
@@ -491,6 +505,13 @@ export function ProgramDeployer({
             throw e;
           }
           writeInstructions.push(writeIx);
+        }
+        
+        // Validate chunk coverage
+        console.log(`[DEBUG] Chunk summary: ${chunkSummary.join(', ')}`);
+        console.log(`[DEBUG] Total bytes to write: ${totalBytesWritten}, program length: ${programBytes.length}`);
+        if (totalBytesWritten !== programBytes.length) {
+          throw new Error(`Chunk coverage mismatch: ${totalBytesWritten} != ${programBytes.length}`);
         }
 
         console.log("writeInstructions", writeInstructions);
@@ -543,27 +564,40 @@ export function ProgramDeployer({
         await signAndRelayWithWallet(initTx, [bufferAccount]);
 
         /* ──────────────────────────────────────────────
-           Stage 2 – upload bytes in batches
+           Stage 2 – upload bytes in batches (ATOMICALLY)
         ────────────────────────────────────────────── */
-        const MAX_WRITES_PER_TX = 1;           // keep each tx well under the 1,232B cap
+        console.log(`[DEBUG] Uploading ${writeInstructions.length} write instructions in atomic batches`);
+        
+        // Calculate optimal batching - each write instruction is ~900-950 bytes
+        // Target ~800 bytes per transaction to leave room for transaction overhead
+        const MAX_WRITES_PER_TX = Math.max(1, Math.floor(800 / (CHUNK + 100))); // +100 for instruction overhead
+        console.log(`[DEBUG] Batching ${MAX_WRITES_PER_TX} write instructions per transaction`);
+        
         for (let i = 0; i < writeInstructions.length; i += MAX_WRITES_PER_TX) {
-          const tx = new Transaction().add(...writeInstructions.slice(i, i + MAX_WRITES_PER_TX));
+          const batch = writeInstructions.slice(i, i + MAX_WRITES_PER_TX);
+          const tx = new Transaction().add(...batch);
+          
           // WRITE txs are server-signed by ephemeral: set feePayer + blockhash here
           tx.feePayer = new PublicKey(ephemeralPubkeyStr);
           await ensureLegacyTxBlockhash(tx, connection);
+          
           // size guard pre-send
           const probe = tx.serialize({ requireAllSignatures: false });
+          console.log(`[DEBUG] Write batch ${Math.floor(i / MAX_WRITES_PER_TX) + 1}: ${batch.length} instructions, ${probe.length} bytes`);
+          
           if (probe.length > 1200) {
             throw new Error(`Tx too large (${probe.length} bytes). Reduce CHUNK or writes/tx.`);
           }
+          
           // Relay unsigned for server to sign with ephemeral (no wallet popups)
-          // Server relay without wallet signature
-          {
-            const encoded = tx.serialize({ requireAllSignatures: false }).toString("base64");
-            await projectApi.relayTx(projectId, { encodedTx: encoded, programId: programId.toBase58() });
-          }
-          setProgress(p => (p ?? 20) + 1);     // cheap visual feedback
+          const encoded = tx.serialize({ requireAllSignatures: false }).toString("base64");
+          const result = await projectApi.relayTx(projectId, { encodedTx: encoded, programId: programId.toBase58() });
+          console.log(`[DEBUG] Write batch ${Math.floor(i / MAX_WRITES_PER_TX) + 1} completed`);
+          
+          setProgress(p => (p ?? 20) + Math.floor((i + batch.length) / writeInstructions.length * 20));
         }
+        
+        console.log(`[DEBUG] All ${writeInstructions.length} write instructions completed. Buffer should now contain complete program.`);
 
         /* ──────────────────────────────────────────────
            Stage 3 – program account + deploy
