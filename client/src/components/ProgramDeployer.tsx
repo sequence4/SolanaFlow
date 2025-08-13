@@ -208,7 +208,7 @@ export function ProgramDeployer({
 
       // Quick cluster check in UI
       // (prevents wallet‑side simulation failures)
-      // @ts-ignore
+      // @ts-expect-error - accessing private connection properties
       const walletCluster = wallet.adapter?.network;
       const rpcUrl = (connection as any)._rpcEndpoint || (connection as any).rpcEndpoint;
       const connCluster = rpcUrl?.includes("devnet") ? "devnet"

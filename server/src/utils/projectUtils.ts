@@ -1780,11 +1780,31 @@ export async function signDeployTxAndBroadcast(
 
   // Simulate transaction before sending
   console.log(`[SIGNING] Simulating transaction on ${endpoint}...`);
+  console.log(`[SIGNING] Transaction size: ${transaction.serialize().length} bytes`);
+  console.log(`[SIGNING] Transaction instructions: ${transaction.instructions.length}`);
+  console.log(`[SIGNING] Transaction signatures: ${transaction.signatures.filter(s => s.signature).length}/${transaction.signatures.length}`);
+  
   const sim = await conn.simulateTransaction(transaction);
   
   if (sim.value.err) {
-    console.error(`[SIGNING] Simulation failed: ${typeof sim.value.err === 'string' ? sim.value.err : 'Transaction error'}`);
-    throw new Error(`Simulation failed: ${typeof sim.value.err === 'string' ? sim.value.err : 'Transaction error'}`);
+    console.error(`[SIGNING] Simulation failed:`, sim.value.err);
+    console.error(`[SIGNING] Simulation logs:`, sim.value.logs);
+    console.error(`[SIGNING] Full simulation result:`, JSON.stringify(sim.value, null, 2));
+    
+    // Enhanced error reporting for debugging
+    let errorMessage = 'Transaction simulation failed';
+    if (typeof sim.value.err === 'string') {
+      errorMessage = sim.value.err;
+    } else if (sim.value.err && typeof sim.value.err === 'object') {
+      errorMessage = JSON.stringify(sim.value.err);
+    }
+    
+    // Add logs if available for more context
+    if (sim.value.logs && sim.value.logs.length > 0) {
+      errorMessage += '. Logs: ' + sim.value.logs.join('; ');
+    }
+    
+    throw new Error(`Simulation failed: ${errorMessage}`);
   }
   
   console.log(`[SIGNING] Simulation successful (${sim.value.unitsConsumed || 0} compute units consumed)`);
