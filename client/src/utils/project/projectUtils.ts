@@ -97,11 +97,8 @@ export const handleOpenProject = async (
     setProjectContext(safeProjectContext);
     console.log(`[DEBUG] Project context set with safeProjectContext`);
 
-    if (!fetchedDetails.details?.projectState?.fileTree) {
-      setFileTree(null);
-    } else {
-      fetchFilesAndCodes(projectId, safeProjectContext, setProjectContext, setFileTree, false);
-    }
+    // Always fetch files and codes to populate the file tree
+    fetchFilesAndCodes(projectId, safeProjectContext, setProjectContext, setFileTree, false);
 
     try {
       const containerResult = await projectApi.startContainer(projectId);
@@ -413,7 +410,10 @@ export const handleSaveClick = async (
 ) => {
     try {
       await toast.promise(
-        saveProject(projectContext, setProjectContext),
+        (async () => {
+          const result = await saveProject(projectContext, setProjectContext);
+          return result || "Project saved";
+        })(),
         {
           loading: "Saving project...",
           success: "Project updated successfully",
