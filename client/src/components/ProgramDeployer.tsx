@@ -412,6 +412,12 @@ export function ProgramDeployer({
         const bufferRent = await connection.getMinimumBalanceForRentExemption(bufferSpace);
         const programRent = await connection.getMinimumBalanceForRentExemption(36);
         
+        console.log(`[DEBUG] Buffer account sizing:`);
+        console.log(`[DEBUG] - Program bytes length: ${programBytes.byteLength}`);
+        console.log(`[DEBUG] - Buffer metadata overhead: 37 bytes`);
+        console.log(`[DEBUG] - Total buffer space: ${bufferSpace} bytes`);
+        console.log(`[DEBUG] - Buffer rent: ${bufferRent} lamports`);
+        
         // 4. Create buffer account
         const bufferAccount = Keypair.generate();
         setDeployStage('Creating buffer account...');
@@ -471,7 +477,14 @@ export function ProgramDeployer({
           // Validate each chunk
           if (off === 0) {
             // First chunk should contain ELF magic if it's the start
-            console.log(`[DEBUG] First chunk ELF magic: [${Array.from(slice.slice(0, 4)).join(',')}]`);
+            const firstBytes = Array.from(slice.slice(0, 4));
+            console.log(`[DEBUG] First chunk ELF magic: [${firstBytes.join(',')}]`);
+            
+            // Verify ELF magic is correct
+            if (firstBytes[0] !== 0x7f || firstBytes[1] !== 0x45 || firstBytes[2] !== 0x4c || firstBytes[3] !== 0x46) {
+              console.error(`[CRITICAL] ELF magic is invalid in first chunk! Got [${firstBytes.join(',')}], expected [127,69,76,70]`);
+              throw new Error(`Invalid ELF magic in program bytes: [${firstBytes.join(',')}]`);
+            }
           }
           if (off + slice.length >= programBytes.length) {
             // Last chunk
@@ -489,6 +502,17 @@ export function ProgramDeployer({
               u64LE(slice.length),        // length of data (BPF Loader uses u64)
               sliceBuffer,                // actual data bytes
             ]);
+            
+            // Debug: validate the constructed write data for first chunk
+            if (off === 0) {
+              const dataOffset = 16; // 4 bytes tag + 4 bytes offset + 8 bytes length
+              const dataSection = writeData.slice(dataOffset, dataOffset + 4);
+              console.log(`[DEBUG] Write instruction data section (first 4 bytes): [${Array.from(dataSection).join(',')}]`);
+              
+              if (dataSection[0] !== 0x7f || dataSection[1] !== 0x45 || dataSection[2] !== 0x4c || dataSection[3] !== 0x46) {
+                console.error(`[CRITICAL] ELF magic corrupted in write instruction! Got [${Array.from(dataSection).join(',')}]`);
+              }
+            }
             
             writeIx = new TransactionInstruction({
               programId: BPF_UPGRADE_LOADER_ID,
@@ -598,6 +622,61 @@ export function ProgramDeployer({
         }
         
         console.log(`[DEBUG] All ${writeInstructions.length} write instructions completed. Buffer should now contain complete program.`);
+        
+        // VERIFY BUFFER DATA BEFORE DEPLOYMENT
+        try {
+          console.log(`[DEBUG] Verifying buffer account data integrity...`);
+          const bufferAccountInfo = await connection.getAccountInfo(bufferAccount.publicKey);
+          if (!bufferAccountInfo?.data) {
+            throw new Error("Buffer account has no data after write operations");
+          }
+          
+          console.log(`[DEBUG] Buffer account data length: ${bufferAccountInfo.data.length} bytes`);
+          console.log(`[DEBUG] Expected program size: ${programBytes.length} bytes (+ 37 byte metadata)`);
+          
+          // The buffer account data format is: 37 bytes of metadata + program bytes
+          const bufferProgramData = bufferAccountInfo.data.subarray(37);
+          console.log(`[DEBUG] Extracted program data length: ${bufferProgramData.length} bytes`);
+          
+          // Check ELF magic in buffer
+          if (bufferProgramData.length >= 4) {
+            const bufferElfMagic = Array.from(bufferProgramData.subarray(0, 4));
+            console.log(`[DEBUG] Buffer ELF magic: [${bufferElfMagic.join(',')}]`);
+            
+            if (bufferElfMagic[0] !== 0x7f || bufferElfMagic[1] !== 0x45 || bufferElfMagic[2] !== 0x4c || bufferElfMagic[3] !== 0x46) {
+              console.error(`[CRITICAL] Buffer contains corrupted ELF data! Got [${bufferElfMagic.join(',')}], expected [127,69,76,70]`);
+              throw new Error(`Buffer corruption detected: Invalid ELF magic [${bufferElfMagic.join(',')}]`);
+            } else {
+              console.log(`[DEBUG] ✅ Buffer ELF magic is valid`);
+            }
+          }
+          
+          // Compare first and last few bytes
+          const originalFirst = Array.from(programBytes.slice(0, 8));
+          const bufferFirst = Array.from(bufferProgramData.subarray(0, 8));
+          const originalLast = Array.from(programBytes.slice(-8));
+          const bufferLast = Array.from(bufferProgramData.subarray(-8));
+          
+          console.log(`[DEBUG] Original first 8 bytes: [${originalFirst.join(',')}]`);
+          console.log(`[DEBUG] Buffer first 8 bytes:   [${bufferFirst.join(',')}]`);
+          console.log(`[DEBUG] Original last 8 bytes:  [${originalLast.join(',')}]`);
+          console.log(`[DEBUG] Buffer last 8 bytes:    [${bufferLast.join(',')}]`);
+          
+          if (JSON.stringify(originalFirst) !== JSON.stringify(bufferFirst)) {
+            console.error(`[CRITICAL] Buffer data corruption detected at start!`);
+            throw new Error(`Buffer corruption: First bytes mismatch`);
+          }
+          
+          if (JSON.stringify(originalLast) !== JSON.stringify(bufferLast)) {
+            console.error(`[CRITICAL] Buffer data corruption detected at end!`);
+            throw new Error(`Buffer corruption: Last bytes mismatch`);
+          }
+          
+          console.log(`[DEBUG] ✅ Buffer data verification passed - proceeding with deployment`);
+        } catch (verificationError) {
+          console.error(`[CRITICAL] Buffer verification failed:`, verificationError);
+          throw verificationError;
+        }
 
         /* ──────────────────────────────────────────────
            Stage 3 – program account + deploy
