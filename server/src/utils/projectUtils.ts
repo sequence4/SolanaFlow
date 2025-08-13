@@ -1495,51 +1495,80 @@ export async function signDeployTxAndBroadcast(
   // Attempt to sign with server-side program keypair if required
   let programKeypair: Keypair | null = null;
   try {
-    // Try to locate the program keypair for this project (existing helper path retained)
-    // We'll reuse the earlier search logic by calling getContainerName/getProjectRootPath if needed
+    // Try to locate the program keypair for this project using the correct naming convention
     const containerName = await getContainerName(projectId);
     if (containerName) {
       const rootPath = await getProjectRootPath(projectId);
+      const rootStem = rootPath.replace(/-[a-f0-9]{8}$/, '');
+      let programName = rootStem.replace(/-/g, '_');
+      if (/^[0-9]/.test(programName)) programName = 'p' + programName;
+      
       const tempTaskId = uuidv4();
-      let listCmd = `docker exec ${containerName} bash -c 'cd /usr/src/${rootPath} && find target/deploy -maxdepth 1 -name "*-keypair.json" ! -name "anchor_template-*" -print'`;
-      let out = await runCommand(listCmd, '.', tempTaskId, { skipSuccessUpdate: true });
-      let candidates = out.split(/\r?\n/).filter(Boolean);
-      if (!candidates.length) {
-        listCmd = `docker exec ${containerName} bash -c 'find /usr/src/target/deploy -maxdepth 1 -name "*-keypair.json" ! -name "anchor_template-*" -print'`;
-        out = await runCommand(listCmd, '.', tempTaskId, { skipSuccessUpdate: true });
-        candidates = out.split(/\r?\n/).filter(Boolean);
-      }
-      for (const c of candidates) {
-        try {
-          console.log(`[SIGNING] Checking keypair file: ${c}`);
-          const content = await runCommand(
-            `docker exec ${containerName} bash -c "cat '${c}'"`,
-            '.',
-            tempTaskId,
-            { skipSuccessUpdate: true },
-          );
-          const arr = JSON.parse(content.trim());
-          if (Array.isArray(arr) && arr.length === 64) {
-            const kp = Keypair.fromSecretKey(Uint8Array.from(arr));
-            console.log(`[SIGNING] Found keypair with pubkey: ${kp.publicKey.toBase58()}`);
-            console.log(`[SIGNING] Looking for program ID: ${programId}`);
-            
-            // For deployment transactions, we might need any program keypair, not necessarily matching the programId
-            // Let's use the first valid keypair we find
-            if (!programKeypair) {
-              programKeypair = kp;
-              console.log(`[SIGNING] Using keypair ${kp.publicKey.toBase58()} as program keypair`);
-            }
-            
-            // But if we find an exact match, prefer that
-            if (kp.publicKey.toBase58() === programId) {
-              programKeypair = kp;
-              console.log(`[SIGNING] Found exact match for program ID: ${programId}`);
-              break;
-            }
+      
+      // First try the correct program keypair filename based on the program name
+      const correctKeypairPath = `/usr/src/target/deploy/${programName}-keypair.json`;
+      console.log(`[SIGNING] Looking for correct program keypair: ${correctKeypairPath}`);
+      
+      try {
+        const content = await runCommand(
+          `docker exec ${containerName} bash -c "cat '${correctKeypairPath}'"`,
+          '.',
+          tempTaskId,
+          { skipSuccessUpdate: true },
+        );
+        const arr = JSON.parse(content.trim());
+        if (Array.isArray(arr) && arr.length === 64) {
+          const kp = Keypair.fromSecretKey(Uint8Array.from(arr));
+          console.log(`[SIGNING] Found correct program keypair with pubkey: ${kp.publicKey.toBase58()}`);
+          console.log(`[SIGNING] Expected program ID: ${programId}`);
+          
+          // Only use this keypair if it matches the expected program ID
+          if (kp.publicKey.toBase58() === programId) {
+            programKeypair = kp;
+            console.log(`[SIGNING] ✅ Using correct program keypair for deployment`);
+          } else {
+            console.warn(`[SIGNING] ❌ Keypair mismatch! Found ${kp.publicKey.toBase58()}, expected ${programId}`);
           }
-        } catch (e) {
-          console.warn(`[SIGNING] Failed to load keypair from ${c}:`, (e as any)?.message);
+        }
+      } catch (e) {
+        console.warn(`[SIGNING] Could not read correct keypair file ${correctKeypairPath}:`, (e as any)?.message);
+        
+        // Fallback: search all keypair files but only use exact matches
+        let listCmd = `docker exec ${containerName} bash -c 'cd /usr/src/${rootPath} && find target/deploy -maxdepth 1 -name "*-keypair.json" ! -name "anchor_template-*" -print'`;
+        let out = await runCommand(listCmd, '.', tempTaskId, { skipSuccessUpdate: true });
+        let candidates = out.split(/\r?\n/).filter(Boolean);
+        if (!candidates.length) {
+          listCmd = `docker exec ${containerName} bash -c 'find /usr/src/target/deploy -maxdepth 1 -name "*-keypair.json" ! -name "anchor_template-*" -print'`;
+          out = await runCommand(listCmd, '.', tempTaskId, { skipSuccessUpdate: true });
+          candidates = out.split(/\r?\n/).filter(Boolean);
+        }
+        
+        for (const c of candidates) {
+          try {
+            console.log(`[SIGNING] Checking fallback keypair file: ${c}`);
+            const content = await runCommand(
+              `docker exec ${containerName} bash -c "cat '${c}'"`,
+              '.',
+              tempTaskId,
+              { skipSuccessUpdate: true },
+            );
+            const arr = JSON.parse(content.trim());
+            if (Array.isArray(arr) && arr.length === 64) {
+              const kp = Keypair.fromSecretKey(Uint8Array.from(arr));
+              console.log(`[SIGNING] Found fallback keypair with pubkey: ${kp.publicKey.toBase58()}`);
+              
+              // ONLY use keypairs that exactly match the expected program ID
+              if (kp.publicKey.toBase58() === programId) {
+                programKeypair = kp;
+                console.log(`[SIGNING] ✅ Found matching program keypair: ${programId}`);
+                break;
+              } else {
+                console.log(`[SIGNING] ❌ Skipping mismatched keypair: ${kp.publicKey.toBase58()} != ${programId}`);
+              }
+            }
+          } catch (e) {
+            console.warn(`[SIGNING] Failed to load keypair from ${c}:`, (e as any)?.message);
+          }
         }
       }
     }
@@ -1614,15 +1643,22 @@ export async function signDeployTxAndBroadcast(
     console.log(
       `[SIGNING] Program signature already present – skipping server-side signing`
     );
-  } else if (programKeypair) {
+  } else if (programKeypair && programKeypair.publicKey.toBase58() === programId) {
+    // Double-check the keypair matches the expected program ID before signing
     transaction.partialSign(programKeypair);
     console.log(
-      `[SIGNING] Added program signature using server keypair ${programId}`
+      `[SIGNING] ✅ Added program signature using correct keypair ${programId}`
     );
+  } else if (programKeypair) {
+    console.error(
+      `[SIGNING] ❌ CRITICAL: Program keypair mismatch! Have ${programKeypair.publicKey.toBase58()}, need ${programId}`
+    );
+    throw new Error(`Program keypair mismatch: expected ${programId}, got ${programKeypair.publicKey.toBase58()}`);
   } else {
     console.warn(
-      `[SIGNING] No server keypair for program ${programId}; assuming client signature is sufficient`
+      `[SIGNING] ❌ No matching server keypair found for program ${programId}; deployment will likely fail`
     );
+    throw new Error(`No matching program keypair found for ${programId}. Ensure the program was built correctly.`);
   }
   
   // Log compact transaction statistics
@@ -1635,7 +1671,7 @@ export async function signDeployTxAndBroadcast(
   if (!/^https?:\/\//.test(endpoint)) {
     throw new Error(`Invalid RPC endpoint: ${endpoint}. Set RPC_ENDPOINT_DEVNET to a full https:// URL.`);
   }
-  // Attempt to sign with any server-resident keys for other missing signers
+  // Attempt to sign with any server-resident keys for other missing signers (NON-PROGRAM KEYS ONLY)
   const msg = transaction.compileMessage();
   const signerCount = msg.header.numRequiredSignatures;
   const signerKeys = msg.accountKeys.slice(0, signerCount).map(k => k.toBase58());
@@ -1647,13 +1683,26 @@ export async function signDeployTxAndBroadcast(
         console.log(`[SIGNING] Skipping ${pubkeyStr} - not a required signer`);
         continue;
       }
+      
+      // Skip the program ID key - we handle that separately above
+      if (pubkeyStr === programId) {
+        console.log(`[SIGNING] Skipping program key ${pubkeyStr} - handled separately`);
+        continue;
+      }
+      
       const keyPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${pubkeyStr}.json`);
       if (fs.existsSync(keyPath)) {
         try {
           const secretBytes = JSON.parse(fs.readFileSync(keyPath, 'utf8'));
           const keypair = Keypair.fromSecretKey(Uint8Array.from(secretBytes));
-          transaction.partialSign(keypair);
-          console.log(`[SIGNING] Added server key signature for ${pubkeyStr}`);
+          
+          // Verify keypair matches expected public key before signing
+          if (keypair.publicKey.toBase58() === pubkeyStr) {
+            transaction.partialSign(keypair);
+            console.log(`[SIGNING] ✅ Added server key signature for ${pubkeyStr}`);
+          } else {
+            console.warn(`[SIGNING] ❌ Server key mismatch for ${pubkeyStr}: file contains ${keypair.publicKey.toBase58()}`);
+          }
         } catch (e) {
           console.warn(`[SIGNING] Failed to sign with server key ${pubkeyStr}:`, (e as any)?.message);
         }
