@@ -63,13 +63,8 @@ export function getSafeProjectContext(
       setProjectState:
         setProjectState || (() => {}), 
       projectState: {
-        mode: fetched.details?.projectState?.mode || "basic",
         nodes: fetched.details?.projectState?.nodes || [],
         edges: fetched.details?.projectState?.edges || [],
-        config: fetched.details?.projectState?.config || {},
-        instructions: fetched.details?.projectState?.instructions || [],
-        projectFiles: fetched.details?.projectState?.projectFiles || { lib: "", mod: "", state: "" },
-        fileTree: fetched.details?.projectState?.fileTree || undefined,
         programId: fetched.details?.projectState?.programId || '',
         built: fetched.details?.projectState?.built || false,
         deployed: fetched.details?.projectState?.deployed || false,

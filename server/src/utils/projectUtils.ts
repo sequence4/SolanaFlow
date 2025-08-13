@@ -1495,13 +1495,22 @@ export async function signDeployTxAndBroadcast(
   // Attempt to sign with server-side program keypair if required
   let programKeypair: Keypair | null = null;
   try {
+    console.log(`[SIGNING] =================== BACKEND KEYPAIR RESOLUTION ===================`);
+    console.log(`[SIGNING] Looking for program keypair for programId: ${programId}`);
+    console.log(`[SIGNING] Project ID: ${projectId}`);
+    
     // Try to locate the program keypair for this project using the correct naming convention
     const containerName = await getContainerName(projectId);
     if (containerName) {
       const rootPath = await getProjectRootPath(projectId);
+      console.log(`[SIGNING] Project rootPath: ${rootPath}`);
+      
       const rootStem = rootPath.replace(/-[a-f0-9]{8}$/, '');
+      console.log(`[SIGNING] Project rootStem: ${rootStem}`);
+      
       let programName = rootStem.replace(/-/g, '_');
       if (/^[0-9]/.test(programName)) programName = 'p' + programName;
+      console.log(`[SIGNING] Derived programName: ${programName}`);
       
       const tempTaskId = uuidv4();
       

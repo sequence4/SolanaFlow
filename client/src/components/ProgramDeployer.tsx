@@ -44,7 +44,8 @@ import { BPF_LOADER_CHUNK_SIZE, BPF_UPGRADE_LOADER_ID } from "@/utils/constants"
 
 // Toggle verbose client-side logs by setting NEXT_PUBLIC_DEBUG_LOGS=true in your
 // environment.  This reduces noisy console output in production.
-const DEBUG_LOGS = process.env.NEXT_PUBLIC_DEBUG_LOGS === 'true';
+// Temporarily enabled by default to debug deployment issues
+const DEBUG_LOGS = process.env.NEXT_PUBLIC_DEBUG_LOGS === 'true' || true;
 
 /* ────────────────────────────────────────────
    TEMP instrumentation helpers
@@ -231,6 +232,14 @@ export function ProgramDeployer({
       setProgress(1);
       await new Promise((r) => setTimeout(r, 0)); // paint flush
 
+      if (DEBUG_LOGS) {
+        console.log("[DEBUG] =================== DEPLOYMENT START ===================");
+        console.log("[DEBUG] existingProgramId from context:", existingProgramId);
+        console.log("[DEBUG] projectContext.details:", projectContext?.details);
+        console.log("[DEBUG] projectContext.details.projectState:", projectContext?.details?.projectState);
+        console.log("[DEBUG] programBytes length:", programBytes?.length);
+      }
+
       try {
         if (!programBytes) {
           toast.error("Program bytes missing");
@@ -241,12 +250,23 @@ export function ProgramDeployer({
         const looksLikePubkey =
           ctxProgramId && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(ctxProgramId);
 
+        if (DEBUG_LOGS) {
+          console.log("[DEBUG] ctxProgramId:", ctxProgramId);
+          console.log("[DEBUG] looksLikePubkey:", looksLikePubkey);
+        }
+
         if (looksLikePubkey) {
           const candidatePk = new PublicKey(ctxProgramId!);
           const acctInfo = await connection.getAccountInfo(candidatePk, "confirmed");
 
+          if (DEBUG_LOGS) {
+            console.log("[DEBUG] Checking if program account exists for:", candidatePk.toBase58());
+            console.log("[DEBUG] Account info:", acctInfo ? "EXISTS" : "DOES NOT EXIST");
+          }
+
           if (acctInfo) {
             /* UPGRADE path (unchanged) */
+            if (DEBUG_LOGS) console.log("[DEBUG] 🔄 Taking UPGRADE path for existing program");
         const authorityEphem = Keypair.generate();
             if (DEBUG_LOGS) console.log("🔑 Ephemeral authority key:", authorityEphem.publicKey.toBase58());
 
@@ -275,6 +295,8 @@ export function ProgramDeployer({
             return;
           }
         }
+
+        if (DEBUG_LOGS) console.log("[DEBUG] 🆕 Taking DEPLOY path for new program deployment");
 
         /* ───────────── NEW: wallet-first signing flow ───────────── */
         // 1. Create an ephemeral keypair on the backend (secret stays on server)
@@ -359,10 +381,25 @@ export function ProgramDeployer({
         setDeployStage('Building transaction...');
         setProgress(10);
 
-        // 3. Generate a new program keypair
-        const programKeypair = Keypair.generate();
-        const programId = programKeypair.publicKey;
-        if (DEBUG_LOGS) console.log(`📦 Generated new program ID: ${programId.toBase58()}`);
+        // 3. Use the existing program keypair from code generation, or generate new one
+        let programKeypair: Keypair;
+        let programId: PublicKey;
+        
+        if (existingProgramId) {
+          // Use the program ID from code generation
+          programId = new PublicKey(existingProgramId);
+          // Note: The actual keypair will be loaded by the backend from the wallets folder
+          // We create a dummy keypair here just for the client-side logic, but the backend
+          // will use the correct keypair that matches this programId
+          programKeypair = Keypair.generate(); // This is just a placeholder
+          if (DEBUG_LOGS) console.log(`📦 Using existing program ID from context: ${programId.toBase58()}`);
+        } else {
+          // Fallback: generate new keypair (this should rarely happen if code gen worked properly)
+          programKeypair = Keypair.generate();
+          programId = programKeypair.publicKey;
+          console.warn(`⚠️ No existing program ID found in context, generating new one: ${programId.toBase58()}`);
+          console.warn(`⚠️ This may indicate code generation didn't complete properly`);
+        }
 
         // Find PDA for program data
         const [programDataPk] = PublicKey.findProgramAddressSync(
@@ -821,6 +858,13 @@ export function ProgramDeployer({
           if (DEBUG_LOGS) console.log(`✅ Transaction confirmed with signature: ${finalSig}`);
           setDeployStage('Transaction confirmed!');
           setProgress(90);
+          
+          if (DEBUG_LOGS) {
+            console.log(`✅ Deployment completed successfully!`);
+            console.log(`✅ Program ID: ${programId.toBase58()}`);
+            console.log(`✅ Transaction signature: ${finalSig}`);
+            console.log(`✅ Calling onSuccess with programId: ${programId.toBase58()}`);
+          }
           
           // Update project with new program ID
           onSuccess(programId.toBase58());
