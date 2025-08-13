@@ -2,11 +2,10 @@ import React from "react";
 import { toast } from "sonner";
 import { projectApi } from "@/api/projectApi";
 import { ensureId } from '@/utils/project/ensureId';
-import { ProjectContextType, ProjectStateUpdater, SaveProjectResponse } from "@/context/project/ProjectContextTypes";
+import { ProjectContextType, ProjectStateUpdater } from "@/context/project/ProjectContextTypes";
 import { saveProject } from "./saveProject";
 import { fetchFilesAndCodes } from "@/utils/files/fetchFilesAndCodes";
 import { FileTreeItemType } from "@/interfaces/FileTreeItemType";
-import { UxOpenPanel } from "@/context/ux/UxContextTypes";
 import { pollTaskStatus4 } from "@/utils/task/taskUtils";
 import { Step } from '@/context/logs/TaskLogsContext';
 import { useTaskLogs } from "@/context/logs/useTaskLogs";
@@ -16,7 +15,7 @@ export const PROJECTS_PAGE_SIZE = 10;
 export const fetchProjects = async (
     page: number, 
     search: string, 
-    setProjects: (projects: any[]) => void, 
+    setProjects: (projects: unknown[]) => void, 
     setTotalPages: (totalPages: number) => void, 
     setLoading: (loading: boolean) => void, 
     setError: (error: string | null) => void,
@@ -41,7 +40,7 @@ export const fetchProjects = async (
 
       setProjects(list);                 // safe: always an array now
       setTotalPages(totalPages);
-    } catch (err) {
+    } catch {
       setError('Failed to load projects. Please try again.');
     } finally {
       setLoading(false);
@@ -119,7 +118,7 @@ export const handleDeleteProject = async (
   projectId: string, 
   page: number, 
   search: string, 
-  setProjects: (projects: any[]) => void, 
+  setProjects: (projects: unknown[]) => void, 
   setTotalPages: (totalPages: number) => void, 
   setLoading: (loading: boolean) => void, 
   setError: (error: string | null) => void,
@@ -153,13 +152,9 @@ export const handleDeleteProject = async (
                 ...prevCtx.details,
                 setProjectState: prevCtx.details?.setProjectState || (() => {}),
                 projectState: {
-                  mode: "basic",
                   nodes: [],
                   edges: [],
                   config: {},
-                  instructions: [],
-                  projectFiles: { lib: "", mod: "", state: "" },
-                  fileTree: undefined,
                   built: false,
                   deployed: false,
                 },
@@ -225,13 +220,9 @@ export const handleDeleteProject = async (
               ...prevCtx.details,
               setProjectState: prevCtx.details?.setProjectState || (() => {}),
               projectState: {
-                mode: "basic",
                 nodes: [],
                 edges: [],
                 config: {},
-                instructions: [],
-                projectFiles: { lib: "", mod: "", state: "" },
-                fileTree: undefined,
                 built: false,
                 deployed: false,
               },
@@ -256,13 +247,9 @@ export const handleDeleteProject = async (
             ...prevCtx.details,
             setProjectState: prevCtx.details?.setProjectState || (() => {}),
             projectState: {
-              mode: "basic",
               nodes: [],
               edges: [],
               config: {},
-              instructions: [],
-              projectFiles: { lib: "", mod: "", state: "" },
-              fileTree: undefined,
               built: false,
               deployed: false,
             },
@@ -339,14 +326,10 @@ export const handleNewProjectClick = (
     details: {
       setProjectState: projectContext.details?.setProjectState || (() => {}),
       projectState: {
-        mode: 'basic',
         nodes: [],
         edges: [],
         config: {},
         programId: '',
-        instructions: [],
-        projectFiles: { lib: '', mod: '', state: '' },
-        fileTree: undefined,
         built: false,
         deployed: false,
       },
@@ -359,24 +342,17 @@ export const handleNewProjectClick = (
   localStorage.removeItem('projectContext');
 };
 
-interface TaskLogActions {
-    setSteps: (steps: Step[]) => void;
-    setProgress: (progress: number) => void;
-    setIsVisible: (isVisible: boolean) => void;
-    addSystemLog: (log: string) => void;
-    resetLogs: () => void;
-}
 
 export const handleConfirmNewProject = async (
   projectContext: ProjectContextType,
   setProjectContext: React.Dispatch<React.SetStateAction<ProjectContextType>>,
   name: string,
   description: string,
-  projectsRefreshCounter: number,
+  _projectsRefreshCounter: number,
   setProjectsRefreshCounter: React.Dispatch<React.SetStateAction<number>>,
   setUxOpenPanel: (p: string) => void,
-  setFileTree: any,
-  setSelectedFile: any,
+  _setFileTree: (tree: FileTreeItemType | null) => void,
+  _setSelectedFile: (file: FileTreeItemType | null) => void,
   taskLogs: ReturnType<typeof useTaskLogs>,
 ) => {
   try {
@@ -404,13 +380,19 @@ export const handleConfirmNewProject = async (
     const hasMeaningfulState =
       !!state &&
       Object.keys(state).some(
-        k => Array.isArray((state as any)[k])
-          ? (state as any)[k].length            // non-empty array
-          : (state as any)[k] !== undefined     // any other truthy value
+        k => {
+          const value = (state as Record<string, unknown>)[k];
+          return Array.isArray(value)
+            ? value.length > 0            // non-empty array
+            : value !== undefined;        // any other truthy value
+        }
       );
 
     if (hasMeaningfulState) {
-      await saveProject({ ...projectContext, id, name, description }, setProjectContext);
+      const result = await saveProject({ ...projectContext, id, name, description }, setProjectContext);
+      if (!result) {
+        console.warn('Save project returned null, but continuing...');
+      }
     }
 
     /* House-keeping */
