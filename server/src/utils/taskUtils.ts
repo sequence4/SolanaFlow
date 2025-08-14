@@ -40,14 +40,11 @@ export async function updateTaskStatus(
 ): Promise<void> {
   const client = await pool.connect();
   const sanitizedTaskId = taskId.trim().replace(/,$/, '');
-  console.log(`[DEBUG_TASK_BACKEND] Updating task status to ${status} for taskId: ${sanitizedTaskId}`);
   try {
     await client.query(
       'UPDATE task SET status = $1, result = $2 WHERE id = $3',
       [status, result, sanitizedTaskId]
     );
-    console.log(`[DEBUG_TASK_BACKEND] Task status updated to ${status} for taskId: ${sanitizedTaskId}`);
-    console.log(`[DEBUG_TASK_BACKEND] Result: ${result?.substring(0, 100)}${result && result.length > 100 ? '...' : ''}`);
   } catch (error) {
     console.error('[DEBUG_TASK_BACKEND] Error updating task status:', error);
   } finally {
@@ -127,7 +124,6 @@ export async function waitForTaskCompletion(
     status = result.status;
 
     if (status === 'succeed' || status === 'finished' || status === 'warning') {
-      console.log(`[DEBUG_TASK_BACKEND] Task ${taskId} completed with status: ${status}`);
       return status;
     }
 
@@ -138,7 +134,6 @@ export async function waitForTaskCompletion(
 
     await new Promise(resolve => setTimeout(resolve, intervalMs));
     retries++;
-    console.log(`[DEBUG_TASK_BACKEND] Waiting for task ${taskId} (attempt ${retries}/${maxRetries})`);
   }
 
   return status;
@@ -161,16 +156,13 @@ export async function pollTaskStatus(
   }
   let retries = 0;
   
-  console.log(`[DEBUG_TASK_BACKEND] Starting poll for task ${taskId}`);
   
   while (retries < maxRetries) {
     try {
       const result = await getTaskById(taskId);
-      console.log(`[DEBUG_TASK_BACKEND] Polled task ${taskId}, status: ${result.status}`);
       
       // For successfully completed (or failed) tasks, return immediately
       if (['succeed', 'finished', 'failed', 'warning'].includes(result.status)) {
-        console.log(`[DEBUG_TASK_BACKEND] Task ${taskId} completed with status: ${result.status}`);
         return { task: result };
       }
       
@@ -183,7 +175,6 @@ export async function pollTaskStatus(
     }
     
     retries++;
-    console.log(`[DEBUG_TASK_BACKEND] Attempt ${retries} of ${maxRetries} for task ${taskId}`);
   }
   
   // If maxRetries reached, throw the appropriate error

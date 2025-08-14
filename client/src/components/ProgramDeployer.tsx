@@ -149,7 +149,7 @@ export function ProgramDeployer({
     if (!projectId) return;
 
     setIsLoading(true);
-    if (DEBUG_LOGS) console.log("🔍 Fetching compiled program…");
+    console.log("🔍 Fetching compiled program…");
 
     try {
       const raw: any = await downloadArtifact(projectId); // string | ArrayBuffer | Uint8Array
@@ -178,17 +178,13 @@ export function ProgramDeployer({
       ) {
         console.warn("[DEPLOY] Unexpected ELF magic", bytes.slice(0, 4));
       } else {
-        if (DEBUG_LOGS) console.log(
-          "[DEPLOY] Valid ELF magic verified:",
-          Array.from(bytes.slice(0, 4))
-        );
       }
 
       setProgramBytes(bytes);
       setByteLength(bytes.byteLength);
       setBytesLoaded(true);
 
-      if (DEBUG_LOGS) console.log(`✅ Program fetched: ${bytes.byteLength.toLocaleString()} bytes`);
+      console.log(`✅ Program fetched: ${bytes.byteLength.toLocaleString()} bytes`);
     } catch (err) {
       console.error("Failed to load program bytes:", err);
       toast.error("Failed to load program", {
@@ -256,7 +252,6 @@ export function ProgramDeployer({
             /* UPGRADE path (unchanged) */
             console.log("🔄 Upgrading existing program");
         const authorityEphem = Keypair.generate();
-            if (DEBUG_LOGS) console.log("🔑 Ephemeral authority key:", authorityEphem.publicKey.toBase58());
 
         const deployOptions: EphemeralDeployOptions = {
           programData: programBytes.toString(),
@@ -292,7 +287,6 @@ export function ProgramDeployer({
         if (!ephemeralPubkeyStr) {
           throw new Error("Failed to get ephemeral public key from server");
         }
-        if (DEBUG_LOGS) console.log(`🔑 Ephemeral key (server-side): ${ephemeralPubkeyStr}`);
 
         // 2. Ask backend for a durable nonce we can anchor the final tx to
         let noncePubkey: string;
@@ -307,10 +301,7 @@ export function ProgramDeployer({
           noncePubkey = nonceResult.noncePubkey;
           nonceHash = nonceResult.nonceHash;
           
-          if (DEBUG_LOGS)
-            console.log(
-              `⏳ Existing durable nonce found – acct ${noncePubkey}, hash ${nonceHash}`,
-            );
+          console.log(`⏳ Using existing durable nonce`);
         } catch (error: any) {
           /* Backend 404 *or* propagated "NO_NONCE_ACCOUNT"
              ⇒ wallet has no durable‑nonce yet – create one */
@@ -319,12 +310,10 @@ export function ProgramDeployer({
             (error instanceof Error && error.message === 'NO_NONCE_ACCOUNT')
           ) {
             setDeployStage('Creating durable nonce account…');
-            if (DEBUG_LOGS) console.log('⏳ No nonce account found, creating one with wallet…');
             
             try {
               const newNoncePk = await walletSigner.createNonce(connection);
-              if (DEBUG_LOGS)
-                console.log(`✅ Created nonce account ${newNoncePk.toBase58()}`);
+              console.log(`✅ Created nonce account ${newNoncePk.toBase58()}`);
               
               // Retry now that we have a nonce account
               const nonceResult = await projectApi.getNonce(
@@ -335,10 +324,7 @@ export function ProgramDeployer({
               noncePubkey = nonceResult.noncePubkey;
               nonceHash = nonceResult.nonceHash;
               
-              if (DEBUG_LOGS)
-                console.log(
-                  `⏳ Durable nonce acquired – acct ${noncePubkey}, hash ${nonceHash}`,
-                );
+              console.log(`⏳ Durable nonce created`);
             } catch (createError: any) {
               /* Emit detailed diagnostics so we can read response body,
                  Phantom rejections, RPC errors, etc. */
@@ -380,7 +366,7 @@ export function ProgramDeployer({
           // We create a dummy keypair here just for the client-side logic, but the backend
           // will use the correct keypair that matches this programId
           programKeypair = Keypair.generate(); // This is just a placeholder
-          if (DEBUG_LOGS) console.log(`📦 Using existing program ID from context: ${programId.toBase58()}`);
+          console.log(`📦 Using existing program ID: ${programId.toBase58()}`);
         } else {
           // Fallback: generate new keypair (this should rarely happen if code gen worked properly)
           programKeypair = Keypair.generate();
@@ -508,7 +494,6 @@ export function ProgramDeployer({
               ],
               data: writeData,
             });
-            if (DEBUG_LOGS) console.log(`[DEBUG] WriteIx chunk ${off}-${off + slice.length}: ${slice.length} bytes`);
           } catch (e) {
             console.error(`[STEP-WRITE offset=${off}] failed`, e);
             throw e;
@@ -569,35 +554,56 @@ export function ProgramDeployer({
           .add(createBufferIx)
           .add(bufferInitIx)
           .add(setAuthorityIx);
-        await signAndRelayWithWallet(initTx, [bufferAccount]);
+        const initTxSignature = await signAndRelayWithWallet(initTx, [bufferAccount]);
+        console.log(`✅ Buffer initialized: ${initTxSignature}`);
         
-        // VERIFY BUFFER AUTHORITY IS SET CORRECTLY
-        try {
-          const bufferAccountInfo = await connection.getAccountInfo(bufferAccount.publicKey);
-          if (bufferAccountInfo?.data) {
-            // Buffer account format: 4 bytes state discriminant + 1 byte COption + 32 bytes authority (if Some)
-            const optionByte = bufferAccountInfo.data[4];
-            
-            if (optionByte === 1) {
-              // Authority is present
-              const authorityBytes = bufferAccountInfo.data.subarray(5, 37);
-              const authorityPubkey = new PublicKey(authorityBytes);
-              
-              if (authorityPubkey.toBase58() !== ephemeralPubkeyStr) {
-                throw new Error(`Buffer authority mismatch`);
-              }
-              console.log(`✅ Buffer authority set to ephemeral key`);
-            } else if (optionByte === 0) {
-              throw new Error(`Buffer authority is None - SetAuthority instruction failed`);
-            } else {
-              throw new Error(`Invalid buffer authority format`);
+        // VERIFY BUFFER AUTHORITY IS SET CORRECTLY with retry logic
+        let bufferVerified = false;
+        let lastError: Error | null = null;
+        
+        for (let attempt = 1; attempt <= 5; attempt++) {
+          try {
+            // Add small delay to allow RPC nodes to sync
+            if (attempt > 1) {
+              console.log(`🔄 Buffer verification attempt ${attempt}/5...`);
+              await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Progressive backoff
             }
-          } else {
-            throw new Error("Buffer account has no data after initialization");
+            
+            const bufferAccountInfo = await connection.getAccountInfo(bufferAccount.publicKey, 'confirmed');
+            if (bufferAccountInfo?.data) {
+              // Buffer account format: 4 bytes state discriminant + 1 byte COption + 32 bytes authority (if Some)
+              const optionByte = bufferAccountInfo.data[4];
+              
+              if (optionByte === 1) {
+                // Authority is present
+                const authorityBytes = bufferAccountInfo.data.subarray(5, 37);
+                const authorityPubkey = new PublicKey(authorityBytes);
+                
+                if (authorityPubkey.toBase58() !== ephemeralPubkeyStr) {
+                  throw new Error(`Buffer authority mismatch`);
+                }
+                console.log(`✅ Buffer authority set to ephemeral key`);
+                bufferVerified = true;
+                break;
+              } else if (optionByte === 0) {
+                throw new Error(`Buffer authority is None - SetAuthority instruction failed`);
+              } else {
+                throw new Error(`Invalid buffer authority format`);
+              }
+            } else {
+              throw new Error("Buffer account has no data after initialization");
+            }
+          } catch (verifyError) {
+            lastError = verifyError instanceof Error ? verifyError : new Error(String(verifyError));
+            if (attempt === 5) {
+              console.error(`❌ Buffer authority verification failed after ${attempt} attempts:`, lastError);
+              break;
+            }
           }
-        } catch (verifyError) {
-          console.error(`❌ Buffer authority verification failed:`, verifyError);
-          throw verifyError;
+        }
+        
+        if (!bufferVerified && lastError) {
+          throw lastError;
         }
 
         /* ──────────────────────────────────────────────
@@ -667,44 +673,62 @@ export function ProgramDeployer({
         console.log(`🎉 All ${writeInstructions.length} write instructions completed!`);
         setProgress(80);
         
-        // VERIFY BUFFER DATA BEFORE DEPLOYMENT
-        try {
-          console.log(`🔍 Verifying buffer integrity...`);
-          const bufferAccountInfo = await connection.getAccountInfo(bufferAccount.publicKey);
-          if (!bufferAccountInfo?.data) {
-            throw new Error("Buffer account has no data after write operations");
-          }
-          
-          // The buffer account data format is: 37 bytes of metadata + program bytes
-          const bufferProgramData = bufferAccountInfo.data.subarray(37);
-          
-          // Check ELF magic in buffer
-          if (bufferProgramData.length >= 4) {
-            const bufferElfMagic = Array.from(bufferProgramData.subarray(0, 4));
+        // VERIFY BUFFER DATA BEFORE DEPLOYMENT with retry logic
+        console.log(`🔍 Verifying buffer integrity...`);
+        let bufferDataVerified = false;
+        let lastVerificationError: Error | null = null;
+        
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            if (attempt > 1) {
+              console.log(`🔄 Buffer data verification attempt ${attempt}/3...`);
+              await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for RPC to sync
+            }
             
-            if (bufferElfMagic[0] !== 0x7f || bufferElfMagic[1] !== 0x45 || bufferElfMagic[2] !== 0x4c || bufferElfMagic[3] !== 0x46) {
-              throw new Error(`Buffer corruption detected: Invalid ELF magic`);
+            const bufferAccountInfo = await connection.getAccountInfo(bufferAccount.publicKey, 'confirmed');
+            if (!bufferAccountInfo?.data) {
+              throw new Error("Buffer account has no data after write operations");
+            }
+            
+            // The buffer account data format is: 37 bytes of metadata + program bytes
+            const bufferProgramData = bufferAccountInfo.data.subarray(37);
+            
+            // Check ELF magic in buffer
+            if (bufferProgramData.length >= 4) {
+              const bufferElfMagic = Array.from(bufferProgramData.subarray(0, 4));
+              
+              if (bufferElfMagic[0] !== 0x7f || bufferElfMagic[1] !== 0x45 || bufferElfMagic[2] !== 0x4c || bufferElfMagic[3] !== 0x46) {
+                throw new Error(`Buffer corruption detected: Invalid ELF magic`);
+              }
+            }
+            
+            // Compare first and last few bytes
+            const originalFirst = Array.from(programBytes.slice(0, 8));
+            const bufferFirst = Array.from(bufferProgramData.subarray(0, 8));
+            const originalLast = Array.from(programBytes.slice(-8));
+            const bufferLast = Array.from(bufferProgramData.subarray(-8));
+            
+            if (JSON.stringify(originalFirst) !== JSON.stringify(bufferFirst)) {
+              throw new Error(`Buffer corruption: First bytes mismatch`);
+            }
+            
+            if (JSON.stringify(originalLast) !== JSON.stringify(bufferLast)) {
+              throw new Error(`Buffer corruption: Last bytes mismatch`);
+            }
+            
+            console.log(`✅ Buffer verification passed`);
+            bufferDataVerified = true;
+            break;
+          } catch (verificationError) {
+            lastVerificationError = verificationError instanceof Error ? verificationError : new Error(String(verificationError));
+            if (attempt === 3) {
+              console.error(`❌ Buffer verification failed after ${attempt} attempts:`, lastVerificationError);
             }
           }
-          
-          // Compare first and last few bytes
-          const originalFirst = Array.from(programBytes.slice(0, 8));
-          const bufferFirst = Array.from(bufferProgramData.subarray(0, 8));
-          const originalLast = Array.from(programBytes.slice(-8));
-          const bufferLast = Array.from(bufferProgramData.subarray(-8));
-          
-          if (JSON.stringify(originalFirst) !== JSON.stringify(bufferFirst)) {
-            throw new Error(`Buffer corruption: First bytes mismatch`);
-          }
-          
-          if (JSON.stringify(originalLast) !== JSON.stringify(bufferLast)) {
-            throw new Error(`Buffer corruption: Last bytes mismatch`);
-          }
-          
-          console.log(`✅ Buffer verification passed`);
-        } catch (verificationError) {
-          console.error(`❌ Buffer verification failed:`, verificationError);
-          throw verificationError;
+        }
+        
+        if (!bufferDataVerified && lastVerificationError) {
+          throw lastVerificationError;
         }
 
         /* ──────────────────────────────────────────────
@@ -733,7 +757,7 @@ export function ProgramDeployer({
         }
 
         /* Helpers */
-        async function signAndRelayWithWallet(tx: Transaction, extras: Keypair[]) {
+        async function signAndRelayWithWallet(tx: Transaction, extras: Keypair[]): Promise<string> {
           
           // Set fee payer and blockhash BEFORE compiling message
           tx.feePayer = wallet.publicKey!;
@@ -748,9 +772,7 @@ export function ProgramDeployer({
           // Verify wallet is first signer
           const walletIsFirstSigner = msg.accountKeys[0].equals(wallet.publicKey!);
           if (!walletIsFirstSigner) {
-            console.error(`[DEBUG] ERROR: Wallet should be first signer but isn't!`);
-            console.error(`[DEBUG] Expected:`, wallet.publicKey!.toBase58());
-            console.error(`[DEBUG] Actual first signer:`, msg.accountKeys[0].toBase58());
+            throw new Error(`Transaction setup error: Wallet should be first signer`);
           }
           
           // Initialize signatures array properly first
@@ -792,7 +814,7 @@ export function ProgramDeployer({
             } else {
             }
           } catch (error) {
-            console.error(`[DEBUG] Wallet signing failed:`, error);
+            console.error(`Wallet signing failed:`, error);
             throw error;
           }
           
@@ -827,7 +849,6 @@ export function ProgramDeployer({
               }
             }
             
-            console.error(`[DEBUG] Transaction is missing signatures for: ${missingSigs.join(', ')}`);
             
             // If only the wallet signature is missing and it's the first signer, try server approach
             if (missingSigs.length === 1 && missingSigs[0] === wallet.publicKey!.toBase58()) {
@@ -848,11 +869,9 @@ export function ProgramDeployer({
                   // Let this fall through to the normal 409 handling below
                   throw new Error(`Server requests wallet signature: ${result.missing?.join(', ')}`);
                 } else {
-                  console.error(`[DEBUG] Unexpected server response:`, result);
                   throw new Error('Unexpected response from server');
                 }
               } catch (error) {
-                console.error(`[DEBUG] Server-side relay failed, falling back to error:`, error);
                 // Fall through to the original error
               }
             }
@@ -870,15 +889,28 @@ export function ProgramDeployer({
             );
             
             if ('signature' in result) {
+              // Wait for transaction confirmation before returning
+              try {
+                await connection.confirmTransaction({
+                  signature: result.signature,
+                  blockhash: tx.recentBlockhash!,
+                  lastValidBlockHeight: tx.lastValidBlockHeight || (await connection.getLatestBlockhash()).lastValidBlockHeight
+                }, 'confirmed');
+                return result.signature;
+              } catch (confirmError) {
+                console.warn(`Transaction confirmation failed, but transaction was sent: ${result.signature}`, confirmError);
+                // Return signature even if confirmation times out - the transaction likely succeeded
+                return result.signature;
+              }
             } else if (result.code === 'WALLET_SIGNATURE_REQUIRED') {
-              console.error(`[DEBUG] Server still needs wallet signature. Missing:`, result.missing);
+              console.error(`Server still needs wallet signature. Missing:`, result.missing);
               throw new Error(`Server requests wallet signature for: ${result.missing?.join(', ')}`);
             } else {
-              console.error(`[DEBUG] Unexpected relay response:`, result);
+              console.error(`Unexpected relay response:`, result);
               throw new Error('Unexpected response from relay signed transaction');
             }
           } catch (error) {
-            console.error(`[DEBUG] Relay failed:`, error);
+            console.error(`Relay failed:`, error);
             throw error;
           }
         }
@@ -913,16 +945,6 @@ export function ProgramDeployer({
 
         console.log("encodedTx", encodedTx);
         
-        // Debug: Show current signature status before sending to backend
-        if (DEBUG_LOGS) {
-          const currentSigs = deployTx.signatures.filter(s => s.signature).length;
-          const requiredSigs = deployTx.compileMessage().header.numRequiredSignatures;
-          
-          for (let i = 0; i < deployTx.signatures.length; i++) {
-            const sig = deployTx.signatures[i];
-            const status = sig.signature ? '✅ SIGNED' : '❌ MISSING';
-          }
-        }
         
         console.log('🚀 Deploying program to Solana...');
         
@@ -988,16 +1010,10 @@ export function ProgramDeployer({
             throw new Error('Unexpected relay response');
           }
           
-          if (DEBUG_LOGS) console.log(`✅ Transaction confirmed with signature: ${finalSig}`);
+          console.log(`✅ Program deployed successfully: ${finalSig}`);
           setDeployStage('Transaction confirmed!');
           setProgress(90);
           
-          if (DEBUG_LOGS) {
-            console.log(`✅ Deployment completed successfully!`);
-            console.log(`✅ Program ID: ${programId.toBase58()}`);
-            console.log(`✅ Transaction signature: ${finalSig}`);
-            console.log(`✅ Calling onSuccess with programId: ${programId.toBase58()}`);
-          }
           
           // Update project with new program ID
           onSuccess(programId.toBase58());
