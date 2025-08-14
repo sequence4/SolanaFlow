@@ -20,7 +20,6 @@ import {
   NonceAccount,
   Transaction,
   VersionedTransaction,
-  LAMPORTS_PER_SOL,
   SendTransactionError,
   TransactionInstruction,
   SYSVAR_RENT_PUBKEY,
@@ -40,12 +39,11 @@ import { connection } from "@/utils/connection";
 import { useWalletSigner } from "@/utils/wallet";
 
 import { createEphemeralKey, EphemeralDeployOptions, deployWithEphemeralKey } from "@/api/projectDeploy";
-import { BPF_LOADER_CHUNK_SIZE, BPF_UPGRADE_LOADER_ID } from "@/utils/constants";
+import { BPF_UPGRADE_LOADER_ID } from "@/utils/constants";
 
 // Toggle verbose client-side logs by setting NEXT_PUBLIC_DEBUG_LOGS=true in your
 // environment.  This reduces noisy console output in production.
 // Temporarily enabled by default to debug deployment issues
-const DEBUG_LOGS = process.env.NEXT_PUBLIC_DEBUG_LOGS === 'true' || true;
 
 /* ────────────────────────────────────────────
    TEMP instrumentation helpers
@@ -149,7 +147,6 @@ export function ProgramDeployer({
     if (!projectId) return;
 
     setIsLoading(true);
-    console.log("🔍 Fetching compiled program…");
 
     try {
       const raw: any = await downloadArtifact(projectId); // string | ArrayBuffer | Uint8Array
@@ -184,7 +181,6 @@ export function ProgramDeployer({
       setByteLength(bytes.byteLength);
       setBytesLoaded(true);
 
-      console.log(`✅ Program fetched: ${bytes.byteLength.toLocaleString()} bytes`);
     } catch (err) {
       console.error("Failed to load program bytes:", err);
       toast.error("Failed to load program", {
@@ -228,8 +224,7 @@ export function ProgramDeployer({
       setProgress(1);
       await new Promise((r) => setTimeout(r, 0)); // paint flush
 
-      console.log("🚀 Starting Solana program deployment...");
-
+  
       try {
         if (!programBytes) {
           toast.error("Program bytes missing");
@@ -250,7 +245,6 @@ export function ProgramDeployer({
 
           if (acctInfo) {
             /* UPGRADE path (unchanged) */
-            console.log("🔄 Upgrading existing program");
         const authorityEphem = Keypair.generate();
 
         const deployOptions: EphemeralDeployOptions = {
@@ -279,7 +273,6 @@ export function ProgramDeployer({
           }
         }
 
-        console.log("🆕 Deploying new program");
 
         /* ───────────── NEW: wallet-first signing flow ───────────── */
         // 1. Create an ephemeral keypair on the backend (secret stays on server)
@@ -301,7 +294,6 @@ export function ProgramDeployer({
           noncePubkey = nonceResult.noncePubkey;
           nonceHash = nonceResult.nonceHash;
           
-          console.log(`⏳ Using existing durable nonce`);
         } catch (error: any) {
           /* Backend 404 *or* propagated "NO_NONCE_ACCOUNT"
              ⇒ wallet has no durable‑nonce yet – create one */
@@ -312,8 +304,7 @@ export function ProgramDeployer({
             setDeployStage('Creating durable nonce account…');
             
             try {
-              const newNoncePk = await walletSigner.createNonce(connection);
-              console.log(`✅ Created nonce account ${newNoncePk.toBase58()}`);
+              await walletSigner.createNonce(connection);
               
               // Retry now that we have a nonce account
               const nonceResult = await projectApi.getNonce(
@@ -324,7 +315,6 @@ export function ProgramDeployer({
               noncePubkey = nonceResult.noncePubkey;
               nonceHash = nonceResult.nonceHash;
               
-              console.log(`⏳ Durable nonce created`);
             } catch (createError: any) {
               /* Emit detailed diagnostics so we can read response body,
                  Phantom rejections, RPC errors, etc. */
@@ -366,7 +356,6 @@ export function ProgramDeployer({
           // We create a dummy keypair here just for the client-side logic, but the backend
           // will use the correct keypair that matches this programId
           programKeypair = Keypair.generate(); // This is just a placeholder
-          console.log(`📦 Using existing program ID: ${programId.toBase58()}`);
         } else {
           // Fallback: generate new keypair (this should rarely happen if code gen worked properly)
           programKeypair = Keypair.generate();
@@ -386,7 +375,6 @@ export function ProgramDeployer({
         const bufferRent = await connection.getMinimumBalanceForRentExemption(bufferSpace);
         const programRent = await connection.getMinimumBalanceForRentExemption(36);
         
-        console.log(`📦 Buffer size: ${bufferSpace} bytes (${bufferRent} lamports rent)`);
         
         // 4. Create buffer account
         const bufferAccount = Keypair.generate();
@@ -402,7 +390,6 @@ export function ProgramDeployer({
           programId: BPF_UPGRADE_LOADER_ID,
         });
 
-        console.log("createBufferIx", createBufferIx);
         
         // Initialize buffer with wallet as authority
         const bufferInitIx = new TransactionInstruction({
@@ -414,7 +401,6 @@ export function ProgramDeployer({
           data: Buffer.from([0, 0, 0, 0]), // InitializeBuffer tag
         });
 
-        console.log("bufferInitIx", bufferInitIx);
         
         // Set buffer authority to ephemeral key (server will sign writes)
         const setAuthorityIx = new TransactionInstruction({
@@ -436,7 +422,6 @@ export function ProgramDeployer({
         const CHUNK = 850;
         
         // Verify program bytes integrity before chunking
-        console.log(`🔍 Program integrity check: ${programBytes.length} bytes`);
         
         let totalBytesWritten = 0;
         const chunkSummary: string[] = [];
@@ -479,7 +464,7 @@ export function ProgramDeployer({
             
             // Validate ELF magic in first chunk only
             if (off === 0) {
-              const dataOffset = 12; // 4 bytes tag + 4 bytes offset + 4 bytes length
+              const dataOffset = 16; // 4 bytes tag + 4 bytes offset + 8 bytes u64 length
               const dataSection = writeData.subarray(dataOffset, dataOffset + 4);
               
               if (dataSection[0] !== 0x7f || dataSection[1] !== 0x45 || dataSection[2] !== 0x4c || dataSection[3] !== 0x46) {
@@ -504,12 +489,10 @@ export function ProgramDeployer({
         }
         
         // Validate chunk coverage
-        console.log(`📝 Created ${writeInstructions.length} write instructions`);
         if (totalBytesWritten !== programBytes.length) {
           throw new Error(`Chunk coverage mismatch: ${totalBytesWritten} != ${programBytes.length}`);
         }
 
-        console.log("writeInstructions", writeInstructions);
         
         // Create program account
         const createProgramAcct = SystemProgram.createAccount({
@@ -520,7 +503,6 @@ export function ProgramDeployer({
           programId: BPF_UPGRADE_LOADER_ID,
         });
 
-        console.log("createProgramAcct", createProgramAcct);
         
         // Deploy instruction
         let deployIx: TransactionInstruction;
@@ -547,7 +529,6 @@ export function ProgramDeployer({
           throw e;
         }
 
-        console.log("deployIx", deployIx);
         
         /* ──────────────────────────────────────────────
            Stage 1 – buffer create & init, then hand authority to ephemeral
@@ -556,8 +537,7 @@ export function ProgramDeployer({
           .add(createBufferIx)
           .add(bufferInitIx)
           .add(setAuthorityIx);
-        const initTxSignature = await signAndRelayWithWallet(initTx, [bufferAccount]);
-        console.log(`✅ Buffer initialized: ${initTxSignature}`);
+        await signAndRelayWithWallet(initTx, [bufferAccount]);
         
         // VERIFY BUFFER AUTHORITY IS SET CORRECTLY with retry logic
         let bufferVerified = false;
@@ -567,7 +547,6 @@ export function ProgramDeployer({
           try {
             // Add small delay to allow RPC nodes to sync
             if (attempt > 1) {
-              console.log(`🔄 Buffer verification attempt ${attempt}/5...`);
               await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Progressive backoff
             }
             
@@ -584,7 +563,6 @@ export function ProgramDeployer({
                 if (authorityPubkey.toBase58() !== ephemeralPubkeyStr) {
                   throw new Error(`Buffer authority mismatch`);
                 }
-                console.log(`✅ Buffer authority set to ephemeral key`);
                 bufferVerified = true;
                 break;
               } else if (optionByte === 0) {
@@ -611,14 +589,12 @@ export function ProgramDeployer({
         /* ──────────────────────────────────────────────
            Stage 2 – upload bytes in batches (ATOMICALLY)
         ────────────────────────────────────────────── */
-        console.log(`🚀 Uploading ${writeInstructions.length} write instructions`);
         
         // Calculate optimal batching - each write instruction is ~900-950 bytes
         // Target ~800 bytes per transaction to leave room for transaction overhead
         const MAX_WRITES_PER_TX = Math.max(1, Math.floor(800 / (CHUNK + 100))); // +100 for instruction overhead
         
         let batchBlockhash = null;
-        let batchBlockheight = 0;
         
         for (let i = 0; i < writeInstructions.length; i += MAX_WRITES_PER_TX) {
           const batchNum = Math.floor(i / MAX_WRITES_PER_TX) + 1;
@@ -629,8 +605,6 @@ export function ProgramDeployer({
           if (!batchBlockhash || batchNum % 5 === 1) {
             const latest = await connection.getLatestBlockhash('confirmed');
             batchBlockhash = latest.blockhash;
-            batchBlockheight = latest.lastValidBlockHeight;
-            console.log(`📝 Refreshed blockhash for batch ${batchNum}`);
           }
           
           // WRITE txs are server-signed by ephemeral: set feePayer + blockhash here
@@ -653,7 +627,6 @@ export function ProgramDeployer({
             if ('signature' in txResult) {
               // Only log every 50 batches to reduce clutter
               if (batchNum % 50 === 0 || batchNum === Math.ceil(writeInstructions.length / MAX_WRITES_PER_TX)) {
-                console.log(`✅ Write batch ${batchNum}/${Math.ceil(writeInstructions.length / MAX_WRITES_PER_TX)} completed`);
               }
             } else {
               // This is an error response (e.g., WALLET_SIGNATURE_REQUIRED)
@@ -675,18 +648,15 @@ export function ProgramDeployer({
           }
         }
         
-        console.log(`🎉 All ${writeInstructions.length} write instructions completed!`);
         setProgress(80);
         
         // VERIFY BUFFER DATA BEFORE DEPLOYMENT with retry logic
-        console.log(`🔍 Verifying buffer integrity...`);
         let bufferDataVerified = false;
         let lastVerificationError: Error | null = null;
         
         for (let attempt = 1; attempt <= 3; attempt++) {
           try {
             if (attempt > 1) {
-              console.log(`🔄 Buffer data verification attempt ${attempt}/3...`);
               await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for RPC to sync
             }
             
@@ -721,7 +691,6 @@ export function ProgramDeployer({
               throw new Error(`Buffer corruption: Last bytes mismatch`);
             }
             
-            console.log(`✅ Buffer verification passed`);
             bufferDataVerified = true;
             break;
           } catch (verificationError) {
@@ -749,7 +718,6 @@ export function ProgramDeployer({
           .add(createProgramAcct)
           .add(deployIx);
 
-        console.log("deployTx", deployTx);
 
         // Recent block-hash & fee-payer
         /* Use the durable nonce instead of a recent block‑hash */
@@ -781,7 +749,6 @@ export function ProgramDeployer({
           }
           
           // Initialize signatures array properly first
-          const signers = [wallet.publicKey!, ...extras.map(k => k.publicKey)];
           
           // Clean signing approach: sign with wallet first on clean transaction
           
@@ -840,10 +807,6 @@ export function ProgramDeployer({
           let currentSigs = tx.signatures.filter(s => s.signature).length;
           
           // Debug: show which signatures we have
-          for (let i = 0; i < finalMsg.header.numRequiredSignatures; i++) {
-            const signer = finalMsg.accountKeys[i].toBase58();
-            const hasSig = tx.signatures[i]?.signature ? 'YES' : 'NO';
-          }
           
           // Handle missing signatures - if only wallet signature is missing, try server handling
           if (currentSigs < finalMsg.header.numRequiredSignatures) {
@@ -869,10 +832,10 @@ export function ProgramDeployer({
                 );
                 
                 if ('signature' in result) {
-                  return; // Success, exit the function
+                  return result.signature; // Success, return the signature
                 } else if (result.code === 'WALLET_SIGNATURE_REQUIRED') {
                   // Let this fall through to the normal 409 handling below
-                  throw new Error(`Server requests wallet signature: ${result.missing?.join(', ')}`);
+                  throw new Error(`Server requests wallet signature: ${result.missing.join(', ')}`);
                 } else {
                   throw new Error('Unexpected response from server');
                 }
@@ -948,10 +911,8 @@ export function ProgramDeployer({
         setProgress(60);
         const encodedTx = deployTx.serialize({ requireAllSignatures: false }).toString('base64');
 
-        console.log("encodedTx", encodedTx);
         
         
-        console.log('🚀 Deploying program to Solana...');
         
         try {
           const firstRelay = await projectApi.relaySignedTx(
@@ -962,9 +923,8 @@ export function ProgramDeployer({
             [ephemeralPubkeyStr]       // tell server which ephemeral key must co-sign
           );
 
-          let finalSig: string | undefined;
           if ('signature' in firstRelay) {
-            finalSig = firstRelay.signature;
+            // Success - deployment completed
           } else if (firstRelay.code === 'WALLET_SIGNATURE_REQUIRED' && firstRelay.txBase64) {
             // Ask wallet to countersign and retry the relay
             if (!wallet?.signTransaction) {
@@ -1007,7 +967,7 @@ export function ProgramDeployer({
               programId.toBase58()
             );
             if ('signature' in secondRelay) {
-              finalSig = secondRelay.signature;
+              // Success - deployment completed with wallet signature
             } else {
               throw new Error(`Still missing signatures: ${secondRelay.missing?.join(', ')}`);
             }
@@ -1015,7 +975,6 @@ export function ProgramDeployer({
             throw new Error('Unexpected relay response');
           }
           
-          console.log(`✅ Program deployed successfully: ${finalSig}`);
           setDeployStage('Transaction confirmed!');
           setProgress(90);
           

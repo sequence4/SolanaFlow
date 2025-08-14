@@ -68,12 +68,10 @@ export const projectApi = {
 
   startContainer: async (projectId: string): Promise<{ message: string; taskId: string }> => {
     try {
-      console.log(`[DEBUG_API] startContainer - Starting container for projectId: ${projectId}`);
       const response = await api.post(`/projects/${projectId}/start-container`);
-      console.log(`[DEBUG_API] startContainer - Response:`, response.data);
       return response.data;
     } catch (err) {
-      console.error('[DEBUG_API] Error starting container:', err);
+      console.error('Error starting container:', err);
       if (axios.isAxiosError(err) && err.response?.status === 503) {
         console.error('All workers busy - try again in a minute');
       } else {
@@ -94,18 +92,10 @@ export const projectApi = {
     projectInfo: ProjectContextToSave
   ): Promise<SaveProjectResponse> => {
     try {
-      console.log(`[DEBUG_API] createProject - Creating project:`, {
-        name: projectInfo.name,
-        description: projectInfo.description ? projectInfo.description.substring(0, 20) + '...' : 'none'
-      });
       const response = await api.post('/projects/create', projectInfo);
-      console.log(`[DEBUG_API] createProject - Response:`, {
-        message: response.data.message,
-        projectId: response.data.project?.id
-      });
       return response.data;
     } catch (error) {
-      console.error('[DEBUG_API] Error creating project:', error);
+      console.error('Error creating project:', error);
       throw error;
     }
   },
@@ -125,11 +115,8 @@ export const projectApi = {
 
   getProjectDetails: async (projectId: string): Promise<ProjectContextType> => {
     try {
-      console.log(`[DEBUG_API] getProjectDetails - Fetching project details for ID: ${projectId}`);
       const response = await api.get(`/projects/details/${projectId}`);
       
-      console.log(`[DEBUG_API] getProjectDetails - Raw API response status: ${response.status}, statusText: ${response.statusText}`);
-      console.log(`[DEBUG_API] getProjectDetails - Raw API response data:`, response.data);
       
       if (response.data.project.container_url) {
         const raw = response.data.project.container_url;
@@ -138,13 +125,11 @@ export const projectApi = {
       } else if (response.data.project.containerUrl) {
         response.data.project.containerUrl = withDappPath(response.data.project.containerUrl, projectId);
       } else {
-        console.log(`[DEBUG_API] getProjectDetails - No container_url or containerUrl found in response`);
       }
       
-      console.log(`[DEBUG_API] getProjectDetails - Final project object with containerUrl: "${response.data.project.containerUrl || 'undefined'}"`);
       return response.data.project;
     } catch (error) {
-      console.error('[DEBUG_API] Error getting project details:', error);
+      console.error('Error getting project details:', error);
       throw error;
     }
   },
@@ -342,9 +327,7 @@ export const projectApi = {
 
   fetchContainerUrl: async (projectId: string): Promise<{ containerUrl: string }> => {
     try {
-      console.log(`[DEBUG_API] fetchContainerUrl - Fetching container URL for project: ${projectId}`);
       const response = await api.get(`/projects/${projectId}/container-url`);
-      console.log(`[DEBUG_API] fetchContainerUrl - Response:`, response.data);
       const raw  = response.data.containerUrl || response.data.container_url;
       const full = withDappPath(raw, projectId);
       return { containerUrl: full };
@@ -352,11 +335,10 @@ export const projectApi = {
       // Only surface "not found" errors in development (for debugging)
       if (axios.isAxiosError(error) && error.response?.status === 404) {
         if (process.env.NODE_ENV === 'development') {
-          console.warn('[DEBUG_API] Container URL not found (404) for project', projectId);
         }
         return { containerUrl: "" };
       } else {
-        console.error('[DEBUG_API] Error fetching container URL:', error);
+        console.error('Error fetching container URL:', error);
         throw error;
       }
     }
