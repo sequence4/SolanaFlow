@@ -46,7 +46,7 @@ export async function updateTaskStatus(
       [status, result, sanitizedTaskId]
     );
   } catch (error) {
-    console.error('[DEBUG_TASK_BACKEND] Error updating task status:', error);
+    console.error('Error updating task status:', error);
   } finally {
     client.release();
   }
@@ -128,7 +128,7 @@ export async function waitForTaskCompletion(
     }
 
     if (status === 'failed') {
-      console.error(`[DEBUG_TASK_BACKEND] Task ${taskId} failed with status: ${status}`);
+      console.error(`Task ${taskId} failed with status: ${status}`);
       return status;
     }
 
@@ -169,7 +169,7 @@ export async function pollTaskStatus(
       // For all other statuses (queued, doing), wait and retry
       await new Promise(resolve => setTimeout(resolve, intervalMs));
     } catch (error) {
-      console.error(`[DEBUG_TASK_BACKEND] Error polling task ${taskId}:`, error);
+      console.error(`Error polling task ${taskId}:`, error);
       // For errors like "task not found", wait and retry
       await new Promise(resolve => setTimeout(resolve, intervalMs));
     }

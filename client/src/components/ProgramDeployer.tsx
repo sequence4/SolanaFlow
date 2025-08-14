@@ -464,13 +464,15 @@ export function ProgramDeployer({
           let writeIx: TransactionInstruction;
           try {
             const sliceBuffer = Buffer.from(slice);  // Explicit conversion
-            // BPF Upgradeable Loader Write instruction format:
-            // [1, 0, 0, 0] + u32(offset) + u32(vec_len) + data
+            
+            // BPF Upgradeable Loader Write instruction using proper bincode serialization
+            // Enum discriminator (1 as u32 for Write variant) + Write { offset: u32, bytes: Vec<u8> }
+            // Vec<u8> in bincode: length as u64 + data bytes
             const writeData = Buffer.concat([
-              Buffer.from([1, 0, 0, 0]),  // Write instruction discriminator 
-              u32LE(off),                 // offset in buffer (u32)
-              u32LE(slice.length),        // Vec<u8> length (u32, not u64)
-              sliceBuffer,                // actual data bytes
+              Buffer.from([1, 0, 0, 0]),  // Write instruction discriminator (u32 LE) 
+              u32LE(off),                 // offset field (u32 LE)
+              u64LE(slice.length),        // Vec<u8> length field (u64 LE for bincode)
+              sliceBuffer,                // Vec<u8> data bytes
             ]);
             
             // Debug: validate the constructed write data
@@ -701,7 +703,7 @@ export function ProgramDeployer({
               const bufferElfMagic = Array.from(bufferProgramData.subarray(0, 4));
               
               if (bufferElfMagic[0] !== 0x7f || bufferElfMagic[1] !== 0x45 || bufferElfMagic[2] !== 0x4c || bufferElfMagic[3] !== 0x46) {
-                throw new Error(`Buffer corruption detected: Invalid ELF magic`);
+                throw new Error(`Buffer corruption detected: Invalid ELF magic [${bufferElfMagic.join(',')}]`);
               }
             }
             
