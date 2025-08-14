@@ -451,10 +451,10 @@ export function ProgramDeployer({
             const sliceBuffer = Buffer.from(slice);  // Explicit conversion
             
             // BPF Upgradeable Loader Write instruction using proper bincode serialization
-            // Enum discriminator (1 as u8 for Write variant) + Write { offset: u32, bytes: Vec<u8> }
+            // Enum discriminator (1 as u32 for Write variant) + Write { offset: u32, bytes: Vec<u8> }
             // Vec<u8> in bincode: length as u64 + data bytes
             const writeData = Buffer.concat([
-              Buffer.from([1]),           // Write instruction discriminator (u8) 
+              u32LE(1),                   // Write instruction discriminator (u32 LE) - FIXED!
               u32LE(off),                 // offset field (u32 LE)
               u64LE(slice.length),        // Vec<u8> length field (u64 LE for bincode)
               sliceBuffer,                // Vec<u8> data bytes
@@ -464,7 +464,7 @@ export function ProgramDeployer({
             
             // Validate ELF magic in first chunk only
             if (off === 0) {
-              const dataOffset = 13; // 1 byte discriminator + 4 bytes offset + 8 bytes u64 length
+              const dataOffset = 16; // 4 bytes discriminator + 4 bytes offset + 8 bytes u64 length
               const dataSection = writeData.subarray(dataOffset, dataOffset + 4);
               
               if (dataSection[0] !== 0x7f || dataSection[1] !== 0x45 || dataSection[2] !== 0x4c || dataSection[3] !== 0x46) {
