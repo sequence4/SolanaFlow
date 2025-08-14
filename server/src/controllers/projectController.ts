@@ -455,10 +455,8 @@ export const getProjectDetails = async (
   const userId = req.user?.id;
   // org_id checks temporarily disabled until auth lands
 
-  console.log(`[DEBUG_PROJECT] getProjectDetails called for id=${id}, userId=${userId}`);
 
   try {
-    console.log(`[DEBUG_PROJECT] Querying database for project id=${id}`);
     const projectResult = await pool.query(
       `
       SELECT id, name, description, root_path, details, container_url, last_updated, created_at
@@ -469,7 +467,6 @@ export const getProjectDetails = async (
     );
 
     if (projectResult.rows.length === 0) {
-      console.log(`[DEBUG_PROJECT] No project found for id=${id}`);
       next(
         new AppError('Project not found or you do not have permission to access it', 404)
       );
@@ -477,7 +474,6 @@ export const getProjectDetails = async (
     }
 
     const project = projectResult.rows[0];
-    console.log(`[DEBUG_PROJECT] Found project id=${project.id}, name=${project.name}, container_url=${project.container_url || 'undefined'}`);
 
     const projectContext = {
       id: project.id,
@@ -494,7 +490,7 @@ export const getProjectDetails = async (
       project: projectContext,
     });
   } catch (error) {
-    console.error('[DEBUG_PROJECT] Error in getProjectDetails:', error);
+    console.error('Error in getProjectDetails:', error);
     next(error);
   }
 };
@@ -1349,10 +1345,8 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
       for (const pk of serverSignFor) {
         const kp = (ephemeralKeys as Map<string, Keypair>).get(pk);
         if (kp) {
-          console.log(`[SIGNING] Found ephemeral key for ${pk}`);
           extraSigners.push(kp);
         } else {
-          console.log(`[SIGNING] Ephemeral key not found for ${pk}`);
         }
       }
     }
@@ -1360,14 +1354,11 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
     if (signerHint?.type === 'ephemeral' && signerHint?.pubkey) {
       const kp = (ephemeralKeys as Map<string, Keypair>).get(signerHint.pubkey);
       if (kp) {
-        console.log(`[SIGNING] Found ephemeral key from signer hint: ${signerHint.pubkey}`);
         extraSigners.push(kp);
       } else {
-        console.log(`[SIGNING] Ephemeral key from signer hint not found: ${signerHint.pubkey}`);
       }
     }
 
-    console.log(`[SIGNING] Total extra signers found: ${extraSigners.length}`);
 
     // First check if the transaction is already fully signed
     const raw = Buffer.from(encodedTx, 'base64');
@@ -1376,21 +1367,6 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
     const requiredSigs = msg.header.numRequiredSignatures;
     const currentSigs = transaction.signatures.filter(s => s.signature).length;
     
-    console.log(`[RELAY_SIGNED_TX] Transaction has ${currentSigs}/${requiredSigs} signatures`);
-    
-    // Debug: show signature details
-    console.log(`[RELAY_SIGNED_TX] Required signers:`);
-    for (let i = 0; i < requiredSigs; i++) {
-      const signer = msg.accountKeys[i].toBase58();
-      const hasSig = transaction.signatures[i]?.signature ? 'YES' : 'NO';
-      const sigLength = transaction.signatures[i]?.signature?.length || 0;
-      console.log(`[RELAY_SIGNED_TX] ${i}: ${signer} = ${hasSig} (${sigLength} bytes)`);
-    }
-    
-    console.log(`[RELAY_SIGNED_TX] Extra signers provided: ${extraSigners.length}`);
-    extraSigners.forEach((signer, idx) => {
-      console.log(`[RELAY_SIGNED_TX] Extra signer ${idx}: ${signer.publicKey.toBase58()}`);
-    });
     
     console.log(`[RELAY_SIGNED_TX] Checking if this is a deployment transaction...`);
     // Check if this is a BPF upgrade loader deployment - look for instruction with [2,0,0,0] prefix

@@ -465,23 +465,23 @@ export function ProgramDeployer({
           try {
             const sliceBuffer = Buffer.from(slice);  // Explicit conversion
             // BPF Upgradeable Loader Write instruction format:
-            // [1, 0, 0, 0] + u32(offset) + u64(length) + data
+            // [1, 0, 0, 0] + u32(offset) + u32(vec_len) + data
             const writeData = Buffer.concat([
-              Buffer.from([1, 0, 0, 0]),  // Write instruction tag (1 for BPF Upgradeable Loader)
-              u32LE(off),                 // offset in buffer  
-              u64LE(slice.length),        // length of data (BPF Loader uses u64)
+              Buffer.from([1, 0, 0, 0]),  // Write instruction discriminator 
+              u32LE(off),                 // offset in buffer (u32)
+              u32LE(slice.length),        // Vec<u8> length (u32, not u64)
               sliceBuffer,                // actual data bytes
             ]);
             
             // Debug: validate the constructed write data
             
+            // Validate ELF magic in first chunk only
             if (off === 0) {
-              const dataOffset = 16; // 4 bytes tag + 4 bytes offset + 8 bytes length
+              const dataOffset = 12; // 4 bytes tag + 4 bytes offset + 4 bytes length
               const dataSection = writeData.subarray(dataOffset, dataOffset + 4);
               
               if (dataSection[0] !== 0x7f || dataSection[1] !== 0x45 || dataSection[2] !== 0x4c || dataSection[3] !== 0x46) {
-                console.error(`[CRITICAL] ELF magic corrupted in write instruction! Got [${Array.from(dataSection).join(',')}]`);
-              } else {
+                throw new Error(`ELF magic corrupted in write instruction! Got [${Array.from(dataSection).join(',')}]`);
               }
             }
             
@@ -649,7 +649,10 @@ export function ProgramDeployer({
             
             // Check if this is a successful transaction result
             if ('signature' in txResult) {
-              console.log(`✅ Write batch ${batchNum}/${Math.ceil(writeInstructions.length / MAX_WRITES_PER_TX)} completed`);
+              // Only log every 50 batches to reduce clutter
+              if (batchNum % 50 === 0 || batchNum === Math.ceil(writeInstructions.length / MAX_WRITES_PER_TX)) {
+                console.log(`✅ Write batch ${batchNum}/${Math.ceil(writeInstructions.length / MAX_WRITES_PER_TX)} completed`);
+              }
             } else {
               // This is an error response (e.g., WALLET_SIGNATURE_REQUIRED)
               console.error(`❌ Write batch ${batchNum} failed:`, txResult);
