@@ -488,12 +488,6 @@ export const getProjectDetails = async (
       containerUrl: project.container_url || "",
     };
     
-    console.log(`[DEBUG_PROJECT] Responding with projectContext:`, {
-      id: projectContext.id,
-      name: projectContext.name,
-      containerUrl: projectContext.containerUrl,
-      detailsKeys: projectContext.details ? Object.keys(projectContext.details) : []
-    });
 
     res.status(200).json({
       message: 'Project details retrieved successfully',
@@ -1495,7 +1489,6 @@ export const relayTx = async (req: Request, res: Response, next: NextFunction) =
   }
   
   try {
-    console.log(`[RELAY_TX] Handling unsigned transaction for program ${programId}`);
     
     // This is for unsigned write transactions that should be signed by ephemeral key
     const endpoint = process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com';
@@ -1512,7 +1505,6 @@ export const relayTx = async (req: Request, res: Response, next: NextFunction) =
       const signerKeys = msg.accountKeys.slice(0, msg.header.numRequiredSignatures);
       if (signerKeys.some(k => k.equals(keypair.publicKey))) {
         ephemeralKeypair = keypair;
-        console.log(`[RELAY_TX] Found ephemeral signer: ${pubkeyStr}`);
         break;
       }
     }
@@ -1525,18 +1517,16 @@ export const relayTx = async (req: Request, res: Response, next: NextFunction) =
     transaction.sign(ephemeralKeypair);
     
     // Send the transaction
-    console.log(`[RELAY_TX] Sending signed transaction...`);
     const signature = await connection.sendRawTransaction(
       transaction.serialize(),
       { skipPreflight: true }
     );
     
     // Don't wait for confirmation for write transactions to avoid timeout
-    console.log(`[RELAY_TX] Transaction sent with signature: ${signature}`);
     
     res.status(200).json({ signature });
   } catch (error: any) {
-    console.error('[RELAY_TX] Error:', error);
+    console.error('Relay transaction error:', error);
     next(new AppError('Failed to relay transaction', 500));
   }
 };

@@ -612,7 +612,7 @@ export const startAnchorDeployTask = async (
     return sanitizedTaskId;
   }
 
-  console.log(`[DEPLOY_DEBUG] Starting anchor deploy task ${sanitizedTaskId} for project ${projectId}${ephemeralPubkey ? ' with ephemeral key: ' + ephemeralPubkey : ''}`);
+  console.log(`Starting anchor deploy for project ${projectId}`);
 
   setImmediate(async () => {
     try {
@@ -835,7 +835,7 @@ export const startAnchorDeployTask = async (
         }
       }
 
-      console.log(`[DEPLOY_DEBUG] Using Program ID: ${programId}`);
+      console.log(`Deployed program ID: ${programId}`);
       
       if (programId) console.log(`Program successfully deployed with ID: ${programId}`);
       

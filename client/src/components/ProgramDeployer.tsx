@@ -232,13 +232,7 @@ export function ProgramDeployer({
       setProgress(1);
       await new Promise((r) => setTimeout(r, 0)); // paint flush
 
-      if (DEBUG_LOGS) {
-        console.log("[DEBUG] =================== DEPLOYMENT START ===================");
-        console.log("[DEBUG] existingProgramId from context:", existingProgramId);
-        console.log("[DEBUG] projectContext.details:", projectContext?.details);
-        console.log("[DEBUG] projectContext.details.projectState:", projectContext?.details?.projectState);
-        console.log("[DEBUG] programBytes length:", programBytes?.length);
-      }
+      console.log("🚀 Starting Solana program deployment...");
 
       try {
         if (!programBytes) {
@@ -250,23 +244,17 @@ export function ProgramDeployer({
         const looksLikePubkey =
           ctxProgramId && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(ctxProgramId);
 
-        if (DEBUG_LOGS) {
-          console.log("[DEBUG] ctxProgramId:", ctxProgramId);
-          console.log("[DEBUG] looksLikePubkey:", looksLikePubkey);
-        }
+        // Removed debug logs
 
         if (looksLikePubkey) {
           const candidatePk = new PublicKey(ctxProgramId!);
           const acctInfo = await connection.getAccountInfo(candidatePk, "confirmed");
 
-          if (DEBUG_LOGS) {
-            console.log("[DEBUG] Checking if program account exists for:", candidatePk.toBase58());
-            console.log("[DEBUG] Account info:", acctInfo ? "EXISTS" : "DOES NOT EXIST");
-          }
+          // Check if program exists on-chain
 
           if (acctInfo) {
             /* UPGRADE path (unchanged) */
-            if (DEBUG_LOGS) console.log("[DEBUG] 🔄 Taking UPGRADE path for existing program");
+            console.log("🔄 Upgrading existing program");
         const authorityEphem = Keypair.generate();
             if (DEBUG_LOGS) console.log("🔑 Ephemeral authority key:", authorityEphem.publicKey.toBase58());
 
@@ -296,7 +284,7 @@ export function ProgramDeployer({
           }
         }
 
-        if (DEBUG_LOGS) console.log("[DEBUG] 🆕 Taking DEPLOY path for new program deployment");
+        console.log("🆕 Deploying new program");
 
         /* ───────────── NEW: wallet-first signing flow ───────────── */
         // 1. Create an ephemeral keypair on the backend (secret stays on server)
@@ -412,11 +400,7 @@ export function ProgramDeployer({
         const bufferRent = await connection.getMinimumBalanceForRentExemption(bufferSpace);
         const programRent = await connection.getMinimumBalanceForRentExemption(36);
         
-        console.log(`[DEBUG] Buffer account sizing:`);
-        console.log(`[DEBUG] - Program bytes length: ${programBytes.byteLength}`);
-        console.log(`[DEBUG] - Buffer metadata overhead: 37 bytes`);
-        console.log(`[DEBUG] - Total buffer space: ${bufferSpace} bytes`);
-        console.log(`[DEBUG] - Buffer rent: ${bufferRent} lamports`);
+        console.log(`📦 Buffer size: ${bufferSpace} bytes (${bufferRent} lamports rent)`);
         
         // 4. Create buffer account
         const bufferAccount = Keypair.generate();
@@ -466,8 +450,7 @@ export function ProgramDeployer({
         const CHUNK = 850;
         
         // Verify program bytes integrity before chunking
-        console.log(`[DEBUG] Program bytes integrity check: length=${programBytes.length}, first 4 bytes=[${Array.from(programBytes.slice(0, 4)).join(',')}]`);
-        console.log(`[DEBUG] Program bytes last 4 bytes=[${Array.from(programBytes.slice(-4)).join(',')}]`);
+        console.log(`🔍 Program integrity check: ${programBytes.length} bytes`);
         
         let totalBytesWritten = 0;
         const chunkSummary: string[] = [];
@@ -481,7 +464,6 @@ export function ProgramDeployer({
           if (off === 0) {
             // First chunk should contain ELF magic if it's the start
             const firstBytes = Array.from(slice.slice(0, 4));
-            console.log(`[DEBUG] First chunk ELF magic: [${firstBytes.join(',')}]`);
             
             // Verify ELF magic is correct
             if (firstBytes[0] !== 0x7f || firstBytes[1] !== 0x45 || firstBytes[2] !== 0x4c || firstBytes[3] !== 0x46) {
@@ -491,7 +473,6 @@ export function ProgramDeployer({
           }
           if (off + slice.length >= programBytes.length) {
             // Last chunk
-            console.log(`[DEBUG] Last chunk ends at offset ${off + slice.length}, final bytes: [${Array.from(slice.slice(-4)).join(',')}]`);
           }
           
           let writeIx: TransactionInstruction;
@@ -507,20 +488,14 @@ export function ProgramDeployer({
             ]);
             
             // Debug: validate the constructed write data
-            console.log(`[DEBUG] Write instruction data length: ${writeData.length} bytes`);
-            console.log(`[DEBUG] Write instruction format - Tag: [${Array.from(writeData.subarray(0, 4)).join(',')}]`);
-            console.log(`[DEBUG] Write instruction format - Offset: ${off} (bytes 4-7: [${Array.from(writeData.subarray(4, 8)).join(',')}])`);
-            console.log(`[DEBUG] Write instruction format - Length: ${slice.length} (bytes 8-15: [${Array.from(writeData.subarray(8, 16)).join(',')}])`);
             
             if (off === 0) {
               const dataOffset = 16; // 4 bytes tag + 4 bytes offset + 8 bytes length
               const dataSection = writeData.subarray(dataOffset, dataOffset + 4);
-              console.log(`[DEBUG] Write instruction data section (first 4 bytes): [${Array.from(dataSection).join(',')}]`);
               
               if (dataSection[0] !== 0x7f || dataSection[1] !== 0x45 || dataSection[2] !== 0x4c || dataSection[3] !== 0x46) {
                 console.error(`[CRITICAL] ELF magic corrupted in write instruction! Got [${Array.from(dataSection).join(',')}]`);
               } else {
-                console.log(`[DEBUG] ✅ Write instruction contains correct ELF magic`);
               }
             }
             
@@ -542,8 +517,7 @@ export function ProgramDeployer({
         }
         
         // Validate chunk coverage
-        console.log(`[DEBUG] Chunk summary: ${chunkSummary.join(', ')}`);
-        console.log(`[DEBUG] Total bytes to write: ${totalBytesWritten}, program length: ${programBytes.length}`);
+        console.log(`📝 Created ${writeInstructions.length} write instructions`);
         if (totalBytesWritten !== programBytes.length) {
           throw new Error(`Chunk coverage mismatch: ${totalBytesWritten} != ${programBytes.length}`);
         }
@@ -599,126 +573,117 @@ export function ProgramDeployer({
         
         // VERIFY BUFFER AUTHORITY IS SET CORRECTLY
         try {
-          console.log(`[DEBUG] Verifying buffer account authority...`);
           const bufferAccountInfo = await connection.getAccountInfo(bufferAccount.publicKey);
           if (bufferAccountInfo?.data) {
             // Buffer account format: 4 bytes state discriminant + 1 byte COption + 32 bytes authority (if Some)
-            console.log(`[DEBUG] Buffer account data length: ${bufferAccountInfo.data.length}`);
-            console.log(`[DEBUG] Buffer account first 10 bytes: [${Array.from(bufferAccountInfo.data.subarray(0, 10)).join(',')}]`);
-            
             const optionByte = bufferAccountInfo.data[4];
-            console.log(`[DEBUG] Buffer authority option byte: ${optionByte} (0=None, 1=Some)`);
             
             if (optionByte === 1) {
               // Authority is present
               const authorityBytes = bufferAccountInfo.data.subarray(5, 37);
               const authorityPubkey = new PublicKey(authorityBytes);
-              console.log(`[DEBUG] Buffer authority set to: ${authorityPubkey.toBase58()}`);
-              console.log(`[DEBUG] Expected ephemeral authority: ${ephemeralPubkeyStr}`);
               
               if (authorityPubkey.toBase58() !== ephemeralPubkeyStr) {
-                console.error(`[CRITICAL] Buffer authority mismatch! Expected ${ephemeralPubkeyStr}, got ${authorityPubkey.toBase58()}`);
-                throw new Error(`Buffer authority not set to ephemeral key`);
-              } else {
-                console.log(`[DEBUG] ✅ Buffer authority correctly set to ephemeral key`);
+                throw new Error(`Buffer authority mismatch`);
               }
+              console.log(`✅ Buffer authority set to ephemeral key`);
             } else if (optionByte === 0) {
-              console.error(`[CRITICAL] Buffer authority is None - SetAuthority failed`);
               throw new Error(`Buffer authority is None - SetAuthority instruction failed`);
             } else {
-              console.error(`[CRITICAL] Invalid authority option byte: ${optionByte}`);
               throw new Error(`Invalid buffer authority format`);
             }
           } else {
             throw new Error("Buffer account has no data after initialization");
           }
         } catch (verifyError) {
-          console.error(`[CRITICAL] Buffer authority verification failed:`, verifyError);
+          console.error(`❌ Buffer authority verification failed:`, verifyError);
           throw verifyError;
         }
 
         /* ──────────────────────────────────────────────
            Stage 2 – upload bytes in batches (ATOMICALLY)
         ────────────────────────────────────────────── */
-        console.log(`[DEBUG] Uploading ${writeInstructions.length} write instructions in atomic batches`);
+        console.log(`🚀 Uploading ${writeInstructions.length} write instructions`);
         
         // Calculate optimal batching - each write instruction is ~900-950 bytes
         // Target ~800 bytes per transaction to leave room for transaction overhead
         const MAX_WRITES_PER_TX = Math.max(1, Math.floor(800 / (CHUNK + 100))); // +100 for instruction overhead
-        console.log(`[DEBUG] Batching ${MAX_WRITES_PER_TX} write instructions per transaction`);
+        
+        let batchBlockhash = null;
+        let batchBlockheight = 0;
         
         for (let i = 0; i < writeInstructions.length; i += MAX_WRITES_PER_TX) {
+          const batchNum = Math.floor(i / MAX_WRITES_PER_TX) + 1;
           const batch = writeInstructions.slice(i, i + MAX_WRITES_PER_TX);
           const tx = new Transaction().add(...batch);
           
+          // Refresh blockhash every 5 batches or if we don't have one (more frequent)
+          if (!batchBlockhash || batchNum % 5 === 1) {
+            const latest = await connection.getLatestBlockhash('confirmed');
+            batchBlockhash = latest.blockhash;
+            batchBlockheight = latest.lastValidBlockHeight;
+            console.log(`📝 Refreshed blockhash for batch ${batchNum}`);
+          }
+          
           // WRITE txs are server-signed by ephemeral: set feePayer + blockhash here
           tx.feePayer = new PublicKey(ephemeralPubkeyStr);
-          await ensureLegacyTxBlockhash(tx, connection);
+          tx.recentBlockhash = batchBlockhash;
           
           // size guard pre-send
           const probe = tx.serialize({ requireAllSignatures: false });
-          console.log(`[DEBUG] Write batch ${Math.floor(i / MAX_WRITES_PER_TX) + 1}: ${batch.length} instructions, ${probe.length} bytes`);
           
           if (probe.length > 1200) {
             throw new Error(`Tx too large (${probe.length} bytes). Reduce CHUNK or writes/tx.`);
           }
           
-          // Relay unsigned for server to sign with ephemeral (no wallet popups)
-          const encoded = tx.serialize({ requireAllSignatures: false }).toString("base64");
-          const txResult = await projectApi.relayTx(projectId, { encodedTx: encoded, programId: programId.toBase58() });
-          
-          // Check if this is a successful transaction result
-          if ('signature' in txResult) {
-            console.log(`[DEBUG] Write batch ${Math.floor(i / MAX_WRITES_PER_TX) + 1} completed with signature: ${txResult.signature}`);
+          try {
+            // Relay unsigned for server to sign with ephemeral (no wallet popups)
+            const encoded = tx.serialize({ requireAllSignatures: false }).toString("base64");
+            const txResult = await projectApi.relayTx(projectId, { encodedTx: encoded, programId: programId.toBase58() });
             
-            // Wait a moment for transaction to be processed before continuing
-            try {
-              console.log(`[DEBUG] Confirming write batch transaction: ${txResult.signature}`);
-              await connection.confirmTransaction({
-                signature: txResult.signature,
-                blockhash: tx.recentBlockhash!,
-                lastValidBlockHeight: (await connection.getLatestBlockhash()).lastValidBlockHeight
-              });
-              console.log(`[DEBUG] Write batch transaction confirmed: ${txResult.signature}`);
-            } catch (confirmError) {
-              console.warn(`[DEBUG] Write batch confirmation failed (continuing anyway): ${confirmError}`);
+            // Check if this is a successful transaction result
+            if ('signature' in txResult) {
+              console.log(`✅ Write batch ${batchNum}/${Math.ceil(writeInstructions.length / MAX_WRITES_PER_TX)} completed`);
+            } else {
+              // This is an error response (e.g., WALLET_SIGNATURE_REQUIRED)
+              console.error(`❌ Write batch ${batchNum} failed:`, txResult);
+              throw new Error(`Write batch transaction failed: ${JSON.stringify(txResult)}`);
             }
-          } else {
-            // This is an error response (e.g., WALLET_SIGNATURE_REQUIRED)
-            console.error(`[CRITICAL] Write batch failed:`, txResult);
-            throw new Error(`Write batch transaction failed: ${JSON.stringify(txResult)}`);
+          } catch (error) {
+            console.error(`❌ Write batch ${batchNum} error:`, error);
+            throw error;
           }
           
-          setProgress(p => (p ?? 20) + Math.floor((i + batch.length) / writeInstructions.length * 20));
+          // Update progress from 20% to 80% based on write completion
+          const writeProgress = Math.floor((i + batch.length) / writeInstructions.length * 60);
+          setProgress(20 + writeProgress);
+          
+          // Small delay to avoid overwhelming the server
+          if (batchNum % 10 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
         }
         
-        console.log(`[DEBUG] All ${writeInstructions.length} write instructions completed. Buffer should now contain complete program.`);
+        console.log(`🎉 All ${writeInstructions.length} write instructions completed!`);
+        setProgress(80);
         
         // VERIFY BUFFER DATA BEFORE DEPLOYMENT
         try {
-          console.log(`[DEBUG] Verifying buffer account data integrity...`);
+          console.log(`🔍 Verifying buffer integrity...`);
           const bufferAccountInfo = await connection.getAccountInfo(bufferAccount.publicKey);
           if (!bufferAccountInfo?.data) {
             throw new Error("Buffer account has no data after write operations");
           }
           
-          console.log(`[DEBUG] Buffer account data length: ${bufferAccountInfo.data.length} bytes`);
-          console.log(`[DEBUG] Expected program size: ${programBytes.length} bytes (+ 37 byte metadata)`);
-          
           // The buffer account data format is: 37 bytes of metadata + program bytes
           const bufferProgramData = bufferAccountInfo.data.subarray(37);
-          console.log(`[DEBUG] Extracted program data length: ${bufferProgramData.length} bytes`);
           
           // Check ELF magic in buffer
           if (bufferProgramData.length >= 4) {
             const bufferElfMagic = Array.from(bufferProgramData.subarray(0, 4));
-            console.log(`[DEBUG] Buffer ELF magic: [${bufferElfMagic.join(',')}]`);
             
             if (bufferElfMagic[0] !== 0x7f || bufferElfMagic[1] !== 0x45 || bufferElfMagic[2] !== 0x4c || bufferElfMagic[3] !== 0x46) {
-              console.error(`[CRITICAL] Buffer contains corrupted ELF data! Got [${bufferElfMagic.join(',')}], expected [127,69,76,70]`);
-              throw new Error(`Buffer corruption detected: Invalid ELF magic [${bufferElfMagic.join(',')}]`);
-            } else {
-              console.log(`[DEBUG] ✅ Buffer ELF magic is valid`);
+              throw new Error(`Buffer corruption detected: Invalid ELF magic`);
             }
           }
           
@@ -728,24 +693,17 @@ export function ProgramDeployer({
           const originalLast = Array.from(programBytes.slice(-8));
           const bufferLast = Array.from(bufferProgramData.subarray(-8));
           
-          console.log(`[DEBUG] Original first 8 bytes: [${originalFirst.join(',')}]`);
-          console.log(`[DEBUG] Buffer first 8 bytes:   [${bufferFirst.join(',')}]`);
-          console.log(`[DEBUG] Original last 8 bytes:  [${originalLast.join(',')}]`);
-          console.log(`[DEBUG] Buffer last 8 bytes:    [${bufferLast.join(',')}]`);
-          
           if (JSON.stringify(originalFirst) !== JSON.stringify(bufferFirst)) {
-            console.error(`[CRITICAL] Buffer data corruption detected at start!`);
             throw new Error(`Buffer corruption: First bytes mismatch`);
           }
           
           if (JSON.stringify(originalLast) !== JSON.stringify(bufferLast)) {
-            console.error(`[CRITICAL] Buffer data corruption detected at end!`);
             throw new Error(`Buffer corruption: Last bytes mismatch`);
           }
           
-          console.log(`[DEBUG] ✅ Buffer data verification passed - proceeding with deployment`);
+          console.log(`✅ Buffer verification passed`);
         } catch (verificationError) {
-          console.error(`[CRITICAL] Buffer verification failed:`, verificationError);
+          console.error(`❌ Buffer verification failed:`, verificationError);
           throw verificationError;
         }
 
@@ -776,7 +734,6 @@ export function ProgramDeployer({
 
         /* Helpers */
         async function signAndRelayWithWallet(tx: Transaction, extras: Keypair[]) {
-          console.log(`[DEBUG] signAndRelayWithWallet called with ${extras.length} extra signers`);
           
           // Set fee payer and blockhash BEFORE compiling message
           tx.feePayer = wallet.publicKey!;
@@ -787,15 +744,9 @@ export function ProgramDeployer({
           
           // Debug: log transaction details before signing
           const msg = tx.compileMessage();
-          console.log(`[DEBUG] Transaction requires ${msg.header.numRequiredSignatures} signatures`);
-          console.log(`[DEBUG] Required signers:`, msg.accountKeys.slice(0, msg.header.numRequiredSignatures).map(k => k.toBase58()));
-          console.log(`[DEBUG] Extra signers provided:`, extras.map(k => k.publicKey.toBase58()));
-          console.log(`[DEBUG] Wallet public key:`, wallet.publicKey!.toBase58());
-          console.log(`[DEBUG] Fee payer:`, tx.feePayer?.toBase58());
           
           // Verify wallet is first signer
           const walletIsFirstSigner = msg.accountKeys[0].equals(wallet.publicKey!);
-          console.log(`[DEBUG] Wallet is first signer:`, walletIsFirstSigner);
           if (!walletIsFirstSigner) {
             console.error(`[DEBUG] ERROR: Wallet should be first signer but isn't!`);
             console.error(`[DEBUG] Expected:`, wallet.publicKey!.toBase58());
@@ -804,10 +755,8 @@ export function ProgramDeployer({
           
           // Initialize signatures array properly first
           const signers = [wallet.publicKey!, ...extras.map(k => k.publicKey)];
-          console.log(`[DEBUG] All signers that need to sign:`, signers.map(s => s.toBase58()));
           
           // Clean signing approach: sign with wallet first on clean transaction
-          console.log(`[DEBUG] Clean signing approach: wallet first on clean transaction`);
           
           // Clone the transaction to ensure clean state
           const cleanTx = new Transaction();
@@ -823,26 +772,15 @@ export function ProgramDeployer({
           // Force compilation to set up signatures array properly
           cleanTx.compileMessage();
           
-          console.log(`[DEBUG] Created clean transaction with ${cleanTx.instructions.length} instructions`);
           
           // Debug transaction before wallet signing
-          console.log(`[DEBUG] Transaction before wallet signing:`);
-          console.log(`[DEBUG] - Instructions: ${cleanTx.instructions.length}`);
-          console.log(`[DEBUG] - Fee payer: ${cleanTx.feePayer?.toBase58()}`);
-          console.log(`[DEBUG] - Recent blockhash: ${cleanTx.recentBlockhash}`);
-          console.log(`[DEBUG] - Signatures length: ${cleanTx.signatures.length}`);
           
           // Try wallet signing with error handling
           try {
-            console.log(`[DEBUG] About to call wallet.signTransaction...`);
             const signedTx = await wallet.signTransaction!(cleanTx);
-            console.log(`[DEBUG] Wallet.signTransaction returned successfully`);
-            console.log(`[DEBUG] Returned tx === original tx:`, signedTx === cleanTx);
-            console.log(`[DEBUG] Returned tx signatures length:`, signedTx.signatures.length);
             
             // Always use the returned transaction as it might be a new instance
             if (signedTx !== cleanTx) {
-              console.log(`[DEBUG] Wallet returned a different transaction object, replacing cleanTx`);
               // Replace the entire transaction
               Object.assign(cleanTx, {
                 signatures: signedTx.signatures,
@@ -852,29 +790,17 @@ export function ProgramDeployer({
                 instructions: signedTx.instructions
               });
             } else {
-              console.log(`[DEBUG] Wallet modified the original transaction in-place`);
             }
           } catch (error) {
             console.error(`[DEBUG] Wallet signing failed:`, error);
             throw error;
           }
           
-          console.log(`[DEBUG] Wallet signed clean transaction`);
           
-          // Check wallet signature was applied
-          let walletSigCount = cleanTx.signatures.filter(s => s.signature).length;
-          console.log(`[DEBUG] After wallet signature on clean tx: ${walletSigCount} signatures`);
-          
-          // Debug each signature slot
-          cleanTx.signatures.forEach((sig, idx) => {
-            console.log(`[DEBUG] Signature slot ${idx}: ${sig.publicKey.toBase58()} = ${sig.signature ? 'PRESENT' : 'MISSING'}`);
-          });
           
           // Then apply extra signatures
           if (extras && extras.length > 0) {
-            console.log(`[DEBUG] Applying ${extras.length} extra signatures to clean transaction...`);
             cleanTx.partialSign(...extras);
-            console.log(`[DEBUG] Applied ${extras.length} extra signatures to clean transaction`);
           }
           
           // Use the clean transaction for the rest of the process
@@ -885,13 +811,11 @@ export function ProgramDeployer({
           
           // Final signature count check
           let currentSigs = tx.signatures.filter(s => s.signature).length;
-          console.log(`[DEBUG] Final signature count: ${currentSigs}/${finalMsg.header.numRequiredSignatures} signatures`);
           
           // Debug: show which signatures we have
           for (let i = 0; i < finalMsg.header.numRequiredSignatures; i++) {
             const signer = finalMsg.accountKeys[i].toBase58();
             const hasSig = tx.signatures[i]?.signature ? 'YES' : 'NO';
-            console.log(`[DEBUG] Signature ${i}: ${signer} = ${hasSig}`);
           }
           
           // Handle missing signatures - if only wallet signature is missing, try server handling
@@ -907,11 +831,9 @@ export function ProgramDeployer({
             
             // If only the wallet signature is missing and it's the first signer, try server approach
             if (missingSigs.length === 1 && missingSigs[0] === wallet.publicKey!.toBase58()) {
-              console.log(`[DEBUG] Only wallet signature missing, attempting server-side handling...`);
               
               // Send partially signed transaction to server and let it handle wallet signature request
               const encoded = tx.serialize({ requireAllSignatures: false }).toString("base64");
-              console.log(`[DEBUG] Sending partially signed transaction to relay-signed-tx endpoint`);
               
               try {
                 const result = await projectApi.relaySignedTx(
@@ -921,10 +843,8 @@ export function ProgramDeployer({
                 );
                 
                 if ('signature' in result) {
-                  console.log(`[DEBUG] Server-side relay successful with signature: ${result.signature}`);
                   return; // Success, exit the function
                 } else if (result.code === 'WALLET_SIGNATURE_REQUIRED') {
-                  console.log(`[DEBUG] Server requests wallet signature, handling 409 response`);
                   // Let this fall through to the normal 409 handling below
                   throw new Error(`Server requests wallet signature: ${result.missing?.join(', ')}`);
                 } else {
@@ -941,7 +861,6 @@ export function ProgramDeployer({
           }
           
           const encoded = tx.serialize({ requireAllSignatures: true }).toString("base64");
-          console.log(`[DEBUG] Sending fully signed transaction to relay-signed-tx endpoint`);
           
           try {
             const result = await projectApi.relaySignedTx(
@@ -951,7 +870,6 @@ export function ProgramDeployer({
             );
             
             if ('signature' in result) {
-              console.log(`[DEBUG] Relay successful with signature: ${result.signature}`);
             } else if (result.code === 'WALLET_SIGNATURE_REQUIRED') {
               console.error(`[DEBUG] Server still needs wallet signature. Missing:`, result.missing);
               throw new Error(`Server requests wallet signature for: ${result.missing?.join(', ')}`);
@@ -974,28 +892,18 @@ export function ProgramDeployer({
         
         // Check if wallet returned a different transaction object
         if (signedTx !== deployTx) {
-          console.log('[DEBUG] Wallet returned a different transaction object, replacing deployTx');
           Object.assign(deployTx, signedTx);  // Update deployTx with signed version
         }
         
-        console.log('[DEBUG] Deployment transaction signed by wallet');
-        console.log('[DEBUG] Deploy tx signers required:', deployTx.compileMessage().accountKeys.slice(0, deployTx.compileMessage().header.numRequiredSignatures).map(k => k.toBase58()));
         
-        // Verify wallet signature is present
-        const walletSigPresent = deployTx.signatures.find(sig => 
-          sig.publicKey?.toBase58() === wallet.publicKey!.toBase58() && sig.signature
-        );
-        console.log('[DEBUG] Wallet signature present:', walletSigPresent ? '✅ YES' : '❌ NO');
         
         // Check if we need to sign with the program keypair on the client side
         // When using existing program ID, the real keypair is on the backend
         if (!existingProgramId) {
           // Only sign with program keypair if we generated a new one (fallback case)
           deployTx.partialSign(programKeypair);
-          console.log('[DEBUG] Program keypair signed deployment transaction (new program)');
         } else {
           // For existing program ID, the backend will handle program keypair signing
-          console.log('[DEBUG] Skipping client-side program keypair signing - backend will handle it');
         }
         
         // 5. Send the partially-signed transaction to backend for co-signing and broadcast
@@ -1009,18 +917,14 @@ export function ProgramDeployer({
         if (DEBUG_LOGS) {
           const currentSigs = deployTx.signatures.filter(s => s.signature).length;
           const requiredSigs = deployTx.compileMessage().header.numRequiredSignatures;
-          console.log(`[DEBUG] Transaction signature status: ${currentSigs}/${requiredSigs} signatures`);
           
           for (let i = 0; i < deployTx.signatures.length; i++) {
             const sig = deployTx.signatures[i];
             const status = sig.signature ? '✅ SIGNED' : '❌ MISSING';
-            console.log(`[DEBUG] Signature ${i}: ${sig.publicKey?.toBase58()} ${status}`);
           }
         }
         
-        console.log('[DEBUG] Sending deploy transaction to server for ephemeral key signing');
-        console.log('[DEBUG] Ephemeral key that should sign:', ephemeralPubkeyStr);
-        console.log('[DEBUG] Expected program ID for backend signing:', programId.toBase58());
+        console.log('🚀 Deploying program to Solana...');
         
         try {
           const firstRelay = await projectApi.relaySignedTx(
