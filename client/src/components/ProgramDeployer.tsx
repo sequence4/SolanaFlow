@@ -454,7 +454,10 @@ export function ProgramDeployer({
             { pubkey: wallet.publicKey!,       isSigner: true,  isWritable: false },
             { pubkey: ephemeralPubkey,         isSigner: false, isWritable: false },
           ],
-          data: Buffer.from([4, 0, 0, 0]), // SetAuthority tag
+          data: Buffer.concat([
+            Buffer.from([4, 0, 0, 0]),        // SetAuthority tag
+            Buffer.from([1])                   // COption Some(1) to indicate new authority
+          ]),
         });
         
         // Prepare write instructions for program bytes (ephemeral will be signer)
@@ -495,9 +498,9 @@ export function ProgramDeployer({
           try {
             const sliceBuffer = Buffer.from(slice);  // Explicit conversion
             // BPF Upgradeable Loader Write instruction format:
-            // [3, 0, 0, 0] + u32(offset) + u64(length) + data
+            // [1, 0, 0, 0] + u32(offset) + u64(length) + data
             const writeData = Buffer.concat([
-              Buffer.from([3, 0, 0, 0]),  // Write instruction tag (3 for BPF Upgradeable Loader)
+              Buffer.from([1, 0, 0, 0]),  // Write instruction tag (1 for BPF Upgradeable Loader)
               u32LE(off),                 // offset in buffer  
               u64LE(slice.length),        // length of data (BPF Loader uses u64)
               sliceBuffer,                // actual data bytes
@@ -599,17 +602,32 @@ export function ProgramDeployer({
           console.log(`[DEBUG] Verifying buffer account authority...`);
           const bufferAccountInfo = await connection.getAccountInfo(bufferAccount.publicKey);
           if (bufferAccountInfo?.data) {
-            // Buffer account format: 4 bytes variant + 32 bytes authority + 1 byte authority option + remaining data
-            const authorityBytes = bufferAccountInfo.data.subarray(4, 36);
-            const authorityPubkey = new PublicKey(authorityBytes);
-            console.log(`[DEBUG] Buffer authority set to: ${authorityPubkey.toBase58()}`);
-            console.log(`[DEBUG] Expected ephemeral authority: ${ephemeralPubkeyStr}`);
+            // Buffer account format: 4 bytes state discriminant + 1 byte COption + 32 bytes authority (if Some)
+            console.log(`[DEBUG] Buffer account data length: ${bufferAccountInfo.data.length}`);
+            console.log(`[DEBUG] Buffer account first 10 bytes: [${Array.from(bufferAccountInfo.data.subarray(0, 10)).join(',')}]`);
             
-            if (authorityPubkey.toBase58() !== ephemeralPubkeyStr) {
-              console.error(`[CRITICAL] Buffer authority mismatch! Expected ${ephemeralPubkeyStr}, got ${authorityPubkey.toBase58()}`);
-              throw new Error(`Buffer authority not set to ephemeral key`);
+            const optionByte = bufferAccountInfo.data[4];
+            console.log(`[DEBUG] Buffer authority option byte: ${optionByte} (0=None, 1=Some)`);
+            
+            if (optionByte === 1) {
+              // Authority is present
+              const authorityBytes = bufferAccountInfo.data.subarray(5, 37);
+              const authorityPubkey = new PublicKey(authorityBytes);
+              console.log(`[DEBUG] Buffer authority set to: ${authorityPubkey.toBase58()}`);
+              console.log(`[DEBUG] Expected ephemeral authority: ${ephemeralPubkeyStr}`);
+              
+              if (authorityPubkey.toBase58() !== ephemeralPubkeyStr) {
+                console.error(`[CRITICAL] Buffer authority mismatch! Expected ${ephemeralPubkeyStr}, got ${authorityPubkey.toBase58()}`);
+                throw new Error(`Buffer authority not set to ephemeral key`);
+              } else {
+                console.log(`[DEBUG] ✅ Buffer authority correctly set to ephemeral key`);
+              }
+            } else if (optionByte === 0) {
+              console.error(`[CRITICAL] Buffer authority is None - SetAuthority failed`);
+              throw new Error(`Buffer authority is None - SetAuthority instruction failed`);
             } else {
-              console.log(`[DEBUG] ✅ Buffer authority correctly set to ephemeral key`);
+              console.error(`[CRITICAL] Invalid authority option byte: ${optionByte}`);
+              throw new Error(`Invalid buffer authority format`);
             }
           } else {
             throw new Error("Buffer account has no data after initialization");
