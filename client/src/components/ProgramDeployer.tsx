@@ -462,10 +462,15 @@ export function ProgramDeployer({
             
             // Debug: validate the constructed write data
             
-            // Validate ELF magic in first chunk only
+            // Debug: log the first write instruction bytes
             if (off === 0) {
+              console.log(`DEBUG: First write instruction bytes:`, Array.from(writeData.subarray(0, 24)));
+              console.log(`DEBUG: Expected ELF magic at offset 16:`, Array.from(slice.slice(0, 4)));
+              
               const dataOffset = 16; // 4 bytes discriminator + 4 bytes offset + 8 bytes u64 length
               const dataSection = writeData.subarray(dataOffset, dataOffset + 4);
+              
+              console.log(`DEBUG: Actual ELF magic in instruction:`, Array.from(dataSection));
               
               if (dataSection[0] !== 0x7f || dataSection[1] !== 0x45 || dataSection[2] !== 0x4c || dataSection[3] !== 0x46) {
                 throw new Error(`ELF magic corrupted in write instruction! Got [${Array.from(dataSection).join(',')}]`);
@@ -667,6 +672,14 @@ export function ProgramDeployer({
             
             // The buffer account data format is: 37 bytes of metadata + program bytes
             const bufferProgramData = bufferAccountInfo.data.subarray(37);
+            
+            // Debug logging
+            console.log(`DEBUG: Buffer total length: ${bufferAccountInfo.data.length}`);
+            console.log(`DEBUG: Buffer program data length: ${bufferProgramData.length}`);
+            console.log(`DEBUG: Expected program length: ${programBytes.length}`);
+            console.log(`DEBUG: Buffer metadata (37 bytes):`, Array.from(bufferAccountInfo.data.subarray(0, 37)));
+            console.log(`DEBUG: First 16 bytes of buffer program data:`, Array.from(bufferProgramData.subarray(0, 16)));
+            console.log(`DEBUG: First 16 bytes of original program:`, Array.from(programBytes.slice(0, 16)));
             
             // Check ELF magic in buffer
             if (bufferProgramData.length >= 4) {
