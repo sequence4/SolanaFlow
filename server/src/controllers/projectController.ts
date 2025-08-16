@@ -1499,6 +1499,24 @@ export const relayTx = async (req: Request, res: Response, next: NextFunction) =
     
     console.log(`[RELAY_TX] Fee payer: ${transaction.feePayer.toBase58()}`);
     
+    // CRITICAL: If fee payer is ephemeral, verify it has funds
+    if (ephemeralKeys.has(transaction.feePayer.toBase58())) {
+      const balance = await connection.getBalance(transaction.feePayer, 'confirmed');
+      const MIN_BALANCE = 15000; // Minimum for one transaction
+      
+      if (balance < MIN_BALANCE) {
+        console.error(`[RELAY_TX] Ephemeral fee payer has insufficient balance: ${balance} lamports`);
+        console.error(`[RELAY_TX] This indicates initial funding was too low`);
+        return next(new AppError(
+          `Ephemeral key has insufficient balance (${balance} lamports). ` +
+          `Initial funding calculation was too low. Please restart deployment.`,
+          400
+        ));
+      }
+      
+      console.log(`[RELAY_TX] Ephemeral fee payer balance: ${balance} lamports`);
+    }
+    
     // Get all required signers
     const msg = transaction.compileMessage();
     const requiredSigners = msg.accountKeys.slice(0, msg.header.numRequiredSignatures);

@@ -342,6 +342,47 @@ export function ProgramDeployer({
 
         // Construct PublicKey with the string returned from the server
         const ephemeralPubkey = new PublicKey(ephemeralPubkeyStr);
+        
+        // CRITICAL: Calculate proper funding for ephemeral key
+        const FUNDING_CHUNK = 850;
+        const numChunks = Math.ceil(programBytes.length / FUNDING_CHUNK);
+        
+        // Funding calculation:
+        // - Buffer creation: 1 tx
+        // - Write chunks: numChunks txs  
+        // - SetAuthority after writes: 1 tx
+        // - Safety margin: 10 txs
+        const totalTxCount = 1 + numChunks + 1 + 10;
+        const FEE_PER_TX = 15000; // 15k lamports per transaction (conservative)
+        
+        const fundingBufferSpace = 37 + programBytes.byteLength;
+        const fundingBufferRent = await connection.getMinimumBalanceForRentExemption(fundingBufferSpace);
+        const totalFeesNeeded = totalTxCount * FEE_PER_TX;
+        const SAFETY_CUSHION = 200_000_000; // 0.2 SOL safety
+        
+        const totalFunding = fundingBufferRent + totalFeesNeeded + SAFETY_CUSHION;
+        
+        console.log(`[DEPLOY] Funding calculation:
+          - Buffer rent: ${fundingBufferRent} lamports
+          - Transactions: ${totalTxCount} × ${FEE_PER_TX} = ${totalFeesNeeded} lamports
+          - Safety cushion: ${SAFETY_CUSHION} lamports
+          - Total funding: ${totalFunding} lamports (${totalFunding / 1_000_000_000} SOL)`);
+        
+        setDeployStage('Funding ephemeral key...');
+        
+        // Fund the ephemeral key with calculated amount
+        const fundingTx = new Transaction().add(
+          SystemProgram.transfer({
+            fromPubkey: wallet.publicKey!,
+            toPubkey: ephemeralPubkey,
+            lamports: totalFunding,
+          })
+        );
+        
+        const fundingSig = await wallet.sendTransaction(fundingTx, connection);
+        await connection.confirmTransaction(fundingSig, 'confirmed');
+        console.log(`[DEPLOY] Funded ephemeral key with ${totalFunding / 1_000_000_000} SOL`);
+        
         setDeployStage('Building transaction...');
         setProgress(10);
 
@@ -607,8 +648,9 @@ export function ProgramDeployer({
             batchBlockhash = latest.blockhash;
           }
           
-          // CRITICAL FIX: Wallet pays fees, ephemeral signs as authority
-          tx.feePayer = wallet.publicKey!;  // Wallet is fee payer
+          // FIXED: Ephemeral key pays fees AND signs as authority
+          // This works because we properly funded it above
+          tx.feePayer = ephemeralPubkey;  // Ephemeral is fee payer
           tx.recentBlockhash = batchBlockhash;
           
           // size guard pre-send
@@ -619,16 +661,9 @@ export function ProgramDeployer({
           }
           
           try {
-            // Sign with wallet first (as fee payer)
-            if (!wallet.signTransaction) {
-              throw new Error("Wallet doesn't support transaction signing");
-            }
+            // No wallet signature needed - send directly to server for ephemeral signing
+            const encoded = tx.serialize({ requireAllSignatures: false }).toString("base64");
             
-            // Get wallet signature first
-            const walletSignedTx = await wallet.signTransaction(tx);
-            
-            // Then relay to server for ephemeral signature (as authority)
-            const encoded = walletSignedTx.serialize({ requireAllSignatures: false }).toString("base64");
             const txResult = await projectApi.relayTx(projectId, { 
               encodedTx: encoded, 
               programId: programId.toBase58() 
