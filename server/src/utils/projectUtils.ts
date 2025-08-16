@@ -1845,9 +1845,39 @@ export async function signDeployTxAndBroadcast(
   }
   
   console.log(`[SIGNING] Sending transaction to ${endpoint}...`);
-  const sig = await sendAndConfirmRawTransaction(conn, transaction.serialize());
-  console.log(`[SIGNING] Transaction confirmed with signature: ${sig}`);
-  return { signature: sig };
+  
+  try {
+    const sig = await sendAndConfirmRawTransaction(conn, transaction.serialize());
+    console.log(`[SIGNING] Transaction confirmed with signature: ${sig}`);
+    return { signature: sig };
+  } catch (error: any) {
+    // Handle blockhash expiry
+    if (error.message?.includes('Blockhash not found')) {
+      console.log('[SIGNING] Blockhash expired, refreshing and retrying...');
+      
+      // Get fresh blockhash and update transaction
+      const { blockhash } = await conn.getLatestBlockhash('confirmed');
+      transaction.recentBlockhash = blockhash;
+      
+      // Collect all available signers for re-signing
+      const allSigners: Keypair[] = [];
+      if (programKeypair) allSigners.push(programKeypair);
+      if (opts?.extraSigners) allSigners.push(...opts.extraSigners);
+      
+      // Re-sign the transaction with the new blockhash
+      if (allSigners.length > 0) {
+        transaction.signatures = [];
+        transaction.sign(...allSigners);
+        console.log(`[SIGNING] Re-signed transaction with ${allSigners.length} signers after blockhash refresh`);
+      }
+      
+      // Retry sending
+      const sig = await sendAndConfirmRawTransaction(conn, transaction.serialize());
+      console.log(`[SIGNING] Transaction confirmed after retry: ${sig}`);
+      return { signature: sig };
+    }
+    throw error;
+  }
 }
 
 /**

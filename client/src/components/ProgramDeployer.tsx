@@ -282,17 +282,18 @@ export function ProgramDeployer({
         }
 
         // 2. Ask backend for a durable nonce we can anchor the final tx to
-        let noncePubkey: string;
-        let nonceHash: string;
+        // Commented out since we're using fresh blockhash instead
+        // let noncePubkey: string;
+        // let nonceHash: string;
         
         try {
           // First try to get an existing nonce account
-          const nonceResult = await projectApi.getNonce(
-            projectId,
-            wallet.publicKey!.toBase58(),
-          );
-          noncePubkey = nonceResult.noncePubkey;
-          nonceHash = nonceResult.nonceHash;
+          // const nonceResult = await projectApi.getNonce(
+          //   projectId,
+          //   wallet.publicKey!.toBase58(),
+          // );
+          // noncePubkey = nonceResult.noncePubkey;
+          // nonceHash = nonceResult.nonceHash;
           
         } catch (error: any) {
           /* Backend 404 *or* propagated "NO_NONCE_ACCOUNT"
@@ -307,13 +308,13 @@ export function ProgramDeployer({
               await walletSigner.createNonce(connection);
               
               // Retry now that we have a nonce account
-              const nonceResult = await projectApi.getNonce(
-                projectId,
-                wallet.publicKey!.toBase58(),
-              );
+              // const nonceResult = await projectApi.getNonce(
+              //   projectId,
+              //   wallet.publicKey!.toBase58(),
+              // );
               
-              noncePubkey = nonceResult.noncePubkey;
-              nonceHash = nonceResult.nonceHash;
+              // noncePubkey = nonceResult.noncePubkey;
+              // nonceHash = nonceResult.nonceHash;
               
             } catch (createError: any) {
               /* Emit detailed diagnostics so we can read response body,
@@ -785,20 +786,24 @@ export function ProgramDeployer({
         /* ──────────────────────────────────────────────
            Stage 3 – program account + deploy
         ────────────────────────────────────────────── */
-        const advanceIx = SystemProgram.nonceAdvance({
-          noncePubkey: new PublicKey(noncePubkey),
-          authorizedPubkey: wallet.publicKey!,
-        });
+        
+        // Skip nonce for deployment - use fresh blockhash to avoid "Blockhash not found" errors
+        // const advanceIx = SystemProgram.nonceAdvance({
+        //   noncePubkey: new PublicKey(noncePubkey),
+        //   authorizedPubkey: wallet.publicKey!,
+        // });
 
         const deployTx = new Transaction()
-          .add(advanceIx)            /* must be FIRST for durable nonce   */
+          // .add(advanceIx)            /* skip nonce for deployment */
           .add(createProgramAcct)
           .add(deployIx);
 
 
         // Recent block-hash & fee-payer
-        /* Use the durable nonce instead of a recent block‑hash */
-        deployTx.recentBlockhash = nonceHash;
+        /* Use fresh blockhash instead of durable nonce to avoid timing issues */
+        const { blockhash: freshHash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+        deployTx.recentBlockhash = freshHash;
+        deployTx.lastValidBlockHeight = lastValidBlockHeight;
         deployTx.feePayer = wallet.publicKey!;
 
         /* Size guard – keep below ~1232 B ceiling */
