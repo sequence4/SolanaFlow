@@ -715,6 +715,8 @@ export const createEphemeralKeypair = async (req: Request, res: Response, next: 
     // Store the keypair in memory only
     ephemeralKeys.set(pubkey, ephem);
     console.log(`[EPHEMERAL] Generated new ephemeral keypair: ${pubkey}`);
+    console.log(`[EPHEMERAL] Total ephemeral keys now stored: ${ephemeralKeys.size}`);
+    console.log(`[EPHEMERAL] All stored keys: ${Array.from(ephemeralKeys.keys()).join(', ')}`);
     
     // Return only the public key to the client
     res.status(200).json({
@@ -1480,6 +1482,9 @@ export const relayTx = async (req: Request, res: Response, next: NextFunction) =
   }
   
   try {
+    console.log(`[RELAY_TX] Starting relay for programId: ${programId}`);
+    console.log(`[RELAY_TX] Total ephemeral keys available: ${ephemeralKeys.size}`);
+    console.log(`[RELAY_TX] Available ephemeral key pubkeys: ${Array.from(ephemeralKeys.keys()).join(', ')}`);
     
     // This is for unsigned write transactions that should be signed by ephemeral key
     const endpoint = process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com';
@@ -1497,6 +1502,7 @@ export const relayTx = async (req: Request, res: Response, next: NextFunction) =
     // Find ALL matching ephemeral keys that need to sign
     const signers: Keypair[] = [];
     for (const [pubkeyStr, keypair] of ephemeralKeys) {
+      console.log(`[RELAY_TX] Checking ephemeral key: ${pubkeyStr} against required signers`);
       if (requiredSigners.some(k => k.equals(keypair.publicKey))) {
         console.log(`[RELAY_TX] Found ephemeral key to sign: ${pubkeyStr}`);
         signers.push(keypair);
@@ -1505,7 +1511,15 @@ export const relayTx = async (req: Request, res: Response, next: NextFunction) =
     
     if (signers.length === 0) {
       console.error(`[RELAY_TX] ERROR: No ephemeral keys found for required signers!`);
+      console.error(`[RELAY_TX] Required signers: ${requiredSigners.map(k => k.toBase58()).join(', ')}`);
       console.error(`[RELAY_TX] Available ephemeral keys: ${Array.from(ephemeralKeys.keys()).join(', ')}`);
+      
+      // Additional debugging: check if we have any ephemeral keys at all
+      if (ephemeralKeys.size === 0) {
+        console.error(`[RELAY_TX] CRITICAL: No ephemeral keys stored in memory! Check if createEphemeralKeypair was called.`);
+        return next(new AppError('No ephemeral keys available. Please create an ephemeral key first.', 400));
+      }
+      
       return next(new AppError('No ephemeral key found to sign this transaction', 400));
     }
     
@@ -1526,6 +1540,7 @@ export const relayTx = async (req: Request, res: Response, next: NextFunction) =
     }
     
     // Send the transaction
+    console.log(`[RELAY_TX] Sending transaction to Solana network...`);
     const signature = await connection.sendRawTransaction(
       transaction.serialize(),
       { skipPreflight: false } // Enable preflight for debugging
@@ -1543,8 +1558,19 @@ export const relayTx = async (req: Request, res: Response, next: NextFunction) =
     
     res.status(200).json({ signature });
   } catch (error: any) {
-    console.error('Relay transaction error:', error);
-    next(new AppError('Failed to relay transaction', 500));
+    console.error('[RELAY_TX] Detailed error information:');
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    console.error('Error type:', error.constructor.name);
+    
+    // More specific error handling
+    if (error.message?.includes('Transaction simulation failed')) {
+      next(new AppError(`Transaction simulation failed: ${error.message}`, 400));
+    } else if (error.message?.includes('Blockhash not found')) {
+      next(new AppError('Transaction expired. Please retry with a fresh blockhash.', 400));
+    } else {
+      next(new AppError(`Failed to relay transaction: ${error.message}`, 500));
+    }
   }
 };
 
