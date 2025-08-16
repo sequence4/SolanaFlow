@@ -69,8 +69,12 @@ export default function FileExplorer() {
   return (
     <>
       <div className="h-full overflow-y-auto bg-[#1e1e20] border-r border-[#2a2a2d]">
-        {roots.map(node => (
-          <TreeItem key={node.path ?? node.name} node={node} />
+        {roots.map((node, idx) => (
+          <TreeItem 
+            /* add index to guarantee unique key */
+            key={`${node.path ?? node.name}-${idx}`} 
+            node={node} 
+          />
         ))}
       </div>
       {/* ticker overlay */}

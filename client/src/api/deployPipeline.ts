@@ -31,6 +31,7 @@ export function deployPipeline(
     headers,
     body: JSON.stringify({ graph, walletSigned }),
     signal: controller.signal,
+    openWhenHidden: true,
     
     async onopen(response) {
       console.log(`[SSE] Connection opened with status: ${response.status}`);

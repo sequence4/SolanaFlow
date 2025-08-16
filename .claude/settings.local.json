@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(npm run build:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Bash(has no data after initialization\" due to RPC nodes not immediately reflecting\ntransaction state changes.\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "WebFetch(domain:docs.rs)",
+      "WebFetch(domain:solana.stackexchange.com)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run:*)",
+      "mcp__ide__getDiagnostics"
+    ],
+    "deny": [],
+    "ask": [],
+    "defaultMode": "acceptEdits"
+  }
+}

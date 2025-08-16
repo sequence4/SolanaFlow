@@ -51,6 +51,10 @@ export async function ensureDurableNonce(
   tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
   tx.partialSign(nonceKP);
   const signed = await wallet.signTransaction!(tx);
+  
+  // Add logging to show the base64 transaction
+  const txBase64 = signed.serialize().toString('base64');
+  console.log('⚡ TX-BASE64 (Nonce):', txBase64);
 
   // 🚀 fire the tx
   const sig = await connection.sendRawTransaction(signed.serialize(), {

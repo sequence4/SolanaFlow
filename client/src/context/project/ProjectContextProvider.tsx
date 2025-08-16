@@ -12,6 +12,7 @@ const defaultContext: ProjectContextType = {
   containerUrl: '',
   injectingNodeTypes: [],
   details: {
+    programId: null, // Add programId at details level
     setProjectState: () => {},
     projectState: {
       mode: 'basic',
@@ -49,6 +50,7 @@ const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
           containerUrl: parsed.containerUrl || '',
           injectingNodeTypes: parsed.injectingNodeTypes || [],
           details: {
+            programId: parsed.details?.programId || null,
             setProjectState: () => {}, // Will be replaced in the next useEffect
             projectState: {
               mode: parsed?.details?.projectState?.mode || 'basic',
@@ -95,6 +97,7 @@ const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
         details: {
           ...prev.details!,
           projectState: newState,
+          programId: prev.details?.programId || null, // Preserve programId
         },
       };
     });
@@ -115,7 +118,10 @@ const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
       };
 
       // Ensure details is not undefined with proper projectState
-      const details = prev.details || { projectState: defaultProjectState };
+      const details = prev.details || { 
+        projectState: defaultProjectState,
+        programId: null 
+      };
 
       return {
         ...prev,
@@ -123,6 +129,7 @@ const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
           ...details,
           setProjectState: handleSetProjectState,
           projectState: details.projectState,
+          programId: details.programId || null,
         },
       };
     });
@@ -143,6 +150,7 @@ const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
         details: {
           projectState: details?.projectState,
           setProjectState: details?.setProjectState || (() => {}),
+          programId: details?.programId || null, // Save programId
         },
       };
       

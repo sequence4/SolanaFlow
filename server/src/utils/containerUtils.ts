@@ -35,19 +35,19 @@ NF==1 { print; next }\
 '\'' \
       "
   `;
-  console.log('[DEBUG] Tree dump command:\n', treeCmd);
+  console.log('[DEBUG] Running directory tree dump command');
 
   let treeDump = '';
   try {
     treeDump = await runCommand(treeCmd, '.', taskId);
   } catch (err) {
-    console.error('[DEBUG] tree-dump command failed:', err);
+    console.error('[DEBUG] Tree dump command failed');
     await updateTaskStatus(taskId, 'failed', 
       'Tree dump failed – see server logs for details');
     throw err;
   }
 
-  console.log('[TREE DUMP]\n' + treeDump);
+  console.log('[DEBUG] Directory tree structure generated');
 }
 
 /**
@@ -61,16 +61,21 @@ export async function debugPrintFiles(
   taskId: string,
 ): Promise<void> {
   if (process.env.DEBUG !== 'true') return;
+  console.log(`[DEBUG] Checking ${paths.length} key project files`);
+  
   for (const rel of paths) {
     const full = `/usr/src/${rootPath}/${rel.replace(/^\.?\/?/, "")}`;
+    // Only print file names without their content to reduce console bloat
     const cmd = `docker exec ${containerName} bash -c "printf '\\n===== ${rel} =====\\n'"`; // ; cat ${full}"
     try {
       await runCommand(cmd, ".", taskId);
     } catch (err) {
-      console.error(`[DEBUG] print ${rel} failed:`, err);
+      console.error(`[DEBUG] Failed to check file: ${rel}`);
       await updateTaskStatus(taskId, 'failed',
-        `Printing ${rel} failed – see logs`);
+        `Checking ${rel} failed – see logs`);
       throw err;
     }
   }
+  
+  console.log(`[DEBUG] All key project files checked`);
 }

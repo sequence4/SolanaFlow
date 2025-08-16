@@ -82,8 +82,13 @@ export const Toolbox = () => {
 
     useEffect(() => {
         setProjectName(projectContext.name || "My Token Project");
-        console.log('projectContext programId', projectContext.details?.projectState?.programId);
+        console.log('[Toolbox useEffect] projectContext programId', projectContext.details?.projectState?.programId);
     }, [projectContext.name, projectContext.details?.projectState?.programId, projectContext.details?.projectState?.deployed]);
+    
+    // Debug: track programId changes to help diagnose context updates
+    useEffect(() => {
+        console.log('[Toolbox useEffect] context programId changed to', projectContext.details?.projectState?.programId);
+    }, [projectContext.details?.projectState?.programId]);
 
     const handleTabChange = (tab: "on-chain" | "off-chain") => {
         setActiveChainTab(tab);
@@ -166,6 +171,11 @@ export const Toolbox = () => {
           projectId,                              // ✅  ALWAYS defined now
           graph,
           (msg: any) => {
+            // ───────────────────────────────────
+            //  DEBUG  –  log every raw message
+            // ───────────────────────────────────
+            console.log('[BUILD DEBUG] raw SSE message', msg);
+
             // … existing progress / fileTree logic unchanged …
             if (msg.fileTree) {
               console.log(`[BUILD] Received fileTree update`);
@@ -175,8 +185,11 @@ export const Toolbox = () => {
             
             if (msg.containerUrl) {
               console.log(`[BUILD] Received container URL: ${msg.containerUrl}`);
-              containerURLRef.current = msg.containerUrl;
-              setProjectContext(prev => ({ ...prev, containerUrl: msg.containerUrl }));
+              const fullUrl = msg.containerUrl.includes("/dapp/")
+                ? msg.containerUrl
+                : msg.containerUrl.replace(/\/$/, "") + `/dapp/${projectId}`;
+              containerURLRef.current = fullUrl;
+              setProjectContext(prev => ({ ...prev, containerUrl: fullUrl }));
             }
             
             if (IS_DEV_SERVER && (msg.stage === "ui-complete" || msg.event === "ui-complete")) {
@@ -206,6 +219,33 @@ export const Toolbox = () => {
               }
             }
             
+            /* ──────────────────────────────────────────────────
+             * Program ID extraction from code‑gen completion
+             * Backend emits: "Code generation complete — Program ID: <ID>"
+             * ────────────────────────────────────────────────── */
+            if (
+              msg.stage === 'code-gen' &&
+              typeof msg.message === 'string' &&
+              msg.message.includes('Program ID')
+            ) {
+              const m = msg.message.match(/Program ID[: ]+([0-9A-Za-z]+)/);
+              if (m) {
+                const programId = m[1];
+                console.log('[Toolbox code-gen stage] extracted programId', programId);
+                setProjectContext(prev => ({
+                  ...prev,
+                  // ⚠️  shallow‑spread is enough; we only need fresh refs
+                  details: {
+                    ...prev.details,
+                    projectState: {
+                      ...(prev.details?.projectState ?? {}),
+                      programId,
+                    },
+                  },
+                }));
+              }
+            }
+
             if (msg.stage === "done" || msg.stage === "build-done") {
               pollingCancelledRef.current = true;
               setIsBuilding(false);
@@ -272,8 +312,8 @@ export const Toolbox = () => {
     ]);
     
     const handleDeploySuccess = useCallback((programId: string) => {
-        // Update project context with deployed status and program ID
         if (projectContext.details?.projectState) {
+            // Update local project context with new deployed program ID
             const updatedContext = {
                 ...projectContext,
                 details: {
@@ -282,10 +322,15 @@ export const Toolbox = () => {
                         ...projectContext.details.projectState,
                         deployed: true,
                         built: false,    // reset built flag so next deploy requires a rebuild
-                        programId
+                        programId: programId
                     }
                 }
             };
+            // Append programId query param to container URL for dApp iframe
+            if (projectContext.containerUrl) {
+                const sep = projectContext.containerUrl.includes('?') ? '&' : '?';
+                updatedContext.containerUrl = `${projectContext.containerUrl}${sep}programId=${programId}`;
+            }
             setProjectContext(updatedContext);
             
             // Persist the updated state to the server
@@ -295,7 +340,7 @@ export const Toolbox = () => {
                         projectState: { 
                             deployed: true,
                             built: false,
-                            programId
+                            programId: programId
                         }
                     }
                 }).catch(err => {

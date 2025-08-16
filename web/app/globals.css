@@ -3,6 +3,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* --------------------------------------------------------------------
+   Solana wallet‑adapter base styles
+   ------------------------------------------------------------------ */
+@import "@solana/wallet-adapter-react-ui/styles.css";
+
 /* --- shadcn-ui semantic colour tokens (needed by border-border etc.) --- */
 @layer base {
   :root {
@@ -61,6 +66,27 @@
   }
 }
 
+/* --------------------------------------------------------------------
+   Wallet selector modal — ShadCN + Tailwind skin
+   ------------------------------------------------------------------ */
+@layer components {
+  /* full‑screen overlay & centring */
+  .wallet-adapter-modal-wrapper    { @apply fixed inset-0 z-50 flex items-center justify-center; }
+  .wallet-adapter-modal-overlay    { @apply fixed inset-0 bg-black/50 backdrop-blur-sm; }   /* frosted glass ✨ */
+
+  /* dialog shell */
+  .wallet-adapter-modal-container  { @apply w-full max-w-sm mx-auto; }
+  .wallet-adapter-modal            { @apply bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-xl; }
+  .wallet-adapter-modal-title      { @apply text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100; }
+
+  /* wallet list */
+  .wallet-adapter-modal-list       { @apply space-y-2; }
+  .wallet-adapter-button           { @apply w-full flex items-center justify-between gap-2 px-4 py-3
+                                            rounded-xl border border-gray-200 dark:border-gray-700
+                                            hover:bg-gray-50 dark:hover:bg-gray-800 transition; }
+  .wallet-adapter-button-start-icon{ @apply w-5 h-5; }
+}
+
 /* ------------- v0 design-tokens ------------- */
 @layer base {
   * {
@@ -70,6 +96,19 @@
     @apply bg-background text-foreground;
     font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
   }
+}
+
+/* ───────── FIX: preserve vertical scrollbar & stop layout-shift ───────── */
+html, body {
+  /* Always leave room for the scrollbar so width never changes */
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+}
+
+/* Wallet-adapter's modal sets "overflow:hidden" inline on <body>;
+   force the scrollbar to stay so we can still scroll inside the iframe */
+body[style*="overflow: hidden"] {
+  overflow-y: scroll !important;
 }
 
 /* Custom wallet adapter button styles */

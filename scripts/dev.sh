@@ -8,11 +8,50 @@
 # ---------------------------------------------------
 set -euo pipefail
 
+# NOTE: This script enforces an isolated Docker config to avoid credsStore/GPG.
+
 # ─── Configurable knobs ─────────────────────────────
 export APP_ID=${APP_ID:-demo}
 export APP_BASE_PATH="/dapp/${APP_ID}"
 export FORCE_REMOTE_DOCKER=0
 export SF_DEV_SERVER=1
+export REGISTRY_DOMAIN=${REGISTRY_DOMAIN:-ghcr.io}
+
+# ─── Use a repo-local Docker config (no credsStore/gpg) ──────────────────────
+# This prevents the global helper (e.g. "desktop.exe" / gpg) from being used.
+REPO_DOCKER_CONFIG="$(cd "$(dirname "$0")/.." && pwd)/scripts/docker-config"
+export DOCKER_CONFIG="$REPO_DOCKER_CONFIG"
+
+# --- Load GHCR creds from local env files (if present) -----------------------
+# We do this before attempting registry login so developers can keep a
+# GHCR_PAT in .env.local which is gitignored.
+load_env () {
+  local f="$1"
+  [ -f "$f" ] || return 0
+  set -a
+  # shellcheck disable=SC1090
+  . "$f"
+  set +a
+}
+load_env ".env"
+load_env ".env.local"
+
+mkdir -p "$DOCKER_CONFIG"
+if [ ! -f "$DOCKER_CONFIG/config.json" ]; then
+  printf '{"auths":{}}\n' > "$DOCKER_CONFIG/config.json"
+fi
+
+# Wrapper that forces all docker commands to use the isolated config.
+# We pick the docker binary now; if we later detect Windows docker.exe we’ll
+# update DOCKER_BIN before using DOCKER().
+DOCKER_BIN="$(command -v docker)"
+DOCKER () {
+  "$DOCKER_BIN" --config "$DOCKER_CONFIG" "$@"
+}
+export DOCKER_CONFIG
+
+# Show which config is used (helps debugging)
+echo "🔧 Using DOCKER_CONFIG: $DOCKER_CONFIG"
 
 # ─── Clear stale Windows → WSL port-proxy rules ────────────────────────────────
 # When Windows leaves a v4-to-v4 port-proxy entry after the previous run,
@@ -32,10 +71,10 @@ done
 # ─── Ensure Docker daemon & CLI are usable ───────────────────────
 # 1) If `docker info` works → nothing to do.
 # 2) Otherwise try to start the Windows service that backs Docker Desktop.
-# 3) If the UNIX shim is busted, fall back to the real docker.exe binary.
+# 3) If the UNIX shim is busted, fall back to the real docker.exe binary (and keep our --config).
 # 4) Wait up to 30 s; bail if the engine never comes up.
 
-if ! docker info >/dev/null 2>&1; then
+if ! DOCKER info >/dev/null 2>&1; then
   echo "🐳  Docker daemon not responding — attempting auto-start…"
 
   # Start Docker Desktop's service (no error if already running)
@@ -43,15 +82,15 @@ if ! docker info >/dev/null 2>&1; then
     "Start-Service -Name com.docker.service" \
     >/dev/null 2>&1 || true   # 📚 MS docs & user reports
 
-  # If the shim at /usr/local/bin/docker is an EIO symlink, alias real docker.exe
+  # If the shim at /usr/local/bin/docker is an EIO symlink, select real docker.exe
   DOCKER_WIN="/mnt/c/Program Files/Docker/Docker/resources/bin/docker.exe"  # default path
   if [ -x "$DOCKER_WIN" ]; then
-    alias docker="$DOCKER_WIN"
+    DOCKER_BIN="$DOCKER_WIN"
   fi
 
   # Wait up to 30 s for the daemon
   for _ in {1..30}; do
-    if docker info >/dev/null 2>&1; then
+    if DOCKER info >/dev/null 2>&1; then
       echo "✅  Docker daemon is up."
       break
     fi
@@ -59,33 +98,49 @@ if ! docker info >/dev/null 2>&1; then
   done
 
   # Fail gracefully if still dead
-  if ! docker info >/dev/null 2>&1; then
+  if ! DOCKER info >/dev/null 2>&1; then
     echo "❌  Docker still unavailable. Please open Docker Desktop manually."
     exit 1
   fi
 fi
 
+# ─── Auth to private registry BEFORE any pull ────────────────────────────────
+# Require GHCR credentials when images are private.
+if [ -n "${GHCR_PAT:-}" ] && [ "${GHCR_PAT}" != "unset" ]; then
+  echo "🔐 Logging in to ${REGISTRY_DOMAIN} (scoped to repo config)…"
+  if ! echo "${GHCR_PAT}" | DOCKER login "${REGISTRY_DOMAIN}" \
+        -u "${GHCR_USER:-github}" --password-stdin 1>/dev/null ; then
+    echo "❌  Login to ${REGISTRY_DOMAIN} failed. Check GHCR_USER / GHCR_PAT."
+    exit 1
+  fi
+else
+  echo "❗ Private images expected but GHCR_PAT is not set."
+  echo "   Export GHCR_USER and GHCR_PAT (classic PAT with 'read:packages') and re-run:"
+  echo "     export GHCR_USER=<your_github_username>"
+  echo "     export GHCR_PAT=<your_pat_with_read_packages>"
+  echo "   Aborting before docker compose pull to avoid gpg/pinentry."
+  exit 1
+fi
+
 # ─── Docker stack ───────────────────────────────────
 unset DOCKER_HOST DOCKER_TLS_VERIFY DOCKER_CERT_PATH DOCKER_CLI_EXPERIMENTAL
 
-docker compose              \
+DOCKER compose              \
   -f compose.yaml           \
   -f docker-compose.db.yaml \
   down --remove-orphans
 
-docker compose              \
+DOCKER compose              \
   -f compose.yaml           \
   -f docker-compose.db.yaml \
   pull
 
-docker compose              \
+DOCKER compose              \
   -f compose.yaml           \
   -f docker-compose.db.yaml \
   up -d
 
-# ─── GitHub Container Registry login (NOP if already logged in) ──
-echo "${GHCR_PAT:-unset}" | \
-  docker login ghcr.io -u "${GHCR_USER:-unset}" --password-stdin 2>/dev/null || true
+# (login already completed above)
 
 # ─── Kill any lingering dev processes so we don't double-spawn ───
 pkill -f 'src/app.ts'  2>/dev/null || true

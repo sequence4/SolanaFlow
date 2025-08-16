@@ -1,0 +1,10 @@
+--- a/server/src/utils/codeGen/handleGenerateCode.ts
++++ b/server/src/utils/codeGen/handleGenerateCode.ts
+@@ -394,7 +394,7 @@ export const handleGenerateCode = async ({
+          const seed = createHash('sha256').update(projectId).digest(); // 32 bytes
+          const programKeypair = Keypair.fromSeed(seed);
+-         const programId = programKeypair.publicKey.toBase58();
++         const programId   = programKeypair.publicKey.toBase58();
++         const sentinelId  = programId;   // expose deterministic ID to caller
+          console.log('[GEN] Generated deterministic program ID:', programId);
+          

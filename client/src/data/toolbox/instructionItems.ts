@@ -24,6 +24,7 @@ import { syncNativeFlow } from "../nodes/onChain/instructions/spl-token-program/
 import { thawAccountFlow } from "../nodes/onChain/instructions/spl-token-program/thawAccount/thawAccountFlow";
 import { transferCheckedFlow } from "../nodes/onChain/instructions/spl-token-program/transferChecked/transferCheckedFlow";
 import { uiAmountToAmountFlow } from "../nodes/onChain/instructions/spl-token-program/uiAmountToAmount/uiAmountToAmountFlow"; 
+import { createMetadataFlow } from "../nodes/onChain/instructions/metaplex-token-metadata/createMetadata/createMetadataFlow";
 
 export const groupedInstructions = [
     {
@@ -60,7 +61,7 @@ export const groupedInstructions = [
     {
       label: "NFT Instructions",
       items: [
-        { name: "Create Metadata", flow: initMintFlow },
+        { name: "Create Metadata", flow: createMetadataFlow },
         { name: "Update Metadata", flow: initMintFlow },
         { name: "Create Master Edition", flow: initMintFlow },
       ],

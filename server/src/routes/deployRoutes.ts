@@ -1,20 +1,62 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
+import { signDeployTxAndBroadcast } from '../utils/projectUtils';
+import { catchAsync } from '../utils/catchAsync';
 import { deployPipeline } from '../controllers/deployController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { v4 as uuidv4 } from 'uuid';
 
 const router = express.Router();
 
-// -- TEMP: skip real auth while debugging ------------------------------------
-const DEV_AUTH = (req: any, _res: any, next: () => void) => {
-  /* provide a synthetic *valid UUID* so DB inserts succeed         */
+/**
+ * DEV_AUTH: Temporary middleware to attach a synthetic user ID to requests.
+ * This is only for development/testing; replace with authMiddleware once ready.
+ */
+const DEV_AUTH = (req: any, _res: any, next: NextFunction): void => {
+  // Provide a deterministic UUID so downstream DB inserts succeed.
   req.user = { id: '00000000-0000-0000-0000-000000000000' };
-  // or use uuidv4() each time → req.user = { id: uuidv4() };
+  // Alternatively, generate a random ID each time: req.user = { id: uuidv4() };
   next();
 };
-const guard = DEV_AUTH;              // <-- flip back to authMiddleware later
-// ----------------------------------------------------------------------------
 
+// Flip this back to authMiddleware for production use.
+const guard = DEV_AUTH;
+
+// POST /api/deploy/:id/deploy-pipeline
 router.post('/:id/deploy-pipeline', guard, deployPipeline);
 
-export default router;
+// POST /projects/:projectId/relayDeployTx  { encodedTx, programId }
+router.post('/:projectId/relayDeployTx', catchAsync(async (req: Request, res: Response) => {
+  const { encodedTx, programId } = req.body as { encodedTx?: string; programId?: string };
+  
+  console.log(`[RELAY_DEPLOY_TX] Received request for project ${req.params.projectId}`);
+  console.log(`[RELAY_DEPLOY_TX] Program ID: ${programId}`);
+  console.log(`[RELAY_DEPLOY_TX] Encoded TX length: ${encodedTx?.length || 0} characters`);
+  
+  if (!encodedTx || !programId) {
+    console.log('[RELAY_DEPLOY_TX] Missing required parameters');
+    return res.status(400).json({ error: 'encodedTx and programId required' });
+  }
+  
+  try {
+    console.log(`[RELAY_DEPLOY_TX] Calling signDeployTxAndBroadcast for project ${req.params.projectId}`);
+    const out = await signDeployTxAndBroadcast(
+      req.params.projectId,
+      encodedTx,
+      programId,
+    );
+    if (out?.txForWallet) {
+      return res.status(409).json({
+        code: 'WALLET_SIGNATURE_REQUIRED',
+        missing: out.missing ?? [],
+        txBase64: out.txForWallet,
+      });
+    }
+    console.log(`[RELAY_DEPLOY_TX] Transaction signed and broadcast successfully, signature: ${out.signature}`);
+    res.json({ signature: out.signature });
+  } catch (e: any) {
+    console.error('[relayDeployTx] failed', e);
+    res.status(500).json({ error: e.message });
+  }
+}));
+
+export default router; 

@@ -1,12 +1,14 @@
-import { deployPipeline as sseDeploy } from '@/api/deployPipeline';
-import { ProjectContextType } from '@/context/project/ProjectContextTypes';
-import { useContext } from 'react';
-import FileContext from '@/context/file/FileContext';
-import { FileTreeItemType } from '@/interfaces/FileTreeItemType';
+import React, { useContext } from "react";
+import { deployPipeline as sseDeploy } from "../../api/deployPipeline";
+import { ProjectContextType } from "@/context/project/ProjectContextTypes";
 import UxContext from "@/context/ux/UxContext";
+import { FileTreeItemType } from '@/interfaces/FileTreeItemType';
 
-// Track file tree state internally to handle streaming
+// Track file tree during stream
 let currentFileTree: FileTreeItemType[] = [];
+
+// Flag indicating development server mode (auto-open interface when UI is ready)
+const IS_DEV_SERVER = process.env.NEXT_PUBLIC_SF_DEV_SERVER === '1';
 
 // Helper function to add a file to the tree
 function addFileToTree(path: string, content: string, setFileTree?: (tree: any) => void) {
@@ -28,6 +30,48 @@ function addFileToTree(path: string, content: string, setFileTree?: (tree: any) 
   // Add to tree - simple version just adds at root level
   currentFileTree.push(fileItem);
   setFileTree([...currentFileTree]);
+}
+
+// Helper function to load IDL from localStorage
+export function loadIdlFromStorage(projectId: string): { primaryIdl: any, allIdls: any[] } {
+  const result = {
+    primaryIdl: null as any,
+    allIdls: [] as any[]
+  };
+  
+  try {
+    // Try to load the primary IDL
+    const storedIdl = localStorage.getItem(`idl-${projectId}`);
+    if (storedIdl) {
+      result.primaryIdl = JSON.parse(storedIdl);
+      result.allIdls.push(result.primaryIdl);
+    }
+    
+    // Look for any program-specific IDLs
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(`idl-${projectId}-`)) {
+        try {
+          const idl = JSON.parse(localStorage.getItem(key) || '');
+          // Only add if not already in the array
+          if (idl && !result.allIdls.some(existing => existing.name === idl.name)) {
+            result.allIdls.push(idl);
+          }
+        } catch (e) {
+          console.error(`[deployPipeline] Error parsing IDL from ${key}:`, e);
+        }
+      }
+    }
+    
+    // If we found program-specific IDLs but no primary IDL, use the first one as primary
+    if (!result.primaryIdl && result.allIdls.length > 0) {
+      result.primaryIdl = result.allIdls[0];
+    }
+  } catch (error) {
+    console.error("[deployPipeline] Failed to load IDLs from localStorage:", error);
+  }
+  
+  return result;
 }
 
 export function runDeployPipelineWithLogs(
@@ -52,9 +96,16 @@ export function runDeployPipelineWithLogs(
   taskLogs.setIsVisible(true);
   taskLogs.addSystemLog("🚀 Starting deployment pipeline...");
 
-  const { activeTab, setActiveTab: uxSetActiveTab } = useContext(UxContext);
+  const { activeTab, setActiveTab: uxSetActiveTab, setContainerUrlRefreshTrigger } = useContext(UxContext);
+  
+  // Track if we've already switched tabs to avoid multiple switches
+  let hasAutoSwitchedTab = false;
+  // Track if we've seen Next.js logs to trigger auto-refresh
+  let hasSeenNextJsLogs = false;
 
   const update = (msg: any) => {
+    // Debug: log every raw SSE message to inspect its fields
+    console.log('[SSE DEBUG] raw message', msg);
     console.log(`[deployPipeline] Received update from SSE:`, msg);
     taskLogs.addSystemLog(JSON.stringify(msg));
 
@@ -73,11 +124,33 @@ export function runDeployPipelineWithLogs(
       taskLogs.addSystemLog(`📄 ${msg.path}`);
     }
 
+    // Check for Next.js logs to trigger auto-switch and refresh
+    if (!hasSeenNextJsLogs && msg.message && typeof msg.message === 'string' && 
+        (msg.message.includes('ready started server on') || 
+         msg.message.includes('started server on') || 
+         msg.message.includes('compiled successfully'))) {
+      hasSeenNextJsLogs = true;
+      
+      // Auto-switch to interface tab if not already there
+      if (!hasAutoSwitchedTab && activeTab !== "interface") {
+        console.log('[deployPipeline] First Next.js logs detected, switching to interface tab');
+        uxSetActiveTab("interface");
+        hasAutoSwitchedTab = true;
+      }
+      
+      // Trigger iframe refresh by incrementing the refresh counter
+      console.log('[deployPipeline] First Next.js logs detected, triggering iframe refresh');
+      // Use the current timestamp to ensure the value changes
+      const timestamp = Date.now();
+      setContainerUrlRefreshTrigger(timestamp);
+    }
+
     /* ------------ AUTO TAB SWITCH on ui-complete ------------- */
-    if (msg.stage === "ui-complete" || msg.event === "ui-complete") {
+    if ((msg.stage === "ui-complete" || msg.event === "ui-complete") && !hasAutoSwitchedTab) {
       // Skip if we're already there or the user manually picked a tab **after** the build started
       if (activeTab !== "interface") {
         uxSetActiveTab("interface");
+        hasAutoSwitchedTab = true;
       }
     }
     /* ---------------------------------------------------------- */
@@ -110,11 +183,127 @@ export function runDeployPipelineWithLogs(
       }
     }
 
-    if (msg.fileTree && setFileTree) {
+         if (msg.fileTree && setFileTree) {
       const count = Array.isArray(msg.fileTree) ? msg.fileTree.length : 1;
       console.log(`[deployPipeline] Received fileTree with ${count} items`);
       taskLogs.addSystemLog(`📂 Received project file tree with ${count} items`);
       setFileTree(structuredClone(msg.fileTree as import("@/interfaces/FileTreeItemType").FileTreeItemType[]));
+     }
+
+    // 🔑 Merge deterministic program ID into context on SSE events.
+    // Deep‑clone each level so React notices the change.
+    if (msg.event === 'ephemeralKey' || msg.event === 'programIdPersisted') {
+      const newProgramId = msg.pubkey || msg.programId;
+      if (newProgramId) {
+        console.log(`[deployPipeline] Received programId via event:`, newProgramId);
+        console.log('[SSE DEBUG] updating programId with', newProgramId);
+        setProjectContext(prev => ({
+          ...prev,
+          details: {
+            ...structuredClone(prev.details ?? {}),
+            projectState: {
+              ...structuredClone(prev.details?.projectState ?? {}),
+              programId: newProgramId,
+            },
+          },
+        }));
+        // log after updating to catch stale closures
+        setTimeout(() => {
+          console.log('[SSE DEBUG] context.programId now', newProgramId);
+        }, 0);
+      }
+    }
+
+    // Also check for stage-based events
+    if (
+      (msg.stage === 'ephemeralKey' && msg.pubkey) ||
+      (msg.stage === 'programIdPersisted' && msg.programId)
+    ) {
+      const newProgramId = msg.pubkey || msg.programId;
+      console.log('[deployPipeline] Received programId via stage:', newProgramId);
+      console.log('[SSE DEBUG] updating programId with (stage)', newProgramId);
+      
+      // Deep‑clone each level so React sees a new object reference
+      setProjectContext(prev => ({
+        ...prev,
+        details: {
+          ...structuredClone(prev.details ?? {}),
+          projectState: {
+            ...structuredClone(prev.details?.projectState ?? {}),
+            programId: newProgramId,
+          },
+        },
+      }));
+      
+      // log after updating to catch stale closures
+      setTimeout(() => {
+        console.log('[SSE DEBUG] context.programId now (stage)', newProgramId);
+      }, 0);
+    }
+
+    if (msg.idl) {
+      console.log(`[deployPipeline] Received IDL:`, msg.idl);
+      taskLogs.addSystemLog(`📜 Received program IDL`);
+      
+      try {
+        localStorage.setItem(`idl-${projectContext.id}`, JSON.stringify(msg.idl));
+      } catch (error) {
+        console.error("[deployPipeline] Failed to save IDL to localStorage:", error);
+      }
+      
+      setProjectContext(prev => ({
+        ...prev,
+        details: {
+          ...structuredClone(prev.details ?? {}),
+          projectState: {
+            ...structuredClone(prev.details?.projectState ?? {}),
+            idl: msg.idl,
+            idls: (prev.details?.projectState?.idls ?? [])
+              .filter((i: any) => i.name !== msg.idl.name)
+              .concat(msg.idl),
+          }
+        }
+      }));
+    }
+
+    if (msg.idls && Array.isArray(msg.idls) && msg.idls.length > 0) {
+      console.log(`[deployPipeline] Received ${msg.idls.length} IDLs`);
+      taskLogs.addSystemLog(`📜 Received ${msg.idls.length} program IDLs`);
+      
+      try {
+        // Store all IDLs in localStorage
+        msg.idls.forEach((idl: any) => {
+          if (idl.name) {
+            localStorage.setItem(`idl-${projectContext.id}-${idl.name}`, JSON.stringify(idl));
+          }
+        });
+      } catch (error) {
+        console.error("[deployPipeline] Failed to save IDLs to localStorage:", error);
+      }
+      
+      setProjectContext(prev => {
+        // Merge new IDLs with existing ones, replacing any with the same name
+        const existingIdls = prev.details?.projectState?.idls ?? [];
+        const mergedIdls = [
+          ...existingIdls.filter((existing: any) => 
+            !msg.idls.some((incoming: any) => incoming.name === existing.name)
+          ),
+          ...msg.idls
+        ];
+        
+        return {
+          ...prev,
+          details: {
+            ...prev.details!,
+            projectState: {
+              ...prev.details!.projectState,
+              // Set the first IDL as the primary one if not already set
+              idl: prev.details!.projectState?.idl || msg.idls[0],
+              idls: mergedIdls
+            }
+          }
+        };
+      });
     }
 
     if (msg.stage === 'deploy-done' || msg.stage === 'done' || msg.stage === 'completed') {

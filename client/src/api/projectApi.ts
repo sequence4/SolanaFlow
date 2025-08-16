@@ -68,12 +68,10 @@ export const projectApi = {
 
   startContainer: async (projectId: string): Promise<{ message: string; taskId: string }> => {
     try {
-      console.log(`[DEBUG_API] startContainer - Starting container for projectId: ${projectId}`);
       const response = await api.post(`/projects/${projectId}/start-container`);
-      console.log(`[DEBUG_API] startContainer - Response:`, response.data);
       return response.data;
     } catch (err) {
-      console.error('[DEBUG_API] Error starting container:', err);
+      console.error('Error starting container:', err);
       if (axios.isAxiosError(err) && err.response?.status === 503) {
         console.error('All workers busy - try again in a minute');
       } else {
@@ -94,18 +92,10 @@ export const projectApi = {
     projectInfo: ProjectContextToSave
   ): Promise<SaveProjectResponse> => {
     try {
-      console.log(`[DEBUG_API] createProject - Creating project:`, {
-        name: projectInfo.name,
-        description: projectInfo.description ? projectInfo.description.substring(0, 20) + '...' : 'none'
-      });
       const response = await api.post('/projects/create', projectInfo);
-      console.log(`[DEBUG_API] createProject - Response:`, {
-        message: response.data.message,
-        projectId: response.data.project?.id
-      });
       return response.data;
     } catch (error) {
-      console.error('[DEBUG_API] Error creating project:', error);
+      console.error('Error creating project:', error);
       throw error;
     }
   },
@@ -125,11 +115,8 @@ export const projectApi = {
 
   getProjectDetails: async (projectId: string): Promise<ProjectContextType> => {
     try {
-      console.log(`[DEBUG_API] getProjectDetails - Fetching project details for ID: ${projectId}`);
       const response = await api.get(`/projects/details/${projectId}`);
       
-      console.log(`[DEBUG_API] getProjectDetails - Raw API response status: ${response.status}, statusText: ${response.statusText}`);
-      console.log(`[DEBUG_API] getProjectDetails - Raw API response data:`, response.data);
       
       if (response.data.project.container_url) {
         const raw = response.data.project.container_url;
@@ -138,13 +125,11 @@ export const projectApi = {
       } else if (response.data.project.containerUrl) {
         response.data.project.containerUrl = withDappPath(response.data.project.containerUrl, projectId);
       } else {
-        console.log(`[DEBUG_API] getProjectDetails - No container_url or containerUrl found in response`);
       }
       
-      console.log(`[DEBUG_API] getProjectDetails - Final project object with containerUrl: "${response.data.project.containerUrl || 'undefined'}"`);
       return response.data.project;
     } catch (error) {
-      console.error('[DEBUG_API] Error getting project details:', error);
+      console.error('Error getting project details:', error);
       throw error;
     }
   },
@@ -232,28 +217,30 @@ export const projectApi = {
   },
 
   /**
-   * POST the 64-byte secret array so the backend can write <pubkey>.json.
+   * Create an ephemeral keypair on the server side.
+   * Returns the public key of the generated keypair.
    */
-  createEphemeral: async (
-    projectId: string,
-    secretKey: number[]
-  ): Promise<{ ephemeralPubkey: string }> => {
+  createEphemeral: async (projectId: string): Promise<{ pubkey: string }> => {
     try {
-      const response = await api.post(
-        `/projects/${projectId}/ephemeral`,
-        { secretKey }
-      );
-      return response.data;
+      const { data } = await api.post(`/projects/${projectId}/ephemeral`);
+      return data as { pubkey: string };
     } catch (err) {
       console.error('Error creating ephemeral:', err);
       throw err;
     }
   },
 
-  deployProject: async (projectId: string): Promise<TaskResponse> => {
+  deployProject: async (
+    projectId: string,
+    walletPubkey: string,
+    bufferAuthority: string
+  ): Promise<{ success: boolean; programId: string }> => {
     try {
-      const response = await api.post(`/projects/${projectId}/deploy`);
-      return response.data;
+      const { data } = await api.post(`/projects/${projectId}/deploy`, {
+        walletPubkey,
+        bufferAuthority,
+      });
+      return data as { success: boolean; programId: string };
     } catch (error) {
       console.error('Error deploying project:', error);
       throw error;
@@ -268,6 +255,26 @@ export const projectApi = {
       return response.data;
     } catch (error) {
       console.error('Error deploying project with ephemeral key:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Relay a partially signed deploy transaction to the backend.
+   * The backend will load the program keypair, sign the transaction, broadcast it,
+   * and return the final signature and programId.
+   */
+  relayTx: async (
+    projectId: string,
+    payload: { encodedTx: string; programId: string }
+  ): Promise<{ signature: string } | { code: 'WALLET_SIGNATURE_REQUIRED'; txBase64: string; missing: string[]; reason?: string; noncePubkey?: string } > => {
+    try {
+      const response = await api.post(`/projects/${projectId}/relay-tx`, payload, { validateStatus: () => true });
+      if (response.status === 409) return response.data;
+      if (response.status >= 200 && response.status < 300) return response.data;
+      throw new Error(`relay-tx failed: ${response.status} ${JSON.stringify(response.data)}`);
+    } catch (error) {
+      console.error('Error relaying transaction:', error);
       throw error;
     }
   },
@@ -320,15 +327,105 @@ export const projectApi = {
 
   fetchContainerUrl: async (projectId: string): Promise<{ containerUrl: string }> => {
     try {
-      console.log(`[DEBUG_API] fetchContainerUrl - Fetching container URL for project: ${projectId}`);
       const response = await api.get(`/projects/${projectId}/container-url`);
-      console.log(`[DEBUG_API] fetchContainerUrl - Response:`, response.data);
       const raw  = response.data.containerUrl || response.data.container_url;
       const full = withDappPath(raw, projectId);
       return { containerUrl: full };
     } catch (error) {
-      console.error('[DEBUG_API] Error fetching container URL:', error);
+      // Only surface "not found" errors in development (for debugging)
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        if (process.env.NODE_ENV === 'development') {
+        }
+        return { containerUrl: "" };
+      } else {
+        console.error('Error fetching container URL:', error);
+        throw error;
+      }
+    }
+  },
+  
+
+
+  /** Fetch the existing **public** program ID (no secret key). */
+  getProgramId: async (projectId: string): Promise<{ programId: string }> => {
+    try {
+      const response = await api.get(`/projects/${projectId}/program-id`);
+      return response.data;                       // { programId: "..." }
+    } catch (error) {
+      console.error('Error getting program ID:', error);
       throw error;
+    }
+  },
+
+  relaySignedTx: async (
+    projectId: string,
+    encodedTx: string,
+    programId: string,
+    taskId?: string,
+    serverSignFor?: string[],
+  ): Promise<
+    { signature: string; programId: string } |
+    { code: 'WALLET_SIGNATURE_REQUIRED'; txBase64: string; missing: string[] }
+  > => {
+    const response = await api.post(
+      `/projects/${projectId}/relay-signed-tx`,
+      { encodedTx, programId, ...(taskId ? { taskId } : {}), ...(serverSignFor?.length ? { serverSignFor } : {}) },
+      { validateStatus: () => true }
+    );
+    if (response.status === 409) return response.data;
+    if (response.status >= 200 && response.status < 300) return response.data;
+    const err = new Error(`relaySignedTx failed: ${response.status} ${JSON.stringify(response.data)}`);
+    console.error('Error relaying signed transaction:', err);
+    throw err;
+  },
+
+  /**
+   * Ask backend to sign & send using an ephemeral server-held key.
+   */
+  relayEphemeralTx: async (
+    projectId: string,
+    encodedTx: string,
+    programId: string,
+    ephemeralPubkey: string,
+  ): Promise<{ signature?: string } | { code: 'WALLET_SIGNATURE_REQUIRED'; txBase64: string; missing: string[] }> => {
+    const response = await api.post(
+      `/projects/${projectId}/relay-tx`,
+      { encodedTx, programId, signerHint: { type: 'ephemeral', pubkey: ephemeralPubkey } },
+      { validateStatus: () => true }
+    );
+    if (response.status === 409) return response.data;
+    if (response.status >= 200 && response.status < 300) return response.data;
+    throw new Error(`relayEphemeralTx failed: ${response.status} ${JSON.stringify(response.data)}`);
+  },
+
+  relayDeployTx: async (
+    projectId: string,
+    payload: { encodedTx: string; programId: string }
+  ): Promise<{ signature: string }> => {
+    try {
+      const response = await api.post(`/projects/${projectId}/relayDeployTx`, payload);
+      return response.data;
+    } catch (error) {
+      console.error('Error relaying deploy transaction:', error);
+      throw error;
+    }
+  },
+
+  /** Durable‑nonce helper */
+  getNonce: async (
+    projectId: string,
+    walletPubkey: string,
+  ): Promise<{ noncePubkey: string; nonceHash: string }> => {
+    try {
+      const response = await api.post(`/projects/${projectId}/nonce`, { walletPubkey }, { validateStatus: () => true });
+      if (response.status === 409) return response.data; // WALLET_SIGNATURE_REQUIRED for nonce creation
+      if (response.status >= 200 && response.status < 300) return response.data;
+      throw new Error(`nonce failed: ${response.status} ${JSON.stringify(response.data)}`);
+    } catch (error) {
+      /* Keep the original AxiosError so callers can read
+       * `error.response.status`.  Converting to a plain Error removes
+       * that field and breaks the fallback that creates the nonce. */
+      throw error;                // propagate anything else
     }
   },
 

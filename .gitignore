@@ -35,6 +35,8 @@ certs/*.pem
 
 projects/
 wallets/
+target/deploy/anchor_template*
+target/deploy/my_program*
 wallets/landing/coverage/
 landing/.env.production
 
@@ -42,6 +44,7 @@ landing-prod.tgz
 solanaflow-landing
 build.log
 /.env*
+!/.env.example
 
 .yarn/*
 !.yarn/releases

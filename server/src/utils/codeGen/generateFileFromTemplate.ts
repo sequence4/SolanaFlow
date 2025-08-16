@@ -24,10 +24,7 @@ export function generateFileFromTemplate(
   let filePath = '';
   let fileContent = '';
 
-  console.log('file type', fileType);
-  console.log('details', details);
-  console.log('programName', programName);
-  console.log('programId', programId);
+  console.log('[GEN-TEMPLATE] Generating file from template');
 
   switch (fileType) {
     case 'instruction': {
@@ -45,8 +42,7 @@ export function generateFileFromTemplate(
       let fileName = instrDetail.name;
       
       filePath = `programs/${programName}/src/instructions/${fileName}.rs`;
-      console.log(`[DEBUG_FILE_GEN] Generating instruction file template for: ${fileName}.rs`);
-      console.log(`[DEBUG_FILE_GEN] Instruction file will be created at: ${filePath}`);
+        console.log(`[GEN-TEMPLATE] Creating instruction file: ${fileName}.rs`);
       break;
     }
 

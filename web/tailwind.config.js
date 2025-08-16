@@ -18,6 +18,8 @@ module.exports = {
   content: [
     "./app/**/*.{ts,tsx}",
     "./src/components/**/*.{ts,tsx}",
+    /* keep wallet‑adapter markup from being purged */
+    "./node_modules/@solana/wallet-adapter-react-ui/dist/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
   	container: {

@@ -1,11 +1,10 @@
-/*
 
-import React from 'react';
-import { taskApi } from '../../api/taskApi';
-import { toast } from 'sonner';
-import { getFilesForNodeType, getDependenciesForNodeType, NodeType } from '../../data/nodes/registryManager';
-import { ProjectContextType } from '../../context/project/ProjectContextTypes';
-import { containerFileApi } from '../../api/containerFileApi';
+// import React from 'react';
+// import { taskApi } from '../../api/taskApi';
+// import { toast } from 'sonner';
+// import { getFilesForNodeType, getDependenciesForNodeType, NodeType } from '../../data/nodes/registryManager';
+// import { ProjectContextType } from '../../context/project/ProjectContextTypes';
+// import { containerFileApi } from '../../api/containerFileApi';
 
 function getDestinationFolder(originalPath: string): string {
   const fileName = originalPath.split('/').pop() || '';
@@ -19,59 +18,56 @@ function getDestinationFolder(originalPath: string): string {
   }
 }
 
-export const codeInjection = {
-  injectNodeCode: async (
-    projectId: string, 
-    nodeType: NodeType, 
-    setProjectContext?: React.Dispatch<React.SetStateAction<ProjectContextType>>
-  ): Promise<void> => {
-    console.log(`Starting code injection for node type: ${nodeType}, projectId: ${projectId}`);
+/* 
+export const injectCodeForNodeType = async (
+  nodeType: string,
+  projectId: string,
+  creatorId: string | null = null
+): Promise<boolean> => {
+  try {
+    console.log(`[INJECT] Starting code injection for ${nodeType}`);
     
-    if (setProjectContext) {
-      console.log(`Adding ${nodeType} to injectingNodeTypes`);
-      setProjectContext(prev => {
-        const updatedContext = {
-          ...prev,
-          injectingNodeTypes: [...(prev.injectingNodeTypes || []), nodeType]
-        };
-        console.log('Updated injectingNodeTypes:', updatedContext.injectingNodeTypes);
-        return updatedContext;
-      });
+    // First, check if we're already injecting for this node type
+    const context = await getInjectingContext(projectId);
+    
+    if (context.injectingNodeTypes.includes(nodeType)) {
+      console.log(`[INJECT] Node type ${nodeType} already being processed`);
+      return true; // Already in progress
     }
     
-    if (!projectId) {
-      console.error("ProjectId is undefined. Cannot inject code.");
-      if (setProjectContext) {
-        setProjectContext(prev => ({
-          ...prev,
-          injectingNodeTypes: (prev.injectingNodeTypes || []).filter(type => type !== nodeType)
-        }));
-      }
-      throw new Error("ProjectId is undefined. Cannot inject code.");
-    }
+    // Add this node type to the list of injecting types
+    const updatedContext = await updateInjectingContext(projectId, {
+      ...context,
+      injectingNodeTypes: [...context.injectingNodeTypes, nodeType]
+    });
     
-    try {
-      const files = await getFilesForNodeType(nodeType as NodeType);
-      console.log(`Files for node type ${nodeType}:`, files);
+    console.log(`[INJECT] Added ${nodeType} to processing queue`);
+    
+    // Get the files for this node type
+    const files = await getFilesForNodeType(nodeType);
+    
+    // Get the dependencies for this node type
+    const dependencies = await getDependenciesForNodeType(nodeType);
+    
+    if (!files || files.length === 0) {
+      console.log(`[INJECT] No files found for ${nodeType}, skipping injection`);
       
-      if (!files || files.length === 0) {
-        console.log(`No files found for node type: ${nodeType}. Skipping code injection.`);
-        if (setProjectContext) {
-          setProjectContext(prev => ({
-            ...prev,
-            injectingNodeTypes: (prev.injectingNodeTypes || []).filter(type => type !== nodeType)
-          }));
-        }
-        return; 
-      }
+      // Remove this node type from the list of injecting types
+      await updateInjectingContext(projectId, {
+        ...context,
+        injectingNodeTypes: context.injectingNodeTypes.filter(t => t !== nodeType)
+      });
+      
+      return false;
+    }
+    
+    console.log(`[INJECT] Found ${files.length} files to inject for ${nodeType}`);
+    console.log(`[INJECT] Found ${Object.keys(dependencies).length} dependencies to install`);
       
       toast.info("Adding Code", {
         description: `Setting up code for ${nodeType}...`,
         duration: 3000,
       });
-      
-      const dependencies = await getDependenciesForNodeType(nodeType as NodeType);
-      console.log(`Dependencies for node type ${nodeType}:`, dependencies);
       
       if (Object.keys(dependencies).length > 0) {
         await updatePackageJsonInContainer(projectId, dependencies);
@@ -80,29 +76,27 @@ export const codeInjection = {
           ([name, version]) => `${name}@${version}`
         );
         
-        console.log(`Installing dependencies first: ${packageList.join(', ')}`);
+        console.log(`[INJECT] Installing dependencies: ${packageList.length} packages`);
         toast.info("Installing Dependencies", {
           description: `Installing ${packageList.length} packages...`,
           duration: 3000,
         });
         
         try {
-          console.log(`Installing dependencies in container for projectId: ${projectId}`);
-          console.log(`Package list: ${JSON.stringify(packageList)}`);
+          console.log(`[INJECT] Starting dependency installation in container`);
           
           const installResponse = await containerFileApi.installDependencies(projectId, packageList);
-          console.log(`Dependency installation response:`, installResponse);
-          console.log(`Dependency installation task started with ID: ${installResponse.taskId}`);
+          console.log(`[INJECT] Dependency installation task started with ID: ${installResponse.taskId}`);
           
           await new Promise<void>((resolve, reject) => {
             const checkInterval = setInterval(async () => {
               try {
                 const taskData = await taskApi.getTask(installResponse.taskId);
-                console.log(`Dependency installation status: ${taskData.task.status}, result: ${taskData.task.result || 'N/A'}`);
+                console.log(`[INJECT] Dependency installation status: ${taskData.task.status}`);
                 
                 if (taskData.task.status === 'succeed' || taskData.task.status === 'finished') {
                   clearInterval(checkInterval);
-                  console.log(`Dependency installation succeeded with result: ${taskData.task.result}`);
+                  console.log(`[INJECT] Dependency installation completed successfully`);
                   toast.success("Dependencies Installed", {
                     description: "Package installation complete",
                     duration: 3000,
@@ -134,7 +128,7 @@ export const codeInjection = {
         }
       }
       
-      console.log("Creating files now that dependencies are installed...");
+      console.log("[INJECT] Creating files after dependency installation");
       
       const tasks: { path: string; taskId: string }[] = [];
       
@@ -143,15 +137,14 @@ export const codeInjection = {
           const originalPath = file.path;
           const finalPath = getDestinationFolder(originalPath);
           
-          console.log(`Creating file: ${finalPath} (originally ${originalPath})`);
-          console.log(`File content length: ${file.content?.length || 0} characters`);
+          console.log(`[INJECT] Creating file: ${finalPath}`);
           
           if (!file.content) {
             console.warn(`Warning: Empty content for file ${finalPath}`);
           }
           
           const response = await containerFileApi.createFile(projectId, finalPath, file.content || '');
-          console.log(`File creation task initiated with ID: ${response.taskId}`);
+          console.log(`[INJECT] File creation task initiated`);
           tasks.push({ path: finalPath, taskId: response.taskId });
         } catch (error: any) {
           console.error(`Failed to create file: ${file.path}`, error);
@@ -178,7 +171,7 @@ export const codeInjection = {
         for (const task of tasks) {
           try {
             const taskData = await taskApi.getTask(task.taskId);
-            console.log(`Task status for ${task.path}:`, taskData.task.status);
+            console.log(`[INJECT] File task status: ${taskData.task.status}`);
             
             if (taskData.task.status === 'queued' || taskData.task.status === 'doing') {
               allCompleted = false;
@@ -195,10 +188,9 @@ export const codeInjection = {
           clearInterval(pollInterval);
           
           if (setProjectContext) {
-            console.log(`Removing ${nodeType} from injectingNodeTypes (completed)`);
+            console.log(`[INJECT] Completed processing for ${nodeType}`);
             setProjectContext(prev => {
               const updatedTypes = (prev.injectingNodeTypes || []).filter(type => type !== nodeType);
-              console.log('Updated injectingNodeTypes after completion:', updatedTypes);
               return {
                 ...prev,
                 injectingNodeTypes: updatedTypes
@@ -233,10 +225,9 @@ export const codeInjection = {
       console.error('Error in code injection:', error);
       
       if (setProjectContext) {
-        console.log(`Removing ${nodeType} from injectingNodeTypes (error)`);
+        console.log(`[INJECT] Error processing ${nodeType}, cleaning up`);
         setProjectContext(prev => {
           const updatedTypes = (prev.injectingNodeTypes || []).filter(type => type !== nodeType);
-          console.log('Updated injectingNodeTypes after error:', updatedTypes);
           return {
             ...prev,
             injectingNodeTypes: updatedTypes
@@ -252,16 +243,17 @@ export const codeInjection = {
     }
   }
 };
+*/
 
-async function updatePackageJsonInContainer(projectId: string, dependencies: Record<string, string>): Promise<void> {
+/* async function updatePackageJsonInContainer(projectId: string, dependencies: Record<string, string>): Promise<void> {
   try {
-    console.log(`Updating package.json for project ${projectId} with dependencies:`, dependencies);
+    console.log(`[INJECT] Updating package.json with ${Object.keys(dependencies).length} dependencies`);
     
     const packagePath = "package.json";
     let response;
     
     try {
-      console.log(`Attempting to get file content for ${packagePath}`);
+      console.log(`[INJECT] Reading package.json file`);
       response = await containerFileApi.getFileContent(projectId, packagePath);
     } catch (error) {
       console.error(`Failed to find package.json at ${packagePath}`);
@@ -273,7 +265,7 @@ async function updatePackageJsonInContainer(projectId: string, dependencies: Rec
         const pollInterval = setInterval(async () => {
           try {
             const taskData = await taskApi.getTask(taskId);
-            console.log(`Package.json fetch task status: ${taskData.task.status}`);
+            console.log(`[INJECT] Package.json read status: ${taskData.task.status}`);
             
             if (taskData.task.status === 'succeed' || taskData.task.status === 'finished') {
               clearInterval(pollInterval);
@@ -296,7 +288,7 @@ async function updatePackageJsonInContainer(projectId: string, dependencies: Rec
     };
     
     const content = await checkPackageJson(response.taskId);
-    console.log(`Package.json content retrieved from ${packagePath}`);
+          console.log(`[INJECT] Package.json content retrieved`);
     
     const packageJson = JSON.parse(content);
     
@@ -314,7 +306,7 @@ async function updatePackageJsonInContainer(projectId: string, dependencies: Rec
     }
     
     if (changed) {
-      console.log(`Updating ${packagePath} with new dependencies`);
+      console.log(`[INJECT] Writing updated package.json`);
       await containerFileApi.updateFile(
         projectId,
         packagePath,
@@ -326,7 +318,7 @@ async function updatePackageJsonInContainer(projectId: string, dependencies: Rec
         duration: 5000,
       });
     } else {
-      console.log("No dependencies needed updating");
+      console.log("[INJECT] Package.json already has all dependencies");
     }
   } catch (error) {
     console.error('Failed to update package.json:', error);
@@ -368,9 +360,9 @@ async function updateIndexExportsInContainer(projectId: string, filePaths: strin
       };
       
       indexContent = await checkTask(response.taskId);
-      console.log(`Retrieved existing index.ts content`);
+      console.log(`[INJECT] Retrieved index.ts content`);
     } catch (error: any) {
-      console.log(`No existing index.ts or error retrieving it: ${error.message}`);
+              console.log(`[INJECT] No existing index.ts found, will create new`);
       indexContent = "// Library exports\n\n";
     }
     
@@ -400,16 +392,16 @@ async function updateIndexExportsInContainer(projectId: string, filePaths: strin
     }
     
     if (exportsAdded) {
-      console.log(`Updating ${indexPath} with new exports`);
+      console.log(`[INJECT] Updating index.ts with new exports`);
       await containerFileApi.updateFile(projectId, indexPath, updatedContent);
     } else {
-      console.log(`No new exports needed for ${indexPath}`);
+      console.log(`[INJECT] No new exports needed for index.ts`);
     }
   } catch (error) {
     console.error(`Failed to update index exports:`, error);
     throw error;
   }
-} 
+}
 */
 
 export const placeholder = () => {

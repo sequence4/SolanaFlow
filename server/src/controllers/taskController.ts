@@ -127,22 +127,37 @@ export const streamTask = async (
   res.flushHeaders();
 
   let lastStatus = '';
+  console.log(`[TASK] Starting task stream for task: ${taskId}`);
+  
   const interval = setInterval(async () => {
     try {
       const { status, result } = await getTaskById(taskId);
 
       if (status !== lastStatus) {
+        // Log a clean, human-readable status update
+        console.log(`[TASK] Task ${taskId} status: ${status}`);
+        
+        // For result, only log its presence, not the content
+        const hasResult = result !== null && result !== undefined;
+        if (hasResult) {
+          console.log(`[TASK] Task ${taskId} has result data`);
+        }
+        
+        // Send the actual data to the client
         res.write(`data: ${JSON.stringify({ status, result })}\n\n`);
         lastStatus = status;
       }
 
       if (['succeed', 'failed', 'finished', 'warning'].includes(status)) {
         clearInterval(interval);
+        console.log(`[TASK] Task ${taskId} completed with status: ${status}`);
         res.end();
       }
     } catch (err) {
       clearInterval(interval);
-      res.write(`event: error\ndata: ${JSON.stringify({ message: (err as Error).message })}\n\n`);
+      const errorMessage = (err as Error).message;
+      console.error(`[TASK] Error streaming task ${taskId}: ${errorMessage}`);
+      res.write(`event: error\ndata: ${JSON.stringify({ message: errorMessage })}\n\n`);
       res.end();
     }
   }, 1000);
@@ -150,5 +165,6 @@ export const streamTask = async (
   // Clean up when client disconnects
   res.on('close', () => {
     clearInterval(interval);
+    console.log(`[TASK] Client disconnected from task stream: ${taskId}`);
   });
 };

@@ -25,6 +25,21 @@ router.get("/:id/artifact", guard, async (req, res, next) => {
     }
 
     const binary = Buffer.from(base64So, "base64");
+    
+    // Validate ELF magic header before sending
+    if (binary.length < 4 || 
+        binary[0] !== 0x7f || 
+        binary[1] !== 0x45 || 
+        binary[2] !== 0x4c || 
+        binary[3] !== 0x46) {
+      console.error(`[ARTIFACT] Invalid ELF header: [${binary.slice(0, 4).join(',')}]`);
+      console.error(`[ARTIFACT] Binary length: ${binary.length} bytes`);
+      console.error(`[ARTIFACT] Base64 length: ${base64So.length} chars`);
+      return next(new AppError("Invalid program artifact - corrupted ELF file", 400));
+    }
+    
+    console.log(`[ARTIFACT] Valid ELF header verified for project ${id} (${binary.length} bytes)`);
+    
     res.setHeader("Content-Type", "application/octet-stream");
     res.setHeader(
       "Content-Disposition",

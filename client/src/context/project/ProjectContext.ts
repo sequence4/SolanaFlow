@@ -15,6 +15,7 @@ const defaultValue: IProjectContextValue = {
     containerUrl: '',
     injectingNodeTypes: [],
     details: {
+      programId: null, // Add programId at the details level
       projectState: {
         mode: 'basic',
         nodes: [],
@@ -25,6 +26,8 @@ const defaultValue: IProjectContextValue = {
         fileTree: undefined,
         built: false,
         deployed: false,
+        idl: null,
+        idls: [],
       },
       setProjectState: () => {},
     },

@@ -55,20 +55,25 @@ export async function ensureAnchorTomlProgram(
     }
 
     let changed = false;
-    if (clusterPrograms[programName] !== programId) {
-      clusterPrograms[programName] = programId;
-      changed = true;
-      console.log(`[ENSURE_CONFIG] Anchor.toml: Setting ${programsClusterKey}.${programName} = ${programId}`);
+    // Only set program ID if not using placeholder on non-localnet clusters
+    if (programId === '11111111111111111111111111111111' && cluster !== 'localnet') {
+      //console.log(`[ENSURE_CONFIG] Skipping program ID for ${cluster}: will use new key at deploy time`);
+    } else {
+      if (clusterPrograms[programName] !== programId) {
+        clusterPrograms[programName] = programId;
+        changed = true;
+        //console.log(`[ENSURE_CONFIG] Anchor.toml: Setting ${programsClusterKey}.${programName} = ${programId}`);
+      }
     }
 
     if (changed) {
-      console.log(`[ENSURE_CONFIG] Updating ${anchorTomlPath}`);
+      //console.log(`[ENSURE_CONFIG] Updating ${anchorTomlPath}`);
       await updateFile(ws, anchorTomlPath, iarnaTomlStringify(parsedToml), projectId, creatorId);
     } else {
-      console.log(`[ENSURE_CONFIG] ${anchorTomlPath} already up-to-date for program ${programName}.`);
+      //console.log(`[ENSURE_CONFIG] ${anchorTomlPath} already up-to-date for program ${programName}.`);
     }
   } catch (error) {
-    console.error(`[ENSURE_CONFIG] Error processing ${anchorTomlPath}:`, error);
+    //console.error(`[ENSURE_CONFIG] Error processing ${anchorTomlPath}:`, error);
   }
 }
 
@@ -94,39 +99,62 @@ export async function ensureRootWorkspaceMembers(
 
   // Build an explicit member list like ["programs/my_program", …]
   // Fallback to wildcard if nothing found (rare but safe).
-  const desiredMembers =
+  const programDirs =
     memberDirs.length ? memberDirs.map(d => `programs/${d}`) : ['programs/*'];
 
   // --- 2. read Cargo.toml --------------------------------------------------
   const cargoTomlPath = 'Cargo.toml';
   const cargoTomlContent = await getFileContent(ws, cargoTomlPath, projectId, creatorId);
   if (cargoTomlContent === null) {
-    console.error(`[ENSURE_CONFIG] Could not read ${cargoTomlPath}.`);
+    //console.error(`[ENSURE_CONFIG] Could not read ${cargoTomlPath}.`);
     return;
   }
-  const parsedToml: any = parseToml(cargoTomlContent);
+  
+  let rootLines = cargoTomlContent.split('\n');
+  
+  const newMembersBlock = [
+    'members = [',
+    ...programDirs.map((p, idx) => {
+      const comma = idx === programDirs.length - 1 ? '' : ',';
+      return `    "${p}"${comma}`;
+    }),
+    ']',
+  ];
 
-  // --- 3. synchronise the member list -------------------------------------
-  parsedToml.workspace ||= {};
-  parsedToml.workspace.members ||= [];
+  let wsIdx = rootLines.findIndex(l => l.trim() === '[workspace]');
+  if (wsIdx === -1) {
+    rootLines.unshift('[workspace]', ...newMembersBlock, '');
+  } else {
+    let wsEnd = rootLines.length;
+    for (let i = wsIdx + 1; i < rootLines.length; i++) {
+      if (/^\[.*\]/.test(rootLines[i].trim())) { wsEnd = i; break; }
+    }
 
-  const current: string[] = parsedToml.workspace.members;
-  const next: string[] = [...desiredMembers].sort();
+    // wipe any previous `members = [` block (one‑ or multi‑line)
+    let scan = wsIdx + 1;
+    while (scan < wsEnd) {
+      if (rootLines[scan].trim().startsWith('members')) {
+        let j = scan;
+        while (j < wsEnd && !rootLines[j].trim().endsWith(']')) j++;
+        if (j < wsEnd) j++;
+        rootLines.splice(scan, j - scan);
+        wsEnd -= (j - scan);
+        continue;
+      }
+      scan++;
+    }
+    // strip leftover wildcard / bracket pair
+    rootLines = rootLines.filter((ln, idx, arr) => {
+      if (ln.trim() === '"programs/*"') return false;
+      if (ln.trim() === ']' && idx > 0 && arr[idx - 1].trim() === '"programs/*"') return false;
+      return true;
+    });
 
-  current.sort();
-  const changed =
-    current.length !== next.length ||
-    current.some((m, i) => m !== next[i]);
-
-  if (!changed) {
-    console.log('[ENSURE_CONFIG] Cargo.toml workspace.members already up-to-date.');
-    return;
+    rootLines.splice(wsIdx + 1, 0, ...newMembersBlock);
   }
-
-  // Strip any stale "anchor-template" entry that might linger.
-  parsedToml.workspace.members = next;
-  console.log('[ENSURE_CONFIG] Cargo.toml: set workspace.members =', next);
-
-  // --- 4. write back if modified ------------------------------------------
-  await updateFile(ws, cargoTomlPath, iarnaTomlStringify(parsedToml), projectId, creatorId);
+  
+  //console.log('[ENSURE_CONFIG] Cargo.toml: updated workspace.members with multi-line format');
+  
+  // --- 4. write back modified content --------------------------------------
+  await updateFile(ws, cargoTomlPath, rootLines.join('\n'), projectId, creatorId);
 } 

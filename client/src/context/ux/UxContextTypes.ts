@@ -20,4 +20,7 @@ export interface UxContextType {
 
   isChatOpen: boolean;
   setIsChatOpen: (open: boolean) => void;
+  
+  containerUrlRefreshTrigger: number;
+  setContainerUrlRefreshTrigger: (value: number) => void;
 }

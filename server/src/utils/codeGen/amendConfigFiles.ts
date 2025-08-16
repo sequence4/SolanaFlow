@@ -45,7 +45,7 @@ async function startListDirTask(
       
       if (containerName) {
         try {
-          console.log(`Listing directory ${dirPath} from container ${containerName}`);
+          //console.log(`[AMEND] Listing directory ${dirPath}`);
           const lsCmd = `docker exec ${containerName} find /usr/src/${projectRootPath}/${dirPath} -maxdepth 1 -mindepth 1 -printf '%y %f\\n'`;
           const output = await runCommand(lsCmd, '.', taskId, { skipSuccessUpdate: true });
           
@@ -62,14 +62,14 @@ async function startListDirTask(
           
           await updateTaskStatus(taskId, 'succeed', JSON.stringify(entries));
         } catch (containerError) {
-          console.error(`Error listing directory ${dirPath} from container:`, containerError);
+          //console.error(`Error listing directory ${dirPath} from container:`, containerError);
           await updateTaskStatus(taskId, 'failed', `Failed to list directory: ${containerError}`);
         }
       } else {
         await updateTaskStatus(taskId, 'failed', 'No container found for this project');
       }
     } catch (error) {
-      console.error('Error listing directory:', error);
+      //console.error('Error listing directory:', error);
       await updateTaskStatus(
         taskId,
         'failed',
@@ -125,6 +125,8 @@ async function listGeneratedPrograms(
   const programDirs: string[] = [];
   for (const entry of entries) {
     if (entry.type !== 'directory') continue;
+    /* Ignore scaffold/template crates that must never enter the workspace */
+    if (entry.name === 'anchor-template' || entry.name === 'my_program') continue;
 
     /* retry up to 5 × 200 ms in case code-gen writes Cargo.toml a bit late */
     const cargoPath = `programs/${entry.name}/Cargo.toml`;
@@ -135,7 +137,7 @@ async function listGeneratedPrograms(
         break;
       } catch (err) {
         if (attempt === 5) {
-          console.log(`[AMEND] Skipping ${cargoPath} – still missing after retries`);
+          //console.log(`[AMEND] Skipping ${cargoPath} – still missing after retries`);
         } else {
           await new Promise(r => setTimeout(r, 200));
         }
@@ -156,7 +158,7 @@ async function patchProgramCargoToml(
 ): Promise<{ status: string; taskId: string }> {
   // Read Cargo.toml content
   const cargoSrc = await getFileContentBlocking(projectId, cargoPath, userId);
-  console.log(`[AMEND] Loaded ${cargoPath} bytes:`, cargoSrc.length);
+  //console.log(`[AMEND] Loaded ${cargoPath} bytes:`, cargoSrc.length);
   
   let cargoLines = cargoSrc.split('\n');
   
@@ -324,7 +326,7 @@ async function patchProgramCargoToml(
         }
       }
       // Remove the section
-      console.log(`[AMEND] Removing redundant ${profileName} section from ${cargoPath}`);
+      //console.log(`[AMEND] Removing redundant ${profileName} section from ${cargoPath}`);
       return [
         ...lines.slice(0, profileStart),
         ...lines.slice(profileEnd)
@@ -340,14 +342,12 @@ async function patchProgramCargoToml(
   const newCargo = cargoLines.join('\n');
   
   // Log preview of the outgoing Cargo.toml
-  console.log('\n──── outgoing Cargo.toml preview ────\n' +
-    newCargo.split('\n').slice(0, 30).join('\n') +
-    '\n─────────────────────────────────────\n');
+  //console.log('[AMEND] Updated Cargo.toml content');
   
-  console.log(`[AMEND] Writing to workspace-relative path: ${cargoPath}`);
+  //console.log(`[AMEND] Writing to workspace-relative path: ${cargoPath}`);
   const taskId = await startUpdateFileTask(projectId, cargoPath, newCargo, userId);
   const { task } = await pollTaskStatus(taskId);
-  console.log(`[AMEND] ${cargoPath} write → ${task.status}`);
+  //console.log(`[AMEND] ${cargoPath} write → ${task.status}`);
   
   if (task.status === 'succeed') {
     // Verify our changes weren't overwritten (wait a moment to ensure any racing writes complete)
@@ -355,18 +355,18 @@ async function patchProgramCargoToml(
     try {
       const verifyContent = await getFileContentBlocking(projectId, cargoPath, userId);
       const hasIdlBuild = verifyContent.includes('idl-build =');
-      console.log(`[AMEND] Verification check: ${cargoPath} contains idl-build feature: ${hasIdlBuild}`);
+      //console.log(`[AMEND] Verification check: ${cargoPath} contains idl-build feature: ${hasIdlBuild}`);
       if (!hasIdlBuild) {
-        console.error(`[AMEND] WARNING: ${cargoPath} was overwritten after our patch! Features lost.`);
+        //console.error(`[AMEND] WARNING: ${cargoPath} was overwritten after our patch! Features lost.`);
         // Re-apply our changes
-        console.log(`[AMEND] Re-applying patch to ${cargoPath}...`);
+        //console.log(`[AMEND] Re-applying patch to ${cargoPath}...`);
         const retryTaskId = await startUpdateFileTask(projectId, cargoPath, newCargo, userId);
         const retryResult = await pollTaskStatus(retryTaskId);
-        console.log(`[AMEND] ${cargoPath} re-write → ${retryResult.task.status}`);
+        //console.log(`[AMEND] ${cargoPath} re-write → ${retryResult.task.status}`);
         return { status: retryResult.task.status, taskId: retryTaskId };
       }
     } catch (error) {
-      console.error(`[AMEND] Error during verification of ${cargoPath}:`, error);
+      //console.error(`[AMEND] Error during verification of ${cargoPath}:`, error);
     }
   }
   
@@ -391,7 +391,12 @@ export const amendConfigFiles = async (
    * 1. Read Anchor.toml (blocking helper waits for actual content)
    * ------------------------------------------------------------------ */
   const anchorSrc = await getFileContentBlocking(projectId, 'Anchor.toml', userId);
-  console.log('[AMEND] Loaded Anchor.toml bytes:', anchorSrc.length);
+  //console.log('[AMEND] Loaded Anchor.toml bytes:', anchorSrc.length);
+
+  /* ------------------------------------------------------------------ *
+   * Discover generated program crates (e.g. "programs/untitled_project")
+   * ------------------------------------------------------------------ */
+  const programPaths = await listGeneratedPrograms(projectId, userId);
 
   /* ────────────────────────────────────────────────────────────────
    * Strip any [programs.*] entries that have no matching crate name
@@ -422,9 +427,61 @@ export const amendConfigFiles = async (
   
   try {
     const rootCargoSrc = await getFileContentBlocking(projectId, rootCargoPath, userId);
-    console.log('[AMEND] Loaded root Cargo.toml bytes:', rootCargoSrc.length);
+    //console.log('[AMEND] Loaded root Cargo.toml bytes:', rootCargoSrc.length);
     
     let rootLines = rootCargoSrc.split('\n');
+
+    /* --------------------------------------------------------------- *
+     * Ensure the workspace members list matches the generated crates
+     * without leaving stray array items or ']' brackets behind.
+     * --------------------------------------------------------------- */
+    const newMembersBlock = [
+      'members = [',
+      ...programPaths.map((p, i) => {
+        const comma = i === programPaths.length - 1 ? '' : ',';
+        return `    "${p}"${comma}`;
+      }),
+      ']',
+    ];
+
+    // ── locate (or create) the [workspace] section ──────────────────
+    let wsIdx = rootLines.findIndex(l => l.trim() === '[workspace]');
+    if (wsIdx === -1) {
+      rootLines.unshift('[workspace]', ...newMembersBlock, '');
+    } else {
+      // find where the section ends (next header or EOF)
+      let wsEnd = rootLines.length;
+      for (let i = wsIdx + 1; i < rootLines.length; i++) {
+        if (/^\[.*\]/.test(rootLines[i].trim())) { wsEnd = i; break; }
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // Purge *every* existing `members = [` block — no matter if it
+      // is a one‑liner or the old three‑line variant containing
+      // `"programs/*"`.
+      // ─────────────────────────────────────────────────────────────
+      let scan = wsIdx + 1;
+      while (scan < wsEnd) {
+        if (rootLines[scan].trim().startsWith('members')) {
+          let j = scan;
+          while (j < wsEnd && !rootLines[j].trim().endsWith(']')) j++;
+          if (j < wsEnd) j++;            // include the closing bracket
+          rootLines.splice(scan, j - scan);
+          wsEnd -= (j - scan);
+          continue;                      // keep scanning for more
+        }
+        scan++;
+      }
+      // Drop any orphan `"programs/*"` line (and its trailing `]`)
+      rootLines = rootLines.filter((ln, idx, arr) => {
+        if (ln.trim() === '"programs/*"') return false;
+        if (ln.trim() === ']' && idx > 0 && arr[idx - 1].trim() === '"programs/*"') return false;
+        return true;
+      });
+
+      /* insert the fresh block just after the header */
+      rootLines.splice(wsIdx + 1, 0, ...newMembersBlock);
+    }
     
     // Define the size-optimized profile blocks for both release and test
     const sizeProfile = [
@@ -499,11 +556,11 @@ export const amendConfigFiles = async (
     
     // Write back the updated root Cargo.toml
     const newRootCargo = rootLines.join('\n');
-    console.log(`[AMEND] Writing to workspace-root Cargo.toml to add size-optimized profiles`);
+    //console.log(`[AMEND] Writing to workspace-root Cargo.toml to add size-optimized profiles`);
     rootCargoTaskId = await startUpdateFileTask(projectId, rootCargoPath, newRootCargo, userId);
     const rootCargoResult = await pollTaskStatus(rootCargoTaskId);
     rootCargoStatus = rootCargoResult.task.status;
-    console.log(`[AMEND] Root ${rootCargoPath} write → ${rootCargoStatus}`);
+    //console.log(`[AMEND] Root ${rootCargoPath} write → ${rootCargoStatus}`);
     
     // Verify changes
     if (rootCargoStatus === 'succeed') {
@@ -515,21 +572,21 @@ export const amendConfigFiles = async (
         const hasTestProfile = verifyContent.includes('[profile.test]') && 
                               verifyContent.includes('opt-level = "s"');
         
-        console.log(`[AMEND] Verification: root ${rootCargoPath} has profiles - release: ${hasReleaseProfile}, test: ${hasTestProfile}`);
+        //console.log(`[AMEND] Verification: root ${rootCargoPath} has profiles - release: ${hasReleaseProfile}, test: ${hasTestProfile}`);
         
         if (!hasReleaseProfile || !hasTestProfile) {
-          console.error(`[AMEND] WARNING: root ${rootCargoPath} profiles were not properly set!`);
+          //console.error(`[AMEND] WARNING: root ${rootCargoPath} profiles were not properly set!`);
           const retryTaskId = await startUpdateFileTask(projectId, rootCargoPath, newRootCargo, userId);
           const retryResult = await pollTaskStatus(retryTaskId);
           rootCargoStatus = retryResult.task.status;
           rootCargoTaskId = retryTaskId;
         }
       } catch (error) {
-        console.error(`[AMEND] Error verifying root ${rootCargoPath}:`, error);
+        //console.error(`[AMEND] Error verifying root ${rootCargoPath}:`, error);
       }
     }
   } catch (error) {
-    console.error(`[AMEND] Error processing root Cargo.toml:`, error);
+    //console.error(`[AMEND] Error processing root Cargo.toml:`, error);
     rootCargoStatus = 'failed';
   }
 
@@ -617,7 +674,7 @@ export const amendConfigFiles = async (
 
   const anchorTaskId = await startUpdateFileTask(projectId, 'Anchor.toml', newAnchor, userId);
   const anchorStatus = (await pollTaskStatus(anchorTaskId)).task.status;
-  console.log(`[AMEND] Anchor.toml write → ${anchorStatus}`);
+  //console.log(`[AMEND] Anchor.toml write → ${anchorStatus}`);
 
   /* ------------------------------------------------------------------ *
    * 3. Patch program Cargo.toml files to add idl-build feature
@@ -634,7 +691,7 @@ export const amendConfigFiles = async (
   }
   
   // Find and patch all program Cargo.toml files
-  const programPaths = await listGeneratedPrograms(projectId, userId);
+  /* programPaths already computed above */
   for (const p of programPaths) {
     const cargoPath = `${p}/Cargo.toml`;
     const res = await patchProgramCargoToml(projectId, cargoPath, userId);

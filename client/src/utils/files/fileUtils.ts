@@ -50,7 +50,7 @@ export const ignoreFiles = [
   ];
 
 export const filterFiles = (projectContextRootPath: string) => (item: FileTreeItemType): boolean => {
-    console.debug(`[filterFiles] Checking file: ${item.path}`);
+    //console.debug(`[filterFiles] Checking file: ${item.path}`);
     
     const ignoredDirs = ignoreFiles.some((dir) => item?.path?.includes(dir));
     const isBinaryFile = binaryExtensions.some((ext) => item.name.endsWith(ext));
@@ -75,18 +75,18 @@ export const filterFiles = (projectContextRootPath: string) => (item: FileTreeIt
       return false; 
     }
     if (item.name === 'sdk' || item.path?.includes('/sdk/')) {
-      console.debug(`[filterFiles] Found "sdk" dir or file, allowing: ${item.path}`);
+      //console.debug(`[filterFiles] Found "sdk" dir or file, allowing: ${item.path}`);
       return true;
     }
     
     // Special debug for instruction files
     if (item.path?.includes('/instructions/') && item.name.endsWith('.rs')) {
-      console.debug(`[filterFiles] Found instruction Rust file: ${item.path}`);
+      //console.debug(`[filterFiles] Found instruction Rust file: ${item.path}`);
     }
   
     // IMPORTANT: We now allow subdirectories and files under the project path.
     // Previously this was causing instruction files to be filtered out.
-    console.debug(`[filterFiles] ACCEPTING file/dir: ${item.path}`);
+    //console.debug(`[filterFiles] ACCEPTING file/dir: ${item.path}`);
     return true;
   };
 

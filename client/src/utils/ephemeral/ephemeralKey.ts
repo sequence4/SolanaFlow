@@ -2,12 +2,10 @@ import { Keypair } from '@solana/web3.js';
 import { projectApi } from '@/api/projectApi';
 
 /**
- * Generates an in-memory Keypair, posts its secretKey array to the backend
- * and returns the Keypair so the caller can sign deploy txs locally.
+ * Requests the backend to generate a new ephemeral Keypair and returns its PublicKey.
  */
 export async function createAndRegisterEphemeral(projectId: string) {
-  const kp = Keypair.generate(); // 64-byte secret; never hits localStorage
-
-  await projectApi.createEphemeral(projectId, Array.from(kp.secretKey));
-  return kp;
+  // Ask the backend to create an ephemeral keypair and return its pubkey
+  const { pubkey } = await projectApi.createEphemeral(projectId);
+  return pubkey;
 } 

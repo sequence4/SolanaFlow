@@ -13,6 +13,9 @@ const UxContext = createContext<UxContextType>({
 
   isChatOpen: false,
   setIsChatOpen: () => {},
+  
+  containerUrlRefreshTrigger: 0,
+  setContainerUrlRefreshTrigger: () => {},
 });
 
 export default UxContext;
