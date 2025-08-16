@@ -462,15 +462,10 @@ export function ProgramDeployer({
             
             // Debug: validate the constructed write data
             
-            // Debug: log the first write instruction bytes
+            // Validate ELF magic in first chunk only
             if (off === 0) {
-              console.log(`DEBUG: First write instruction bytes:`, Array.from(writeData.subarray(0, 24)));
-              console.log(`DEBUG: Expected ELF magic at offset 16:`, Array.from(slice.slice(0, 4)));
-              
               const dataOffset = 16; // 4 bytes discriminator + 4 bytes offset + 8 bytes u64 length
               const dataSection = writeData.subarray(dataOffset, dataOffset + 4);
-              
-              console.log(`DEBUG: Actual ELF magic in instruction:`, Array.from(dataSection));
               
               if (dataSection[0] !== 0x7f || dataSection[1] !== 0x45 || dataSection[2] !== 0x4c || dataSection[3] !== 0x46) {
                 throw new Error(`ELF magic corrupted in write instruction! Got [${Array.from(dataSection).join(',')}]`);
@@ -632,6 +627,37 @@ export function ProgramDeployer({
             if ('signature' in txResult) {
               // Only log every 50 batches to reduce clutter
               if (batchNum % 50 === 0 || batchNum === Math.ceil(writeInstructions.length / MAX_WRITES_PER_TX)) {
+                console.log(`✅ Write batch ${batchNum}/${Math.ceil(writeInstructions.length / MAX_WRITES_PER_TX)} completed`);
+              }
+              
+              // Add buffer verification after every 10 write batches to detect corruption early
+              if (batchNum % 10 === 0 || batchNum === Math.ceil(writeInstructions.length / MAX_WRITES_PER_TX)) {
+                console.log(`[VERIFY] Checking buffer after batch ${batchNum}...`);
+                
+                // Add small delay for RPC sync
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                const bufferCheck = await connection.getAccountInfo(bufferAccount.publicKey, 'confirmed');
+                if (bufferCheck?.data) {
+                  const bufferData = bufferCheck.data.subarray(37); // Skip 37-byte header
+                  const firstBytes = Array.from(bufferData.slice(0, 4));
+                  
+                  if (batchNum >= 10 && firstBytes.join(',') !== '127,69,76,70') {
+                    console.error(`[CRITICAL] Buffer corruption detected after batch ${batchNum}!`);
+                    console.error(`[CRITICAL] Expected [127,69,76,70], got [${firstBytes.join(',')}]`);
+                    console.error(`[CRITICAL] Buffer length: ${bufferData.length}`);
+                    
+                    // Check if buffer is all zeros
+                    const nonZeroBytes = bufferData.filter(b => b !== 0).length;
+                    console.error(`[CRITICAL] Non-zero bytes in buffer: ${nonZeroBytes}/${bufferData.length}`);
+                    
+                    throw new Error(`Buffer corruption detected at batch ${batchNum}`);
+                  } else if (batchNum >= 10) {
+                    console.log(`[VERIFY] Buffer intact after batch ${batchNum}, ELF magic: [${firstBytes.join(',')}]`);
+                  }
+                } else {
+                  console.error(`[CRITICAL] Buffer account not found after batch ${batchNum}!`);
+                }
               }
             } else {
               // This is an error response (e.g., WALLET_SIGNATURE_REQUIRED)
@@ -672,14 +698,6 @@ export function ProgramDeployer({
             
             // The buffer account data format is: 37 bytes of metadata + program bytes
             const bufferProgramData = bufferAccountInfo.data.subarray(37);
-            
-            // Debug logging
-            console.log(`DEBUG: Buffer total length: ${bufferAccountInfo.data.length}`);
-            console.log(`DEBUG: Buffer program data length: ${bufferProgramData.length}`);
-            console.log(`DEBUG: Expected program length: ${programBytes.length}`);
-            console.log(`DEBUG: Buffer metadata (37 bytes):`, Array.from(bufferAccountInfo.data.subarray(0, 37)));
-            console.log(`DEBUG: First 16 bytes of buffer program data:`, Array.from(bufferProgramData.subarray(0, 16)));
-            console.log(`DEBUG: First 16 bytes of original program:`, Array.from(programBytes.slice(0, 16)));
             
             // Check ELF magic in buffer
             if (bufferProgramData.length >= 4) {

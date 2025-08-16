@@ -1369,31 +1369,41 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
     
     
     console.log(`[RELAY_SIGNED_TX] Checking if this is a deployment transaction...`);
-    // Check if this is a BPF upgrade loader deployment - look for instruction with [2,0,0,0] prefix
-    // The deployment transaction may have multiple instructions (nonce advance, create account, deploy)
-    let deployInstructionFound = false;
+    // Check if this is a BPF upgrade loader transaction - look for Write (1), Deploy (2), or Upgrade (3) instructions
+    // The deployment transaction may have multiple instructions (nonce advance, create account, write, deploy)
+    let isBPFLoaderTransaction = false;
     for (let i = 0; i < transaction.instructions.length; i++) {
       const instruction = transaction.instructions[i];
       if (instruction && instruction.data.length >= 4) {
         const instructionType = Array.from(instruction.data.slice(0, 4));
         console.log(`[RELAY_SIGNED_TX] Instruction ${i} data prefix: [${instructionType.join(',')}]`);
-        if (instructionType[0] === 2 && instructionType[1] === 0 && instructionType[2] === 0 && instructionType[3] === 0) {
-          console.log(`[RELAY_SIGNED_TX] Found BPF loader deployment instruction at index ${i}`);
-          deployInstructionFound = true;
+        
+        // Check for Write (1) OR Deploy (2) OR Upgrade (3) instructions
+        if ((instructionType[0] === 1 || instructionType[0] === 2 || instructionType[0] === 3) 
+            && instructionType[1] === 0 && instructionType[2] === 0 && instructionType[3] === 0) {
+          console.log(`[RELAY_SIGNED_TX] Found BPF loader instruction (type ${instructionType[0]}) at index ${i}`);
+          isBPFLoaderTransaction = true;
+          
+          // For Write instructions, sign with ephemeral key
+          if (instructionType[0] === 1) {
+            console.log(`[RELAY_SIGNED_TX] This is a Write instruction - needs ephemeral signing`);
+          }
         }
       }
     }
     
-    if (deployInstructionFound) {
-      console.log(`[RELAY_SIGNED_TX] This is a BPF loader deployment transaction`);
+    if (isBPFLoaderTransaction) {
+      console.log(`[RELAY_SIGNED_TX] This is a BPF loader transaction`);
     } else {
-      console.log(`[RELAY_SIGNED_TX] This is not a BPF loader deployment transaction`);
+      console.log(`[RELAY_SIGNED_TX] This is not a BPF loader transaction`);
     }
     
     let txSignature: string;
     
-    if (currentSigs === requiredSigs) {
-      // Transaction is fully signed, broadcast directly
+    // Force server signing for BPF loader transactions even if they appear "fully signed"
+    // because Write transactions need ephemeral key signatures
+    if (currentSigs === requiredSigs && !isBPFLoaderTransaction) {
+      // Transaction is fully signed and not a BPF loader transaction, broadcast directly
       console.log(`[RELAY_SIGNED_TX] Transaction is fully signed, broadcasting directly`);
       const endpoint = process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com';
       const connection = new Connection(endpoint, 'confirmed');
@@ -1405,8 +1415,13 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
       
       console.log(`[RELAY_SIGNED_TX] Direct broadcast successful: ${txSignature}`);
     } else {
-      // Transaction needs additional server signing
-      console.log(`[RELAY_SIGNED_TX] Transaction needs server signatures, processing...`);
+      // Transaction needs additional server signing (or is a BPF loader transaction)
+      if (isBPFLoaderTransaction) {
+        console.log(`[RELAY_SIGNED_TX] BPF loader transaction detected, forcing server signature processing`);
+      } else {
+        console.log(`[RELAY_SIGNED_TX] Transaction needs server signatures, processing...`);
+      }
+      
       const out = await signDeployTxAndBroadcast(id, encodedTx, programId, { extraSigners });
       if (out?.txForWallet) {
         return res.status(409).json({
@@ -1474,31 +1489,57 @@ export const relayTx = async (req: Request, res: Response, next: NextFunction) =
     const raw = Buffer.from(encodedTx, 'base64');
     const transaction = Transaction.from(raw);
     
-    // Find ephemeral key that should sign this transaction
-    let ephemeralKeypair: Keypair | null = null;
+    // Debug: log all signers required
+    const msg = transaction.compileMessage();
+    const requiredSigners = msg.accountKeys.slice(0, msg.header.numRequiredSignatures);
+    console.log(`[RELAY_TX] Required signers: ${requiredSigners.map(k => k.toBase58()).join(', ')}`);
+    
+    // Find ALL matching ephemeral keys that need to sign
+    const signers: Keypair[] = [];
     for (const [pubkeyStr, keypair] of ephemeralKeys) {
-      const msg = transaction.compileMessage();
-      const signerKeys = msg.accountKeys.slice(0, msg.header.numRequiredSignatures);
-      if (signerKeys.some(k => k.equals(keypair.publicKey))) {
-        ephemeralKeypair = keypair;
-        break;
+      if (requiredSigners.some(k => k.equals(keypair.publicKey))) {
+        console.log(`[RELAY_TX] Found ephemeral key to sign: ${pubkeyStr}`);
+        signers.push(keypair);
       }
     }
     
-    if (!ephemeralKeypair) {
+    if (signers.length === 0) {
+      console.error(`[RELAY_TX] ERROR: No ephemeral keys found for required signers!`);
+      console.error(`[RELAY_TX] Available ephemeral keys: ${Array.from(ephemeralKeys.keys()).join(', ')}`);
       return next(new AppError('No ephemeral key found to sign this transaction', 400));
     }
     
-    // Sign with the ephemeral key
-    transaction.sign(ephemeralKeypair);
+    // Sign with all found ephemeral keys
+    for (const signer of signers) {
+      transaction.partialSign(signer);
+      console.log(`[RELAY_TX] Signed with ephemeral key: ${signer.publicKey.toBase58()}`);
+    }
+    
+    // Verify signatures before sending
+    const currentSigs = transaction.signatures.filter(s => s.signature).length;
+    const requiredSigs = msg.header.numRequiredSignatures;
+    console.log(`[RELAY_TX] Signatures: ${currentSigs}/${requiredSigs}`);
+    
+    if (currentSigs < requiredSigs) {
+      console.error(`[RELAY_TX] ERROR: Missing signatures! Have ${currentSigs}, need ${requiredSigs}`);
+      return next(new AppError(`Missing signatures: ${currentSigs}/${requiredSigs}`, 400));
+    }
     
     // Send the transaction
     const signature = await connection.sendRawTransaction(
       transaction.serialize(),
-      { skipPreflight: true }
+      { skipPreflight: false } // Enable preflight for debugging
     );
     
-    // Don't wait for confirmation for write transactions to avoid timeout
+    console.log(`[RELAY_TX] Transaction sent successfully: ${signature}`);
+    
+    // Wait briefly for confirmation
+    try {
+      await connection.confirmTransaction(signature, 'confirmed');
+      console.log(`[RELAY_TX] Transaction confirmed: ${signature}`);
+    } catch (confirmError) {
+      console.warn(`[RELAY_TX] Confirmation timeout (continuing anyway): ${confirmError}`);
+    }
     
     res.status(200).json({ signature });
   } catch (error: any) {
