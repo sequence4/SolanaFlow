@@ -1483,91 +1483,104 @@ export const relayTx = async (req: Request, res: Response, next: NextFunction) =
   
   try {
     console.log(`[RELAY_TX] Starting relay for programId: ${programId}`);
-    console.log(`[RELAY_TX] Total ephemeral keys available: ${ephemeralKeys.size}`);
-    console.log(`[RELAY_TX] Available ephemeral key pubkeys: ${Array.from(ephemeralKeys.keys()).join(', ')}`);
     
-    // This is for unsigned write transactions that should be signed by ephemeral key
     const endpoint = process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com';
     const connection = new Connection(endpoint, 'confirmed');
     
-    // Decode the transaction to inspect it
+    // Decode the transaction
     const raw = Buffer.from(encodedTx, 'base64');
     const transaction = Transaction.from(raw);
     
-    // Debug: log all signers required
+    // Check fee payer
+    if (!transaction.feePayer) {
+      console.error('[RELAY_TX] ERROR: No fee payer set');
+      return next(new AppError('Transaction must have a fee payer', 400));
+    }
+    
+    console.log(`[RELAY_TX] Fee payer: ${transaction.feePayer.toBase58()}`);
+    
+    // Get all required signers
     const msg = transaction.compileMessage();
     const requiredSigners = msg.accountKeys.slice(0, msg.header.numRequiredSignatures);
     console.log(`[RELAY_TX] Required signers: ${requiredSigners.map(k => k.toBase58()).join(', ')}`);
     
-    // Find ALL matching ephemeral keys that need to sign
+    // Check which signatures we already have
+    const existingSigs = transaction.signatures.filter(s => s.signature).length;
+    console.log(`[RELAY_TX] Existing signatures: ${existingSigs}`);
+    
+    // Find ephemeral keys that need to sign
     const signers: Keypair[] = [];
     for (const [pubkeyStr, keypair] of ephemeralKeys) {
-      console.log(`[RELAY_TX] Checking ephemeral key: ${pubkeyStr} against required signers`);
       if (requiredSigners.some(k => k.equals(keypair.publicKey))) {
-        console.log(`[RELAY_TX] Found ephemeral key to sign: ${pubkeyStr}`);
-        signers.push(keypair);
+        // Check if this key hasn't already signed
+        const sigIndex = msg.accountKeys.findIndex(k => k.equals(keypair.publicKey));
+        if (sigIndex >= 0 && sigIndex < transaction.signatures.length) {
+          if (!transaction.signatures[sigIndex].signature) {
+            console.log(`[RELAY_TX] Found ephemeral key to sign: ${pubkeyStr}`);
+            signers.push(keypair);
+          } else {
+            console.log(`[RELAY_TX] Ephemeral key ${pubkeyStr} already signed`);
+          }
+        }
       }
     }
     
-    if (signers.length === 0) {
-      console.error(`[RELAY_TX] ERROR: No ephemeral keys found for required signers!`);
+    if (signers.length === 0 && existingSigs < msg.header.numRequiredSignatures) {
+      console.error(`[RELAY_TX] ERROR: No ephemeral keys found to complete signing`);
       console.error(`[RELAY_TX] Required signers: ${requiredSigners.map(k => k.toBase58()).join(', ')}`);
       console.error(`[RELAY_TX] Available ephemeral keys: ${Array.from(ephemeralKeys.keys()).join(', ')}`);
-      
-      // Additional debugging: check if we have any ephemeral keys at all
-      if (ephemeralKeys.size === 0) {
-        console.error(`[RELAY_TX] CRITICAL: No ephemeral keys stored in memory! Check if createEphemeralKeypair was called.`);
-        return next(new AppError('No ephemeral keys available. Please create an ephemeral key first.', 400));
-      }
-      
       return next(new AppError('No ephemeral key found to sign this transaction', 400));
     }
     
-    // Sign with all found ephemeral keys
+    // Sign with ephemeral keys
     for (const signer of signers) {
       transaction.partialSign(signer);
       console.log(`[RELAY_TX] Signed with ephemeral key: ${signer.publicKey.toBase58()}`);
     }
     
-    // Verify signatures before sending
-    const currentSigs = transaction.signatures.filter(s => s.signature).length;
-    const requiredSigs = msg.header.numRequiredSignatures;
-    console.log(`[RELAY_TX] Signatures: ${currentSigs}/${requiredSigs}`);
+    // Verify all required signatures are present
+    const finalSigs = transaction.signatures.filter(s => s.signature).length;
+    console.log(`[RELAY_TX] Final signatures: ${finalSigs}/${msg.header.numRequiredSignatures}`);
     
-    if (currentSigs < requiredSigs) {
-      console.error(`[RELAY_TX] ERROR: Missing signatures! Have ${currentSigs}, need ${requiredSigs}`);
-      return next(new AppError(`Missing signatures: ${currentSigs}/${requiredSigs}`, 400));
+    if (finalSigs < msg.header.numRequiredSignatures) {
+      const missing = [];
+      for (let i = 0; i < msg.header.numRequiredSignatures; i++) {
+        if (!transaction.signatures[i]?.signature) {
+          missing.push(msg.accountKeys[i].toBase58());
+        }
+      }
+      console.error(`[RELAY_TX] Still missing signatures from: ${missing.join(', ')}`);
+      return next(new AppError(`Missing signatures from: ${missing.join(', ')}`, 400));
     }
     
-    // Send the transaction
-    console.log(`[RELAY_TX] Sending transaction to Solana network...`);
+    // Send the fully signed transaction
+    console.log(`[RELAY_TX] Sending fully signed transaction...`);
     const signature = await connection.sendRawTransaction(
       transaction.serialize(),
-      { skipPreflight: false } // Enable preflight for debugging
+      { skipPreflight: false }
     );
     
     console.log(`[RELAY_TX] Transaction sent successfully: ${signature}`);
     
-    // Wait briefly for confirmation
+    // Wait for confirmation
     try {
       await connection.confirmTransaction(signature, 'confirmed');
       console.log(`[RELAY_TX] Transaction confirmed: ${signature}`);
     } catch (confirmError) {
-      console.warn(`[RELAY_TX] Confirmation timeout (continuing anyway): ${confirmError}`);
+      console.warn(`[RELAY_TX] Confirmation timeout (continuing): ${confirmError}`);
     }
     
     res.status(200).json({ signature });
   } catch (error: any) {
-    console.error('[RELAY_TX] Detailed error information:');
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
-    console.error('Error type:', error.constructor.name);
+    console.error('[RELAY_TX] Error:', error.message);
+    if (error.logs) {
+      console.error('[RELAY_TX] Transaction logs:', error.logs);
+    }
     
-    // More specific error handling
-    if (error.message?.includes('Transaction simulation failed')) {
+    if (error.message?.includes('Attempt to debit')) {
+      next(new AppError('Fee payer has insufficient SOL balance', 400));
+    } else if (error.message?.includes('Transaction simulation failed')) {
       next(new AppError(`Transaction simulation failed: ${error.message}`, 400));
-    } else if (error.message?.includes('Blockhash not found')) {
-      next(new AppError('Transaction expired. Please retry with a fresh blockhash.', 400));
     } else {
       next(new AppError(`Failed to relay transaction: ${error.message}`, 500));
     }

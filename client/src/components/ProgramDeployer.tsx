@@ -607,8 +607,8 @@ export function ProgramDeployer({
             batchBlockhash = latest.blockhash;
           }
           
-          // WRITE txs are server-signed by ephemeral: set feePayer + blockhash here
-          tx.feePayer = new PublicKey(ephemeralPubkeyStr);
+          // CRITICAL FIX: Wallet pays fees, ephemeral signs as authority
+          tx.feePayer = wallet.publicKey!;  // Wallet is fee payer
           tx.recentBlockhash = batchBlockhash;
           
           // size guard pre-send
@@ -619,9 +619,20 @@ export function ProgramDeployer({
           }
           
           try {
-            // Relay unsigned for server to sign with ephemeral (no wallet popups)
-            const encoded = tx.serialize({ requireAllSignatures: false }).toString("base64");
-            const txResult = await projectApi.relayTx(projectId, { encodedTx: encoded, programId: programId.toBase58() });
+            // Sign with wallet first (as fee payer)
+            if (!wallet.signTransaction) {
+              throw new Error("Wallet doesn't support transaction signing");
+            }
+            
+            // Get wallet signature first
+            const walletSignedTx = await wallet.signTransaction(tx);
+            
+            // Then relay to server for ephemeral signature (as authority)
+            const encoded = walletSignedTx.serialize({ requireAllSignatures: false }).toString("base64");
+            const txResult = await projectApi.relayTx(projectId, { 
+              encodedTx: encoded, 
+              programId: programId.toBase58() 
+            });
             
             // Check if this is a successful transaction result
             if ('signature' in txResult) {
