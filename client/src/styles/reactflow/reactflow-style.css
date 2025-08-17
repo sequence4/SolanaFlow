@@ -50,7 +50,16 @@
 /* Improve the appearance of connections */
 .react-flow__edge .react-flow__edge-path {
   stroke-dasharray: 5, 5;
-  animation: flowAnimation 30s linear infinite;
+  animation: dashdraw 0.5s linear infinite;
+}
+
+@keyframes dashdraw {
+  0% {
+    stroke-dashoffset: 10;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
 }
 
 @keyframes flowAnimation {

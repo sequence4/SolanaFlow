@@ -1,4 +1,4 @@
-import React, {  useCallback, useMemo, useEffect, useContext } from 'react';
+import React, { useCallback, useMemo, useEffect, useContext } from 'react';
 
 import {
     ReactFlow,
@@ -24,7 +24,7 @@ import { ProjectStateUpdater } from "@/context/project/ProjectContextTypes";
 
 import { handleDrop } from '@/utils/tabs/workflow/onDrop';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { PlusIcon } from 'lucide-react';
+import { PlusIcon, Trash2, Layers } from 'lucide-react';
 import { darkTheme } from '@/styles/theme';
 
 // Separate component that uses the useReactFlow hook
@@ -134,14 +134,31 @@ const ReactFlowContent = ({
     }, [uxOpenPanel, setUxOpenPanel]);
     
     return (
-        <ReactFlow 
-            nodes={projectState.nodes} 
-            edges={projectState.edges} 
-            style={{
-                background: darkTheme.background.canvas, // CONSISTENT with app background
-                border: 'none',
-                position: 'relative',
-            }}
+        <div className="relative h-full">
+            {/* Canvas Grid Pattern */}
+            <div 
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                    backgroundImage: `radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px)`,
+                    backgroundSize: '20px 20px',
+                    backgroundPosition: '0 0, 10px 10px',
+                }}
+            />
+            <ReactFlow 
+                nodes={projectState.nodes} 
+                edges={projectState.edges} 
+                style={{
+                    background: '#0a0a0b', // Solid dark background
+                    backgroundImage: `
+                        radial-gradient(circle at 20% 50%, rgba(77, 124, 254, 0.02) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.02) 0%, transparent 50%),
+                        radial-gradient(circle at 40% 20%, rgba(34, 197, 94, 0.02) 0%, transparent 50%)
+                    `,
+                    border: 'none',
+                    position: 'relative',
+                }}
+                snapToGrid={true}
+                snapGrid={[15, 15]}
             nodeTypes={nodeTypes}
             fitView
             nodesDraggable={true}
@@ -153,11 +170,13 @@ const ReactFlowContent = ({
             onNodeClick={onNodeClick}
             defaultEdgeOptions={{ 
                 style: { 
-                    stroke: darkTheme.border.active,
+                    stroke: 'rgba(77, 124, 254, 0.3)',
                     strokeWidth: 2,
-                    filter: `drop-shadow(0 0 4px ${darkTheme.border.active})`
+                    strokeDasharray: '5 5',
+                    animation: 'dashdraw 0.5s linear infinite',
                 },
-                type: 'smoothstep' // More modern than 'default'
+                animated: true,
+                type: 'smoothstep',
             }}
         >
             <Controls 
@@ -188,7 +207,7 @@ const ReactFlowContent = ({
                     }}
                     className="hover:bg-white/10 hover:scale-105 transition-all duration-200"
                 >
-                    🗑
+                    <Trash2 size={14} />
                 </ControlButton>
                 <ControlButton 
                     onClick={toggleAccountsBox}
@@ -202,10 +221,11 @@ const ReactFlowContent = ({
                     }}
                     className="hover:bg-white/10 hover:scale-105 transition-all duration-200"
                 >
-                    🗃
+                    <Layers size={14} />
                 </ControlButton>
             </Controls>
         </ReactFlow>
+        </div>
     );
 };
 
@@ -250,13 +270,14 @@ const Workflow = () => {
             {/* Empty Canvas Message */}
             {(projectState?.nodes?.length || 0) === 0 && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="text-center">
-                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/5 backdrop-blur-sm border border-white/10 mb-4 shadow-2xl">
-                            <PlusIcon className="w-6 h-6 text-[#4d7cfe]" />
+                    <div className="text-center px-8 py-12 rounded-2xl bg-white/[0.02] backdrop-blur-sm border border-white/[0.06]">
+                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-white/10 mb-4">
+                            <PlusIcon className="w-8 h-8 text-blue-400" />
                         </div>
-                        <h3 className="text-lg font-medium mb-2 text-gray-300">Start Building Your Workflow</h3>
-                        <p className="text-gray-500 max-w-md text-sm">
-                            Drag instructions from the sidebar to create your Solana workflow. Connect components to define your program logic.
+                        <h3 className="text-xl font-semibold mb-2 text-white/90">Start Building Your Workflow</h3>
+                        <p className="text-white/50 max-w-md text-sm leading-relaxed">
+                            Drag instructions from the sidebar to create your Solana workflow. 
+                            Connect components to define your program logic and build powerful decentralized applications.
                         </p>
                     </div>
                 </div>

@@ -19,12 +19,11 @@ export default function MainLayout({
       <LayoutHeader />
 
       <div className="flex flex-1 overflow-hidden">
-        <Toolbox />
-
         <main className="w-full h-full flex-1 overflow-y-auto">
           {children}
         </main>
 
+        <Toolbox />
         <Chat />
         <TaskLogsToast />
       </div>
