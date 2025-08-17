@@ -207,7 +207,7 @@ const ReactFlowContent = ({
                     }}
                     className="hover:bg-white/10 hover:scale-105 transition-all duration-200"
                 >
-                    <Trash2 size={14} />
+                    <Trash2 size={14} style={{ color: darkTheme.text.secondary }} />
                 </ControlButton>
                 <ControlButton 
                     onClick={toggleAccountsBox}
@@ -221,7 +221,7 @@ const ReactFlowContent = ({
                     }}
                     className="hover:bg-white/10 hover:scale-105 transition-all duration-200"
                 >
-                    <Layers size={14} />
+                    <Layers size={14} style={{ color: darkTheme.text.secondary }} />
                 </ControlButton>
             </Controls>
         </ReactFlow>

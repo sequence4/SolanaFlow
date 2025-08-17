@@ -376,7 +376,7 @@ const Chat: React.FC = () => {
 
     return (
         <div
-            className={`flex flex-col w-[32%] ${isExpanded ? "fixed inset-4 z-50" : "h-full"} transition-all duration-300 ease-in-out`}
+            className={`flex flex-col ${isExpanded ? "fixed inset-4 z-50" : "w-full h-full"} transition-all duration-300 ease-in-out`}
         >
             <div 
                 className="flex flex-col h-full backdrop-blur-xl overflow-hidden border shadow-2xl"

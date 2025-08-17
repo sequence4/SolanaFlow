@@ -41,9 +41,7 @@ export default function MainPage() {
     <>
       <Header />
       
-      <div className="flex flex-1 overflow-hidden">
-        <Toolbox />
-        
+      <div className="flex flex-1 overflow-hidden">        
         <div className="flex-1">
           <Tabs 
             value={activeTab}
@@ -122,6 +120,7 @@ export default function MainPage() {
           </Tabs>
         </div>
         
+        <Toolbox />
         <RightPanel />
       </div>
     </>
