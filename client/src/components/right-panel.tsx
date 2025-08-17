@@ -114,7 +114,9 @@ export function RightPanel() {
         </div>
       </div>
 
-      <Chat />
+      <div className="flex-1 min-h-0">
+        <Chat />
+      </div>
     </div>
   )
 }

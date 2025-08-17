@@ -376,14 +376,16 @@ const Chat: React.FC = () => {
 
     return (
         <div
-            className={`flex flex-col ${isExpanded ? "fixed inset-4 z-50" : "w-full h-full"} transition-all duration-300 ease-in-out`}
+            className={`flex flex-col ${isExpanded ? "fixed inset-4 z-50" : "w-full h-full max-h-full"} transition-all duration-300 ease-in-out`}
         >
             <div 
-                className="flex flex-col h-full backdrop-blur-xl overflow-hidden border shadow-2xl max-h-full"
+                className="flex flex-col h-full backdrop-blur-xl overflow-hidden border shadow-2xl"
                 style={{
                     backgroundColor: darkTheme.background.secondary,
                     borderColor: darkTheme.border.default,
                     backdropFilter: `blur(${darkTheme.glass.blur})`,
+                    height: '100%',
+                    maxHeight: '100%'
                 }}
             >
                 {/* Header */}
@@ -420,7 +422,13 @@ const Chat: React.FC = () => {
                 </div>
 
                 {/* Messages */}
-                <div className="text-xs flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent min-h-0">
+                <div 
+                    className="text-xs flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent min-h-0"
+                    style={{ 
+                        maxHeight: 'calc(100% - 120px)', // Account for header + input + status bar
+                        height: '100%'
+                    }}
+                >
                     <AnimatePresence>
                         {messages.map((message, index) => {
                             const isUser = message.sender === 'user';
