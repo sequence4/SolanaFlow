@@ -379,7 +379,7 @@ const Chat: React.FC = () => {
             className={`flex flex-col ${isExpanded ? "fixed inset-4 z-50" : "w-full h-full"} transition-all duration-300 ease-in-out`}
         >
             <div 
-                className="flex flex-col h-full backdrop-blur-xl overflow-hidden border shadow-2xl"
+                className="flex flex-col h-full backdrop-blur-xl overflow-hidden border shadow-2xl max-h-full"
                 style={{
                     backgroundColor: darkTheme.background.secondary,
                     borderColor: darkTheme.border.default,
@@ -387,7 +387,7 @@ const Chat: React.FC = () => {
                 }}
             >
                 {/* Header */}
-                <div className="flex items-center justify-between px-4 py-3 bg-white/5 backdrop-blur-sm border-b border-white/10">
+                <div className="flex items-center justify-between px-4 py-3 bg-white/5 backdrop-blur-sm border-b border-white/10 flex-shrink-0">
                     <div className="flex items-center space-x-2">
                         <div className="w-2 h-2 rounded-full bg-green-500 shadow-lg shadow-green-500/50 animate-pulse"></div>
                         <h4 className="font-medium text-sm text-gray-300">AI Assistant</h4>
@@ -420,7 +420,7 @@ const Chat: React.FC = () => {
                 </div>
 
                 {/* Messages */}
-                <div className="text-xs flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
+                <div className="text-xs flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent min-h-0">
                     <AnimatePresence>
                         {messages.map((message, index) => {
                             const isUser = message.sender === 'user';
@@ -511,7 +511,7 @@ const Chat: React.FC = () => {
                 </div>
 
                 {/* Input area */}
-                <div className="p-3 bg-white/5 backdrop-blur-sm border-t border-white/10">
+                <div className="p-3 bg-white/5 backdrop-blur-sm border-t border-white/10 flex-shrink-0">
                     <div className="flex flex-col space-y-2">
                         <div className="flex items-center gap-1 px-2">
                             <Button
@@ -576,7 +576,7 @@ const Chat: React.FC = () => {
                 </div>
 
                 {/* Status bar */}
-                <div className="px-4 py-1.5 bg-white/5 backdrop-blur-sm border-t border-white/10 flex items-center justify-between">
+                <div className="px-4 py-1.5 bg-white/5 backdrop-blur-sm border-t border-white/10 flex items-center justify-between flex-shrink-0">
                     <div className="text-xs text-gray-500 font-mono">v1.0.0</div>
                     <div className="flex items-center space-x-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-lg shadow-green-500/50 animate-pulse"></div>
