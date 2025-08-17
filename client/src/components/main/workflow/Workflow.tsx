@@ -134,27 +134,19 @@ const ReactFlowContent = ({
     
     return (
         <div className="relative h-full">
-            {/* Visible Grid Pattern */}
-            <div 
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                    backgroundImage: `
-                        linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
-                        linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px)
-                    `,
-                    backgroundSize: '20px 20px',
-                }}
-            />
             <ReactFlow 
                 nodes={projectState.nodes} 
                 edges={projectState.edges} 
                 style={{
-                    background: '#0a0a0b', // Solid dark background
+                    background: '#0a0a0b',
                     backgroundImage: `
+                        linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
                         radial-gradient(circle at 20% 50%, rgba(77, 124, 254, 0.02) 0%, transparent 50%),
                         radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.02) 0%, transparent 50%),
                         radial-gradient(circle at 40% 20%, rgba(34, 197, 94, 0.02) 0%, transparent 50%)
                     `,
+                    backgroundSize: '20px 20px, 20px 20px, 100% 100%, 100% 100%, 100% 100%',
                     border: 'none',
                     position: 'relative',
                 }}
@@ -185,45 +177,45 @@ const ReactFlowContent = ({
                 position="top-left" 
                 orientation="horizontal"
                 style={{ 
-                    backgroundColor: 'hsl(var(--background))',
-                    border: '1px solid hsl(var(--border))',
-                    color: 'hsl(var(--foreground))',
+                    backgroundColor: 'hsl(0 0% 9%)',
+                    border: '1px solid hsl(0 0% 14.9%)',
+                    color: 'hsl(0 0% 98%)',
                     zIndex: 9999,
-                    padding: '10px',
-                    gap: '8px',
+                    padding: '8px',
+                    gap: '6px',
                     borderRadius: '8px',
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
                 }} 
             >
                 <ControlButton 
                     onClick={handleClearCanvas} 
                     title="Clear Canvas"
                     style={{
-                        backgroundColor: 'hsl(var(--background))',
-                        border: '1px solid hsl(var(--border))',
+                        backgroundColor: 'hsl(0 0% 3.9%)',
+                        border: '1px solid hsl(0 0% 14.9%)',
                         borderRadius: '6px',
                         padding: '8px',
-                        color: 'hsl(var(--foreground))',
+                        color: 'hsl(0 0% 98%)',
                         transition: 'all 0.2s ease',
                     }}
-                    className="hover:bg-muted hover:scale-105"
+                    className="hover:opacity-80 hover:scale-105"
                 >
-                    <Trash2 size={16} style={{ color: 'hsl(var(--foreground))' }} />
+                    <Trash2 size={16} style={{ color: 'hsl(0 0% 98%)' }} />
                 </ControlButton>
                 <ControlButton 
                     onClick={toggleAccountsBox}
                     title="Toggle Accounts"
                     style={{
-                        backgroundColor: 'hsl(var(--background))',
-                        border: '1px solid hsl(var(--border))',
+                        backgroundColor: 'hsl(0 0% 3.9%)',
+                        border: '1px solid hsl(0 0% 14.9%)',
                         borderRadius: '6px',
                         padding: '8px',
-                        color: 'hsl(var(--foreground))',
+                        color: 'hsl(0 0% 98%)',
                         transition: 'all 0.2s ease',
                     }}
-                    className="hover:bg-muted hover:scale-105"
+                    className="hover:opacity-80 hover:scale-105"
                 >
-                    <Layers size={16} style={{ color: 'hsl(var(--foreground))' }} />
+                    <Layers size={16} style={{ color: 'hsl(0 0% 98%)' }} />
                 </ControlButton>
             </Controls>
         </ReactFlow>
