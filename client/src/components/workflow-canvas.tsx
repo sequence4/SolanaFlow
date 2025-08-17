@@ -232,7 +232,7 @@ export function WorkflowCanvas() {
               <div className="w-20 h-20 bg-gradient-to-br from-primary/20 to-purple-600/20 rounded-full flex items-center justify-center mb-8 mx-auto shadow-lg">
                 <Plus className="w-10 h-10 text-primary" />
               </div>
-              <h2 className="text-2xl font-heading font-bold mb-3">Start Building Your Workflow</h2>
+              <h2 className="text-2xl font-heading font-bold mb-3">Drag and drop nodes to create your dApp</h2>
               <p className="text-muted-foreground leading-relaxed">
                 Drag instructions from the sidebar to create your Solana workflow. Connect components to define your
                 program logic and build powerful decentralized applications.

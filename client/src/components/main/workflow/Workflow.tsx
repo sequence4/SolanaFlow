@@ -140,8 +140,8 @@ const ReactFlowContent = ({
                 style={{
                     background: '#0a0a0b',
                     backgroundImage: `
-                        linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
-                        linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+                        linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
                         radial-gradient(circle at 20% 50%, rgba(77, 124, 254, 0.02) 0%, transparent 50%),
                         radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.02) 0%, transparent 50%),
                         radial-gradient(circle at 40% 20%, rgba(34, 197, 94, 0.02) 0%, transparent 50%)
@@ -173,49 +173,21 @@ const ReactFlowContent = ({
             }}
         >
             <Controls 
-                className="backdrop-blur-xl"
+                className="react-flow-controls-custom"
                 position="top-left" 
                 orientation="horizontal"
-                style={{ 
-                    backgroundColor: 'hsl(0 0% 9%)',
-                    border: '1px solid hsl(0 0% 14.9%)',
-                    color: 'hsl(0 0% 98%)',
-                    zIndex: 9999,
-                    padding: '8px',
-                    gap: '6px',
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
-                }} 
             >
                 <ControlButton 
                     onClick={handleClearCanvas} 
                     title="Clear Canvas"
-                    style={{
-                        backgroundColor: 'hsl(0 0% 3.9%)',
-                        border: '1px solid hsl(0 0% 14.9%)',
-                        borderRadius: '6px',
-                        padding: '8px',
-                        color: 'hsl(0 0% 98%)',
-                        transition: 'all 0.2s ease',
-                    }}
-                    className="hover:opacity-80 hover:scale-105"
                 >
-                    <Trash2 size={16} style={{ color: 'hsl(0 0% 98%)' }} />
+                    <Trash2 size={16} />
                 </ControlButton>
                 <ControlButton 
                     onClick={toggleAccountsBox}
                     title="Toggle Accounts"
-                    style={{
-                        backgroundColor: 'hsl(0 0% 3.9%)',
-                        border: '1px solid hsl(0 0% 14.9%)',
-                        borderRadius: '6px',
-                        padding: '8px',
-                        color: 'hsl(0 0% 98%)',
-                        transition: 'all 0.2s ease',
-                    }}
-                    className="hover:opacity-80 hover:scale-105"
                 >
-                    <Layers size={16} style={{ color: 'hsl(0 0% 98%)' }} />
+                    <Layers size={16} />
                 </ControlButton>
             </Controls>
         </ReactFlow>
