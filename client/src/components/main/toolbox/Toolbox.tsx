@@ -52,7 +52,7 @@ export const Toolbox = () => {
     const { projectContext, setProjectContext } = useContext(ProjectContext);
     const { fileTree, setFileTree, setSelectedFile } = useContext(FileContext);
     const { activeTab, setUxOpenPanel, setActiveTab } = useContext(UxContext);
-    const [activeChainTab, setActiveChainTab] = useState<"on-chain" | "off-chain">("on-chain");
+    const [activeChainTab] = useState<"off-chain">("off-chain");
     const [projectName, setProjectName] = useState(projectContext.name || "My Token Project");
     const [isEditing, setIsEditing] = useState(false);
     const [searchValue, setSearchValue] = useState("");
@@ -84,12 +84,6 @@ export const Toolbox = () => {
         console.log('[Toolbox useEffect] context programId changed to', projectContext.details?.projectState?.programId);
     }, [projectContext.details?.projectState?.programId]);
 
-    const handleTabChange = (tab: "on-chain" | "off-chain") => {
-        setActiveChainTab(tab);
-        if (nodeItemsRef.current) {
-            nodeItemsRef.current.setActiveChainTab(tab === "on-chain" ? "onChain" : "offChain");
-        }
-    };
 
     const handleNewProject = () => {
         handleNewProjectClick(
@@ -446,18 +440,7 @@ export const Toolbox = () => {
                     <div className="grid grid-cols-3 gap-1">
                         <button 
                             onClick={handleOpenProjectClick}
-                            className="h-7 px-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105"
-                            style={{
-                                backgroundColor: theme.colors.bg.hover,
-                                borderColor: theme.colors.border.primary,
-                                color: theme.colors.text.primary,
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = theme.colors.bg.tertiary;
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = theme.colors.bg.hover;
-                            }}
+                            className="h-7 px-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 text-white border-white/20 bg-sidebar-accent hover:bg-sidebar-accent/80"
                         >
                             <FolderOpen size={12} />
                             <span>Open</span>
@@ -465,38 +448,14 @@ export const Toolbox = () => {
                         <button 
                             onClick={handleSaveProject}
                             disabled={!projectContext.id}
-                            className="h-7 px-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 disabled:opacity-50"
-                            style={{
-                                backgroundColor: theme.colors.bg.hover,
-                                borderColor: theme.colors.border.primary,
-                                color: theme.colors.text.primary,
-                            }}
-                            onMouseEnter={(e) => {
-                                if (!e.currentTarget.disabled) {
-                                    e.currentTarget.style.backgroundColor = theme.colors.bg.tertiary;
-                                }
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = theme.colors.bg.hover;
-                            }}
+                            className="h-7 px-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 disabled:opacity-50 text-white border-white/20 bg-sidebar-accent hover:bg-sidebar-accent/80"
                         >
                             <Save size={12} />
                             <span>Save</span>
                         </button>
                         <button 
                             onClick={handleNewProject}
-                            className="h-7 px-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105"
-                            style={{
-                                backgroundColor: theme.colors.bg.hover,
-                                borderColor: theme.colors.border.primary,
-                                color: theme.colors.text.primary,
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = theme.colors.bg.tertiary;
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = theme.colors.bg.hover;
-                            }}
+                            className="h-7 px-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 text-white border-white/20 bg-sidebar-accent hover:bg-sidebar-accent/80"
                         >
                             <Plus size={12} />
                             <span>New</span>
@@ -505,67 +464,31 @@ export const Toolbox = () => {
                         {/* Second row - Build/Deploy */}
                         <button
                             onClick={handleBuildClick}
-                            className="h-7 col-span-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105"
-                            style={{
-                                background: `linear-gradient(to right, ${theme.colors.accent.success}20, ${theme.colors.accent.success}20)`,
-                                borderColor: `${theme.colors.accent.success}30`,
-                                color: theme.colors.accent.success,
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.background = `linear-gradient(to right, ${theme.colors.accent.success}30, ${theme.colors.accent.success}30)`;
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.background = `linear-gradient(to right, ${theme.colors.accent.success}20, ${theme.colors.accent.success}20)`;
-                            }}
+                            className="h-7 col-span-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 text-white border-white/20 bg-sidebar-accent hover:bg-sidebar-accent/80"
                         >
                             {isBuilding ? (
-                                <PulseLoader color={theme.colors.accent.success} size={3} cssOverride={{ display: 'inline-block', margin: 0 }} />
+                                <PulseLoader color="white" size={3} cssOverride={{ display: 'inline-block', margin: 0 }} />
                             ) : (
-                                <Hammer size={12} style={{ color: theme.colors.accent.success }} />
+                                <Hammer size={12} />
                             )}
-                            <span style={{ color: `${theme.colors.accent.success}cc` }}>Build</span>
+                            <span>Build</span>
                         </button>
                         <button
                             onClick={handleDeployClick}
                             disabled={isDeploying || !walletSigner.isConnected || !built}
-                            className="h-7 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 disabled:opacity-50"
-                            style={{
-                                background: `linear-gradient(to right, ${theme.colors.accent.primary}20, ${theme.colors.accent.primary}20)`,
-                                borderColor: `${theme.colors.accent.primary}30`,
-                                color: theme.colors.accent.primary,
-                            }}
-                            onMouseEnter={(e) => {
-                                if (!e.currentTarget.disabled) {
-                                    e.currentTarget.style.background = `linear-gradient(to right, ${theme.colors.accent.primary}30, ${theme.colors.accent.primary}30)`;
-                                }
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.background = `linear-gradient(to right, ${theme.colors.accent.primary}20, ${theme.colors.accent.primary}20)`;
-                            }}
+                            className="h-7 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 disabled:opacity-50 text-white border-white/20 bg-sidebar-accent hover:bg-sidebar-accent/80"
                         >
                             {isDeploying ? (
-                                <PulseLoader color={theme.colors.accent.primary} size={3} cssOverride={{ display: 'inline-block', margin: 0 }} />
+                                <PulseLoader color="white" size={3} cssOverride={{ display: 'inline-block', margin: 0 }} />
                             ) : (
-                                <Rocket size={12} style={{ color: projectDeployed ? theme.colors.accent.success : theme.colors.accent.primary }} />
+                                <Rocket size={12} />
                             )}
-                            <span style={{ color: `${theme.colors.accent.primary}cc` }}>
+                            <span>
                                 {projectDeployed ? "Deployed" : "Deploy"}
                             </span>
                         </button>
                     </div>
                     
-                    {/* Project Type Badges */}
-                    <div className="flex gap-1 justify-center mb-2">
-                        <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
-                            Token
-                        </Badge>
-                        <Badge variant="secondary" className="text-xs bg-blue-500/10 text-blue-400 border-blue-500/20">
-                            Mint
-                        </Badge>
-                        <Badge variant="secondary" className="text-xs bg-green-500/10 text-green-400 border-green-500/20">
-                            Transfer
-                        </Badge>
-                    </div>
                     
                     {/* Status Indicators - Compact Pills */}
                     <div className="flex gap-1 justify-center">
@@ -623,78 +546,13 @@ export const Toolbox = () => {
                     </div>
                 )}
                 
-                {/* Node Library Tab Switcher */}
-                {activeTab === 'workflow' && (
-                    <div className="px-3 pb-2">
-                        <div 
-                            className="flex p-0.5 rounded-lg"
-                            style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
-                        >
-                            <button
-                                onClick={() => handleTabChange("on-chain")}
-                                className="flex-1 h-7 rounded-md text-xs font-medium transition-all"
-                                style={{
-                                    background: activeChainTab === "on-chain" 
-                                        ? `linear-gradient(to right, ${theme.colors.accent.primary}cc, ${theme.colors.accent.primary}cc)`
-                                        : 'transparent',
-                                    color: activeChainTab === "on-chain" 
-                                        ? theme.colors.text.primary 
-                                        : theme.colors.text.secondary,
-                                    boxShadow: activeChainTab === "on-chain" 
-                                        ? `0 4px 12px ${theme.colors.accent.primary}25`
-                                        : 'none',
-                                }}
-                                onMouseEnter={(e) => {
-                                    if (activeChainTab !== "on-chain") {
-                                        e.currentTarget.style.color = theme.colors.text.primary;
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    if (activeChainTab !== "on-chain") {
-                                        e.currentTarget.style.color = theme.colors.text.secondary;
-                                    }
-                                }}
-                            >
-                                On-Chain
-                            </button>
-                            <button
-                                onClick={() => handleTabChange("off-chain")}
-                                className="flex-1 h-7 rounded-md text-xs font-medium transition-all"
-                                style={{
-                                    background: activeChainTab === "off-chain" 
-                                        ? `linear-gradient(to right, ${theme.colors.accent.primary}cc, ${theme.colors.accent.primary}cc)`
-                                        : 'transparent',
-                                    color: activeChainTab === "off-chain" 
-                                        ? theme.colors.text.primary 
-                                        : theme.colors.text.secondary,
-                                    boxShadow: activeChainTab === "off-chain" 
-                                        ? `0 4px 12px ${theme.colors.accent.primary}25`
-                                        : 'none',
-                                }}
-                                onMouseEnter={(e) => {
-                                    if (activeChainTab !== "off-chain") {
-                                        e.currentTarget.style.color = theme.colors.text.primary;
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    if (activeChainTab !== "off-chain") {
-                                        e.currentTarget.style.color = theme.colors.text.secondary;
-                                    }
-                                }}
-                            >
-                                Off-Chain
-                            </button>
-                        </div>
-                    </div>
-                )}
             </div>
 
             {/* Enhanced Search Bar */}
             <div 
-                className="border-t border-b backdrop-blur-sm"
+                className="border-t border-b backdrop-blur-sm bg-sidebar-accent/10"
                 style={{
-                    borderColor: theme.colors.border.secondary,
-                    backgroundColor: theme.colors.bg.hover,
+                    borderColor: 'var(--sidebar-border)',
                 }}
             >
                 <div className="px-3 py-2">
@@ -711,27 +569,12 @@ export const Toolbox = () => {
                             value={searchValue}
                             onChange={(e) => setSearchValue(e.target.value)}
                             placeholder="Search nodes..."
-                            className="relative w-full h-8 rounded-lg pl-8 pr-8 text-xs transition-all focus:outline-none"
-                            style={{
-                                backgroundColor: theme.colors.bg.hover,
-                                borderWidth: '1px',
-                                borderStyle: 'solid',
-                                borderColor: isFocused ? theme.colors.border.accent : theme.colors.border.primary,
-                                color: theme.colors.text.primary,
-                            }}
+                            className="relative w-full h-8 rounded-lg pl-8 pr-8 text-xs transition-all focus:outline-none bg-sidebar-accent border border-sidebar-border text-foreground focus:ring-1 focus:ring-primary"
                             onFocus={() => {
                                 setIsFocused(true);
-                                const input = inputRef.current;
-                                if (input) {
-                                    input.style.backgroundColor = theme.colors.bg.tertiary;
-                                }
                             }}
                             onBlur={() => {
                                 setIsFocused(false);
-                                const input = inputRef.current;
-                                if (input) {
-                                    input.style.backgroundColor = theme.colors.bg.hover;
-                                }
                             }}
                         />
                         <Search 
@@ -788,7 +631,7 @@ export const Toolbox = () => {
                 {isExpanded && activeTab === 'workflow' && (
                     <NodeItems
                         ref={nodeItemsRef}
-                        activeChainTab={activeChainTab === "on-chain" ? "onChain" : "offChain"}
+                        activeChainTab="offChain"
                     />
                 )}
 
