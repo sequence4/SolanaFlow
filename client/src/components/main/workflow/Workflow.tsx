@@ -131,7 +131,7 @@ const ReactFlowContent = ({
             nodes={projectState.nodes} 
             edges={projectState.edges} 
             style={{
-                background: '#121214', 
+                background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)', 
                 border: 'none!important',
                 position: 'relative',
             }}
@@ -150,33 +150,46 @@ const ReactFlowContent = ({
             }}
         >
             <Controls 
-                className="reactflow-dark-controls"
+                className="reactflow-dark-controls backdrop-blur-xl"
                 position="top-left" 
                 orientation="horizontal"
                 style={{ 
-                    backgroundColor: '#2A3347',
-                    color: '#A0AEC0', 
+                    backgroundColor: 'rgba(30, 41, 59, 0.3)',
+                    color: '#94a3b8', 
                     zIndex: 9999,
-                    border: '1px solid #2A3347',
-                    padding: '10px',
-                    gap: '10px',
-                    borderRadius: '4px',    
+                    border: '1px solid rgba(148, 163, 184, 0.1)',
+                    padding: '12px',
+                    gap: '12px',
+                    borderRadius: '12px',
+                    backdropFilter: 'blur(16px)',
+                    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
                 }} 
             >
                 <ControlButton 
                     onClick={handleClearCanvas} 
                     title="Clear Canvas"
-                    style={{ backgroundColor: '#2A3347',
-                        color: '#A0AEC0', 
+                    style={{ 
+                        backgroundColor: 'rgba(30, 41, 59, 0.5)',
+                        color: '#94a3b8',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(148, 163, 184, 0.1)',
+                        transition: 'all 0.2s ease',
                     }}
+                    className="hover:bg-white/10 hover:scale-105 transition-all duration-200"
                 >
                     🗑
                 </ControlButton>
                 <ControlButton 
                     onClick={toggleAccountsBox}
                     title="Toggle Accounts"
-                    style={{  backgroundColor: '#2A3347',
-                        color: '#A0AEC0', }}
+                    style={{  
+                        backgroundColor: 'rgba(30, 41, 59, 0.5)',
+                        color: '#94a3b8',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(148, 163, 184, 0.1)',
+                        transition: 'all 0.2s ease',
+                    }}
+                    className="hover:bg-white/10 hover:scale-105 transition-all duration-200"
                 >
                     🗃
                 </ControlButton>
@@ -224,14 +237,14 @@ const Workflow = () => {
             </ReactFlowProvider>
 
             {/* Empty Canvas Message */}
-            {projectState.nodes.length === 0 && (
+            {(projectState?.nodes?.length || 0) === 0 && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <div className="text-center">
-                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#2A3347] mb-4">
+                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/5 backdrop-blur-sm border border-white/10 mb-4 shadow-2xl">
                             <PlusIcon className="w-6 h-6 text-[#4d7cfe]" />
                         </div>
-                        <h3 className="text-lg font-medium mb-2 text-gray-400">Start Building Your Workflow</h3>
-                        <p className="text-gray-600 max-w-md text-sm">
+                        <h3 className="text-lg font-medium mb-2 text-gray-300">Start Building Your Workflow</h3>
+                        <p className="text-gray-500 max-w-md text-sm">
                             Drag instructions from the sidebar to create your Solana workflow. Connect components to define your program logic.
                         </p>
                     </div>
@@ -241,7 +254,9 @@ const Workflow = () => {
             {/* AccountsBox Panel */}
             {uxOpenPanel === 'accountsBox' && (
                 <div className="absolute top-14 right-6 z-50">
-                    <AccountsBox />
+                    <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-xl shadow-2xl">
+                        <AccountsBox />
+                    </div>
                 </div>
             )}
         </div>

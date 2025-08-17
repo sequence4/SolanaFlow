@@ -1114,7 +1114,7 @@ export function ProgramDeployer({
   ──────────────────────────────────────────── */
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !isLoading && !open && onClose()}>
-      <DialogContent className="bg-[#121214] border-[#2a2a2d] text-white sm:max-w-md">
+      <DialogContent className="bg-gradient-to-br from-slate-900/90 via-slate-800/80 to-slate-900/90 backdrop-blur-xl border-white/10 text-white sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-lg font-medium text-white">
             Deploy Program to Devnet

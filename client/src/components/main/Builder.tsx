@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useContext } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import Workflow from "@/components/main/workflow/Workflow";
 import Interface from "@/components/main/interface/Interface";
 import Code from "@/components/main/code/Code";
@@ -89,7 +90,7 @@ const Builder = () => {
         projectContext.details.setProjectState((prevState) => {
             let changed = false;
 
-            const newNodes = prevState.nodes.map((node) => {
+            const newNodes = (prevState.nodes || []).map((node) => {
                 if (node.type !== "accountNode" || !node.data?.fields) {
                     return node; // no change
                 }
@@ -154,8 +155,12 @@ const Builder = () => {
     }, [connected, publicKey]);
 
     return (
-        <div style={{ border: '1px solid red' }}
-        className="relative flex-1 h-[98%] p-2 w-full bg-[var(--body-bg-dark)] flex flex-col justify-center items-center">
+        <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5 }}
+            className="relative flex-1 h-[98%] p-2 w-full bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex flex-col justify-center items-center"
+        >
             <Tabs
                 value={activeTab}
                 onValueChange={(val) => setActiveTab(val as ActiveTab)}
@@ -166,37 +171,60 @@ const Builder = () => {
                 <ProjectInfo />
                 <div className="w-full h-full flex">                        
                     <TabsContent value="workflow" className="h-full w-full">
-                        <div className="w-full h-full flex">
+                        <motion.div 
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.4, delay: 0.1 }}
+                            className="w-full h-full flex"
+                        >
                             {/* Left side: main content */}
                             <div className="flex-auto">
                                 <Workflow />
                             </div>
-                        </div>
+                        </motion.div>
                     </TabsContent>
                     <TabsContent value="interface" className="h-full w-full">
-                        <div className="w-full h-full flex">
+                        <motion.div 
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.4, delay: 0.1 }}
+                            className="w-full h-full flex"
+                        >
                             <div className="flex-auto">
                                 <Interface />
                             </div>
-                        </div>
+                        </motion.div>
                     </TabsContent>
                     <TabsContent value="code" className="h-full w-full">
-                        <div className="w-full h-full flex">
+                        <motion.div 
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.4, delay: 0.1 }}
+                            className="w-full h-full flex"
+                        >
                             <div className="flex-auto">
                                 <Code />
                             </div>
-                        </div>
+                        </motion.div>
                     </TabsContent>
                 </div>
                 
                 {/* Fixed Chat Panel */}
-                {isChatOpen && (
-                    <div className="fixed right-0 top-[180px] z-[9999] w-[300px] h-[calc(100vh-210px)] border-l border-[var(--border-2-dark)] bg-[var(--chat-bg-dark)] shadow-xl">
-                        <Chat />
-                    </div>
-                )}
+                <AnimatePresence>
+                    {isChatOpen && (
+                        <motion.div 
+                            initial={{ x: 300, opacity: 0 }}
+                            animate={{ x: 0, opacity: 1 }}
+                            exit={{ x: 300, opacity: 0 }}
+                            transition={{ duration: 0.3, ease: "easeInOut" }}
+                            className="fixed right-0 top-[180px] z-[9999] w-[300px] h-[calc(100vh-210px)] border-l border-white/10 bg-gradient-to-br from-slate-900/50 via-slate-800/30 to-slate-900/50 backdrop-blur-xl shadow-2xl"
+                        >
+                            <Chat />
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </Tabs>
-        </div>
+        </motion.div>
     );
 };
 

@@ -377,18 +377,18 @@ const Chat: React.FC = () => {
         <div
             className={`flex flex-col w-[32%] ${isExpanded ? "fixed inset-4 z-50" : "h-full"} transition-all duration-300 ease-in-out`}
         >
-            <div className="flex flex-col h-full bg-[#0e0e12] overflow-hidden border border-[#232329] shadow-2xl">
+            <div className="flex flex-col h-full bg-gradient-to-br from-slate-900/50 via-slate-800/30 to-slate-900/50 backdrop-blur-xl overflow-hidden border border-white/10 shadow-2xl ring-1 ring-white/5">
                 {/* Header */}
-                <div className="flex items-center justify-between px-4 py-3 bg-[#121218] border-b border-[#232329]">
+                <div className="flex items-center justify-between px-4 py-3 bg-white/5 backdrop-blur-sm border-b border-white/10">
                     <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                        <div className="w-2 h-2 rounded-full bg-green-500 shadow-lg shadow-green-500/50 animate-pulse"></div>
                         <h4 className="font-medium text-sm text-gray-300">AI Assistant</h4>
                     </div>
                     <div className="flex items-center space-x-1">
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-[#232329]"
+                            className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-white/10 backdrop-blur-sm transition-all duration-200 hover:scale-105"
                             onClick={() => setIsExpanded(!isExpanded)}
                         >
                             {isExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
@@ -396,7 +396,7 @@ const Chat: React.FC = () => {
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-[#232329]"
+                            className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-white/10 backdrop-blur-sm transition-all duration-200 hover:scale-105"
                             onClick={clearChat}
                         >
                             <Trash2 size={14} />
@@ -404,7 +404,7 @@ const Chat: React.FC = () => {
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-[#232329]"
+                            className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-white/10 backdrop-blur-sm transition-all duration-200 hover:scale-105"
                         >
                             <X size={14} />
                         </Button>
@@ -412,7 +412,7 @@ const Chat: React.FC = () => {
                 </div>
 
                 {/* Messages */}
-                <div className="text-xs flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-[#232329] scrollbar-track-transparent">
+                <div className="text-xs flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
                     <AnimatePresence>
                         {messages.map((message, index) => {
                             const isUser = message.sender === 'user';
@@ -432,10 +432,10 @@ const Chat: React.FC = () => {
                                     <div
                                         className={`max-w-[85%] rounded-lg ${
                                             isUser
-                                                ? "bg-[#0066ff] text-white rounded-tr-none"
+                                                ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-tr-none shadow-lg shadow-blue-500/25 backdrop-blur-sm"
                                                 : isLog
-                                                  ? "bg-transparent text-[#7dd3fc]"           /* cyan-ish text, no bubble */
-                                                  : "bg-[#1a1a22] text-gray-100 rounded-tl-none border border-[#2a2a33]"
+                                                  ? "bg-transparent text-cyan-300"
+                                                  : "bg-white/5 backdrop-blur-xl text-gray-100 rounded-tl-none border border-white/10 shadow-lg"
                                         }`}
                                         style={{
                                             whiteSpace: 'pre-wrap',
@@ -447,8 +447,8 @@ const Chat: React.FC = () => {
                                         <div className="p-3">
                                             <div className="flex items-start gap-2">
                                                 {!isUser && (
-                                                    <div className="mt-1 bg-[#232329] p-1 rounded-full">
-                                                        <Bot size={14} className="text-[#0066ff]" />
+                                                    <div className="mt-1 bg-white/10 backdrop-blur-sm p-1 rounded-full border border-white/10">
+                                                        <Bot size={14} className="text-blue-400" />
                                                     </div>
                                                 )}
                                                 <div className="leading-relaxed">
@@ -477,7 +477,7 @@ const Chat: React.FC = () => {
                     {/* Typing indicator */}
                     {isTyping && (
                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
-                            <div className="bg-[#1a1a22] text-gray-100 rounded-lg rounded-tl-none border border-[#2a2a33] p-3 max-w-[85%]"
+                            <div className="bg-white/5 backdrop-blur-xl text-gray-100 rounded-lg rounded-tl-none border border-white/10 p-3 max-w-[85%] shadow-lg"
                                 style={{
                                     whiteSpace: 'pre-wrap',
                                     wordWrap: 'break-word', 
@@ -486,8 +486,8 @@ const Chat: React.FC = () => {
                                 }}
                             >
                                 <div className="flex items-center gap-2">
-                                    <div className="bg-[#232329] p-1 rounded-full">
-                                        <Bot size={14} className="text-[#0066ff]" />
+                                    <div className="bg-white/10 backdrop-blur-sm p-1 rounded-full border border-white/10">
+                                        <Bot size={14} className="text-blue-400" />
                                     </div>
                                     <div className="flex space-x-1">
                                         <div className="w-2 h-2 rounded-full bg-gray-400 animate-pulse"></div>
@@ -503,34 +503,34 @@ const Chat: React.FC = () => {
                 </div>
 
                 {/* Input area */}
-                <div className="p-3 bg-[#121218] border-t border-[#232329]">
+                <div className="p-3 bg-white/5 backdrop-blur-sm border-t border-white/10">
                     <div className="flex flex-col space-y-2">
                         <div className="flex items-center gap-1 px-2">
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-[#232329]"
+                                className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-white/10 backdrop-blur-sm transition-all duration-200 hover:scale-105"
                             >
                                 <Code size={14} />
                             </Button>
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-[#232329]"
+                                className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-white/10 backdrop-blur-sm transition-all duration-200 hover:scale-105"
                             >
                                 <Image size={14} />
                             </Button>
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-[#232329]"
+                                className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-white/10 backdrop-blur-sm transition-all duration-200 hover:scale-105"
                             >
                                 <Paperclip size={14} />
                             </Button>
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-[#232329]"
+                                className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-white/10 backdrop-blur-sm transition-all duration-200 hover:scale-105"
                             >
                                 <Plus size={14} />
                             </Button>
@@ -540,7 +540,7 @@ const Chat: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-2 bg-[#1a1a22] rounded-lg p-1 border border-[#2a2a33] focus-within:ring-1 focus-within:ring-[#0066ff] focus-within:border-[#0066ff]">
+                        <div className="flex items-center gap-2 bg-white/5 backdrop-blur-sm rounded-lg p-1 border border-white/10 focus-within:ring-1 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all duration-200">
                             <textarea
                                 ref={textareaRef}
                                 value={input}
@@ -554,10 +554,10 @@ const Chat: React.FC = () => {
                             <Button
                                 onClick={sendMessage}
                                 disabled={input.trim() === ""}
-                                className={`rounded-md px-3 py-1.5 h-auto ${
+                                className={`rounded-lg px-3 py-1.5 h-auto transition-all duration-200 ${
                                     input.trim() === ""
-                                        ? "bg-[#232329] text-gray-500"
-                                        : "bg-[#0066ff] hover:bg-[#0052cc] text-white"
+                                        ? "bg-white/10 text-gray-500"
+                                        : "bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-lg shadow-blue-500/25 hover:scale-105"
                                 }`}
                             >
                                 <Send size={12} className="mr-2" />
@@ -568,10 +568,10 @@ const Chat: React.FC = () => {
                 </div>
 
                 {/* Status bar */}
-                <div className="px-4 py-1.5 bg-[#0e0e12] border-t border-[#232329] flex items-center justify-between">
+                <div className="px-4 py-1.5 bg-white/5 backdrop-blur-sm border-t border-white/10 flex items-center justify-between">
                     <div className="text-xs text-gray-500 font-mono">v1.0.0</div>
                     <div className="flex items-center space-x-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-lg shadow-green-500/50 animate-pulse"></div>
                         <span className="text-xs text-gray-500 font-mono">ONLINE</span>
                     </div>
                 </div>

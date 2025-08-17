@@ -384,16 +384,16 @@ export const Toolbox = () => {
 
     return (
         <div
-            className="app-sidebar w-[20%] flex flex-col h-full bg-[#121214] text-white border-r border-[#2a2a2d] overflow-hidden"
+            className="app-sidebar w-[20%] flex flex-col h-full bg-gradient-to-br from-slate-900 via-slate-900/95 to-slate-950 backdrop-blur-xl text-white border-r border-white/10 overflow-hidden shadow-2xl"
         >
-            <div className="p-4 border-b border-[#2a2a2d]">
+            <div className="p-4 border-b border-white/10 backdrop-blur-sm bg-white/5">
                 <div className="flex justify-between items-center">
-                    <div className="text-xs font-medium text-[#6e6e76] uppercase tracking-wider">PROJECT</div>
+                    <div className="text-xs font-medium text-slate-400 uppercase tracking-wider">PROJECT</div>
                     <div className="flex items-center space-x-2">
-                        <button className="p-1 h-7 w-7 rounded-full hover:bg-[#2a2a2d] text-[#6e6e76] hover:text-white transition-colors">
+                        <button className="p-1 h-7 w-7 rounded-full hover:bg-white/10 text-slate-400 hover:text-white transition-all duration-200 backdrop-blur-sm">
                             <Info className="h-3.5 w-3.5" />
                         </button>
-                        <button className="p-1 h-7 w-7 rounded-full hover:bg-[#2a2a2d] text-[#6e6e76] hover:text-white transition-colors">
+                        <button className="p-1 h-7 w-7 rounded-full hover:bg-white/10 text-slate-400 hover:text-white transition-all duration-200 backdrop-blur-sm">
                             <Settings className="h-3.5 w-3.5" />
                         </button>
                     </div>
@@ -406,7 +406,7 @@ export const Toolbox = () => {
                                 type="text"
                                 value={projectName}
                                 onChange={(e) => setProjectName(e.target.value)}
-                                className="bg-[#1e1e20] border border-[#2a2a2d] rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#4d7cfe] w-full"
+                                className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#4d7cfe] w-full backdrop-blur-sm"
                                 autoFocus
                                 onBlur={() => {
                                     setIsEditing(false);
@@ -430,7 +430,7 @@ export const Toolbox = () => {
                                 <h3 className="text-lg font-semibold text-white">{projectName}</h3>
                                 <button
                                     onClick={() => setIsEditing(true)}
-                                    className="p-1 rounded-full hover:bg-[#2a2a2d] text-[#6e6e76] hover:text-white transition-colors"
+                                    className="p-1 rounded-full hover:bg-white/10 text-slate-400 hover:text-white transition-all duration-200"
                                 >
                                     <Edit3 className="h-3.5 w-3.5" />
                                 </button>
@@ -438,21 +438,21 @@ export const Toolbox = () => {
                         )}
                     </div>
 
-                    <div className="flex items-center mt-2 space-x-2 text-[#6e6e76] mb-4">
-                        <span className="w-2 h-2 rounded-full bg-[#4d7cfe]"></span>
+                    <div className="flex items-center mt-2 space-x-2 text-slate-400 mb-4">
+                        <span className="w-2 h-2 rounded-full bg-[#4d7cfe] shadow-lg shadow-blue-500/20"></span>
                         <span className="text-xs">Token • Mint • Transfer</span>
                     </div>
 
                     <div className="grid grid-cols-3 gap-2 mb-4">
                         <button 
-                            className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-9 rounded-md text-xs font-medium flex items-center justify-center"
+                            className="cursor-pointer bg-white/5 border border-white/10 hover:bg-white/10 h-9 rounded-lg text-xs font-medium flex items-center justify-center backdrop-blur-sm transition-all duration-200 hover:scale-105"
                             onClick={handleOpenProjectClick}
                         >
                             <FolderOpen className="h-4 w-4 mr-2" />
                             <span className="flex items-center">Open</span>
                         </button>
                         <button 
-                            className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-9 rounded-md text-xs font-medium flex items-center justify-center"
+                            className="cursor-pointer bg-white/5 border border-white/10 hover:bg-white/10 h-9 rounded-lg text-xs font-medium flex items-center justify-center backdrop-blur-sm transition-all duration-200 hover:scale-105 disabled:opacity-50"
                             onClick={handleSaveProject}
                             disabled={!projectContext.id}
                         >
@@ -460,7 +460,7 @@ export const Toolbox = () => {
                             <span className="flex items-center">Save</span>
                         </button>
                         <button 
-                            className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-9 rounded-md text-xs font-medium flex items-center justify-center"
+                            className="cursor-pointer bg-white/5 border border-white/10 hover:bg-white/10 h-9 rounded-lg text-xs font-medium flex items-center justify-center backdrop-blur-sm transition-all duration-200 hover:scale-105"
                             onClick={handleNewProject}
                         >
                             <Plus className="h-4 w-4 mr-2" />
@@ -473,7 +473,7 @@ export const Toolbox = () => {
                             onClick={handleBuildClick}
                             // always enabled – the guard inside handleConfirmBuild
                             // will stop accidental double-clicks
-                            className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center"
+                            className="cursor-pointer bg-white/5 border border-white/10 hover:bg-white/10 h-8 rounded-lg text-xs font-medium flex items-center justify-center backdrop-blur-sm transition-all duration-200 hover:scale-105"
                         >
                             <>
                               {isBuilding ? (
@@ -489,7 +489,7 @@ export const Toolbox = () => {
                                 onClick={handleDeployClick}
                                 disabled={isDeploying}
                                 className={clsx(
-                                    'w-full cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center',
+                                    'w-full cursor-pointer bg-white/5 border border-white/10 hover:bg-white/10 h-8 rounded-lg text-xs font-medium flex items-center justify-center backdrop-blur-sm transition-all duration-200 hover:scale-105',
                                     (!walletSigner.isConnected || !built) && 'opacity-70 cursor-not-allowed'
                                 )}
                             >
@@ -512,7 +512,7 @@ export const Toolbox = () => {
                             <a 
                                 href={artifactUrl} 
                                 download="program.so" 
-                                className="cursor-pointer bg-[#1e1e20] border border-[#2a2a2d] hover:bg-[#2a2a2d] h-8 rounded-md text-xs font-medium flex items-center justify-center text-[#4d7cfe] mt-2"
+                                className="cursor-pointer bg-white/5 border border-white/10 hover:bg-white/10 h-8 rounded-lg text-xs font-medium flex items-center justify-center text-[#4d7cfe] mt-2 backdrop-blur-sm transition-all duration-200 hover:scale-105"
                             >
                                 <span>Download compiled program</span>
                             </a>
@@ -520,9 +520,9 @@ export const Toolbox = () => {
                     </div>
                     
                     {projectDeployed && projectContext.details?.projectState?.programId && (
-                        <div className="bg-[#1e1e20] border border-[#2a2a2d] rounded-md p-2 mb-4">
+                        <div className="bg-white/5 border border-white/10 rounded-lg p-3 mb-4 backdrop-blur-sm shadow-lg">
                             <div className="flex items-center text-xs">
-                                <span className="text-[#6e6e76] mr-2">Program ID:</span>
+                                <span className="text-slate-400 mr-2">Program ID:</span>
                                 <a 
                                     href={`https://explorer.solana.com/address/${projectContext.details?.projectState?.programId}?cluster=devnet`}
                                     target="_blank"
@@ -534,7 +534,7 @@ export const Toolbox = () => {
                                 </a>
                                 <button 
                                     onClick={() => window.open(`https://explorer.solana.com/address/${projectContext.details?.projectState?.programId}?cluster=devnet`, '_blank')}
-                                    className="ml-auto p-1 rounded-full hover:bg-[#2a2a2d] text-[#6e6e76] hover:text-white transition-colors"
+                                    className="ml-auto p-1 rounded-full hover:bg-white/10 text-slate-400 hover:text-white transition-all duration-200"
                                 >
                                     <ArrowRight className="h-3 w-3" />
                                 </button>
@@ -544,24 +544,24 @@ export const Toolbox = () => {
                     
                     {activeTab === 'workflow' && (
                         <>
-                            <div className="text-xs font-medium text-[#6e6e76] uppercase tracking-wider pb-2">NODE LIBRARY</div>
+                            <div className="text-xs font-medium text-slate-400 uppercase tracking-wider pb-2">NODE LIBRARY</div>
                             <Separator />            
-                            <div className="grid grid-cols-2 gap-1 p-0.5 bg-[#1e1e20] rounded-md">
+                            <div className="grid grid-cols-2 gap-1 p-0.5 bg-white/5 backdrop-blur-sm rounded-lg border border-white/10">
                                 <button
-                                    className={`h-8 rounded-md text-xs font-medium transition-all ${
+                                    className={`h-8 rounded-lg text-xs font-medium transition-all duration-200 ${
                                         activeChainTab === "on-chain"
-                                            ? "bg-[#4d7cfe] text-white hover:bg-[#4d7cfe]/90"
-                                            : "bg-transparent text-[#6e6e76] hover:bg-[#2a2a2d] hover:text-white"
+                                            ? "bg-[#4d7cfe] text-white hover:bg-[#4d7cfe]/90 shadow-lg shadow-blue-500/25"
+                                            : "bg-transparent text-slate-400 hover:bg-white/10 hover:text-white"
                                     }`}
                                     onClick={() => handleTabChange("on-chain")}
                                 >
                                     On-Chain
                                 </button>
                                 <button
-                                    className={`h-8 rounded-md text-xs font-medium transition-all ${
+                                    className={`h-8 rounded-lg text-xs font-medium transition-all duration-200 ${
                                         activeChainTab === "off-chain"
-                                            ? "bg-[#4d7cfe] text-white hover:bg-[#4d7cfe]/90"
-                                            : "bg-transparent text-[#6e6e76] hover:bg-[#2a2a2d] hover:text-white"
+                                            ? "bg-[#4d7cfe] text-white hover:bg-[#4d7cfe]/90 shadow-lg shadow-blue-500/25"
+                                            : "bg-transparent text-slate-400 hover:bg-white/10 hover:text-white"
                                     }`}
                                     onClick={() => handleTabChange("off-chain")}
                                 >
@@ -573,10 +573,10 @@ export const Toolbox = () => {
                 </div>
             </div>
 
-            <div className="p-4 border-b border-[#2a2a2d]">
+            <div className="p-4 border-b border-white/10 bg-white/5 backdrop-blur-sm">
                 <div className="relative">
                     <Search
-                        className="absolute left-4 top-2 mt-[0.4px] h-3 w-3 text-[#6e6e76]"
+                        className="absolute left-4 top-2 mt-[0.4px] h-3 w-3 text-slate-400"
                     />
 
                     <input
@@ -585,14 +585,14 @@ export const Toolbox = () => {
                         value={searchValue}
                         onChange={(e) => setSearchValue(e.target.value)}
                         placeholder="Search instructions..."
-                        className="w-full h-8 bg-[#1e1e20] border border-[#2a2a2d] rounded-lg pl-10 pr-10 py-2 text-xs text-gray-300 placeholder-[#6e6e76] focus:outline-none focus:ring-[#4d7cfe]"
+                        className="w-full h-8 bg-white/5 border border-white/10 rounded-lg pl-10 pr-10 py-2 text-xs text-gray-300 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#4d7cfe] focus:border-[#4d7cfe] backdrop-blur-sm transition-all duration-200"
                         onFocus={() => setIsFocused(true)}
                         onBlur={() => setIsFocused(false)}
                     />
 
                     {searchValue && (
                         <button
-                            className="text-[#6e6e76] hover:text-white transition-colors cursor-pointer"
+                            className="text-slate-400 hover:text-white transition-all duration-200 cursor-pointer absolute right-3 top-2"
                             onClick={() => setSearchValue("")}
                         >
                             <X className="h-4 w-4" />
@@ -600,25 +600,25 @@ export const Toolbox = () => {
                     )}
 
                     {!searchValue && !isFocused && (
-                        <div className="absolute right-3 top-2.5 text-[10px] text-[#6e6e76]">
+                        <div className="absolute right-3 top-2.5 text-[10px] text-slate-400 font-mono">
                             Ctrl+F
                         </div>
                     )}
                 </div>
 
                 {isFocused && (
-                    <div className="flex items-center justify-between mt-2 px-1 text-xs text-[#6e6e76]">
+                    <div className="flex items-center justify-between mt-2 px-1 text-xs text-slate-400">
                         <div className="flex items-center space-x-2">
-                            <button className="flex items-center space-x-1 hover:text-white transition-colors">
+                            <button className="flex items-center space-x-1 hover:text-white transition-all duration-200">
                                 <Filter className="h-3 w-3" />
                                 <span>Filters</span>
                             </button>
-                            <button className="flex items-center space-x-1 hover:text-white transition-colors">
+                            <button className="flex items-center space-x-1 hover:text-white transition-all duration-200">
                                 <Clock className="h-3 w-3" />
                                 <span>Recent</span>
                             </button>
                         </div>
-                        <button className="hover:text-white transition-colors">Advanced</button>
+                        <button className="hover:text-white transition-all duration-200">Advanced</button>
                     </div>
                 )}
             </div>
@@ -639,7 +639,7 @@ export const Toolbox = () => {
 
                 {/* INTERFACE placeholder (unchanged) */}
                 {activeTab === 'interface' && (
-                    <div className="p-4 text-[#6e6e76]">
+                    <div className="p-4 text-slate-400">
                         <p>Interface Tab Toolbox Placeholder</p>
                     </div>
                 )}

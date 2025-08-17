@@ -121,7 +121,7 @@ export function NewProjectModal({ open, onOpenChange, onSubmit }: NewProjectModa
             </div>
           </div>
 
-          <DialogFooter className="bg-[#0c111d] border-t border-[#1f2937] px-8 py-6 flex items-center justify-between">
+          <DialogFooter className="bg-white/5 backdrop-blur-sm border-t border-white/10 px-8 py-6 flex items-center justify-between">
             <div className="flex items-center justify-between gap-3 w-full">
               <Button
                 type="button"
