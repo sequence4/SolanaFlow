@@ -20,6 +20,7 @@ import '@/styles/reactflow/reactflow-style.css';
 
 import ProjectContext from "@/context/project/ProjectContext";
 import UxContext from "@/context/ux/UxContext";
+import { ProjectStateUpdater } from "@/context/project/ProjectContextTypes";
 
 import { handleDrop } from '@/utils/tabs/workflow/onDrop';
 import { useWallet } from '@solana/wallet-adapter-react';
@@ -29,7 +30,7 @@ import { darkTheme } from '@/styles/theme';
 // Separate component that uses the useReactFlow hook
 interface ReactFlowContentProps {
     projectState: any;
-    setProjectState: React.Dispatch<React.SetStateAction<any>>;
+    setProjectState: ((updater: ProjectStateUpdater) => void) | undefined;
     nodeTypes: any;
     uxOpenPanel: any;
     setUxOpenPanel: React.Dispatch<React.SetStateAction<any>>;
@@ -52,6 +53,7 @@ const ReactFlowContent = ({
     
     const onNodesChange = useCallback(
         (changes: any) => {
+          if (!setProjectState) return;
           setProjectState((prev: any) => ({
             ...prev,
             nodes: applyNodeChanges(changes, prev.nodes),
@@ -62,6 +64,7 @@ const ReactFlowContent = ({
       
     const onEdgesChange = useCallback(
         (changes: any) => {
+          if (!setProjectState) return;
           setProjectState((prev: any) => ({
             ...prev,
             edges: applyEdgeChanges(changes, prev.edges),
@@ -71,11 +74,13 @@ const ReactFlowContent = ({
     );
 
     const onConnect = useCallback(
-      (connection: any) =>
+      (connection: any) => {
+        if (!setProjectState) return;
         setProjectState((prev: any) => ({
           ...prev,
           edges: addEdge(connection, prev.edges),
-        })),
+        }));
+      },
       [setProjectState]
     );
 
@@ -115,6 +120,7 @@ const ReactFlowContent = ({
     }, []);
 
     function handleClearCanvas() {
+        if (!setProjectState) return;
         setProjectState((prev: any) => ({
             ...prev,
             nodes: [],
