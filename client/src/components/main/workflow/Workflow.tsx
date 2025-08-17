@@ -134,13 +134,15 @@ const ReactFlowContent = ({
     
     return (
         <div className="relative h-full">
-            {/* Canvas Grid Pattern */}
+            {/* Faint Grid Pattern */}
             <div 
                 className="absolute inset-0 pointer-events-none"
                 style={{
-                    backgroundImage: `radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px)`,
+                    backgroundImage: `
+                        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px)
+                    `,
                     backgroundSize: '20px 20px',
-                    backgroundPosition: '0 0, 10px 10px',
                 }}
             />
             <ReactFlow 
@@ -179,30 +181,48 @@ const ReactFlowContent = ({
             }}
         >
             <Controls 
-                className="backdrop-blur-xl bg-card border-border text-muted-foreground"
+                className="backdrop-blur-xl"
                 position="top-left" 
                 orientation="horizontal"
                 style={{ 
+                    backgroundColor: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
                     zIndex: 9999,
-                    padding: '12px',
-                    gap: '12px',
-                    borderRadius: '12px',
-                    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)',
+                    padding: '8px',
+                    gap: '8px',
+                    borderRadius: '8px',
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
                 }} 
             >
                 <ControlButton 
                     onClick={handleClearCanvas} 
                     title="Clear Canvas"
-                    className="bg-muted border-border text-muted-foreground hover:bg-muted/80 hover:scale-105 transition-all duration-200 rounded-lg"
+                    style={{
+                        backgroundColor: 'hsl(var(--muted))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '6px',
+                        padding: '6px',
+                        color: 'hsl(var(--muted-foreground))',
+                        transition: 'all 0.2s ease',
+                    }}
+                    className="hover:bg-muted/80 hover:scale-105"
                 >
-                    <Trash2 size={14} className="text-muted-foreground" />
+                    <Trash2 size={14} style={{ color: 'hsl(var(--muted-foreground))' }} />
                 </ControlButton>
                 <ControlButton 
                     onClick={toggleAccountsBox}
                     title="Toggle Accounts"
-                    className="bg-muted border-border text-muted-foreground hover:bg-muted/80 hover:scale-105 transition-all duration-200 rounded-lg"
+                    style={{
+                        backgroundColor: 'hsl(var(--muted))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '6px',
+                        padding: '6px',
+                        color: 'hsl(var(--muted-foreground))',
+                        transition: 'all 0.2s ease',
+                    }}
+                    className="hover:bg-muted/80 hover:scale-105"
                 >
-                    <Layers size={14} className="text-muted-foreground" />
+                    <Layers size={14} style={{ color: 'hsl(var(--muted-foreground))' }} />
                 </ControlButton>
             </Controls>
         </ReactFlow>
@@ -251,15 +271,11 @@ const Workflow = () => {
             {/* Empty Canvas Message */}
             {(projectState?.nodes?.length || 0) === 0 && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="text-center px-8 py-12 rounded-2xl bg-white/[0.02] backdrop-blur-sm border border-white/[0.06]">
-                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-white/10 mb-4">
-                            <PlusIcon className="w-8 h-8 text-blue-400" />
+                    <div className="text-center px-2 py-4 rounded-2xl bg-white/[0.02] backdrop-blur-sm border border-white/[0.06]">
+                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/5 to-purple-500/5 border border-white/5 mb-4">
+                            <PlusIcon className="w-4 h-4 text-blue-400/40" />
                         </div>
-                        <h3 className="text-xl font-semibold mb-2 text-white/90">Start Building Your Workflow</h3>
-                        <p className="text-white/50 max-w-md text-sm leading-relaxed">
-                            Drag instructions from the sidebar to create your Solana workflow. 
-                            Connect components to define your program logic and build powerful decentralized applications.
-                        </p>
+                        <h3 className="text-xmd font-semibold mb-2 text-white/30">Drag and drop nodes to start building your dApp</h3>
                     </div>
                 </div>
             )}
