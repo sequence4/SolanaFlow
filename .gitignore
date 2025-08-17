@@ -52,3 +52,5 @@ build.log
 !.yarn/patches
 !.yarn/sdks
 !.yarn/versions
+
+scripts/docker-config/config.json
