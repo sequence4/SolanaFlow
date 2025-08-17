@@ -1,13 +1,12 @@
 import React, { useRef, useState } from 'react';
-import { useColorModeValue } from '../../../ui/color-mode';
 import { motion } from 'framer-motion';
 import { groupedInstructions } from '../../../../data/toolbox/instructionItems'; 
 import { Star, PlusCircle } from 'lucide-react';
+import { theme } from '../../../../styles/theme';
 
 const MotionDiv = motion.div;
 
 interface InstructionCardProps {
-  key: string;
   name: string;
   icon?: React.ElementType;
   flow?: any;
@@ -98,13 +97,23 @@ export function InstructionCard({
         boxShadow: "0 10px 30px rgba(77, 124, 254, 0.3)",
         zIndex: 1000
       }}
-      className={`w-full mx-2 my-1 px-4 py-3 text-sm transition-all duration-200 rounded-lg cursor-grab active:cursor-grabbing group backdrop-blur-sm ${
-        isDragging 
-          ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/50 shadow-lg shadow-blue-500/25" 
+      className="w-full mx-1 my-0.5 px-3 py-1.5 text-sm transition-all duration-200 rounded-lg cursor-grab active:cursor-grabbing group backdrop-blur-sm border-l-2"
+      style={{
+        backgroundColor: isDragging 
+          ? theme.colors.bg.tertiary
           : isHovered 
-            ? "bg-white/5 border border-white/10" 
-            : "bg-transparent border border-transparent hover:border-white/5"
-      }`}
+            ? theme.colors.bg.hover
+            : 'transparent',
+        borderLeftColor: isDragging || isHovered 
+          ? theme.colors.accent.primary 
+          : 'transparent',
+        borderTopColor: theme.colors.border.primary,
+        borderRightColor: theme.colors.border.primary,
+        borderBottomColor: theme.colors.border.primary,
+        borderTopWidth: isDragging || isHovered ? '1px' : '0',
+        borderRightWidth: isDragging || isHovered ? '1px' : '0',
+        borderBottomWidth: isDragging || isHovered ? '1px' : '0',
+      }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onDragStart={handleDragStart as any}
@@ -112,12 +121,22 @@ export function InstructionCard({
     >
       <div className="flex items-center justify-between w-full">
         <div className="flex items-center">
-          <MotionDiv
-            animate={isDragging ? { scale: [1, 1.2, 1], rotate: [0, 180, 360] } : {}}
-            transition={{ duration: 0.6, repeat: isDragging ? Infinity : 0 }}
-            className="w-2 h-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 mr-3 shadow-lg shadow-blue-500/50"
+          <div 
+            className="w-1 h-1 rounded-full mr-2"
+            style={{ 
+              backgroundColor: isDragging || isHovered 
+                ? theme.colors.accent.primary 
+                : theme.colors.text.tertiary 
+            }}
           />
-          <span className={`font-medium transition-colors duration-200 ${isHovered || isDragging ? "text-white" : "text-slate-300"}`}>
+          <span 
+            className="text-xs font-medium transition-colors duration-200"
+            style={{ 
+              color: isHovered || isDragging 
+                ? theme.colors.text.primary 
+                : theme.colors.text.secondary 
+            }}
+          >
             {name}
           </span>
           {isNew && (
@@ -125,9 +144,14 @@ export function InstructionCard({
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               whileHover={{ scale: 1.1 }}
-              className="ml-2 text-xs px-2 py-1 rounded-full bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/30"
+              className="ml-2 text-[9px] px-1.5 py-0.5 rounded-full border"
+              style={{
+                backgroundColor: `${theme.colors.accent.info}20`,
+                color: theme.colors.accent.info,
+                borderColor: `${theme.colors.accent.info}30`,
+              }}
             >
-              New
+              NEW
             </MotionDiv>
           )}
         </div>
@@ -140,21 +164,42 @@ export function InstructionCard({
             whileHover={{ scale: 1.2 }}
             whileTap={{ scale: 0.9 }}
             onClick={toggleFavorite}
-            className={`p-1.5 rounded-lg backdrop-blur-sm transition-all duration-200 ${
-              isFavorite 
-                ? "text-amber-400 bg-amber-500/10 border border-amber-500/20" 
-                : "text-slate-400 hover:text-amber-400 hover:bg-amber-500/10"
-            }`}
+            className="p-0.5 rounded transition-all duration-200"
+            style={{
+              color: isFavorite ? theme.colors.accent.warning : theme.colors.text.tertiary,
+              backgroundColor: isFavorite ? `${theme.colors.accent.warning}10` : 'transparent',
+            }}
+            onMouseEnter={(e) => {
+              if (!isFavorite) {
+                e.currentTarget.style.color = theme.colors.accent.warning;
+                e.currentTarget.style.backgroundColor = `${theme.colors.accent.warning}10`;
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isFavorite) {
+                e.currentTarget.style.color = theme.colors.text.tertiary;
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }
+            }}
           >
-            <Star className={`h-3 w-3 ${isFavorite ? "fill-current" : ""}`} />
+            <Star className={`h-2.5 w-2.5 ${isFavorite ? "fill-current" : ""}`} />
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.2 }}
             whileTap={{ scale: 0.9 }}
             onClick={handleAdd}
-            className="p-1.5 rounded-lg backdrop-blur-sm text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 transition-all duration-200"
+            className="p-0.5 rounded transition-all duration-200"
+            style={{ color: theme.colors.text.tertiary }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = theme.colors.accent.primary;
+              e.currentTarget.style.backgroundColor = `${theme.colors.accent.primary}10`;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = theme.colors.text.tertiary;
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
           >
-            <PlusCircle className="h-3 w-3" />
+            <PlusCircle className="h-2.5 w-2.5" />
           </motion.button>
         </MotionDiv>
       </div>

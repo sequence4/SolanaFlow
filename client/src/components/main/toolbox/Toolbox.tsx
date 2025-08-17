@@ -10,35 +10,29 @@ import UxContext from '@/context/ux/UxContext';
 import eventBus from '@/lib/eventBus';
 import 'simplebar-react/dist/simplebar.min.css';
 import { Dialog, DialogContent, DialogDescription } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { NewProjectModal } from '@/components/ui/new-project-modal';
 import ProjectListPopover from '../workflow/ProjectListPopover';
 import { toast } from "sonner";
-import clsx from "clsx";
 import PulseLoader from "react-spinners/PulseLoader";
 import { handleConfirmNewProject, handleOpenProject, handleSaveClick, handleNewProjectClick } from '@/utils/project/projectUtils';
 import {
   Search,
   X,
-  Filter,
-  Settings,
-  Clock,
-  Edit3,
   ArrowRight,
-  Info,
   FolderOpen,
   Save,
   Plus,
   Rocket,
   Hammer,
+  Edit2,
 } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
 import { deployPipeline } from '@/api/deployPipeline';
 import { useWalletSigner } from '@/utils/wallet';
 import { ensureId } from '@/utils/project/ensureId';
 import { ProgramDeployer } from '@/components/ProgramDeployer';
 import { projectApi } from '@/api/projectApi';
 import { useTaskLogs } from '@/context/logs/useTaskLogs';
+import { theme } from '@/styles/theme';
 
 // Add this constant after the imports section
 // Prevent duplicate "wallet not connected" toasts
@@ -67,14 +61,13 @@ export const Toolbox = () => {
     const esRef = useRef<ReturnType<typeof deployPipeline> | null>(null);
     const containerURLRef = useRef<string | null>(null);
     const pollingCancelledRef = useRef<boolean>(false);
-    const [artifactUrl, setArtifactUrl] = useState<string | null>(null);
     const taskLogs = useTaskLogs();
     
     const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
     const [isProjectListModalOpen, setIsProjectListModalOpen] = useState(false);
     const [projectsRefreshCounter, setProjectsRefreshCounter] = useState(0);
     
-    const [isDeploying, setIsDeploying] = useState(false);
+    const [isDeploying] = useState(false);
     const [isBuilding, setIsBuilding] = useState(false);
     const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
     
@@ -282,7 +275,6 @@ export const Toolbox = () => {
     
     const projectDeployed = !!projectContext?.details?.projectState?.deployed;
     const built = !!projectContext.details?.projectState?.built;
-    const canDeploy = fileTree !== null || projectDeployed;
 
     const handleDeployClick = useCallback(() => {
         /* Wallet gate */
@@ -384,243 +376,397 @@ export const Toolbox = () => {
 
     return (
         <div
-            className="app-sidebar w-[20%] flex flex-col h-full bg-gradient-to-br from-slate-900 via-slate-900/95 to-slate-950 backdrop-blur-xl text-white border-r border-white/10 overflow-hidden shadow-2xl"
+            className="app-sidebar w-[20%] flex flex-col h-full backdrop-blur-xl text-white border-r overflow-hidden shadow-2xl"
+            style={{
+                backgroundColor: theme.colors.bg.primary,
+                borderColor: theme.colors.border.primary,
+            }}
         >
-            <div className="p-4 border-b border-white/10 backdrop-blur-sm bg-white/5">
-                <div className="flex justify-between items-center">
-                    <div className="text-xs font-medium text-slate-400 uppercase tracking-wider">PROJECT</div>
-                    <div className="flex items-center space-x-2">
-                        <button className="p-1 h-7 w-7 rounded-full hover:bg-white/10 text-slate-400 hover:text-white transition-all duration-200 backdrop-blur-sm">
-                            <Info className="h-3.5 w-3.5" />
-                        </button>
-                        <button className="p-1 h-7 w-7 rounded-full hover:bg-white/10 text-slate-400 hover:text-white transition-all duration-200 backdrop-blur-sm">
-                            <Settings className="h-3.5 w-3.5" />
-                        </button>
-                    </div>
-                </div>
-
-                <div className="mt-3">
-                    <div className="flex items-center">
-                        {isEditing ? (
-                            <input
-                                type="text"
-                                value={projectName}
-                                onChange={(e) => setProjectName(e.target.value)}
-                                className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#4d7cfe] w-full backdrop-blur-sm"
-                                autoFocus
-                                onBlur={() => {
-                                    setIsEditing(false);
-                                    setProjectContext((prev) => ({
-                                        ...prev,
-                                        name: projectName
-                                    }));
-                                }}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
+            {/* Compact Project Controls Section */}
+            <div 
+                className="border-b backdrop-blur-sm"
+                style={{
+                    borderColor: theme.colors.border.primary,
+                    backgroundColor: theme.colors.bg.hover,
+                }}
+            >
+                <div className="space-y-2 px-3 py-2">
+                    {/* Project Name with inline edit */}
+                    <div className="flex items-center gap-2 h-8">
+                        <div 
+                            className="flex-1 px-2 py-1 rounded-md border"
+                            style={{
+                                backgroundColor: theme.colors.bg.hover,
+                                borderColor: theme.colors.border.primary,
+                            }}
+                        >
+                            {isEditing ? (
+                                <input
+                                    type="text"
+                                    value={projectName}
+                                    onChange={(e) => setProjectName(e.target.value)}
+                                    className="bg-transparent text-sm font-medium w-full focus:outline-none"
+                                    style={{ color: theme.colors.text.primary }}
+                                    autoFocus
+                                    onBlur={() => {
                                         setIsEditing(false);
                                         setProjectContext((prev) => ({
                                             ...prev,
                                             name: projectName
                                         }));
-                                    }
-                                }}
-                            />
-                        ) : (
-                            <div className="flex items-center justify-between w-full">
-                                <h3 className="text-lg font-semibold text-white">{projectName}</h3>
-                                <button
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                            setIsEditing(false);
+                                            setProjectContext((prev) => ({
+                                                ...prev,
+                                                name: projectName
+                                            }));
+                                        }
+                                    }}
+                                />
+                            ) : (
+                                <div 
+                                    className="text-sm font-medium truncate cursor-pointer"
+                                    style={{ color: theme.colors.text.primary }}
                                     onClick={() => setIsEditing(true)}
-                                    className="p-1 rounded-full hover:bg-white/10 text-slate-400 hover:text-white transition-all duration-200"
                                 >
-                                    <Edit3 className="h-3.5 w-3.5" />
-                                </button>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="flex items-center mt-2 space-x-2 text-slate-400 mb-4">
-                        <span className="w-2 h-2 rounded-full bg-[#4d7cfe] shadow-lg shadow-blue-500/20"></span>
-                        <span className="text-xs">Token • Mint • Transfer</span>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 mb-4">
+                                    {projectName}
+                                </div>
+                            )}
+                        </div>
                         <button 
-                            className="cursor-pointer bg-white/5 border border-white/10 hover:bg-white/10 h-9 rounded-lg text-xs font-medium flex items-center justify-center backdrop-blur-sm transition-all duration-200 hover:scale-105"
-                            onClick={handleOpenProjectClick}
+                            onClick={() => setIsEditing(true)}
+                            className="p-1.5 hover:bg-white/10 rounded-md transition-colors"
                         >
-                            <FolderOpen className="h-4 w-4 mr-2" />
-                            <span className="flex items-center">Open</span>
+                            <Edit2 size={14} style={{ color: theme.colors.text.secondary }} />
+                        </button>
+                    </div>
+                    
+                    {/* Compact 2x3 Button Grid */}
+                    <div className="grid grid-cols-3 gap-1">
+                        <button 
+                            onClick={handleOpenProjectClick}
+                            className="h-7 px-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105"
+                            style={{
+                                backgroundColor: theme.colors.bg.hover,
+                                borderColor: theme.colors.border.primary,
+                                color: theme.colors.text.primary,
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = theme.colors.bg.tertiary;
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = theme.colors.bg.hover;
+                            }}
+                        >
+                            <FolderOpen size={12} />
+                            <span>Open</span>
                         </button>
                         <button 
-                            className="cursor-pointer bg-white/5 border border-white/10 hover:bg-white/10 h-9 rounded-lg text-xs font-medium flex items-center justify-center backdrop-blur-sm transition-all duration-200 hover:scale-105 disabled:opacity-50"
                             onClick={handleSaveProject}
                             disabled={!projectContext.id}
+                            className="h-7 px-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 disabled:opacity-50"
+                            style={{
+                                backgroundColor: theme.colors.bg.hover,
+                                borderColor: theme.colors.border.primary,
+                                color: theme.colors.text.primary,
+                            }}
+                            onMouseEnter={(e) => {
+                                if (!e.currentTarget.disabled) {
+                                    e.currentTarget.style.backgroundColor = theme.colors.bg.tertiary;
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = theme.colors.bg.hover;
+                            }}
                         >
-                            <Save className="h-4 w-4 mr-2" />
-                            <span className="flex items-center">Save</span>
+                            <Save size={12} />
+                            <span>Save</span>
                         </button>
                         <button 
-                            className="cursor-pointer bg-white/5 border border-white/10 hover:bg-white/10 h-9 rounded-lg text-xs font-medium flex items-center justify-center backdrop-blur-sm transition-all duration-200 hover:scale-105"
                             onClick={handleNewProject}
+                            className="h-7 px-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105"
+                            style={{
+                                backgroundColor: theme.colors.bg.hover,
+                                borderColor: theme.colors.border.primary,
+                                color: theme.colors.text.primary,
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = theme.colors.bg.tertiary;
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = theme.colors.bg.hover;
+                            }}
                         >
-                            <Plus className="h-4 w-4 mr-2" />
-                            <span className="flex items-center">New</span>
+                            <Plus size={12} />
+                            <span>New</span>
                         </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-2 mb-4">
+                        
+                        {/* Second row - Build/Deploy */}
                         <button
                             onClick={handleBuildClick}
-                            // always enabled – the guard inside handleConfirmBuild
-                            // will stop accidental double-clicks
-                            className="cursor-pointer bg-white/5 border border-white/10 hover:bg-white/10 h-8 rounded-lg text-xs font-medium flex items-center justify-center backdrop-blur-sm transition-all duration-200 hover:scale-105"
+                            className="h-7 col-span-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105"
+                            style={{
+                                background: `linear-gradient(to right, ${theme.colors.accent.success}20, ${theme.colors.accent.success}20)`,
+                                borderColor: `${theme.colors.accent.success}30`,
+                                color: theme.colors.accent.success,
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = `linear-gradient(to right, ${theme.colors.accent.success}30, ${theme.colors.accent.success}30)`;
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = `linear-gradient(to right, ${theme.colors.accent.success}20, ${theme.colors.accent.success}20)`;
+                            }}
                         >
-                            <>
-                              {isBuilding ? (
-                                <PulseLoader color="#9de19f" size={3} cssOverride={{ display: 'inline-block', margin: 0 }} />
-                              ) : (
-                                <Hammer className="h-4 w-4 mr-2 text-[#22c55e]" />
-                              )}
-                              <span>Build</span>
-                            </>
+                            {isBuilding ? (
+                                <PulseLoader color={theme.colors.accent.success} size={3} cssOverride={{ display: 'inline-block', margin: 0 }} />
+                            ) : (
+                                <Hammer size={12} style={{ color: theme.colors.accent.success }} />
+                            )}
+                            <span style={{ color: `${theme.colors.accent.success}cc` }}>Build</span>
                         </button>
-                        <div className="relative">
-                            <button
-                                onClick={handleDeployClick}
-                                disabled={isDeploying}
-                                className={clsx(
-                                    'w-full cursor-pointer bg-white/5 border border-white/10 hover:bg-white/10 h-8 rounded-lg text-xs font-medium flex items-center justify-center backdrop-blur-sm transition-all duration-200 hover:scale-105',
-                                    (!walletSigner.isConnected || !built) && 'opacity-70 cursor-not-allowed'
-                                )}
+                        <button
+                            onClick={handleDeployClick}
+                            disabled={isDeploying || !walletSigner.isConnected || !built}
+                            className="h-7 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 disabled:opacity-50"
+                            style={{
+                                background: `linear-gradient(to right, ${theme.colors.accent.primary}20, ${theme.colors.accent.primary}20)`,
+                                borderColor: `${theme.colors.accent.primary}30`,
+                                color: theme.colors.accent.primary,
+                            }}
+                            onMouseEnter={(e) => {
+                                if (!e.currentTarget.disabled) {
+                                    e.currentTarget.style.background = `linear-gradient(to right, ${theme.colors.accent.primary}30, ${theme.colors.accent.primary}30)`;
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = `linear-gradient(to right, ${theme.colors.accent.primary}20, ${theme.colors.accent.primary}20)`;
+                            }}
+                        >
+                            {isDeploying ? (
+                                <PulseLoader color={theme.colors.accent.primary} size={3} cssOverride={{ display: 'inline-block', margin: 0 }} />
+                            ) : (
+                                <Rocket size={12} style={{ color: projectDeployed ? theme.colors.accent.success : theme.colors.accent.primary }} />
+                            )}
+                            <span style={{ color: `${theme.colors.accent.primary}cc` }}>
+                                {projectDeployed ? "Deployed" : "Deploy"}
+                            </span>
+                        </button>
+                    </div>
+                    
+                    {/* Status Indicators - Compact Pills */}
+                    <div className="flex gap-1 justify-center">
+                        <div 
+                            className="px-2 py-0.5 border rounded-full"
+                            style={{
+                                backgroundColor: `${theme.colors.accent.success}10`,
+                                borderColor: `${theme.colors.accent.success}20`,
+                            }}
+                        >
+                            <span className="text-[10px]" style={{ color: theme.colors.accent.success }}>Ready</span>
+                        </div>
+                        <div 
+                            className="px-2 py-0.5 border rounded-full"
+                            style={{
+                                backgroundColor: `${theme.colors.accent.primary}10`,
+                                borderColor: `${theme.colors.accent.primary}20`,
+                            }}
+                        >
+                            <span className="text-[10px]" style={{ color: theme.colors.accent.primary }}>Token • Mint</span>
+                        </div>
+                    </div>
+                </div>
+                
+                {/* Program ID Display */}
+                {projectDeployed && projectContext.details?.projectState?.programId && (
+                    <div 
+                        className="mx-3 mb-2 rounded-lg p-2 border backdrop-blur-sm"
+                        style={{
+                            backgroundColor: theme.colors.bg.hover,
+                            borderColor: theme.colors.border.primary,
+                        }}
+                    >
+                        <div className="flex items-center text-xs">
+                            <span style={{ color: theme.colors.text.secondary }}>Program ID:</span>
+                            <a 
+                                href={`https://explorer.solana.com/address/${projectContext.details?.projectState?.programId}?cluster=devnet`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="ml-2 truncate hover:underline"
+                                style={{ color: theme.colors.accent.primary }}
+                                title={projectContext.details?.projectState?.programId}
                             >
-                                {isDeploying ? (
-                                    <PulseLoader
-                                        color="#80a3ff"
-                                        size={3}
-                                        cssOverride={{ display: 'inline-block', margin: '0' }}
-                                    />
-                                ) : (
-                                    <>
-                                        <Rocket className={`h-4 w-4 mr-2 ${projectDeployed ? "text-[#9de19f]" : ""}`} />
-                                        <span>{projectDeployed ? "Program Deployed" : "Deploy Program"}</span>
-                                    </>
-                                )}
+                                {projectContext.details?.projectState?.programId?.substring(0, 20)}...
+                            </a>
+                            <button 
+                                onClick={() => window.open(`https://explorer.solana.com/address/${projectContext.details?.projectState?.programId}?cluster=devnet`, '_blank')}
+                                className="ml-auto p-1 rounded-full hover:bg-white/10 transition-colors"
+                            >
+                                <ArrowRight className="h-3 w-3" style={{ color: theme.colors.text.secondary }} />
                             </button>
                         </div>
-                        
-                        {artifactUrl && (
-                            <a 
-                                href={artifactUrl} 
-                                download="program.so" 
-                                className="cursor-pointer bg-white/5 border border-white/10 hover:bg-white/10 h-8 rounded-lg text-xs font-medium flex items-center justify-center text-[#4d7cfe] mt-2 backdrop-blur-sm transition-all duration-200 hover:scale-105"
+                    </div>
+                )}
+                
+                {/* Node Library Tab Switcher */}
+                {activeTab === 'workflow' && (
+                    <div className="px-3 pb-2">
+                        <div 
+                            className="flex p-0.5 rounded-lg"
+                            style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
+                        >
+                            <button
+                                onClick={() => handleTabChange("on-chain")}
+                                className="flex-1 h-7 rounded-md text-xs font-medium transition-all"
+                                style={{
+                                    background: activeChainTab === "on-chain" 
+                                        ? `linear-gradient(to right, ${theme.colors.accent.primary}cc, ${theme.colors.accent.primary}cc)`
+                                        : 'transparent',
+                                    color: activeChainTab === "on-chain" 
+                                        ? theme.colors.text.primary 
+                                        : theme.colors.text.secondary,
+                                    boxShadow: activeChainTab === "on-chain" 
+                                        ? `0 4px 12px ${theme.colors.accent.primary}25`
+                                        : 'none',
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (activeChainTab !== "on-chain") {
+                                        e.currentTarget.style.color = theme.colors.text.primary;
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (activeChainTab !== "on-chain") {
+                                        e.currentTarget.style.color = theme.colors.text.secondary;
+                                    }
+                                }}
                             >
-                                <span>Download compiled program</span>
-                            </a>
+                                On-Chain
+                            </button>
+                            <button
+                                onClick={() => handleTabChange("off-chain")}
+                                className="flex-1 h-7 rounded-md text-xs font-medium transition-all"
+                                style={{
+                                    background: activeChainTab === "off-chain" 
+                                        ? `linear-gradient(to right, ${theme.colors.accent.primary}cc, ${theme.colors.accent.primary}cc)`
+                                        : 'transparent',
+                                    color: activeChainTab === "off-chain" 
+                                        ? theme.colors.text.primary 
+                                        : theme.colors.text.secondary,
+                                    boxShadow: activeChainTab === "off-chain" 
+                                        ? `0 4px 12px ${theme.colors.accent.primary}25`
+                                        : 'none',
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (activeChainTab !== "off-chain") {
+                                        e.currentTarget.style.color = theme.colors.text.primary;
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (activeChainTab !== "off-chain") {
+                                        e.currentTarget.style.color = theme.colors.text.secondary;
+                                    }
+                                }}
+                            >
+                                Off-Chain
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Enhanced Search Bar */}
+            <div 
+                className="border-t border-b backdrop-blur-sm"
+                style={{
+                    borderColor: theme.colors.border.secondary,
+                    backgroundColor: theme.colors.bg.hover,
+                }}
+            >
+                <div className="px-3 py-2">
+                    <div className="relative group">
+                        <div 
+                            className="absolute inset-0 rounded-lg blur-xl opacity-0 group-focus-within:opacity-50 transition-opacity"
+                            style={{
+                                background: `linear-gradient(to right, ${theme.colors.accent.primary}20, ${theme.colors.accent.purple}20)`,
+                            }}
+                        />
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            value={searchValue}
+                            onChange={(e) => setSearchValue(e.target.value)}
+                            placeholder="Search nodes..."
+                            className="relative w-full h-8 rounded-lg pl-8 pr-8 text-xs transition-all focus:outline-none"
+                            style={{
+                                backgroundColor: theme.colors.bg.hover,
+                                borderWidth: '1px',
+                                borderStyle: 'solid',
+                                borderColor: isFocused ? theme.colors.border.accent : theme.colors.border.primary,
+                                color: theme.colors.text.primary,
+                            }}
+                            onFocus={() => {
+                                setIsFocused(true);
+                                const input = inputRef.current;
+                                if (input) {
+                                    input.style.backgroundColor = theme.colors.bg.tertiary;
+                                }
+                            }}
+                            onBlur={() => {
+                                setIsFocused(false);
+                                const input = inputRef.current;
+                                if (input) {
+                                    input.style.backgroundColor = theme.colors.bg.hover;
+                                }
+                            }}
+                        />
+                        <Search 
+                            className="absolute left-2.5 top-2.5 h-3 w-3" 
+                            style={{ color: theme.colors.text.tertiary }}
+                        />
+                        {searchValue && (
+                            <button
+                                className="absolute right-2 top-2 p-0.5 hover:bg-white/10 rounded transition-colors"
+                                onClick={() => setSearchValue("")}
+                            >
+                                <X className="h-3 w-3" style={{ color: theme.colors.text.secondary }} />
+                            </button>
+                        )}
+                        {!searchValue && !isFocused && (
+                            <div 
+                                className="absolute right-3 top-2.5 text-[10px] font-mono"
+                                style={{ color: theme.colors.text.tertiary }}
+                            >
+                                Ctrl+F
+                            </div>
                         )}
                     </div>
                     
-                    {projectDeployed && projectContext.details?.projectState?.programId && (
-                        <div className="bg-white/5 border border-white/10 rounded-lg p-3 mb-4 backdrop-blur-sm shadow-lg">
-                            <div className="flex items-center text-xs">
-                                <span className="text-slate-400 mr-2">Program ID:</span>
-                                <a 
-                                    href={`https://explorer.solana.com/address/${projectContext.details?.projectState?.programId}?cluster=devnet`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-[#4d7cfe] hover:text-[#4d7cfe]/90 truncate"
-                                    title={projectContext.details?.projectState?.programId}
-                                >
-                                    {projectContext.details?.projectState?.programId?.substring(0, 20)}...
-                                </a>
-                                <button 
-                                    onClick={() => window.open(`https://explorer.solana.com/address/${projectContext.details?.projectState?.programId}?cluster=devnet`, '_blank')}
-                                    className="ml-auto p-1 rounded-full hover:bg-white/10 text-slate-400 hover:text-white transition-all duration-200"
-                                >
-                                    <ArrowRight className="h-3 w-3" />
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                    
-                    {activeTab === 'workflow' && (
-                        <>
-                            <div className="text-xs font-medium text-slate-400 uppercase tracking-wider pb-2">NODE LIBRARY</div>
-                            <Separator />            
-                            <div className="grid grid-cols-2 gap-1 p-0.5 bg-white/5 backdrop-blur-sm rounded-lg border border-white/10">
-                                <button
-                                    className={`h-8 rounded-lg text-xs font-medium transition-all duration-200 ${
-                                        activeChainTab === "on-chain"
-                                            ? "bg-[#4d7cfe] text-white hover:bg-[#4d7cfe]/90 shadow-lg shadow-blue-500/25"
-                                            : "bg-transparent text-slate-400 hover:bg-white/10 hover:text-white"
-                                    }`}
-                                    onClick={() => handleTabChange("on-chain")}
-                                >
-                                    On-Chain
-                                </button>
-                                <button
-                                    className={`h-8 rounded-lg text-xs font-medium transition-all duration-200 ${
-                                        activeChainTab === "off-chain"
-                                            ? "bg-[#4d7cfe] text-white hover:bg-[#4d7cfe]/90 shadow-lg shadow-blue-500/25"
-                                            : "bg-transparent text-slate-400 hover:bg-white/10 hover:text-white"
-                                    }`}
-                                    onClick={() => handleTabChange("off-chain")}
-                                >
-                                    Off-Chain
-                                </button>
-                            </div>
-                        </>
-                    )}
-                </div>
-            </div>
-
-            <div className="p-4 border-b border-white/10 bg-white/5 backdrop-blur-sm">
-                <div className="relative">
-                    <Search
-                        className="absolute left-4 top-2 mt-[0.4px] h-3 w-3 text-slate-400"
-                    />
-
-                    <input
-                        ref={inputRef}
-                        type="text"
-                        value={searchValue}
-                        onChange={(e) => setSearchValue(e.target.value)}
-                        placeholder="Search instructions..."
-                        className="w-full h-8 bg-white/5 border border-white/10 rounded-lg pl-10 pr-10 py-2 text-xs text-gray-300 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#4d7cfe] focus:border-[#4d7cfe] backdrop-blur-sm transition-all duration-200"
-                        onFocus={() => setIsFocused(true)}
-                        onBlur={() => setIsFocused(false)}
-                    />
-
-                    {searchValue && (
-                        <button
-                            className="text-slate-400 hover:text-white transition-all duration-200 cursor-pointer absolute right-3 top-2"
-                            onClick={() => setSearchValue("")}
-                        >
-                            <X className="h-4 w-4" />
-                        </button>
-                    )}
-
-                    {!searchValue && !isFocused && (
-                        <div className="absolute right-3 top-2.5 text-[10px] text-slate-400 font-mono">
-                            Ctrl+F
-                        </div>
-                    )}
-                </div>
-
-                {isFocused && (
-                    <div className="flex items-center justify-between mt-2 px-1 text-xs text-slate-400">
-                        <div className="flex items-center space-x-2">
-                            <button className="flex items-center space-x-1 hover:text-white transition-all duration-200">
-                                <Filter className="h-3 w-3" />
-                                <span>Filters</span>
+                    {/* Quick Filters - Tiny Pills */}
+                    <div className="flex gap-1 mt-2">
+                        {['Recent', 'Favorites', 'Popular'].map((filter) => (
+                            <button
+                                key={filter}
+                                className="px-2 py-0.5 text-[10px] border rounded-full transition-all hover:scale-105"
+                                style={{
+                                    backgroundColor: theme.colors.bg.hover,
+                                    borderColor: theme.colors.border.primary,
+                                    color: theme.colors.text.secondary,
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = theme.colors.bg.tertiary;
+                                    e.currentTarget.style.color = theme.colors.text.primary;
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = theme.colors.bg.hover;
+                                    e.currentTarget.style.color = theme.colors.text.secondary;
+                                }}
+                            >
+                                {filter}
                             </button>
-                            <button className="flex items-center space-x-1 hover:text-white transition-all duration-200">
-                                <Clock className="h-3 w-3" />
-                                <span>Recent</span>
-                            </button>
-                        </div>
-                        <button className="hover:text-white transition-all duration-200">Advanced</button>
+                        ))}
                     </div>
-                )}
+                </div>
             </div>
 
             <div className="flex-1 overflow-hidden">
@@ -674,7 +820,7 @@ export const Toolbox = () => {
                     <ProjectListPopover
                         modalIsOpen={isProjectListModalOpen}
                         refreshTrigger={projectsRefreshCounter}
-                        onProjectClick={(projectId, projectName) => {
+                        onProjectClick={(projectId) => {
                             handleOpenProject(projectId, projectContext, setProjectContext, setSelectedFile);
                             setIsProjectListModalOpen(false);
                         }}

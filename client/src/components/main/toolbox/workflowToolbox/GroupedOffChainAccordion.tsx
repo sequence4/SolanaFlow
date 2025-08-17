@@ -18,6 +18,7 @@ import {
     Coins
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { theme } from "../../../../styles/theme";
 
 // Add styles for the accordion
 const accordionStyles = `
@@ -106,23 +107,35 @@ export function GroupedOffChainAccordion() {
                         >
                             <AccordionItem
                                 value={group.label}
-                                className="border-b border-white/10 accordion-item overflow-hidden"
+                                className="border-b accordion-item overflow-hidden"
+                                style={{ borderColor: theme.colors.border.primary }}
                             >
                                 <AccordionItemTrigger
-                                    className="group flex items-center justify-between w-full p-4 text-sm font-medium transition-all duration-300 hover:bg-white/5 backdrop-blur-sm relative"
+                                    className="group flex items-center justify-between w-full px-3 py-2 text-sm font-medium transition-all duration-300 backdrop-blur-sm relative hover:bg-opacity-5"
+                                    style={{
+                                        backgroundColor: 'transparent',
+                                    }}
                                 >
                                     {/* Gradient background on hover */}
                                     <div className={`absolute inset-0 bg-gradient-to-r ${group.gradient}/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
                                     
-                                    <div className="flex items-center gap-3 relative z-10">
+                                    <div className="flex items-center gap-2 relative z-10">
                                         <motion.div
                                             whileHover={{ scale: 1.1, rotate: 5 }}
-                                            className={`h-6 w-6 rounded-lg bg-gradient-to-r ${group.gradient} flex items-center justify-center shadow-lg`}
-                                            style={{ boxShadow: `0 4px 20px ${group.color === 'blue' ? 'rgba(59, 130, 246, 0.3)' : group.color === 'purple' ? 'rgba(168, 85, 247, 0.3)' : group.color === 'green' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}` }}
+                                            className="h-6 w-6 rounded-md flex items-center justify-center"
+                                            style={{
+                                                background: `linear-gradient(to right, ${group.color === 'blue' ? theme.colors.accent.primary : group.color === 'purple' ? theme.colors.accent.purple : group.color === 'green' ? theme.colors.accent.success : theme.colors.accent.warning}20, ${group.color === 'blue' ? theme.colors.accent.primary : group.color === 'purple' ? theme.colors.accent.purple : group.color === 'green' ? theme.colors.accent.success : theme.colors.accent.warning}20)`,
+                                                borderWidth: '1px',
+                                                borderStyle: 'solid',
+                                                borderColor: theme.colors.border.primary,
+                                            }}
                                         >
                                             {group.icon}
                                         </motion.div>
-                                        <span className="font-semibold text-white group-hover:text-white transition-colors duration-200">
+                                        <span 
+                                            className="text-xs font-medium transition-colors duration-200"
+                                            style={{ color: theme.colors.text.primary }}
+                                        >
                                             {group.label}
                                         </span>
                                     </div>
@@ -130,7 +143,12 @@ export function GroupedOffChainAccordion() {
                                     <div className="flex items-center gap-2 relative z-10">
                                         <motion.span 
                                             whileHover={{ scale: 1.05 }}
-                                            className={`text-xs px-2 py-1 rounded-full bg-gradient-to-r ${group.gradient}/20 text-white border border-white/10`}
+                                            className="px-1.5 py-0.5 text-[10px] rounded-md border"
+                                            style={{
+                                                backgroundColor: theme.colors.bg.tertiary,
+                                                borderColor: theme.colors.border.primary,
+                                                color: theme.colors.text.secondary,
+                                            }}
                                         >
                                             {group.items.length}
                                         </motion.span>
@@ -138,7 +156,10 @@ export function GroupedOffChainAccordion() {
                                             animate={{ rotate: isOpen ? 180 : 0 }}
                                             transition={{ duration: 0.3, ease: "easeInOut" }}
                                         >
-                                            <ChevronDown className="h-4 w-4 text-slate-400 group-hover:text-white transition-colors duration-200" />
+                                            <ChevronDown 
+                                                className="h-3 w-3 transition-colors duration-200" 
+                                                style={{ color: theme.colors.text.tertiary }}
+                                            />
                                         </motion.div>
                                     </div>
                                 </AccordionItemTrigger>
@@ -151,17 +172,20 @@ export function GroupedOffChainAccordion() {
                                                 animate={{ height: "auto", opacity: 1 }}
                                                 exit={{ height: 0, opacity: 0 }}
                                                 transition={{ duration: 0.3, ease: "easeInOut" }}
-                                                className="border-l-2 border-gradient-to-b from-transparent via-white/20 to-transparent ml-4"
+                                                className="border-l-2 ml-4"
+                                                style={{
+                                                    borderColor: theme.colors.border.secondary,
+                                                }}
                                             >
-                                                <div className="pl-6 pr-4 pb-2 space-y-1">
+                                                <div className="pl-4 pr-3 pb-1 space-y-0.5">
                                                     {group.items.map((instruction, itemIndex) => (
                                                         <motion.div
                                                             key={instruction.name}
-                                                            initial={{ opacity: 0, x: -20 }}
+                                                            initial={{ opacity: 0, x: -10 }}
                                                             animate={{ opacity: 1, x: 0 }}
                                                             transition={{ 
                                                                 duration: 0.2, 
-                                                                delay: itemIndex * 0.05,
+                                                                delay: itemIndex * 0.03,
                                                                 ease: "easeOut"
                                                             }}
                                                             className="text-sm w-full"
