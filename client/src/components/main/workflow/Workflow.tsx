@@ -24,6 +24,7 @@ import UxContext from "@/context/ux/UxContext";
 import { handleDrop } from '@/utils/tabs/workflow/onDrop';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { PlusIcon } from 'lucide-react';
+import { darkTheme } from '@/styles/theme';
 
 // Separate component that uses the useReactFlow hook
 interface ReactFlowContentProps {
@@ -131,8 +132,8 @@ const ReactFlowContent = ({
             nodes={projectState.nodes} 
             edges={projectState.edges} 
             style={{
-                background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)', 
-                border: 'none!important',
+                background: darkTheme.background.canvas, // CONSISTENT with app background
+                border: 'none',
                 position: 'relative',
             }}
             nodeTypes={nodeTypes}
@@ -145,34 +146,38 @@ const ReactFlowContent = ({
             onEdgesChange={onEdgesChange}
             onNodeClick={onNodeClick}
             defaultEdgeOptions={{ 
-                style: { stroke: '#98b5ff', strokeWidth: 2 },
-                type: 'default'
+                style: { 
+                    stroke: darkTheme.border.active,
+                    strokeWidth: 2,
+                    filter: `drop-shadow(0 0 4px ${darkTheme.border.active})`
+                },
+                type: 'smoothstep' // More modern than 'default'
             }}
         >
             <Controls 
-                className="reactflow-dark-controls backdrop-blur-xl"
+                className="backdrop-blur-xl"
                 position="top-left" 
                 orientation="horizontal"
                 style={{ 
-                    backgroundColor: 'rgba(30, 41, 59, 0.3)',
-                    color: '#94a3b8', 
+                    backgroundColor: darkTheme.glass.background,
+                    color: darkTheme.text.secondary, 
                     zIndex: 9999,
-                    border: '1px solid rgba(148, 163, 184, 0.1)',
+                    border: `1px solid ${darkTheme.border.default}`,
                     padding: '12px',
                     gap: '12px',
                     borderRadius: '12px',
-                    backdropFilter: 'blur(16px)',
-                    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                    backdropFilter: `blur(${darkTheme.glass.blur})`,
+                    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)',
                 }} 
             >
                 <ControlButton 
                     onClick={handleClearCanvas} 
                     title="Clear Canvas"
                     style={{ 
-                        backgroundColor: 'rgba(30, 41, 59, 0.5)',
-                        color: '#94a3b8',
+                        backgroundColor: darkTheme.background.tertiary,
+                        color: darkTheme.text.secondary,
                         borderRadius: '8px',
-                        border: '1px solid rgba(148, 163, 184, 0.1)',
+                        border: `1px solid ${darkTheme.border.default}`,
                         transition: 'all 0.2s ease',
                     }}
                     className="hover:bg-white/10 hover:scale-105 transition-all duration-200"
@@ -183,10 +188,10 @@ const ReactFlowContent = ({
                     onClick={toggleAccountsBox}
                     title="Toggle Accounts"
                     style={{  
-                        backgroundColor: 'rgba(30, 41, 59, 0.5)',
-                        color: '#94a3b8',
+                        backgroundColor: darkTheme.background.tertiary,
+                        color: darkTheme.text.secondary,
                         borderRadius: '8px',
-                        border: '1px solid rgba(148, 163, 184, 0.1)',
+                        border: `1px solid ${darkTheme.border.default}`,
                         transition: 'all 0.2s ease',
                     }}
                     className="hover:bg-white/10 hover:scale-105 transition-all duration-200"
@@ -254,7 +259,14 @@ const Workflow = () => {
             {/* AccountsBox Panel */}
             {uxOpenPanel === 'accountsBox' && (
                 <div className="absolute top-14 right-6 z-50">
-                    <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-xl shadow-2xl">
+                    <div 
+                        className="backdrop-blur-xl rounded-xl shadow-2xl"
+                        style={{
+                            backgroundColor: darkTheme.background.secondary,
+                            border: `1px solid ${darkTheme.border.default}`,
+                            backdropFilter: `blur(${darkTheme.glass.blur})`,
+                        }}
+                    >
                         <AccountsBox />
                     </div>
                 </div>

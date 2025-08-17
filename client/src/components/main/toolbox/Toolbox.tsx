@@ -32,7 +32,7 @@ import { ensureId } from '@/utils/project/ensureId';
 import { ProgramDeployer } from '@/components/ProgramDeployer';
 import { projectApi } from '@/api/projectApi';
 import { useTaskLogs } from '@/context/logs/useTaskLogs';
-import { theme } from '@/styles/theme';
+import { theme, darkTheme } from '@/styles/theme';
 
 // Add this constant after the imports section
 // Prevent duplicate "wallet not connected" toasts
@@ -378,8 +378,8 @@ export const Toolbox = () => {
         <div
             className="app-sidebar w-[20%] flex flex-col h-full backdrop-blur-xl text-white border-r overflow-hidden shadow-2xl"
             style={{
-                backgroundColor: theme.colors.bg.primary,
-                borderColor: theme.colors.border.primary,
+                backgroundColor: darkTheme.background.secondary,
+                borderColor: darkTheme.border.default,
             }}
         >
             {/* Compact Project Controls Section */}

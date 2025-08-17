@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogD
 import { Input } from "./input"
 import { Label } from "./label"
 import { Textarea } from "./textarea"
+import { darkTheme } from '@/styles/theme'
 
 interface NewProjectModalProps {
   open: boolean
@@ -33,7 +34,12 @@ export function NewProjectModal({ open, onOpenChange, onSubmit }: NewProjectModa
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         aria-describedby="new-project-desc"
-        className="sm:max-w-[550px] bg-gradient-to-b from-[#111827] to-[#0f1623] border-[#1f2937] text-slate-100 p-0 overflow-hidden shadow-xl shadow-black/40 rounded-xl"
+        className="sm:max-w-[550px] text-slate-100 p-0 overflow-hidden shadow-xl rounded-xl backdrop-blur-xl"
+        style={{
+          backgroundColor: darkTheme.background.secondary,
+          borderColor: darkTheme.border.default,
+          backdropFilter: `blur(${darkTheme.glass.blur})`,
+        }}
       >
         <form onSubmit={handleSubmit}>
           <DialogHeader className="px-7 pt-7 pb-3">

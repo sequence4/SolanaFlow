@@ -43,6 +43,7 @@ import {
 } from "lucide-react";
 import MarkdownRenderer from '@/components/main/code/markdown/MarkdownRenderer';
 import ChatChecklistBubble from './ChatChecklistBubble';
+import { darkTheme } from '@/styles/theme';
 
 export interface AIMessageType {
   text: string;
@@ -377,7 +378,14 @@ const Chat: React.FC = () => {
         <div
             className={`flex flex-col w-[32%] ${isExpanded ? "fixed inset-4 z-50" : "h-full"} transition-all duration-300 ease-in-out`}
         >
-            <div className="flex flex-col h-full bg-gradient-to-br from-slate-900/50 via-slate-800/30 to-slate-900/50 backdrop-blur-xl overflow-hidden border border-white/10 shadow-2xl ring-1 ring-white/5">
+            <div 
+                className="flex flex-col h-full backdrop-blur-xl overflow-hidden border shadow-2xl"
+                style={{
+                    backgroundColor: darkTheme.background.secondary,
+                    borderColor: darkTheme.border.default,
+                    backdropFilter: `blur(${darkTheme.glass.blur})`,
+                }}
+            >
                 {/* Header */}
                 <div className="flex items-center justify-between px-4 py-3 bg-white/5 backdrop-blur-sm border-b border-white/10">
                     <div className="flex items-center space-x-2">

@@ -14,6 +14,7 @@ import ProjectListPopover from './workflow/ProjectListPopover';
 import '@/styles/toolbar/ToolbarStyle.css';
 import { useColorModeValue, useColorMode } from '@/components/ui/color-mode';
 import { NewProjectModal } from '@/components/ui/new-project-modal';
+import { darkTheme } from '@/styles/theme';
 
 export const ProjectInfo: React.FC = () => {
     const { projectContext, setProjectContext } = useContext(ProjectContext);
@@ -65,7 +66,13 @@ export const ProjectInfo: React.FC = () => {
     };
 
     return (
-        <div className="flex flex-1 flex-row justify-between w-full items-center p-[10px_25px] gap-[30px] text-[10px] bg-gradient-to-r from-slate-900/50 via-slate-800/30 to-slate-900/50 backdrop-blur-xl border-b border-white/10 shadow-lg"
+        <div 
+            className="flex flex-1 flex-row justify-between w-full items-center p-[10px_25px] gap-[30px] text-[10px] backdrop-blur-xl border-b shadow-lg"
+            style={{
+                backgroundColor: darkTheme.background.secondary,
+                borderColor: darkTheme.border.default,
+                backdropFilter: `blur(${darkTheme.glass.blur})`,
+            }}
         >
             <div className="flex flex-row gap-[20px] items-center justify-between min-w-[250px] w-full">
                 <div className="flex flex-row gap-[20px] items-center justify-center">

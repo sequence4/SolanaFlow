@@ -1,108 +1,91 @@
 /**
  * Unified Color System and Theme Constants
- * AI-Inspired Dark Theme following 2024-2025 best practices
+ * Complete Frontend Style Unification for SolanaFlow
  */
 
+export const darkTheme = {
+  // Primary backgrounds - USE THESE CONSISTENTLY
+  background: {
+    primary: '#0a0a0b',        // Main app background
+    secondary: '#0f0f11',      // Panels, sidebars, modals
+    tertiary: '#141416',       // Cards, elevated surfaces
+    canvas: '#0a0a0b',         // Workflow canvas - SAME as primary
+  },
+  
+  // Glassmorphism
+  glass: {
+    background: 'rgba(15, 15, 17, 0.6)',
+    border: 'rgba(255, 255, 255, 0.06)',
+    blur: '16px',
+  },
+  
+  // Borders
+  border: {
+    default: 'rgba(255, 255, 255, 0.06)',
+    hover: 'rgba(255, 255, 255, 0.1)',
+    active: 'rgba(77, 124, 254, 0.4)',
+  },
+  
+  // Text
+  text: {
+    primary: 'rgba(255, 255, 255, 0.9)',
+    secondary: 'rgba(255, 255, 255, 0.6)',
+    tertiary: 'rgba(255, 255, 255, 0.4)',
+  },
+  
+  // Accents
+  accent: {
+    blue: '#4d7cfe',
+    green: '#22c55e',
+    purple: '#8b5cf6',
+    cyan: '#06b6d4',
+    red: '#ef4444',
+  },
+  
+  // Node styling constants
+  node: {
+    background: 'rgba(15, 15, 17, 0.8)',
+    border: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: '12px',
+    padding: '12px 16px',
+    minWidth: '200px',
+    shadow: '0 4px 6px rgba(0, 0, 0, 0.3), 0 0 20px rgba(77, 124, 254, 0.1)',
+    hoverShadow: '0 4px 6px rgba(0, 0, 0, 0.3), 0 0 30px rgba(77, 124, 254, 0.2)',
+    headerBackground: 'linear-gradient(90deg, rgba(77, 124, 254, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%)',
+  },
+};
+
+// Legacy theme export for backward compatibility
 export const theme = {
-  // Core Dark Theme Palette
   colors: {
     bg: {
-      primary: '#0a0a0b',         // Deepest background
-      secondary: '#111113',       // Panels and cards
-      tertiary: '#1a1a1d',        // Elevated surfaces
-      hover: 'rgba(255,255,255,0.05)', // Hover states
+      primary: darkTheme.background.primary,
+      secondary: darkTheme.background.secondary,
+      tertiary: darkTheme.background.tertiary,
+      hover: darkTheme.glass.background,
     },
     border: {
-      primary: 'rgba(255,255,255,0.08)',  // Main borders
-      secondary: 'rgba(255,255,255,0.05)', // Subtle borders
-      accent: 'rgba(77,124,254,0.3)',      // Active/focus borders
+      primary: darkTheme.border.default,
+      secondary: darkTheme.border.default,
+      accent: darkTheme.border.active,
     },
     text: {
-      primary: 'rgba(255,255,255,0.87)',   // Main text (87% opacity)
-      secondary: 'rgba(255,255,255,0.60)', // Secondary text (60% opacity)
-      tertiary: 'rgba(255,255,255,0.38)',  // Disabled/hints (38% opacity)
+      primary: darkTheme.text.primary,
+      secondary: darkTheme.text.secondary,
+      tertiary: darkTheme.text.tertiary,
     },
     accent: {
-      primary: '#4d7cfe',      // Primary blue
-      success: '#22c55e',      // Success green
-      warning: '#f59e0b',      // Warning amber
-      danger: '#ef4444',       // Error red
-      info: '#06b6d4',         // Info cyan
-      purple: '#a855f7',       // Purple accent
+      primary: darkTheme.accent.blue,
+      success: darkTheme.accent.green,
+      warning: '#f59e0b',
+      danger: '#ef4444',
+      info: darkTheme.accent.cyan,
+      purple: darkTheme.accent.purple,
     },
-    // Glassmorphism
     glass: {
-      bg: 'rgba(17,17,19,0.7)',
-      border: 'rgba(255,255,255,0.06)',
-      blur: '12px',
-    },
-  },
-  
-  // 8px Grid System
-  spacing: {
-    xs: '4px',    // 0.5 * 8
-    sm: '8px',    // 1 * 8
-    md: '16px',   // 2 * 8
-    lg: '24px',   // 3 * 8
-    xl: '32px',   // 4 * 8
-    '2xl': '40px', // 5 * 8
-    '3xl': '48px', // 6 * 8
-    '4xl': '56px', // 7 * 8
-    '5xl': '64px', // 8 * 8
-  },
-  
-  // Typography
-  typography: {
-    fontFamily: {
-      sans: ['Inter', 'system-ui', 'sans-serif'],
-      mono: ['JetBrains Mono', 'Menlo', 'Monaco', 'monospace'],
-    },
-    fontSize: {
-      xs: '10px',
-      sm: '12px',
-      base: '14px',
-      lg: '16px',
-      xl: '18px',
-      '2xl': '20px',
-      '3xl': '24px',
-    },
-    lineHeight: {
-      tight: '1.4',
-      normal: '1.5',
-      relaxed: '1.6',
-    },
-  },
-  
-  // Shadows and Effects
-  effects: {
-    shadow: {
-      sm: '0 1px 2px rgba(0, 0, 0, 0.05)',
-      md: '0 4px 6px rgba(0, 0, 0, 0.1)',
-      lg: '0 10px 15px rgba(0, 0, 0, 0.1)',
-      xl: '0 20px 25px rgba(0, 0, 0, 0.15)',
-      glow: '0 0 20px rgba(77, 124, 254, 0.3)',
-    },
-    blur: {
-      sm: '4px',
-      md: '8px',
-      lg: '12px',
-      xl: '16px',
-    },
-  },
-  
-  // Animation
-  animation: {
-    duration: {
-      fast: '150ms',
-      normal: '200ms',
-      slow: '300ms',
-    },
-    easing: {
-      linear: 'linear',
-      ease: 'ease',
-      easeIn: 'ease-in',
-      easeOut: 'ease-out',
-      easeInOut: 'ease-in-out',
+      bg: darkTheme.glass.background,
+      border: darkTheme.glass.border,
+      blur: darkTheme.glass.blur,
     },
   },
 } as const;

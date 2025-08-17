@@ -12,6 +12,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Hammer } from "lucide-react";
+import { darkTheme } from '@/styles/theme';
 
 /* ------------------------------------------------------------------ *
  *  Props
@@ -50,12 +51,23 @@ export function BuildModal({
         if (!open && !isBuilding) onClose();
       }}
     >
-      <DialogContent className="bg-gradient-to-br from-slate-900/90 via-slate-800/80 to-slate-900/90 backdrop-blur-xl border-white/10 text-white sm:max-w-md">
+      <DialogContent 
+        className="backdrop-blur-xl sm:max-w-md shadow-2xl"
+        style={{
+          backgroundColor: darkTheme.background.secondary,
+          borderColor: darkTheme.border.default,
+          backdropFilter: `blur(${darkTheme.glass.blur})`,
+          color: darkTheme.text.primary,
+        }}
+      >
         <DialogHeader>
-          <DialogTitle className="text-lg font-medium text-white">
+          <DialogTitle 
+            className="text-lg font-medium"
+            style={{ color: darkTheme.text.primary }}
+          >
             Build Program
           </DialogTitle>
-          <DialogDescription className="text-[#6e6e76]">
+          <DialogDescription style={{ color: darkTheme.text.secondary }}>
             This will run <code>anchor build</code> inside a disposable
             container and generate the final <code>.so</code> artefact.
           </DialogDescription>
@@ -64,8 +76,8 @@ export function BuildModal({
         {isBuilding && (
           <div className="space-y-2 my-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-[#6e6e76]">{stage}</span>
-              <span className="text-sm text-[#6e6e76]">
+              <span className="text-sm" style={{ color: darkTheme.text.secondary }}>{stage}</span>
+              <span className="text-sm" style={{ color: darkTheme.text.secondary }}>
                 {percent ?? 0}%
               </span>
             </div>
@@ -78,7 +90,18 @@ export function BuildModal({
             variant="outline"
             disabled={isBuilding}
             onClick={onClose}
-            className="w-full sm:w-auto bg-transparent border-[#2a2a2d] text-white hover:bg-[#2a2a2d]"
+            className="w-full sm:w-auto transition-colors"
+            style={{
+              backgroundColor: 'transparent',
+              borderColor: darkTheme.border.default,
+              color: darkTheme.text.primary,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = darkTheme.background.tertiary;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
           >
             Cancel
           </Button>
@@ -86,7 +109,17 @@ export function BuildModal({
           <Button
             onClick={handleStart}
             disabled={isBuilding}
-            className="w-full sm:w-auto bg-[#22c55e] hover:bg-[#22c55e]/90 text-white flex items-center"
+            className="w-full sm:w-auto flex items-center transition-colors"
+            style={{
+              backgroundColor: darkTheme.accent.green,
+              color: darkTheme.text.primary,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = `${darkTheme.accent.green}CC`;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = darkTheme.accent.green;
+            }}
           >
             <Hammer className="h-4 w-4 mr-2" />
             <span>Start Build</span>

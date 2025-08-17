@@ -40,6 +40,7 @@ import { useWalletSigner } from "@/utils/wallet";
 
 import { createEphemeralKey, EphemeralDeployOptions, deployWithEphemeralKey } from "@/api/projectDeploy";
 import { BPF_UPGRADE_LOADER_ID } from "@/utils/constants";
+import { darkTheme } from '@/styles/theme';
 
 // Toggle verbose client-side logs by setting NEXT_PUBLIC_DEBUG_LOGS=true in your
 // environment.  This reduces noisy console output in production.
@@ -1114,12 +1115,23 @@ export function ProgramDeployer({
   ──────────────────────────────────────────── */
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !isLoading && !open && onClose()}>
-      <DialogContent className="bg-gradient-to-br from-slate-900/90 via-slate-800/80 to-slate-900/90 backdrop-blur-xl border-white/10 text-white sm:max-w-md">
+      <DialogContent 
+        className="backdrop-blur-xl sm:max-w-md shadow-2xl"
+        style={{
+          backgroundColor: darkTheme.background.secondary,
+          borderColor: darkTheme.border.default,
+          backdropFilter: `blur(${darkTheme.glass.blur})`,
+          color: darkTheme.text.primary,
+        }}
+      >
         <DialogHeader>
-          <DialogTitle className="text-lg font-medium text-white">
+          <DialogTitle 
+            className="text-lg font-medium"
+            style={{ color: darkTheme.text.primary }}
+          >
             Deploy Program to Devnet
           </DialogTitle>
-          <DialogDescription className="text-[#6e6e76]">
+          <DialogDescription style={{ color: darkTheme.text.secondary }}>
             Your program will be deployed using your connected wallet. Make sure
             you have enough SOL for the transaction fees.
           </DialogDescription>
@@ -1129,7 +1141,10 @@ export function ProgramDeployer({
           {bytesLoaded ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-[#6e6e76]">
+                <span 
+                  className="text-sm font-medium"
+                  style={{ color: darkTheme.text.secondary }}
+                >
                   Program size:
                 </span>
                 <span className="text-sm font-mono">
@@ -1138,7 +1153,10 @@ export function ProgramDeployer({
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-[#6e6e76]">
+                <span 
+                  className="text-sm font-medium"
+                  style={{ color: darkTheme.text.secondary }}
+                >
                   Wallet:
                 </span>
                 <span className="text-sm font-mono truncate max-w-[200px]">
@@ -1150,10 +1168,16 @@ export function ProgramDeployer({
                 <div className="bg-[#2a2a2d] p-4 rounded-md flex items-start space-x-2 mt-2">
                   <AlertTriangle className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium text-white">
+                    <p 
+                      className="text-sm font-medium"
+                      style={{ color: darkTheme.text.primary }}
+                    >
                       Wallet not connected
                     </p>
-                    <p className="text-xs text-[#6e6e76]">
+                    <p 
+                      className="text-xs"
+                      style={{ color: darkTheme.text.secondary }}
+                    >
                       Please connect your wallet to deploy the program.
                     </p>
                   </div>
@@ -1163,10 +1187,18 @@ export function ProgramDeployer({
               {progress !== null && (
                 <div className="space-y-2 mt-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-[#6e6e76]">
+                    <span 
+                      className="text-sm"
+                      style={{ color: darkTheme.text.secondary }}
+                    >
                       {deployStage || "Preparing…"}
                     </span>
-                    <span className="text-sm text-[#6e6e76]">{progress}%</span>
+                    <span 
+                      className="text-sm"
+                      style={{ color: darkTheme.text.secondary }}
+                    >
+                      {progress}%
+                    </span>
                   </div>
                   <Progress value={progress} aria-label="deployment progress" />
                 </div>
@@ -1174,7 +1206,10 @@ export function ProgramDeployer({
             </div>
           ) : (
             <div className="flex items-center justify-center h-20">
-              <div className="animate-pulse text-[#6e6e76]">
+              <div 
+                className="animate-pulse"
+                style={{ color: darkTheme.text.secondary }}
+              >
                 Loading program data…
               </div>
             </div>
@@ -1186,7 +1221,18 @@ export function ProgramDeployer({
             variant="outline"
             onClick={onClose}
             disabled={isLoading}
-            className="w-full sm:w-auto bg-transparent border-[#2a2a2d] text-white hover:bg-[#2a2a2d]"
+            className="w-full sm:w-auto transition-colors"
+            style={{
+              backgroundColor: 'transparent',
+              borderColor: darkTheme.border.default,
+              color: darkTheme.text.primary,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = darkTheme.background.tertiary;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
           >
             Cancel
           </Button>
@@ -1194,7 +1240,17 @@ export function ProgramDeployer({
             type="button"
             onClick={handleDeploy}
             disabled={isLoading || !bytesLoaded}
-            className="w-full sm:w-auto bg-[#22c55e] hover:bg-[#22c55e]/90 text-white flex items-center"
+            className="w-full sm:w-auto flex items-center transition-colors"
+            style={{
+              backgroundColor: darkTheme.accent.green,
+              color: darkTheme.text.primary,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = `${darkTheme.accent.green}CC`;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = darkTheme.accent.green;
+            }}
           >
             {isLoading ? (
               <span>Deploying…</span>

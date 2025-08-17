@@ -37,6 +37,7 @@ import { MessageSquare } from "lucide-react";
 
 // Utils
 import { ProjectInfo } from "./Toolbar";
+import { darkTheme } from '@/styles/theme';
 
 const Builder = () => {
     const { projectContext } = useContext(ProjectContext);
@@ -159,7 +160,8 @@ const Builder = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
-            className="relative flex-1 h-[98%] p-2 w-full bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex flex-col justify-center items-center"
+            className="relative flex-1 h-[98%] p-2 w-full flex flex-col justify-center items-center"
+            style={{ backgroundColor: darkTheme.background.primary }}
         >
             <Tabs
                 value={activeTab}

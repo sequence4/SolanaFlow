@@ -4,6 +4,7 @@ import { Handle, Position } from "@xyflow/react";
 // Styles
 import './style/instructionStyle.css';
 import "@/styles/nodes/basicNodeStyle.css";
+import { darkTheme } from '@/styles/theme';
 
 // Icons
 import { ChevronDown, ChevronRight, Check, Key, Database, Edit2, Copy, Shield, XCircle, Zap, Cpu, Hash, Text } from "lucide-react";
@@ -128,7 +129,7 @@ const AccountSection = ({ account }: { account: Account }) => {
             <ChevronRight className="h-4 w-4 text-[#5d5dff] mr-1" />
           )}
 
-          <span className={`text-sm text-[#e1e2e6]`}>
+          <span className={`text-sm`} style={{ color: darkTheme.text.primary }}>
             {account.label}
           </span>
         </div>
@@ -136,34 +137,76 @@ const AccountSection = ({ account }: { account: Account }) => {
         <div className="flex items-center space-x-1">
           {/* Account Type Badges */}
           {account.type === "AccountInfo" && (
-            <span className="text-[8px] bg-[#121218] px-1.5 py-0.5 rounded border border-gray-500 text-gray-500">
+            <span 
+              className="text-[8px] px-1.5 py-0.5 rounded border"
+              style={{
+                backgroundColor: darkTheme.background.primary,
+                borderColor: darkTheme.text.secondary,
+                color: darkTheme.text.secondary,
+              }}
+            >
               AccountInfo
             </span>
           )}
           {account.type === "Program" && (
-            <span className="text-[8px] bg-[#121218] px-1.5 py-0.5 rounded border border-[#5d5dff] text-[#5d5dff]">
+            <span 
+              className="text-[8px] px-1.5 py-0.5 rounded border"
+              style={{
+                backgroundColor: darkTheme.background.primary,
+                borderColor: darkTheme.accent.blue,
+                color: darkTheme.accent.blue,
+              }}
+            >
               Program
             </span>
           )}
           {account.type === "Sysvar" && (
-            <span className="text-[8px] bg-[#121218] px-1.5 py-0.5 rounded border border-[#d69e2e] text-[#d69e2e]">
+            <span 
+              className="text-[8px] px-1.5 py-0.5 rounded border"
+              style={{
+                backgroundColor: darkTheme.background.primary,
+                borderColor: darkTheme.accent.cyan,
+                color: darkTheme.accent.cyan,
+              }}
+            >
               Sysvar
             </span>
           )}
           {!account.type && (
-            <span className="text-[8px] bg-[#121218] px-1.5 py-0.5 rounded border border-[#888] text-[#888]">
+            <span 
+              className="text-[8px] px-1.5 py-0.5 rounded border"
+              style={{
+                backgroundColor: darkTheme.background.primary,
+                borderColor: darkTheme.text.secondary,
+                color: darkTheme.text.secondary,
+              }}
+            >
               Unknown
             </span>
           )}
 
           {/* Account Properties */}
           {isSigner && (
-            <span className="text-[8px] bg-[#121218] text-[#00a6ed] px-1.5 py-0.5 rounded border border-[#00a6ed]">
+            <span 
+              className="text-[8px] px-1.5 py-0.5 rounded border"
+              style={{
+                backgroundColor: darkTheme.background.primary,
+                borderColor: darkTheme.accent.blue,
+                color: darkTheme.accent.blue,
+              }}
+            >
               Signer
             </span>
           )}
           {isWritable && (
-            <span className="text-[8px] bg-[#121218] text-[#36b37e] px-1.5 py-0.5 rounded border border-[#36b37e]">
+            <span 
+              className="text-[8px] px-1.5 py-0.5 rounded border"
+              style={{
+                backgroundColor: darkTheme.background.primary,
+                borderColor: darkTheme.accent.green,
+                color: darkTheme.accent.green,
+              }}
+            >
               Writable
             </span>
           )}
@@ -403,17 +446,28 @@ const ContentSection = ({
   defaultOpen?: boolean;
 }) => {
   return (
-    <div className="border border-[#333] rounded-lg overflow-hidden bg-[#1a1a24] shadow-[0_0_10px_rgba(93,93,255,0.05)] mb-4 last:mb-0">
+    <div 
+      className="border rounded-lg overflow-hidden shadow-lg mb-4 last:mb-0"
+      style={{
+        backgroundColor: darkTheme.background.tertiary,
+        borderColor: darkTheme.border.default,
+        boxShadow: '0 0 10px rgba(77, 124, 254, 0.05)',
+      }}
+    >
       <div
-        className="p-2 flex items-center justify-between bg-[#1a1a24] border-b border-[#333]"
+        className="p-2 flex items-center justify-between border-b"
+        style={{
+          backgroundColor: darkTheme.background.tertiary,
+          borderColor: darkTheme.border.default,
+        }}
       >
         <div className="flex items-center">
           <div className={`w-1 h-6 ${accentColor} rounded-sm mr-2`}></div>
-          <h4 className="text-sm font-medium tracking-tight">{title}</h4>
+          <h4 className="text-sm font-medium tracking-tight" style={{ color: darkTheme.text.primary }}>{title}</h4>
         </div>
       </div>
 
-      <div className="p-3 bg-[#121218]">
+      <div className="p-3" style={{ backgroundColor: darkTheme.background.primary }}>
         {children}
       </div>
     </div>
@@ -437,7 +491,7 @@ export function InstructionGroupNode({ data }: { data: InstructionGroupNodeData 
   
   return (
     <div
-      className="flex flex-col border-2 border-solid transition-all ease-in-out parent-node"
+      className="flex flex-col border transition-all ease-in-out parent-node shadow-2xl backdrop-blur-xl"
       style={{
         width: '440px',
         minWidth: '440px',
@@ -445,62 +499,118 @@ export function InstructionGroupNode({ data }: { data: InstructionGroupNodeData 
         height: '500px',
         position: 'relative',
         boxSizing: 'border-box',
-        backgroundColor: '#121218',
-        borderColor: '#333',
-        borderRadius: '8px',
-        color: '#e1e2e6',
+        backgroundColor: darkTheme.background.secondary,
+        borderColor: darkTheme.border.default,
+        borderRadius: '12px',
+        color: darkTheme.text.primary,
+        backdropFilter: `blur(${darkTheme.glass.blur})`,
+        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3), 0 0 20px rgba(77, 124, 254, 0.1)',
       }}
     >
       {/* Main Header */}
       <div
-        className="p-3 flex items-center bg-[#1a1a24] border-b border-[#333] pl-6 sticky top-0 z-10 rounded-t-lg"
+        className="p-3 flex items-center border-b pl-6 sticky top-0 z-10 rounded-t-xl"
+        style={{
+          backgroundColor: darkTheme.background.tertiary,
+          borderColor: darkTheme.border.default,
+        }}
       >
-        <h3 className="font-medium flex-1 tracking-tight">{data.label}</h3>
+        <h3 className="font-medium flex-1 tracking-tight" style={{ color: darkTheme.text.primary }}>{data.label}</h3>
         <div className="flex items-center space-x-2">
-          <span className="text-xs bg-[#121218] px-2 py-0.5 rounded-sm border border-[#333] font-mono text-[#5d5dff]">
+          <span 
+            className="text-xs px-2 py-0.5 rounded-sm border font-mono"
+            style={{
+              backgroundColor: darkTheme.background.primary,
+              borderColor: darkTheme.border.default,
+              color: darkTheme.accent.blue,
+            }}
+          >
             ID: 12345
           </span>
-          <button className="p-1 rounded hover:bg-[#333] transition-colors">
-            <Text className="h-4 w-4 text-[#888] hover:text-[#5d5dff]" />
+          <button 
+            className="p-1 rounded transition-colors"
+            style={{ color: darkTheme.text.secondary }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = darkTheme.background.primary;
+              e.currentTarget.style.color = darkTheme.accent.blue;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = darkTheme.text.secondary;
+            }}
+          >
+            <Text className="h-4 w-4" />
           </button>
         </div>
       </div>
 
       {/* Description */}
       {data.description && (
-        <div className="px-6 py-3 text-sm text-[#888] bg-[#121218]">
+        <div 
+          className="px-6 py-3 text-sm"
+          style={{
+            backgroundColor: darkTheme.background.primary,
+            color: darkTheme.text.secondary,
+          }}
+        >
           {data.description}
         </div>
       )}
       
       {/* Tabs */}
-      <div className="flex border-b border-[#333] bg-[#121218]">
+      <div 
+        className="flex border-b"
+        style={{
+          backgroundColor: darkTheme.background.primary,
+          borderColor: darkTheme.border.default,
+        }}
+      >
         <button 
-          className={`px-4 py-2 text-sm ${activeSection === "Context" ? "text-[#5d5dff] border-b-2 border-[#5d5dff]" : "text-[#888] hover:text-white"}`}
+          className={`px-4 py-2 text-sm transition-colors ${activeSection === "Context" ? "border-b-2" : "hover:text-white"}`}
+          style={{
+            color: activeSection === "Context" ? darkTheme.accent.blue : darkTheme.text.secondary,
+            borderColor: activeSection === "Context" ? darkTheme.accent.blue : 'transparent',
+          }}
           onClick={() => setActiveSection("Context")}
         >
           Context
         </button>
         <button 
-          className={`px-4 py-2 text-sm ${activeSection === "Inputs" ? "text-[#36b37e] border-b-2 border-[#36b37e]" : "text-[#888] hover:text-white"}`}
+          className={`px-4 py-2 text-sm transition-colors ${activeSection === "Inputs" ? "border-b-2" : "hover:text-white"}`}
+          style={{
+            color: activeSection === "Inputs" ? darkTheme.accent.green : darkTheme.text.secondary,
+            borderColor: activeSection === "Inputs" ? darkTheme.accent.green : 'transparent',
+          }}
           onClick={() => setActiveSection("Inputs")}
         >
           Inputs
         </button>
         <button 
-          className={`px-4 py-2 text-sm ${activeSection === "Errors" ? "text-[#e53e3e] border-b-2 border-[#e53e3e]" : "text-[#888] hover:text-white"}`}
+          className={`px-4 py-2 text-sm transition-colors ${activeSection === "Errors" ? "border-b-2" : "hover:text-white"}`}
+          style={{
+            color: activeSection === "Errors" ? darkTheme.accent.red : darkTheme.text.secondary,
+            borderColor: activeSection === "Errors" ? darkTheme.accent.red : 'transparent',
+          }}
           onClick={() => setActiveSection("Errors")}
         >
           Errors
         </button>
         <button 
-          className={`px-4 py-2 text-sm ${activeSection === "Events" ? "text-[#d69e2e] border-b-2 border-[#d69e2e]" : "text-[#888] hover:text-white"}`}
+          className={`px-4 py-2 text-sm transition-colors ${activeSection === "Events" ? "border-b-2" : "hover:text-white"}`}
+          style={{
+            color: activeSection === "Events" ? darkTheme.accent.cyan : darkTheme.text.secondary,
+            borderColor: activeSection === "Events" ? darkTheme.accent.cyan : 'transparent',
+          }}
           onClick={() => setActiveSection("Events")}
         >
           Events
         </button>
         <button 
-          className={`px-4 py-2 text-sm ${activeSection === "Outputs" ? "text-purple-500 border-b-2 border-purple-500" : "text-[#888] hover:text-white"}`}
+          className={`px-4 py-2 text-sm transition-colors ${activeSection === "Outputs" ? "border-b-2" : "hover:text-white"}`}
+          style={{
+            color: activeSection === "Outputs" ? darkTheme.accent.purple : darkTheme.text.secondary,
+            borderColor: activeSection === "Outputs" ? darkTheme.accent.purple : 'transparent',
+          }}
           onClick={() => setActiveSection("Outputs")}
         >
           Outputs
@@ -510,7 +620,12 @@ export function InstructionGroupNode({ data }: { data: InstructionGroupNodeData 
       {/* Content - Scrollable area */}
       <div 
         ref={contentRef}
-        className="p-4 pl-6 bg-[#121218] flex-grow w-[99.7%] overflow-y-auto custom-scrollbar scrollbar-thin scrollbar-thumb-[#333] scrollbar-track-[#1a1a24] nowheel" 
+        className="p-4 pl-6 flex-grow w-[99.7%] overflow-y-auto custom-scrollbar scrollbar-thin nowheel" 
+        style={{
+          backgroundColor: darkTheme.background.primary,
+          '--scrollbar-thumb': darkTheme.border.default,
+          '--scrollbar-track': darkTheme.background.tertiary,
+        } as React.CSSProperties}
         onWheel={handleWheel}
       >
         {activeSection === "Context" && accounts.length > 0 && (
@@ -571,28 +686,59 @@ export function InstructionGroupNode({ data }: { data: InstructionGroupNodeData 
       </div>
 
       {/* Footer with counters - Fixed at bottom */}
-      <div className="border-t border-[#333] p-3 text-xs text-[#888] font-mono flex justify-between items-center bg-[#121218] rounded-b-lg">
+      <div 
+        className="border-t p-3 text-xs font-mono flex justify-between items-center rounded-b-xl"
+        style={{
+          backgroundColor: darkTheme.background.primary,
+          borderColor: darkTheme.border.default,
+          color: darkTheme.text.secondary,
+        }}
+      >
         <div className="flex items-center">
-          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#1a1a24] border border-[#333] mr-1">
-            <Hash className="h-3 w-3 text-[#5d5dff]" />
+          <div 
+            className="flex h-5 w-5 items-center justify-center rounded-full border mr-1"
+            style={{
+              backgroundColor: darkTheme.background.tertiary,
+              borderColor: darkTheme.border.default,
+            }}
+          >
+            <Hash className="h-3 w-3" style={{ color: darkTheme.accent.blue }} />
           </div>
           <span>Accounts: {accounts.length}</span>
         </div>
         <div className="flex items-center">
-          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#1a1a24] border border-[#333] mr-1">
-            <Hash className="h-3 w-3 text-[#36b37e]" />
+          <div 
+            className="flex h-5 w-5 items-center justify-center rounded-full border mr-1"
+            style={{
+              backgroundColor: darkTheme.background.tertiary,
+              borderColor: darkTheme.border.default,
+            }}
+          >
+            <Hash className="h-3 w-3" style={{ color: darkTheme.accent.green }} />
           </div>
           <span>Inputs: {parameters.length}</span>
         </div>
         <div className="flex items-center">
-          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#1a1a24] border border-[#333] mr-1">
-            <Hash className="h-3 w-3 text-[#e53e3e]" />
+          <div 
+            className="flex h-5 w-5 items-center justify-center rounded-full border mr-1"
+            style={{
+              backgroundColor: darkTheme.background.tertiary,
+              borderColor: darkTheme.border.default,
+            }}
+          >
+            <Hash className="h-3 w-3" style={{ color: darkTheme.accent.red }} />
           </div>
           <span>Errors: {errorCodes.length}</span>
         </div>
         <div className="flex items-center">
-          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#1a1a24] border border-[#333] mr-1">
-            <Hash className="h-3 w-3 text-[#d69e2e]" />
+          <div 
+            className="flex h-5 w-5 items-center justify-center rounded-full border mr-1"
+            style={{
+              backgroundColor: darkTheme.background.tertiary,
+              borderColor: darkTheme.border.default,
+            }}
+          >
+            <Hash className="h-3 w-3" style={{ color: darkTheme.accent.cyan }} />
           </div>
           <span>Events: {events.length}</span>
         </div>
