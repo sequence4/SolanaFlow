@@ -53,58 +53,6 @@ export default function MainPage() {
             }}
             className="h-full w-full flex flex-col"
           >
-            <div className="flex items-center justify-start w-full">
-              <TabsList className="mx-4 my-2 px-1 bg-card/95 backdrop-blur-sm border border-border rounded-lg">
-                <TabsTrigger
-                  value="workflow"
-                  className="
-                    data-[state=active]:bg-primary
-                    data-[state=active]:text-primary-foreground
-                    px-3 py-1 text-sm font-medium
-                    hover:bg-accent
-                    rounded-md
-                    cursor-pointer
-                    transition-all
-                  "
-                >
-                  workflow
-                </TabsTrigger>
-
-                <TabsTrigger
-                  value="interface"
-                  disabled={!hasFiles}
-                  className="
-                    data-[state=active]:bg-primary
-                    data-[state=active]:text-primary-foreground
-                    px-3 py-1 text-sm font-medium
-                    hover:bg-accent
-                    rounded-md
-                    cursor-pointer
-                    transition-all
-                    disabled:opacity-50
-                  "
-                >
-                  interface
-                </TabsTrigger>
-
-                <TabsTrigger
-                  value="code"
-                  disabled={!hasFiles}
-                  className="
-                    data-[state=active]:bg-primary
-                    data-[state=active]:text-primary-foreground
-                    px-3 py-1 text-sm font-medium
-                    hover:bg-accent
-                    rounded-md
-                    cursor-pointer
-                    transition-all
-                    disabled:opacity-50
-                  "
-                >
-                  code
-                </TabsTrigger>
-              </TabsList>
-            </div>
             
             <TabsContent value="workflow" className="flex-1 h-full overflow-auto">
               <Workflow />

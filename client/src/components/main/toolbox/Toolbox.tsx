@@ -11,6 +11,7 @@ import eventBus from '@/lib/eventBus';
 import 'simplebar-react/dist/simplebar.min.css';
 import { Dialog, DialogContent, DialogDescription } from "@/components/ui/dialog";
 import { NewProjectModal } from '@/components/ui/new-project-modal';
+import { Badge } from "@/components/ui/badge";
 import ProjectListPopover from '../workflow/ProjectListPopover';
 import { toast } from "sonner";
 import PulseLoader from "react-spinners/PulseLoader";
@@ -376,18 +377,16 @@ export const Toolbox = () => {
 
     return (
         <div
-            className="app-sidebar w-[20%] flex flex-col h-full backdrop-blur-xl text-white border-r overflow-hidden shadow-2xl"
+            className="app-sidebar w-[20%] flex flex-col h-full backdrop-blur-xl border-r overflow-hidden shadow-sm bg-sidebar text-foreground"
             style={{
-                backgroundColor: darkTheme.background.secondary,
-                borderColor: darkTheme.border.default,
+                borderColor: 'var(--sidebar-border)',
             }}
         >
             {/* Compact Project Controls Section */}
             <div 
-                className="border-b backdrop-blur-sm"
+                className="border-b backdrop-blur-sm bg-sidebar-accent/10"
                 style={{
-                    borderColor: theme.colors.border.primary,
-                    backgroundColor: theme.colors.bg.hover,
+                    borderColor: 'var(--sidebar-border)',
                 }}
             >
                 <div className="space-y-2 px-3 py-2">
@@ -555,6 +554,19 @@ export const Toolbox = () => {
                         </button>
                     </div>
                     
+                    {/* Project Type Badges */}
+                    <div className="flex gap-1 justify-center mb-2">
+                        <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
+                            Token
+                        </Badge>
+                        <Badge variant="secondary" className="text-xs bg-blue-500/10 text-blue-400 border-blue-500/20">
+                            Mint
+                        </Badge>
+                        <Badge variant="secondary" className="text-xs bg-green-500/10 text-green-400 border-green-500/20">
+                            Transfer
+                        </Badge>
+                    </div>
+                    
                     {/* Status Indicators - Compact Pills */}
                     <div className="flex gap-1 justify-center">
                         <div 
@@ -569,11 +581,13 @@ export const Toolbox = () => {
                         <div 
                             className="px-2 py-0.5 border rounded-full"
                             style={{
-                                backgroundColor: `${theme.colors.accent.primary}10`,
-                                borderColor: `${theme.colors.accent.primary}20`,
+                                backgroundColor: built ? `${theme.colors.accent.success}10` : `${theme.colors.accent.primary}10`,
+                                borderColor: built ? `${theme.colors.accent.success}20` : `${theme.colors.accent.primary}20`,
                             }}
                         >
-                            <span className="text-[10px]" style={{ color: theme.colors.accent.primary }}>Token • Mint</span>
+                            <span className="text-[10px]" style={{ color: built ? theme.colors.accent.success : theme.colors.accent.primary }}>
+                                {built ? 'Built' : 'Not Built'}
+                            </span>
                         </div>
                     </div>
                 </div>
