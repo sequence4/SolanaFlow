@@ -134,13 +134,13 @@ const ReactFlowContent = ({
     
     return (
         <div className="relative h-full">
-            {/* Faint Grid Pattern */}
+            {/* Visible Grid Pattern */}
             <div 
                 className="absolute inset-0 pointer-events-none"
                 style={{
                     backgroundImage: `
-                        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-                        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px)
+                        linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px)
                     `,
                     backgroundSize: '20px 20px',
                 }}
@@ -185,44 +185,45 @@ const ReactFlowContent = ({
                 position="top-left" 
                 orientation="horizontal"
                 style={{ 
-                    backgroundColor: 'hsl(var(--card))',
+                    backgroundColor: 'hsl(var(--background))',
                     border: '1px solid hsl(var(--border))',
+                    color: 'hsl(var(--foreground))',
                     zIndex: 9999,
-                    padding: '8px',
+                    padding: '10px',
                     gap: '8px',
                     borderRadius: '8px',
-                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
                 }} 
             >
                 <ControlButton 
                     onClick={handleClearCanvas} 
                     title="Clear Canvas"
                     style={{
-                        backgroundColor: 'hsl(var(--muted))',
+                        backgroundColor: 'hsl(var(--background))',
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '6px',
-                        padding: '6px',
-                        color: 'hsl(var(--muted-foreground))',
+                        padding: '8px',
+                        color: 'hsl(var(--foreground))',
                         transition: 'all 0.2s ease',
                     }}
-                    className="hover:bg-muted/80 hover:scale-105"
+                    className="hover:bg-muted hover:scale-105"
                 >
-                    <Trash2 size={14} style={{ color: 'hsl(var(--muted-foreground))' }} />
+                    <Trash2 size={16} style={{ color: 'hsl(var(--foreground))' }} />
                 </ControlButton>
                 <ControlButton 
                     onClick={toggleAccountsBox}
                     title="Toggle Accounts"
                     style={{
-                        backgroundColor: 'hsl(var(--muted))',
+                        backgroundColor: 'hsl(var(--background))',
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '6px',
-                        padding: '6px',
-                        color: 'hsl(var(--muted-foreground))',
+                        padding: '8px',
+                        color: 'hsl(var(--foreground))',
                         transition: 'all 0.2s ease',
                     }}
-                    className="hover:bg-muted/80 hover:scale-105"
+                    className="hover:bg-muted hover:scale-105"
                 >
-                    <Layers size={14} style={{ color: 'hsl(var(--muted-foreground))' }} />
+                    <Layers size={16} style={{ color: 'hsl(var(--foreground))' }} />
                 </ControlButton>
             </Controls>
         </ReactFlow>
