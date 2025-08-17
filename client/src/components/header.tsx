@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button"
 import { useContext } from "react"
 import { useWallet } from "@solana/wallet-adapter-react"
+import { PhantomWalletName } from "@solana/wallet-adapter-phantom"
 import UxContext from "@/context/ux/UxContext"
 import FileContext from "@/context/file/FileContext"
 import { ActiveTab } from "@/context/ux/UxContextTypes"
@@ -9,7 +10,20 @@ import { FileTreeItemType } from "@/interfaces/FileTreeItemType"
 export function Header() {
   const { activeTab, setActiveTab } = useContext(UxContext)
   const { fileTree } = useContext(FileContext)
-  const { connected, publicKey } = useWallet()
+  const { connected, publicKey, connect, disconnect, select } = useWallet()
+
+  const handleWalletClick = async () => {
+    try {
+      if (!connected) {
+        await select(PhantomWalletName)
+        await connect()
+      } else {
+        await disconnect()
+      }
+    } catch (error) {
+      console.error("Wallet connect error:", error)
+    }
+  }
 
   // Check if files exist for enabling interface/code tabs
   const treeHasFile = (n: FileTreeItemType | FileTreeItemType[]): boolean =>
@@ -81,7 +95,12 @@ export function Header() {
           </div>
         )}
         {!connected && (
-          <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-shadow bg-transparent">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="shadow-sm hover:shadow-md transition-shadow bg-transparent"
+            onClick={handleWalletClick}
+          >
             Connect Wallet
           </Button>
         )}

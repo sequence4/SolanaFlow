@@ -283,39 +283,6 @@ export const NodeItems = forwardRef<{ setActiveChainTab: (tab: string) => void }
                     >
                         <SimpleBar style={{ width: "100%", height: "100%" }}>
                             <div>
-                                {/* Favorites Section */}
-                                <div 
-                                    className="border-b backdrop-blur-sm"
-                                    style={{
-                                        borderColor: theme.colors.border.primary,
-                                        backgroundColor: theme.colors.bg.hover,
-                                    }}
-                                >
-                                    <div className="p-3 flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <Star className="h-4 w-4" style={{ color: theme.colors.accent.warning }} />
-                                            <span 
-                                                className="font-medium"
-                                                style={{ color: theme.colors.text.primary }}
-                                            >
-                                                Favorites
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center">
-                                            <span 
-                                                className="mr-2 text-xs px-1.5 py-0.5 rounded-full border"
-                                                style={{
-                                                    backgroundColor: `${theme.colors.accent.warning}20`,
-                                                    color: theme.colors.accent.warning,
-                                                    borderColor: `${theme.colors.accent.warning}30`,
-                                                }}
-                                            >
-                                                2
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-
                                 <GroupedOffChainAccordion />
                             </div>
                         </SimpleBar>

@@ -89,7 +89,7 @@ export function GroupedOffChainAccordion() {
     const [openItems, setOpenItems] = useState<string[]>(["Fungible Tokens"]);
 
     return (
-        <div className="bg-transparent p-0">
+        <div className="bg-sidebar-accent/10 p-0">
             <style>{accordionStyles}</style>
             <AccordionRoot 
                 type="multiple" 

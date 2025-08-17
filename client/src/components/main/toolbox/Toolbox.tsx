@@ -440,7 +440,7 @@ export const Toolbox = () => {
                     <div className="grid grid-cols-3 gap-1">
                         <button 
                             onClick={handleOpenProjectClick}
-                            className="h-7 px-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 text-white border-white/20 bg-sidebar-accent hover:bg-sidebar-accent/80"
+                            className="h-7 px-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 text-white border-sidebar-border bg-sidebar-accent hover:bg-sidebar-accent/80"
                         >
                             <FolderOpen size={12} />
                             <span>Open</span>
@@ -448,14 +448,14 @@ export const Toolbox = () => {
                         <button 
                             onClick={handleSaveProject}
                             disabled={!projectContext.id}
-                            className="h-7 px-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 disabled:opacity-50 text-white border-white/20 bg-sidebar-accent hover:bg-sidebar-accent/80"
+                            className="h-7 px-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 disabled:opacity-50 text-white border-sidebar-border bg-sidebar-accent hover:bg-sidebar-accent/80"
                         >
                             <Save size={12} />
                             <span>Save</span>
                         </button>
                         <button 
                             onClick={handleNewProject}
-                            className="h-7 px-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 text-white border-white/20 bg-sidebar-accent hover:bg-sidebar-accent/80"
+                            className="h-7 px-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 text-white border-sidebar-border bg-sidebar-accent hover:bg-sidebar-accent/80"
                         >
                             <Plus size={12} />
                             <span>New</span>
@@ -464,7 +464,7 @@ export const Toolbox = () => {
                         {/* Second row - Build/Deploy */}
                         <button
                             onClick={handleBuildClick}
-                            className="h-7 col-span-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 text-white border-white/20 bg-sidebar-accent hover:bg-sidebar-accent/80"
+                            className="h-7 col-span-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 text-white border-sidebar-border bg-sidebar-accent hover:bg-sidebar-accent/80"
                         >
                             {isBuilding ? (
                                 <PulseLoader color="white" size={3} cssOverride={{ display: 'inline-block', margin: 0 }} />
@@ -476,7 +476,7 @@ export const Toolbox = () => {
                         <button
                             onClick={handleDeployClick}
                             disabled={isDeploying || !walletSigner.isConnected || !built}
-                            className="h-7 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 disabled:opacity-50 text-white border-white/20 bg-sidebar-accent hover:bg-sidebar-accent/80"
+                            className="h-7 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 disabled:opacity-50 text-white border-sidebar-border bg-sidebar-accent hover:bg-sidebar-accent/80"
                         >
                             {isDeploying ? (
                                 <PulseLoader color="white" size={3} cssOverride={{ display: 'inline-block', margin: 0 }} />
@@ -490,29 +490,6 @@ export const Toolbox = () => {
                     </div>
                     
                     
-                    {/* Status Indicators - Compact Pills */}
-                    <div className="flex gap-1 justify-center">
-                        <div 
-                            className="px-2 py-0.5 border rounded-full"
-                            style={{
-                                backgroundColor: `${theme.colors.accent.success}10`,
-                                borderColor: `${theme.colors.accent.success}20`,
-                            }}
-                        >
-                            <span className="text-[10px]" style={{ color: theme.colors.accent.success }}>Ready</span>
-                        </div>
-                        <div 
-                            className="px-2 py-0.5 border rounded-full"
-                            style={{
-                                backgroundColor: built ? `${theme.colors.accent.success}10` : `${theme.colors.accent.primary}10`,
-                                borderColor: built ? `${theme.colors.accent.success}20` : `${theme.colors.accent.primary}20`,
-                            }}
-                        >
-                            <span className="text-[10px]" style={{ color: built ? theme.colors.accent.success : theme.colors.accent.primary }}>
-                                {built ? 'Built' : 'Not Built'}
-                            </span>
-                        </div>
-                    </div>
                 </div>
                 
                 {/* Program ID Display */}
