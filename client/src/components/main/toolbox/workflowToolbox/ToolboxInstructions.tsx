@@ -2,7 +2,6 @@ import React, { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { groupedInstructions } from '../../../../data/toolbox/instructionItems'; 
 import { Star, PlusCircle } from 'lucide-react';
-import { theme } from '../../../../styles/theme';
 
 const MotionDiv = motion.div;
 
@@ -88,31 +87,18 @@ export function InstructionCard({
       animate={{ opacity: 1, x: 0 }}
       whileHover={{ 
         scale: 1.02,
-        boxShadow: "0 4px 20px rgba(77, 124, 254, 0.15)",
-        backgroundColor: "rgba(30, 41, 59, 0.3)"
+        backgroundColor: "var(--sidebar-accent)"
       }}
       whileDrag={{ 
         scale: 1.05,
         opacity: 0.8,
-        boxShadow: "0 10px 30px rgba(77, 124, 254, 0.3)",
         zIndex: 1000
       }}
-      className="w-full mx-1 my-0.5 px-3 py-1.5 text-sm transition-all duration-200 rounded-lg cursor-grab active:cursor-grabbing group backdrop-blur-sm border-l-2"
+      className="w-full mx-1 my-0.5 px-3 py-1.5 text-sm transition-all duration-200 rounded-lg cursor-grab active:cursor-grabbing group backdrop-blur-sm border border-sidebar-border hover:border-primary"
       style={{
         backgroundColor: isDragging 
-          ? theme.colors.bg.tertiary
-          : isHovered 
-            ? theme.colors.bg.hover
-            : 'transparent',
-        borderLeftColor: isDragging || isHovered 
-          ? theme.colors.accent.primary 
+          ? 'var(--sidebar-accent)'
           : 'transparent',
-        borderTopColor: theme.colors.border.primary,
-        borderRightColor: theme.colors.border.primary,
-        borderBottomColor: theme.colors.border.primary,
-        borderTopWidth: isDragging || isHovered ? '1px' : '0',
-        borderRightWidth: isDragging || isHovered ? '1px' : '0',
-        borderBottomWidth: isDragging || isHovered ? '1px' : '0',
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -122,20 +108,10 @@ export function InstructionCard({
       <div className="flex items-center justify-between w-full">
         <div className="flex items-center">
           <div 
-            className="w-1 h-1 rounded-full mr-2"
-            style={{ 
-              backgroundColor: isDragging || isHovered 
-                ? theme.colors.accent.primary 
-                : theme.colors.text.tertiary 
-            }}
+            className="w-1 h-1 rounded-full mr-2 bg-muted-foreground"
           />
           <span 
-            className="text-xs font-medium transition-colors duration-200"
-            style={{ 
-              color: isHovered || isDragging 
-                ? theme.colors.text.primary 
-                : theme.colors.text.secondary 
-            }}
+            className="text-xs font-medium transition-colors duration-200 text-foreground"
           >
             {name}
           </span>
@@ -144,12 +120,7 @@ export function InstructionCard({
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               whileHover={{ scale: 1.1 }}
-              className="ml-2 text-[9px] px-1.5 py-0.5 rounded-full border"
-              style={{
-                backgroundColor: `${theme.colors.accent.info}20`,
-                color: theme.colors.accent.info,
-                borderColor: `${theme.colors.accent.info}30`,
-              }}
+              className="ml-2 text-[9px] px-1.5 py-0.5 rounded-full border bg-sidebar-accent/20 text-primary border-sidebar-border"
             >
               NEW
             </MotionDiv>
@@ -164,23 +135,7 @@ export function InstructionCard({
             whileHover={{ scale: 1.2 }}
             whileTap={{ scale: 0.9 }}
             onClick={toggleFavorite}
-            className="p-0.5 rounded transition-all duration-200"
-            style={{
-              color: isFavorite ? theme.colors.accent.warning : theme.colors.text.tertiary,
-              backgroundColor: isFavorite ? `${theme.colors.accent.warning}10` : 'transparent',
-            }}
-            onMouseEnter={(e) => {
-              if (!isFavorite) {
-                e.currentTarget.style.color = theme.colors.accent.warning;
-                e.currentTarget.style.backgroundColor = `${theme.colors.accent.warning}10`;
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isFavorite) {
-                e.currentTarget.style.color = theme.colors.text.tertiary;
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }
-            }}
+            className="p-0.5 rounded transition-all duration-200 text-muted-foreground hover:text-primary hover:bg-sidebar-accent/10"
           >
             <Star className={`h-2.5 w-2.5 ${isFavorite ? "fill-current" : ""}`} />
           </motion.button>
@@ -188,16 +143,7 @@ export function InstructionCard({
             whileHover={{ scale: 1.2 }}
             whileTap={{ scale: 0.9 }}
             onClick={handleAdd}
-            className="p-0.5 rounded transition-all duration-200"
-            style={{ color: theme.colors.text.tertiary }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = theme.colors.accent.primary;
-              e.currentTarget.style.backgroundColor = `${theme.colors.accent.primary}10`;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = theme.colors.text.tertiary;
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
+            className="p-0.5 rounded transition-all duration-200 text-muted-foreground hover:text-primary hover:bg-sidebar-accent/10"
           >
             <PlusCircle className="h-2.5 w-2.5" />
           </motion.button>
@@ -209,7 +155,7 @@ export function InstructionCard({
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: "auto" }}
           exit={{ opacity: 0, height: 0 }}
-          className="mt-2 text-xs text-slate-400 pl-4 border-l border-gradient-to-b from-blue-500/50 to-purple-500/50 bg-black/10 rounded-r-lg p-2"
+          className="mt-2 text-xs text-muted-foreground pl-4 border-l border-sidebar-border bg-sidebar-accent/10 rounded-r-lg p-2"
         >
           {description}
         </MotionDiv>
@@ -220,7 +166,7 @@ export function InstructionCard({
 
 export const ToolboxInstructions = () => {
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 space-y-6 bg-sidebar-accent/10">
       {groupedInstructions.map((group, groupIndex) => (
         <MotionDiv
           key={group.label}
@@ -230,12 +176,12 @@ export const ToolboxInstructions = () => {
           className="space-y-3"
         >
           <div className="flex items-center space-x-2 mb-4">
-            <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full" />
-            <h3 className="font-semibold text-white text-sm tracking-wide">
+            <div className="w-1 h-6 bg-primary rounded-full" />
+            <h3 className="font-semibold text-foreground text-sm tracking-wide">
               {group.label}
             </h3>
-            <div className="flex-1 h-px bg-gradient-to-r from-white/20 to-transparent" />
-            <span className="text-xs text-slate-400 bg-white/5 px-2 py-1 rounded-full">
+            <div className="flex-1 h-px bg-sidebar-border" />
+            <span className="text-xs text-muted-foreground bg-sidebar-accent px-2 py-1 rounded-full border border-sidebar-border">
               {group.items.length}
             </span>
           </div>

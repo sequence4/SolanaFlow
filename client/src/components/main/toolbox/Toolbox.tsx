@@ -33,7 +33,6 @@ import { ensureId } from '@/utils/project/ensureId';
 import { ProgramDeployer } from '@/components/ProgramDeployer';
 import { projectApi } from '@/api/projectApi';
 import { useTaskLogs } from '@/context/logs/useTaskLogs';
-import { theme, darkTheme } from '@/styles/theme';
 
 // Add this constant after the imports section
 // Prevent duplicate "wallet not connected" toasts
@@ -387,19 +386,14 @@ export const Toolbox = () => {
                     {/* Project Name with inline edit */}
                     <div className="flex items-center gap-2 h-8">
                         <div 
-                            className="flex-1 px-2 py-1 rounded-md border"
-                            style={{
-                                backgroundColor: theme.colors.bg.hover,
-                                borderColor: theme.colors.border.primary,
-                            }}
+                            className="flex-1 px-2 py-1 rounded-md border bg-sidebar-accent border-sidebar-border"
                         >
                             {isEditing ? (
                                 <input
                                     type="text"
                                     value={projectName}
                                     onChange={(e) => setProjectName(e.target.value)}
-                                    className="bg-transparent text-sm font-medium w-full focus:outline-none"
-                                    style={{ color: theme.colors.text.primary }}
+                                    className="bg-transparent text-sm font-medium w-full focus:outline-none text-foreground"
                                     autoFocus
                                     onBlur={() => {
                                         setIsEditing(false);
@@ -420,8 +414,7 @@ export const Toolbox = () => {
                                 />
                             ) : (
                                 <div 
-                                    className="text-sm font-medium truncate cursor-pointer"
-                                    style={{ color: theme.colors.text.primary }}
+                                    className="text-sm font-medium truncate cursor-pointer text-foreground"
                                     onClick={() => setIsEditing(true)}
                                 >
                                     {projectName}
@@ -432,7 +425,7 @@ export const Toolbox = () => {
                             onClick={() => setIsEditing(true)}
                             className="p-1.5 hover:bg-white/10 rounded-md transition-colors"
                         >
-                            <Edit2 size={14} style={{ color: theme.colors.text.secondary }} />
+                            <Edit2 size={14} className="text-muted-foreground" />
                         </button>
                     </div>
                     
@@ -495,20 +488,15 @@ export const Toolbox = () => {
                 {/* Program ID Display */}
                 {projectDeployed && projectContext.details?.projectState?.programId && (
                     <div 
-                        className="mx-3 mb-2 rounded-lg p-2 border backdrop-blur-sm"
-                        style={{
-                            backgroundColor: theme.colors.bg.hover,
-                            borderColor: theme.colors.border.primary,
-                        }}
+                        className="mx-3 mb-2 rounded-lg p-2 border backdrop-blur-sm bg-sidebar-accent border-sidebar-border"
                     >
                         <div className="flex items-center text-xs">
-                            <span style={{ color: theme.colors.text.secondary }}>Program ID:</span>
+                            <span className="text-muted-foreground">Program ID:</span>
                             <a 
                                 href={`https://explorer.solana.com/address/${projectContext.details?.projectState?.programId}?cluster=devnet`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="ml-2 truncate hover:underline"
-                                style={{ color: theme.colors.accent.primary }}
+                                className="ml-2 truncate hover:underline text-primary"
                                 title={projectContext.details?.projectState?.programId}
                             >
                                 {projectContext.details?.projectState?.programId?.substring(0, 20)}...
@@ -517,7 +505,7 @@ export const Toolbox = () => {
                                 onClick={() => window.open(`https://explorer.solana.com/address/${projectContext.details?.projectState?.programId}?cluster=devnet`, '_blank')}
                                 className="ml-auto p-1 rounded-full hover:bg-white/10 transition-colors"
                             >
-                                <ArrowRight className="h-3 w-3" style={{ color: theme.colors.text.secondary }} />
+                                <ArrowRight className="h-3 w-3 text-muted-foreground" />
                             </button>
                         </div>
                     </div>
@@ -535,10 +523,7 @@ export const Toolbox = () => {
                 <div className="px-3 py-2">
                     <div className="relative group">
                         <div 
-                            className="absolute inset-0 rounded-lg blur-xl opacity-0 group-focus-within:opacity-50 transition-opacity"
-                            style={{
-                                background: `linear-gradient(to right, ${theme.colors.accent.primary}20, ${theme.colors.accent.purple}20)`,
-                            }}
+                            className="absolute inset-0 rounded-lg blur-xl opacity-0 group-focus-within:opacity-50 transition-opacity bg-gradient-to-r from-primary/20 to-purple-600/20"
                         />
                         <input
                             ref={inputRef}
@@ -555,21 +540,19 @@ export const Toolbox = () => {
                             }}
                         />
                         <Search 
-                            className="absolute left-2.5 top-2.5 h-3 w-3" 
-                            style={{ color: theme.colors.text.tertiary }}
+                            className="absolute left-2.5 top-2.5 h-3 w-3 text-muted-foreground" 
                         />
                         {searchValue && (
                             <button
                                 className="absolute right-2 top-2 p-0.5 hover:bg-white/10 rounded transition-colors"
                                 onClick={() => setSearchValue("")}
                             >
-                                <X className="h-3 w-3" style={{ color: theme.colors.text.secondary }} />
+                                <X className="h-3 w-3 text-muted-foreground" />
                             </button>
                         )}
                         {!searchValue && !isFocused && (
                             <div 
-                                className="absolute right-3 top-2.5 text-[10px] font-mono"
-                                style={{ color: theme.colors.text.tertiary }}
+                                className="absolute right-3 top-2.5 text-[10px] font-mono text-muted-foreground"
                             >
                                 Ctrl+F
                             </div>
@@ -581,20 +564,7 @@ export const Toolbox = () => {
                         {['Recent', 'Favorites', 'Popular'].map((filter) => (
                             <button
                                 key={filter}
-                                className="px-2 py-0.5 text-[10px] border rounded-full transition-all hover:scale-105"
-                                style={{
-                                    backgroundColor: theme.colors.bg.hover,
-                                    borderColor: theme.colors.border.primary,
-                                    color: theme.colors.text.secondary,
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = theme.colors.bg.tertiary;
-                                    e.currentTarget.style.color = theme.colors.text.primary;
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = theme.colors.bg.hover;
-                                    e.currentTarget.style.color = theme.colors.text.secondary;
-                                }}
+                                className="px-2 py-0.5 text-[10px] border rounded-full transition-all hover:scale-105 bg-sidebar-accent border-sidebar-border text-muted-foreground hover:bg-sidebar-accent/80 hover:text-foreground"
                             >
                                 {filter}
                             </button>
@@ -619,7 +589,7 @@ export const Toolbox = () => {
 
                 {/* INTERFACE placeholder (unchanged) */}
                 {activeTab === 'interface' && (
-                    <div className="p-4 text-slate-400">
+                    <div className="p-4 text-muted-foreground">
                         <p>Interface Tab Toolbox Placeholder</p>
                     </div>
                 )}

@@ -8,7 +8,6 @@ import SimpleBar from 'simplebar-react';
 import { cn } from '../../../../lib/utils';
 import { Star, Clock, Zap, Database, Settings, Play } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { theme } from '../../../../styles/theme';
 
 interface NodeItemsProps {
     activeChainTab?: string;
@@ -42,8 +41,7 @@ export const NodeItems = forwardRef<{ setActiveChainTab: (tab: string) => void }
 
         return (
             <div 
-                className="flex flex-col w-full h-full backdrop-blur-xl"
-                style={{ backgroundColor: theme.colors.bg.secondary }}
+                className="flex flex-col w-full h-full backdrop-blur-xl bg-sidebar-accent/10"
             >
                 <Tabs
                     defaultValue="onChain"
@@ -94,11 +92,7 @@ export const NodeItems = forwardRef<{ setActiveChainTab: (tab: string) => void }
                         >
                             {/* Enhanced Modern Tab Switcher */}
                             <div 
-                                className="flex border-b backdrop-blur-sm overflow-x-auto scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent relative"
-                                style={{
-                                    borderColor: theme.colors.border.primary,
-                                    backgroundColor: theme.colors.bg.hover,
-                                }}
+                                className="flex border-b backdrop-blur-sm overflow-x-auto scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent relative border-sidebar-border bg-sidebar-accent/5"
                             >
                                 {/* Sliding indicator with glow effect */}
                                 <motion.div
@@ -112,8 +106,8 @@ export const NodeItems = forwardRef<{ setActiveChainTab: (tab: string) => void }
                                             return `${index * 25}%`;
                                         })(),
                                         width: "25%",
-                                        background: `linear-gradient(to right, ${theme.colors.accent.primary}, ${theme.colors.accent.purple})`,
-                                        boxShadow: `0 0 8px ${theme.colors.accent.primary}50`,
+                                        background: "var(--primary)",
+                                        boxShadow: "0 0 8px var(--primary)",
                                     }}
                                 />
                                 
@@ -127,31 +121,19 @@ export const NodeItems = forwardRef<{ setActiveChainTab: (tab: string) => void }
                                         key={tab.id}
                                         whileHover={{ scale: 1.02 }}
                                         whileTap={{ scale: 0.98 }}
-                                        className="flex items-center space-x-1.5 px-3 py-2 text-xs font-medium transition-all duration-200 whitespace-nowrap h-9 relative flex-1"
+                                        className="flex items-center space-x-1.5 px-3 py-2 text-xs font-medium transition-all duration-200 whitespace-nowrap h-9 relative flex-1 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/10"
                                         style={{
                                             color: activeSectionTab === tab.id 
-                                                ? theme.colors.text.primary 
-                                                : theme.colors.text.secondary,
+                                                ? "var(--foreground)" 
+                                                : "var(--muted-foreground)",
                                         }}
                                         onClick={() => setActiveSectionTab(tab.id)}
-                                        onMouseEnter={(e) => {
-                                            if (activeSectionTab !== tab.id) {
-                                                e.currentTarget.style.backgroundColor = theme.colors.bg.tertiary;
-                                                e.currentTarget.style.color = theme.colors.text.primary;
-                                            }
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            if (activeSectionTab !== tab.id) {
-                                                e.currentTarget.style.backgroundColor = 'transparent';
-                                                e.currentTarget.style.color = theme.colors.text.secondary;
-                                            }
-                                        }}
                                     >
                                         <span 
                                             style={{
                                                 color: activeSectionTab === tab.id 
-                                                    ? theme.colors.accent.primary 
-                                                    : theme.colors.text.tertiary
+                                                    ? "var(--primary)" 
+                                                    : "var(--muted-foreground)"
                                             }}
                                         >
                                             {tab.icon}
@@ -159,18 +141,7 @@ export const NodeItems = forwardRef<{ setActiveChainTab: (tab: string) => void }
                                         <span className="hidden sm:inline">{tab.label}</span>
                                         {tab.count > 0 && (
                                             <span 
-                                                className="ml-1 px-1.5 py-0.5 text-[9px] rounded-full border text-center min-w-[16px]"
-                                                style={{
-                                                    backgroundColor: activeSectionTab === tab.id 
-                                                        ? `${theme.colors.accent.primary}20`
-                                                        : `${theme.colors.text.tertiary}10`,
-                                                    borderColor: activeSectionTab === tab.id 
-                                                        ? `${theme.colors.accent.primary}30`
-                                                        : `${theme.colors.text.tertiary}20`,
-                                                    color: activeSectionTab === tab.id 
-                                                        ? theme.colors.accent.primary
-                                                        : theme.colors.text.tertiary,
-                                                }}
+                                                className="ml-1 px-1.5 py-0.5 text-[9px] rounded-full border text-center min-w-[16px] bg-sidebar-accent border-sidebar-border text-muted-foreground"
                                             >
                                                 {tab.count}
                                             </span>
@@ -180,8 +151,7 @@ export const NodeItems = forwardRef<{ setActiveChainTab: (tab: string) => void }
                             </div>
 
                             <div 
-                                className="flex-1 overflow-hidden"
-                                style={{ backgroundColor: 'transparent' }}
+                                className="flex-1 overflow-hidden bg-transparent"
                             >
                                 <SimpleBar style={{ width: "100%", height: "100%" }}>
 
@@ -221,18 +191,15 @@ export const NodeItems = forwardRef<{ setActiveChainTab: (tab: string) => void }
                                             >
                                                 <div className="p-8 text-center">
                                                     <Settings 
-                                                        className="h-12 w-12 mx-auto mb-4" 
-                                                        style={{ color: theme.colors.text.tertiary }}
+                                                        className="h-12 w-12 mx-auto mb-4 text-muted-foreground" 
                                                     />
                                                     <h3 
-                                                        className="text-sm font-medium mb-2"
-                                                        style={{ color: theme.colors.text.secondary }}
+                                                        className="text-sm font-medium mb-2 text-foreground"
                                                     >
                                                         Account Templates
                                                     </h3>
                                                     <p 
-                                                        className="text-xs"
-                                                        style={{ color: theme.colors.text.tertiary }}
+                                                        className="text-xs text-muted-foreground"
                                                     >
                                                         Pre-configured account structures coming soon
                                                     </p>
@@ -247,18 +214,15 @@ export const NodeItems = forwardRef<{ setActiveChainTab: (tab: string) => void }
                                             >
                                                 <div className="p-8 text-center">
                                                     <Play 
-                                                        className="h-12 w-12 mx-auto mb-4" 
-                                                        style={{ color: theme.colors.text.tertiary }}
+                                                        className="h-12 w-12 mx-auto mb-4 text-muted-foreground" 
                                                     />
                                                     <h3 
-                                                        className="text-sm font-medium mb-2"
-                                                        style={{ color: theme.colors.text.secondary }}
+                                                        className="text-sm font-medium mb-2 text-foreground"
                                                     >
                                                         Input Components
                                                     </h3>
                                                     <p 
-                                                        className="text-xs"
-                                                        style={{ color: theme.colors.text.tertiary }}
+                                                        className="text-xs text-muted-foreground"
                                                     >
                                                         Reusable input elements coming soon
                                                     </p>

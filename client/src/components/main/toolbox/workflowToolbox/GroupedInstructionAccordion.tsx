@@ -15,7 +15,6 @@ import {
   Droplet 
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { theme } from "../../../../styles/theme";
 import { InstructionCard } from "./ToolboxInstructions";
 
 const accordionStyles = `
@@ -67,7 +66,7 @@ export function GroupedInstructionsAccordion() {
   };
 
   return (
-    <div className="bg-transparent p-0">
+    <div className="bg-sidebar-accent/10 p-0">
       <style>{accordionStyles}</style>
       <AccordionRoot 
         type="multiple" 
@@ -90,14 +89,10 @@ export function GroupedInstructionsAccordion() {
             >
               <AccordionItem
                 value={group.label}
-                className="border-b accordion-item overflow-hidden"
-                style={{ borderColor: theme.colors.border.primary }}
+                className="border-b accordion-item overflow-hidden border-sidebar-border"
               >
                 <AccordionItemTrigger
-                  className="group flex items-center justify-between w-full px-3 py-2 text-sm font-medium transition-all duration-300 backdrop-blur-sm relative hover:bg-opacity-5"
-                  style={{
-                    backgroundColor: 'transparent',
-                  }}
+                  className="group flex items-center justify-between w-full px-3 py-2 text-sm font-medium transition-all duration-300 backdrop-blur-sm relative hover:bg-sidebar-accent/5 bg-transparent"
                 >
                   {/* Gradient background on hover */}
                   <div className={`absolute inset-0 bg-gradient-to-r ${categoryInfo.gradient}/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
@@ -105,19 +100,12 @@ export function GroupedInstructionsAccordion() {
                   <div className="flex items-center gap-2 relative z-10">
                     <motion.div
                       whileHover={{ scale: 1.1, rotate: 5 }}
-                      className="h-6 w-6 rounded-md flex items-center justify-center"
-                      style={{
-                        background: `linear-gradient(to right, ${categoryInfo.color === 'blue' ? theme.colors.accent.primary : categoryInfo.color === 'purple' ? theme.colors.accent.purple : categoryInfo.color === 'green' ? theme.colors.accent.success : theme.colors.accent.warning}20, ${categoryInfo.color === 'blue' ? theme.colors.accent.primary : categoryInfo.color === 'purple' ? theme.colors.accent.purple : categoryInfo.color === 'green' ? theme.colors.accent.success : theme.colors.accent.warning}20)`,
-                        borderWidth: '1px',
-                        borderStyle: 'solid',
-                        borderColor: theme.colors.border.primary,
-                      }}
+                      className="h-6 w-6 rounded-md flex items-center justify-center bg-sidebar-accent border border-sidebar-border"
                     >
                       {categoryInfo.icon}
                     </motion.div>
                     <span 
-                      className="text-xs font-medium transition-colors duration-200"
-                      style={{ color: theme.colors.text.primary }}
+                      className="text-xs font-medium transition-colors duration-200 text-foreground"
                     >
                       {group.label}
                     </span>
@@ -126,12 +114,7 @@ export function GroupedInstructionsAccordion() {
                   <div className="flex items-center gap-2 relative z-10">
                     <motion.span 
                       whileHover={{ scale: 1.05 }}
-                      className="px-1.5 py-0.5 text-[10px] rounded-md border"
-                      style={{
-                        backgroundColor: theme.colors.bg.tertiary,
-                        borderColor: theme.colors.border.primary,
-                        color: theme.colors.text.secondary,
-                      }}
+                      className="px-1.5 py-0.5 text-[10px] rounded-md border bg-sidebar-accent border-sidebar-border text-muted-foreground"
                     >
                       {group.items.length}
                     </motion.span>
@@ -140,8 +123,7 @@ export function GroupedInstructionsAccordion() {
                       transition={{ duration: 0.3, ease: "easeInOut" }}
                     >
                       <ChevronDown 
-                        className="h-3 w-3 transition-colors duration-200" 
-                        style={{ color: theme.colors.text.tertiary }}
+                        className="h-3 w-3 transition-colors duration-200 text-muted-foreground" 
                       />
                     </motion.div>
                   </div>
@@ -155,10 +137,7 @@ export function GroupedInstructionsAccordion() {
                         animate={{ height: "auto", opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.3, ease: "easeInOut" }}
-                        className="border-l-2 ml-4"
-                        style={{
-                          borderColor: theme.colors.border.secondary,
-                        }}
+                        className="border-l-2 ml-4 border-sidebar-border"
                       >
                         <div className="pl-4 pr-3 pb-1 space-y-0.5">
                           {group.items.map((instruction, itemIndex) => (
