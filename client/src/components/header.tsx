@@ -1,0 +1,49 @@
+import { Button } from "@/components/ui/button"
+
+export function Header() {
+  return (
+    <header className="h-14 border-b border-border bg-card flex items-center justify-between px-6 shadow-sm">
+      <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-gradient-to-br from-primary to-purple-600 rounded-lg flex items-center justify-center shadow-md">
+            <span className="text-sm font-bold text-white font-heading">S</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="font-heading font-bold text-xl">SolanaFlow</span>
+            <span className="text-xs text-muted-foreground">Visual Programming Interface</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
+        <Button variant="default" size="sm" className="bg-primary text-primary-foreground shadow-sm">
+          workflow
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground hover:text-foreground hover:bg-background/50"
+        >
+          interface
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground hover:text-foreground hover:bg-background/50"
+        >
+          code
+        </Button>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+          <span className="text-sm text-muted-foreground">Connected</span>
+        </div>
+        <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-shadow bg-transparent">
+          Connect Wallet
+        </Button>
+      </div>
+    </header>
+  )
+}

@@ -1,30 +1,26 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import { Oxygen_Mono } from 'next/font/google';
+import { Space_Grotesk, DM_Sans } from "next/font/google";
 import "@/styles/globals.css";
 import "@/utils/polyfills";
 
 import Providers from "@/components/Providers";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
-});
+  display: "swap",
+  variable: "--font-space-grotesk",
+})
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const dmSans = DM_Sans({
   subsets: ["latin"],
-});
-
-const oxygenMono = Oxygen_Mono({
-  variable: "--font-oxygen-mono",
-  subsets: ["latin"],
-  weight: ["400"],
-});
+  display: "swap",
+  variable: "--font-dm-sans",
+})
 
 export const metadata: Metadata = {
-  title: "SolanaFlow - Build Solana dApps Without Code",
-  description: "Visual AI developer tool for building and deploying Solana blockchain applications without writing code",
+  title: "SolanaFlow - Visual Programming Interface",
+  description: "Modern visual programming interface for Solana blockchain development",
+  generator: "v0.app",
 };
 
 export default function RootLayout({
@@ -54,7 +50,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} ${oxygenMono.variable} antialiased`}>
+      <body className={`${spaceGrotesk.variable} ${dmSans.variable} dark font-sans antialiased`}>
         <Providers>{children}</Providers>
       </body>
     </html>

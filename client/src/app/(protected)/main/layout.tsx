@@ -1,9 +1,10 @@
 "use client";
 
 import React from "react"
-import { Toolbox } from "@/components/main/toolbox/Toolbox";
-import Chat from "@/components/main/chat/Chat";
-import LayoutHeader from "@/components/main/LayoutHeader";
+import { Header } from "@/components/header"
+import { WorkflowCanvas } from "@/components/workflow-canvas"
+import { InstructionsPanel } from "@/components/instructions-panel"
+import { RightPanel } from "@/components/right-panel"
 import TaskLogsToast from "@/components/logs/TaskLogsToast";
 import useInitializeTaskLogger from "@/data/hooks/useInitializeTaskLogger";
 
@@ -15,16 +16,16 @@ export default function MainLayout({
   useInitializeTaskLogger();
   
   return (
-    <div className="w-screen h-screen flex flex-col overflow-y-hidden">
-      <LayoutHeader />
+    <div className="h-screen flex flex-col bg-background text-foreground">
+      <Header />
 
       <div className="flex flex-1 overflow-hidden">
-        <main className="w-full h-full flex-1 overflow-y-auto">
-          {children}
+        <main className="flex-1 flex">
+          <WorkflowCanvas />
+          <InstructionsPanel />
         </main>
 
-        <Toolbox />
-        <Chat />
+        <RightPanel />
         <TaskLogsToast />
       </div>
     </div>
