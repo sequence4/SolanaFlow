@@ -5,6 +5,7 @@ import type React from "react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import Chat from "@/components/main/chat/Chat"
 import {
   Edit,
   Folder,
@@ -16,58 +17,11 @@ import {
   ChevronRight,
   MessageSquare,
   X,
-  Send,
-  Bot,
-  User,
 } from "lucide-react"
-
-interface Message {
-  id: string
-  content: string
-  sender: "user" | "assistant"
-  timestamp: Date
-}
 
 export function RightPanel() {
   const [isProjectExpanded, setIsProjectExpanded] = useState(true)
-  const [isAIExpanded, setIsAIExpanded] = useState(true)
   const [isMinimized, setIsMinimized] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([])
-  const [inputValue, setInputValue] = useState("")
-  const [isTyping, setIsTyping] = useState(false)
-
-  const handleSendMessage = () => {
-    if (inputValue.trim()) {
-      const newMessage: Message = {
-        id: Date.now().toString(),
-        content: inputValue,
-        sender: "user",
-        timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, newMessage])
-      setInputValue("")
-      setIsTyping(true)
-
-      // Simulate AI response
-      setTimeout(() => {
-        const aiResponse: Message = {
-          id: (Date.now() + 1).toString(),
-          content: "I can help you with Solana development and workflow building. What would you like to know?",
-          sender: "assistant",
-          timestamp: new Date(),
-        }
-        setMessages((prev) => [...prev, aiResponse])
-        setIsTyping(false)
-      }, 1500)
-    }
-  }
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSendMessage()
-    }
-  }
 
   if (isMinimized) {
     return (
@@ -160,120 +114,7 @@ export function RightPanel() {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col">
-        <div className="p-4 border-b border-border flex items-center justify-between bg-gradient-to-r from-card to-card/80">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-md">
-              <Bot className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <span className="font-heading font-semibold">AI Assistant</span>
-              <div className="flex items-center gap-2 mt-0.5">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-xs text-muted-foreground">Online</span>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsMinimized(true)}
-              title="Minimize"
-              className="hover:bg-accent transition-all duration-200 hover:scale-105"
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex-1 p-4 overflow-y-auto scrollbar-thin">
-          {messages.length === 0 ? (
-            <div className="text-center text-muted-foreground text-sm">
-              <div className="w-16 h-16 bg-gradient-to-br from-primary/20 to-purple-600/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <MessageSquare className="w-8 h-8 text-primary" />
-              </div>
-              <p className="font-medium mb-2">Welcome to AI Assistant</p>
-              <p className="text-xs leading-relaxed">
-                Ask me anything about Solana development, workflow building, or smart contract programming.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex gap-3 ${message.sender === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  {message.sender === "assistant" && (
-                    <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-sm flex-shrink-0">
-                      <Bot className="w-4 h-4 text-white" />
-                    </div>
-                  )}
-                  <div
-                    className={`max-w-[75%] p-3 rounded-xl text-sm shadow-sm ${
-                      message.sender === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-foreground border border-border"
-                    }`}
-                  >
-                    {message.content}
-                  </div>
-                  {message.sender === "user" && (
-                    <div className="w-8 h-8 bg-gradient-to-br from-primary to-purple-600 rounded-full flex items-center justify-center shadow-sm flex-shrink-0">
-                      <User className="w-4 h-4 text-white" />
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              {isTyping && (
-                <div className="flex gap-3 justify-start">
-                  <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-sm">
-                    <Bot className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="bg-muted border border-border p-3 rounded-xl">
-                    <div className="flex gap-1">
-                      <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" />
-                      <div
-                        className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"
-                        style={{ animationDelay: "0.1s" }}
-                      />
-                      <div
-                        className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"
-                        style={{ animationDelay: "0.2s" }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="p-4 border-t border-border bg-gradient-to-r from-card to-card/80">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="Message the AI Assistant..."
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyPress={handleKeyPress}
-              className="flex-1 px-3 py-2.5 bg-input border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all duration-200 focus:shadow-sm"
-              disabled={isTyping}
-            />
-            <Button
-              size="sm"
-              onClick={handleSendMessage}
-              disabled={!inputValue.trim() || isTyping}
-              className="transition-all duration-200 hover:shadow-md px-3"
-            >
-              <Send className="w-4 h-4" />
-            </Button>
-          </div>
-          <div className="text-xs text-muted-foreground mt-2 text-center font-mono">v1.0.0 • SolanaFlow AI</div>
-        </div>
-      </div>
+      <Chat />
     </div>
   )
 }
