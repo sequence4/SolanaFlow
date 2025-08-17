@@ -94,10 +94,10 @@ export function InstructionCard({
         opacity: 0.8,
         zIndex: 1000
       }}
-      className="w-full mx-1 my-0.5 px-3 py-1.5 text-sm transition-all duration-200 rounded-lg cursor-grab active:cursor-grabbing group backdrop-blur-sm border border-sidebar-border hover:border-primary"
+      className="w-full mx-1 my-0.5 px-3 py-1.5 text-sm transition-all duration-200 rounded-lg cursor-grab active:cursor-grabbing group backdrop-blur-sm border border-border hover:border-primary"
       style={{
         backgroundColor: isDragging 
-          ? 'var(--sidebar-accent)'
+          ? 'var(--muted)'
           : 'transparent',
       }}
       onMouseEnter={() => setIsHovered(true)}
@@ -120,7 +120,7 @@ export function InstructionCard({
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               whileHover={{ scale: 1.1 }}
-              className="ml-2 text-[9px] px-1.5 py-0.5 rounded-full border bg-sidebar-accent/20 text-primary border-sidebar-border"
+              className="ml-2 text-[9px] px-1.5 py-0.5 rounded-full border bg-muted/20 text-primary border-border"
             >
               NEW
             </MotionDiv>
@@ -135,7 +135,7 @@ export function InstructionCard({
             whileHover={{ scale: 1.2 }}
             whileTap={{ scale: 0.9 }}
             onClick={toggleFavorite}
-            className="p-0.5 rounded transition-all duration-200 text-muted-foreground hover:text-primary hover:bg-sidebar-accent/10"
+            className="p-0.5 rounded transition-all duration-200 text-muted-foreground hover:text-primary hover:bg-muted/10"
           >
             <Star className={`h-2.5 w-2.5 ${isFavorite ? "fill-current" : ""}`} />
           </motion.button>
@@ -143,7 +143,7 @@ export function InstructionCard({
             whileHover={{ scale: 1.2 }}
             whileTap={{ scale: 0.9 }}
             onClick={handleAdd}
-            className="p-0.5 rounded transition-all duration-200 text-muted-foreground hover:text-primary hover:bg-sidebar-accent/10"
+            className="p-0.5 rounded transition-all duration-200 text-muted-foreground hover:text-primary hover:bg-muted/10"
           >
             <PlusCircle className="h-2.5 w-2.5" />
           </motion.button>
@@ -155,7 +155,7 @@ export function InstructionCard({
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: "auto" }}
           exit={{ opacity: 0, height: 0 }}
-          className="mt-2 text-xs text-muted-foreground pl-4 border-l border-sidebar-border bg-sidebar-accent/10 rounded-r-lg p-2"
+          className="mt-2 text-xs text-muted-foreground pl-4 border-l border-border bg-muted/10 rounded-r-lg p-2"
         >
           {description}
         </MotionDiv>
@@ -166,7 +166,7 @@ export function InstructionCard({
 
 export const ToolboxInstructions = () => {
   return (
-    <div className="p-4 space-y-6 bg-sidebar-accent/10">
+    <div className="p-4 space-y-6 bg-card">
       {groupedInstructions.map((group, groupIndex) => (
         <MotionDiv
           key={group.label}
@@ -180,8 +180,8 @@ export const ToolboxInstructions = () => {
             <h3 className="font-semibold text-foreground text-sm tracking-wide">
               {group.label}
             </h3>
-            <div className="flex-1 h-px bg-sidebar-border" />
-            <span className="text-xs text-muted-foreground bg-sidebar-accent px-2 py-1 rounded-full border border-sidebar-border">
+            <div className="flex-1 h-px bg-border" />
+            <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full border border-border">
               {group.items.length}
             </span>
           </div>

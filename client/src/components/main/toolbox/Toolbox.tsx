@@ -370,23 +370,17 @@ export const Toolbox = () => {
 
     return (
         <div
-            className="app-sidebar w-[20%] flex flex-col h-full backdrop-blur-xl border-r overflow-hidden shadow-sm bg-sidebar text-foreground"
-            style={{
-                borderColor: 'var(--sidebar-border)',
-            }}
+            className="app-sidebar w-[20%] flex flex-col h-full backdrop-blur-xl border-r overflow-hidden shadow-sm bg-card text-foreground border-border"
         >
             {/* Compact Project Controls Section */}
             <div 
-                className="border-b backdrop-blur-sm bg-sidebar-accent/10"
-                style={{
-                    borderColor: 'var(--sidebar-border)',
-                }}
+                className="border-b backdrop-blur-sm bg-card border-border"
             >
                 <div className="space-y-2 px-3 py-2">
                     {/* Project Name with inline edit */}
                     <div className="flex items-center gap-2 h-8">
                         <div 
-                            className="flex-1 px-2 py-1 rounded-md border bg-sidebar-accent border-sidebar-border"
+                            className="flex-1 px-2 py-1 rounded-md border bg-muted border-border"
                         >
                             {isEditing ? (
                                 <input
@@ -433,7 +427,7 @@ export const Toolbox = () => {
                     <div className="grid grid-cols-3 gap-1">
                         <button 
                             onClick={handleOpenProjectClick}
-                            className="h-7 px-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 text-white border-sidebar-border bg-sidebar-accent hover:bg-sidebar-accent/80"
+                            className="h-7 px-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 text-foreground border-border bg-muted hover:bg-muted/80"
                         >
                             <FolderOpen size={12} />
                             <span>Open</span>
@@ -441,14 +435,14 @@ export const Toolbox = () => {
                         <button 
                             onClick={handleSaveProject}
                             disabled={!projectContext.id}
-                            className="h-7 px-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 disabled:opacity-50 text-white border-sidebar-border bg-sidebar-accent hover:bg-sidebar-accent/80"
+                            className="h-7 px-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 disabled:opacity-50 text-foreground border-border bg-muted hover:bg-muted/80"
                         >
                             <Save size={12} />
                             <span>Save</span>
                         </button>
                         <button 
                             onClick={handleNewProject}
-                            className="h-7 px-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 text-white border-sidebar-border bg-sidebar-accent hover:bg-sidebar-accent/80"
+                            className="h-7 px-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 text-foreground border-border bg-muted hover:bg-muted/80"
                         >
                             <Plus size={12} />
                             <span>New</span>
@@ -457,7 +451,7 @@ export const Toolbox = () => {
                         {/* Second row - Build/Deploy */}
                         <button
                             onClick={handleBuildClick}
-                            className="h-7 col-span-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 text-white border-sidebar-border bg-sidebar-accent hover:bg-sidebar-accent/80"
+                            className="h-7 col-span-2 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 text-foreground border-border bg-muted hover:bg-muted/80"
                         >
                             {isBuilding ? (
                                 <PulseLoader color="white" size={3} cssOverride={{ display: 'inline-block', margin: 0 }} />
@@ -469,7 +463,7 @@ export const Toolbox = () => {
                         <button
                             onClick={handleDeployClick}
                             disabled={isDeploying || !walletSigner.isConnected || !built}
-                            className="h-7 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 disabled:opacity-50 text-white border-sidebar-border bg-sidebar-accent hover:bg-sidebar-accent/80"
+                            className="h-7 rounded-md flex items-center justify-center gap-1 text-xs font-medium border transition-all hover:scale-105 disabled:opacity-50 text-foreground border-border bg-muted hover:bg-muted/80"
                         >
                             {isDeploying ? (
                                 <PulseLoader color="white" size={3} cssOverride={{ display: 'inline-block', margin: 0 }} />
@@ -488,7 +482,7 @@ export const Toolbox = () => {
                 {/* Program ID Display */}
                 {projectDeployed && projectContext.details?.projectState?.programId && (
                     <div 
-                        className="mx-3 mb-2 rounded-lg p-2 border backdrop-blur-sm bg-sidebar-accent border-sidebar-border"
+                        className="mx-3 mb-2 rounded-lg p-2 border backdrop-blur-sm bg-muted border-border"
                     >
                         <div className="flex items-center text-xs">
                             <span className="text-muted-foreground">Program ID:</span>
@@ -515,10 +509,7 @@ export const Toolbox = () => {
 
             {/* Enhanced Search Bar */}
             <div 
-                className="border-t border-b backdrop-blur-sm bg-sidebar-accent/10"
-                style={{
-                    borderColor: 'var(--sidebar-border)',
-                }}
+                className="border-t border-b backdrop-blur-sm bg-card border-border"
             >
                 <div className="px-3 py-2">
                     <div className="relative group">
@@ -531,7 +522,7 @@ export const Toolbox = () => {
                             value={searchValue}
                             onChange={(e) => setSearchValue(e.target.value)}
                             placeholder="Search nodes..."
-                            className="relative w-full h-8 rounded-lg pl-8 pr-8 text-xs transition-all focus:outline-none bg-sidebar-accent border border-sidebar-border text-foreground focus:ring-1 focus:ring-primary"
+                            className="relative w-full h-8 rounded-lg pl-8 pr-8 text-xs transition-all focus:outline-none bg-muted border border-border text-foreground focus:ring-1 focus:ring-primary"
                             onFocus={() => {
                                 setIsFocused(true);
                             }}
@@ -564,7 +555,7 @@ export const Toolbox = () => {
                         {['Recent', 'Favorites', 'Popular'].map((filter) => (
                             <button
                                 key={filter}
-                                className="px-2 py-0.5 text-[10px] border rounded-full transition-all hover:scale-105 bg-sidebar-accent border-sidebar-border text-muted-foreground hover:bg-sidebar-accent/80 hover:text-foreground"
+                                className="px-2 py-0.5 text-[10px] border rounded-full transition-all hover:scale-105 bg-muted border-border text-muted-foreground hover:bg-muted/80 hover:text-foreground"
                             >
                                 {filter}
                             </button>

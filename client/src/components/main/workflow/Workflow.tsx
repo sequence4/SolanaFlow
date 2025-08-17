@@ -25,7 +25,6 @@ import { ProjectStateUpdater } from "@/context/project/ProjectContextTypes";
 import { handleDrop } from '@/utils/tabs/workflow/onDrop';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { PlusIcon, Trash2, Layers } from 'lucide-react';
-import { darkTheme } from '@/styles/theme';
 
 // Separate component that uses the useReactFlow hook
 interface ReactFlowContentProps {
@@ -113,7 +112,7 @@ const ReactFlowContent = ({
         [setUxOpenPanel, setProjectState, publicKey, projectId, setProjectContext, reactFlow]
     );
 
-    const onNodeClick = useCallback((event: any, node: any) => {
+    const onNodeClick = useCallback((_event: any, node: any) => {
         if (node.type === 'instructionGroupNode') {
             // setActiveInstructionId((prevId) => (prevId === node.id ? null : node.id));
         }
@@ -180,48 +179,30 @@ const ReactFlowContent = ({
             }}
         >
             <Controls 
-                className="backdrop-blur-xl"
+                className="backdrop-blur-xl bg-card border-border text-muted-foreground"
                 position="top-left" 
                 orientation="horizontal"
                 style={{ 
-                    backgroundColor: darkTheme.glass.background,
-                    color: darkTheme.text.secondary, 
                     zIndex: 9999,
-                    border: `1px solid ${darkTheme.border.default}`,
                     padding: '12px',
                     gap: '12px',
                     borderRadius: '12px',
-                    backdropFilter: `blur(${darkTheme.glass.blur})`,
                     boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)',
                 }} 
             >
                 <ControlButton 
                     onClick={handleClearCanvas} 
                     title="Clear Canvas"
-                    style={{ 
-                        backgroundColor: darkTheme.background.tertiary,
-                        color: darkTheme.text.secondary,
-                        borderRadius: '8px',
-                        border: `1px solid ${darkTheme.border.default}`,
-                        transition: 'all 0.2s ease',
-                    }}
-                    className="hover:bg-white/10 hover:scale-105 transition-all duration-200"
+                    className="bg-muted border-border text-muted-foreground hover:bg-muted/80 hover:scale-105 transition-all duration-200 rounded-lg"
                 >
-                    <Trash2 size={14} style={{ color: darkTheme.text.secondary }} />
+                    <Trash2 size={14} className="text-muted-foreground" />
                 </ControlButton>
                 <ControlButton 
                     onClick={toggleAccountsBox}
                     title="Toggle Accounts"
-                    style={{  
-                        backgroundColor: darkTheme.background.tertiary,
-                        color: darkTheme.text.secondary,
-                        borderRadius: '8px',
-                        border: `1px solid ${darkTheme.border.default}`,
-                        transition: 'all 0.2s ease',
-                    }}
-                    className="hover:bg-white/10 hover:scale-105 transition-all duration-200"
+                    className="bg-muted border-border text-muted-foreground hover:bg-muted/80 hover:scale-105 transition-all duration-200 rounded-lg"
                 >
-                    <Layers size={14} style={{ color: darkTheme.text.secondary }} />
+                    <Layers size={14} className="text-muted-foreground" />
                 </ControlButton>
             </Controls>
         </ReactFlow>
@@ -287,12 +268,7 @@ const Workflow = () => {
             {uxOpenPanel === 'accountsBox' && (
                 <div className="absolute top-14 right-6 z-50">
                     <div 
-                        className="backdrop-blur-xl rounded-xl shadow-2xl"
-                        style={{
-                            backgroundColor: darkTheme.background.secondary,
-                            border: `1px solid ${darkTheme.border.default}`,
-                            backdropFilter: `blur(${darkTheme.glass.blur})`,
-                        }}
+                        className="backdrop-blur-xl rounded-xl shadow-2xl bg-card border-border"
                     >
                         <AccountsBox />
                     </div>

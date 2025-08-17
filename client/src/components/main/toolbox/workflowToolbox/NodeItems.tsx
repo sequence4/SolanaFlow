@@ -41,7 +41,7 @@ export const NodeItems = forwardRef<{ setActiveChainTab: (tab: string) => void }
 
         return (
             <div 
-                className="flex flex-col w-full h-full backdrop-blur-xl bg-sidebar-accent/10"
+                className="flex flex-col w-full h-full backdrop-blur-xl bg-card"
             >
                 <Tabs
                     defaultValue="onChain"
@@ -92,7 +92,7 @@ export const NodeItems = forwardRef<{ setActiveChainTab: (tab: string) => void }
                         >
                             {/* Enhanced Modern Tab Switcher */}
                             <div 
-                                className="flex border-b backdrop-blur-sm overflow-x-auto scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent relative border-sidebar-border bg-sidebar-accent/5"
+                                className="flex border-b backdrop-blur-sm overflow-x-auto scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent relative border-border bg-muted/5"
                             >
                                 {/* Sliding indicator with glow effect */}
                                 <motion.div
@@ -121,7 +121,7 @@ export const NodeItems = forwardRef<{ setActiveChainTab: (tab: string) => void }
                                         key={tab.id}
                                         whileHover={{ scale: 1.02 }}
                                         whileTap={{ scale: 0.98 }}
-                                        className="flex items-center space-x-1.5 px-3 py-2 text-xs font-medium transition-all duration-200 whitespace-nowrap h-9 relative flex-1 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/10"
+                                        className="flex items-center space-x-1.5 px-3 py-2 text-xs font-medium transition-all duration-200 whitespace-nowrap h-9 relative flex-1 text-muted-foreground hover:text-foreground hover:bg-muted/10"
                                         style={{
                                             color: activeSectionTab === tab.id 
                                                 ? "var(--foreground)" 
@@ -141,7 +141,7 @@ export const NodeItems = forwardRef<{ setActiveChainTab: (tab: string) => void }
                                         <span className="hidden sm:inline">{tab.label}</span>
                                         {tab.count > 0 && (
                                             <span 
-                                                className="ml-1 px-1.5 py-0.5 text-[9px] rounded-full border text-center min-w-[16px] bg-sidebar-accent border-sidebar-border text-muted-foreground"
+                                                className="ml-1 px-1.5 py-0.5 text-[9px] rounded-full border text-center min-w-[16px] bg-muted border-border text-muted-foreground"
                                             >
                                                 {tab.count}
                                             </span>
