@@ -12,14 +12,14 @@
     --delete-button-color-light: #c55b5b;
 
 /* Dark mode */
-    --popover-bg-dark: #171b27;
-    --popover-border-dark: #1c1f30;
+    --popover-bg-dark: oklch(0.245 0 0);
+    --popover-border-dark: oklch(0.309 0 0);
 
-    --input-bg-dark: #0b0f18;
-    --input-border-dark: #212745;
+    --input-bg-dark: oklch(0.185 0 0);
+    --input-border-dark: oklch(0.309 0 0);
 
-    --project-list-bg-dark: #101524;
-    --project-list-border-dark: #212745;
+    --project-list-bg-dark: oklch(0.225 0 0);
+    --project-list-border-dark: oklch(0.309 0 0);
 
     --project-list-name-dark: #d0d7f1;
     --description-dark: #aaaec5;

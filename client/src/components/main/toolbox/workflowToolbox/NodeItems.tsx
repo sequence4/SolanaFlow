@@ -54,8 +54,8 @@ export const NodeItems = forwardRef<{ setActiveChainTab: (tab: string) => void }
                             className={cn(
                                 "flex-1 py-2.5 text-sm font-medium transition-colors chain-tabs",
                                 activeChainTab === "onChain"
-                                    ? "bg-[#2A3347] text-[#E9ECEF] border-b-2 border-[#80a3ff]"
-                                    : "text-[#A0AEC0] hover:bg-[#2A3347]",
+                                    ? "bg-muted text-foreground border-b-2 border-primary"
+                                    : "text-muted-foreground hover:bg-muted",
                             )}
                             onClick={() => setActiveChainTab("onChain")}
                         >
@@ -65,8 +65,8 @@ export const NodeItems = forwardRef<{ setActiveChainTab: (tab: string) => void }
                             className={cn(
                                 "flex-1 py-2.5 text-sm font-medium transition-colors chain-tabs",
                                 activeChainTab === "offChain"
-                                    ? "bg-[#2A3347] text-[#E9ECEF] border-b-2 border-[#80a3ff]"
-                                    : "text-[#A0AEC0] hover:bg-[#2A3347]",
+                                    ? "bg-muted text-foreground border-b-2 border-primary"
+                                    : "text-muted-foreground hover:bg-muted",
                             )}
                             onClick={() => setActiveChainTab("offChain")}
                         >
