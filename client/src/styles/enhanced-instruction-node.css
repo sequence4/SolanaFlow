@@ -1,6 +1,7 @@
 /* Enhanced Instruction Node - Exact Design Match */
 
-* {
+/* Scoped reset only for instruction nodes */
+.instruction-node * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -12,6 +13,7 @@
     border: 1px solid rgba(139, 92, 246, 0.3);
     border-radius: 12px;
     width: 380px;
+    height: 500px; /* Fixed height for all nodes */
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4),
                 0 0 80px rgba(139, 92, 246, 0.1);
     overflow: hidden;
@@ -19,6 +21,8 @@
     position: relative;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     color: #e0e0e0;
+    display: flex;
+    flex-direction: column;
 }
 
 .instruction-node::before {
@@ -121,6 +125,35 @@
 /* Node Body */
 .node-body {
     padding: 16px;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Custom scrollbar for node body */
+.node-body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.node-body::-webkit-scrollbar-track {
+    background: rgba(139, 92, 246, 0.05);
+    border-radius: 3px;
+}
+
+.node-body::-webkit-scrollbar-thumb {
+    background: rgba(139, 92, 246, 0.3);
+    border-radius: 3px;
+    transition: background 0.2s ease;
+}
+
+.node-body::-webkit-scrollbar-thumb:hover {
+    background: rgba(139, 92, 246, 0.5);
+}
+
+/* Firefox scrollbar */
+.node-body {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(139, 92, 246, 0.3) rgba(139, 92, 246, 0.05);
 }
 
 .section {
