@@ -103,13 +103,21 @@ function convertAccount(legacyAccount: LegacyAccount): EnhancedAccount {
   const accountType = mapAccountType(legacyAccount.type);
   const isSigner = legacyAccount.isSigner || (legacyAccount.type.toLowerCase() === 'signer');
   
+  // Smart writable detection based on account role
+  const isWritable = legacyAccount.isWritable || 
+    legacyAccount.label.toLowerCase().includes('destination') ||
+    legacyAccount.label.toLowerCase().includes('mint') ||
+    legacyAccount.label.toLowerCase().includes('payer') ||
+    accountType === AccountType.MINT ||
+    accountType === AccountType.TOKEN_ACCOUNT;
+  
   return {
     label: legacyAccount.label,
     type: accountType,
     description: legacyAccount.description || generateAccountDescription(legacyAccount.label, accountType),
-    isWritable: legacyAccount.isWritable || false,
+    isWritable,
     isSigner,
-    publicKey: generateAccountAddress(accountType),
+    publicKey: generateAccountAddress(accountType, legacyAccount.label),
     owner: getAccountOwner(accountType),
     lamports: getAccountLamports(accountType),
     rentEpoch: accountType === AccountType.PROGRAM ? undefined : '18446744073709551615'
@@ -160,17 +168,31 @@ function generatePlaceholderAddress(): string {
   return result;
 }
 
-function generateAccountAddress(accountType: AccountType): string {
+function generateAccountAddress(accountType: AccountType, label?: string): string {
   // Return known addresses for common account types
   switch (accountType) {
     case AccountType.PROGRAM:
+      if (label?.toLowerCase().includes('token')) {
+        return 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
+      }
+      if (label?.toLowerCase().includes('system')) {
+        return '11111111111111111111111111111112';
+      }
+      if (label?.toLowerCase().includes('associated')) {
+        return 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL';
+      }
       return 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
     case AccountType.MINT:
       return 'So11111111111111111111111111111111111111112'; // SOL mint
     case AccountType.SYSVAR:
       return 'Rent1111111111111111111111111111111111111111';
     default:
-      return generatePlaceholderAddress();
+      // Generate more realistic looking addresses
+      const prefixes = ['1234', '5678', '9ABC', 'DEF0', '2468', '1357'];
+      const suffixes = ['xyz', 'abc', '123', 'def', '456', 'ghi'];
+      const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+      const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
+      return prefix + generatePlaceholderAddress().slice(4, -3) + suffix;
   }
 }
 
