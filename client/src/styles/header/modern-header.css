@@ -1,6 +1,7 @@
 /* Modern Glassmorphic Header/Tab Styling */
 
-/* Tab list container */
+/* Ensure styles are applied with high specificity */
+body .tab-list-modern,
 .tab-list-modern {
   background: rgba(20, 20, 35, 0.85) !important;
   backdrop-filter: blur(20px) !important;

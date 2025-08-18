@@ -1,6 +1,7 @@
 /* Modern Glassmorphic Chat Styling */
 
-/* Main chat container */
+/* Ensure styles are applied with high specificity */
+body .chat-container,
 .chat-container {
   background: rgba(20, 20, 35, 0.90) !important;
   backdrop-filter: blur(20px) !important;

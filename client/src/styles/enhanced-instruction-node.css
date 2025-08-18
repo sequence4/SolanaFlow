@@ -1,13 +1,15 @@
 /* Enhanced Instruction Node - Exact Design Match */
 
-/* Scoped reset only for instruction nodes */
+/* Ensure styles are applied with high specificity */
+body .instruction-node *,
 .instruction-node * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
 
-/* Main instruction node container */
+/* Main instruction node container with enhanced specificity */
+body .instruction-node,
 .instruction-node {
     background: rgba(20, 20, 35, 0.95);
     border: 1px solid rgba(139, 92, 246, 0.3);

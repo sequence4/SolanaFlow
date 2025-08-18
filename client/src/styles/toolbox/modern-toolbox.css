@@ -1,6 +1,7 @@
 /* Modern Glassmorphic Toolbox Styling */
 
-/* Main sidebar with glassmorphism */
+/* Ensure styles are applied with high specificity */
+body .app-sidebar,
 .app-sidebar {
   background: rgba(20, 20, 35, 0.85) !important;
   backdrop-filter: blur(20px) !important;

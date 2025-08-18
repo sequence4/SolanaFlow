@@ -1,79 +1,18 @@
-/* Global Enhancements - Darker Backgrounds & AI-like Futuristic Appearance */
+/* Global Enhancements - AI-like Futuristic Appearance */
 
-/* Enhanced global color scheme with darker backgrounds */
-:root {
-  /* Darker, more contrasted backgrounds */
-  --color-background: oklch(0.12 0 0);  /* Much darker main background */
-  --color-card: oklch(0.16 0 0);        /* Darker card backgrounds */
-  --color-popover: oklch(0.18 0 0);     /* Darker popovers */
-  --color-muted: oklch(0.20 0 0);       /* Darker muted backgrounds */
-  --color-sidebar: oklch(0.14 0 0);     /* Darker sidebar */
-  
-  /* Enhanced contrast for text */
-  --color-foreground: oklch(0.95 0 0);  /* Brighter text */
-  --color-muted-foreground: oklch(0.65 0 0); /* More visible muted text */
-  
-  /* AI-like accent colors */
-  --color-primary: oklch(0.65 0.25 265);     /* Enhanced purple primary */
-  --color-accent: oklch(0.68 0.22 280);      /* Shifted to more blue-purple */
-  --color-secondary: oklch(0.25 0 0);        /* Darker secondary */
-  
-  /* AI-themed custom properties */
-  --ai-glow-primary: rgba(139, 92, 246, 0.4);
-  --ai-glow-secondary: rgba(168, 85, 247, 0.3);
-  --ai-glow-accent: rgba(59, 130, 246, 0.2);
-  
-  /* Enhanced borders with AI glow */
-  --color-border: oklch(0.25 0 0);
-  --ai-border-glow: rgba(139, 92, 246, 0.15);
-  
-  /* Neural network inspired gradients */
-  --ai-gradient-1: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(168, 85, 247, 0.05));
-  --ai-gradient-2: linear-gradient(225deg, rgba(59, 130, 246, 0.08), rgba(139, 92, 246, 0.05));
-  --ai-gradient-3: radial-gradient(circle, rgba(139, 92, 246, 0.03), transparent 70%);
-  
-  /* Subtle animation variables */
-  --ai-pulse-duration: 3s;
-  --ai-glow-duration: 2s;
+/* Enhanced body background with neural patterns */
+body {
+  background-image: 
+    radial-gradient(circle at 20% 20%, rgba(139, 92, 246, 0.02) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(168, 85, 247, 0.02) 0%, transparent 50%),
+    radial-gradient(circle at 40% 60%, rgba(59, 130, 246, 0.01) 0%, transparent 50%) !important;
+  background-attachment: fixed;
 }
 
-/* Enhanced dark mode with same values */
-.dark {
-  --color-background: oklch(0.12 0 0);
-  --color-card: oklch(0.16 0 0);
-  --color-popover: oklch(0.18 0 0);
-  --color-muted: oklch(0.20 0 0);
-  --color-sidebar: oklch(0.14 0 0);
-  --color-foreground: oklch(0.95 0 0);
-  --color-muted-foreground: oklch(0.65 0 0);
-  --color-primary: oklch(0.65 0.25 265);
-  --color-accent: oklch(0.68 0.22 280);
-  --color-secondary: oklch(0.25 0 0);
-  --color-border: oklch(0.25 0 0);
-}
-
-/* Global enhancements */
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  
-  body {
-    @apply bg-background text-foreground;
-    font-family: var(--font-family-sans);
-    background-image: 
-      radial-gradient(circle at 20% 20%, rgba(139, 92, 246, 0.02) 0%, transparent 50%),
-      radial-gradient(circle at 80% 80%, rgba(168, 85, 247, 0.02) 0%, transparent 50%),
-      radial-gradient(circle at 40% 60%, rgba(59, 130, 246, 0.01) 0%, transparent 50%);
-    background-attachment: fixed;
-  }
-  
-  /* Enhanced typography with better contrast */
-  h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-family-heading);
-    color: oklch(0.98 0 0);
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  }
+/* Enhanced typography with better contrast */
+h1, h2, h3, h4, h5, h6 {
+  color: oklch(0.98 0 0) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
 }
 
 /* AI-inspired utility classes */
