@@ -29,39 +29,35 @@ export function GroupedInstructionsAccordion() {
   // Map of category labels to their icons and colors
   const categoryIcons: Record<string, { icon: any; color: string; gradient: string }> = {
     "SPL Token Instructions": { 
-      icon: <Package className="h-4 w-4 text-white" />, 
-      color: "blue",
-      gradient: "from-blue-500 to-cyan-500"
+      icon: <Package className="h-4 w-4 text-foreground" />, 
+      color: "muted",
+      gradient: "from-muted to-muted"
     },
     "NFT and Metaplex Instructions": { 
-      icon: <Layers className="h-4 w-4 text-white" />, 
-      color: "purple",
-      gradient: "from-purple-500 to-pink-500"
+      icon: <Layers className="h-4 w-4 text-foreground" />, 
+      color: "muted",
+      gradient: "from-muted to-muted"
     },
     "Governance Instructions": { 
-      icon: <Briefcase className="h-4 w-4 text-white" />, 
-      color: "green",
-      gradient: "from-emerald-500 to-teal-500"
+      icon: <Briefcase className="h-4 w-4 text-foreground" />, 
+      color: "muted",
+      gradient: "from-muted to-muted"
     },
     "DeFi Instructions": { 
-      icon: <Droplet className="h-4 w-4 text-white" />, 
-      color: "amber",
-      gradient: "from-orange-500 to-amber-500"
+      icon: <Droplet className="h-4 w-4 text-foreground" />, 
+      color: "muted",
+      gradient: "from-muted to-muted"
     },
   };
 
   const getColorClass = (color: string) => {
     switch (color) {
-      case "blue":
-        return "bg-blue-500";
-      case "green":
-        return "bg-emerald-500";
-      case "purple":
-        return "bg-purple-500";
-      case "amber":
-        return "bg-amber-500";
+      case "muted":
+        return "bg-muted";
+      case "card":
+        return "bg-card";
       default:
-        return "bg-blue-500";
+        return "bg-muted";
     }
   };
 
@@ -74,9 +70,9 @@ export function GroupedInstructionsAccordion() {
       >
         {groupedInstructions.map((group, index) => {
           const categoryInfo = categoryIcons[group.label] || { 
-            icon: <Package className="h-4 w-4 text-white" />, 
-            color: "blue",
-            gradient: "from-blue-500 to-cyan-500"
+            icon: <Package className="h-4 w-4 text-foreground" />, 
+            color: "muted",
+            gradient: "from-muted to-muted"
           };
           const isOpen = openItems.includes(group.label);
 
@@ -94,8 +90,8 @@ export function GroupedInstructionsAccordion() {
                 <AccordionItemTrigger
                   className="group flex items-center justify-between w-full px-3 py-2 text-sm font-medium transition-all duration-300 backdrop-blur-sm relative hover:bg-muted/5 bg-transparent"
                 >
-                  {/* Gradient background on hover */}
-                  <div className={`absolute inset-0 bg-gradient-to-r ${categoryInfo.gradient}/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
+                  {/* Muted background on hover */}
+                  <div className="absolute inset-0 bg-muted/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                   
                   <div className="flex items-center gap-2 relative z-10">
                     <motion.div
