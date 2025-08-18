@@ -23,35 +23,28 @@ const ACCOUNT_TYPE_EMOJIS = {
   'Unknown': '❓'
 };
 
-// Account Card Component matching the new design
+// Account Card Component - Professional Design
 const AccountCard: React.FC<{ account: EnhancedAccount; index: number }> = ({ account, index }) => {
-  const getAccountEmoji = (type: string) => {
-    return ACCOUNT_TYPE_EMOJIS[type as keyof typeof ACCOUNT_TYPE_EMOJIS] || '❓';
-  };
-
   const getAccountFlags = () => {
     const flags = [];
-    if (account?.isSigner) flags.push({ label: 'Sign', class: 'signer' });
-    if (account?.isWritable) flags.push({ label: 'Write', class: 'writable' });
+    if (account?.isSigner) flags.push({ label: 'Signer', class: 'signer' });
+    if (account?.isWritable) flags.push({ label: 'Writable', class: 'writable' });
     if (account?.label?.toLowerCase().includes('payer')) flags.push({ label: 'Payer', class: 'payer' });
     return flags;
   };
 
   const truncateAddress = (address: string) => {
-    if (!address || address.length <= 8) return address;
-    return `${address.slice(0, 4)}...${address.slice(-3)}`;
+    if (!address || address.length <= 12) return address;
+    return `${address.slice(0, 8)}...${address.slice(-8)}`;
   };
 
   return (
     <div className="account-item">
       <div className="account-info">
-        <div className="account-type">
-          {getAccountEmoji(account?.type || 'Unknown')}
-        </div>
         <div className="account-details">
           <div className="account-name">{account?.label || 'Unknown Account'}</div>
           <div className="account-address">
-            {truncateAddress(account?.publicKey || 'Addr...123')}
+            {truncateAddress(account?.publicKey || 'Click to configure')}
           </div>
         </div>
       </div>
@@ -216,23 +209,6 @@ export const EnhancedInstructionNode: React.FC<{ data: EnhancedInstructionNodeDa
         {/* Description */}
         <div className="description">
           {getDescription()}
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="node-footer">
-        <div className="connection-ports">
-          <div className="port">
-            <div className="port-dot input"></div>
-            <span>In</span>
-          </div>
-          <div className="port">
-            <div className="port-dot output"></div>
-            <span>Out</span>
-          </div>
-        </div>
-        <div className="validation-status">
-          {getValidationStatus()}
         </div>
       </div>
 
