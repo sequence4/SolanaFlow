@@ -1,13 +1,5 @@
 import { initMintFlow } from "../nodes/onChain/instructions/spl-token-program/initializeMint/initMintFlow";
 import { mintToFlow } from "../nodes/onChain/instructions/spl-token-program/mintTo/mintToFlow";
-
-// Debug: Check flow imports at module load time
-console.log("🔍 IMPORT DEBUG - initMintFlow:", initMintFlow);
-console.log("🔍 IMPORT DEBUG - initMintFlow.nodes:", initMintFlow?.nodes);
-console.log("🔍 IMPORT DEBUG - initMintFlow.nodes.length:", initMintFlow?.nodes?.length);
-console.log("🔍 IMPORT DEBUG - mintToFlow:", mintToFlow);
-console.log("🔍 IMPORT DEBUG - mintToFlow.nodes:", mintToFlow?.nodes);
-console.log("🔍 IMPORT DEBUG - mintToFlow.nodes.length:", mintToFlow?.nodes?.length);
 import { initAccountFlow } from "../nodes/onChain/instructions/spl-token-program/initializeAccount/initAccountFlow";
 import { burnFlow } from "../nodes/onChain/instructions/spl-token-program/burn/burnFlow";
 import { transferFlow } from "../nodes/onChain/instructions/spl-token-program/transfer/transferFlow"; 

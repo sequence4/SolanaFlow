@@ -31,15 +31,8 @@ export function InstructionCard({
   
   const handleDragStart = (event: React.DragEvent<HTMLDivElement>) => {
     setIsDragging(true);
-    console.log("🚀 Dragging instruction:", name, "with flow:", flow);
     
     if (flow) {
-      console.log("🔍 Flow object type:", typeof flow);
-      console.log("🔍 Flow object keys:", Object.keys(flow));
-      console.log("🔍 Flow.nodes:", flow.nodes);
-      console.log("🔍 Flow.nodes type:", typeof flow.nodes);
-      console.log("🔍 Flow.nodes isArray:", Array.isArray(flow.nodes));
-      
       const isOffChainFlow = typeof flow === 'string' && flow === 'off-chain';
       
       // Handle missing nodes array - create a fallback node
@@ -68,14 +61,6 @@ export function InstructionCard({
         edges: isOffChainFlow ? [] : (flow.edges || []),
         code: isOffChainFlow ? undefined : flow.code
       };
-      
-      console.log("📦 Drag data:", draggedData);
-      console.log("🎯 Nodes count:", draggedData.nodes.length);
-      console.log("🔗 Edges count:", draggedData.edges.length);
-      
-      if (draggedData.nodes.length > 0) {
-        console.log("📋 First node:", draggedData.nodes[0]);
-      }
       
       event.dataTransfer.setData(
         "application/reactflow",
