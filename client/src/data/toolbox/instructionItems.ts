@@ -1,6 +1,7 @@
 // Import all available SPL Token Program flows
 import { initMintFlow } from "../nodes/onChain/instructions/spl-token-program/initializeMint/initMintFlow";
 import { mintToFlow } from "../nodes/onChain/instructions/spl-token-program/mintTo/mintToFlow";
+
 import { transferFlow } from "../nodes/onChain/instructions/spl-token-program/transfer/transferFlow";
 import { burnFlow } from "../nodes/onChain/instructions/spl-token-program/burn/burnFlow";
 import { approveFlow } from "../nodes/onChain/instructions/spl-token-program/approve/approveFlow";
@@ -28,6 +29,7 @@ import { uiAmountToAmountFlow } from "../nodes/onChain/instructions/spl-token-pr
 
 // NFT/Metaplex instructions
 import { createMetadataFlow } from "../nodes/onChain/instructions/metaplex-token-metadata/createMetadata/createMetadataFlow";
+
 
 export const groupedInstructions = [
     {

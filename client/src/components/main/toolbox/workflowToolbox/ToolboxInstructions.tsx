@@ -32,6 +32,7 @@ export function InstructionCard({
   const handleDragStart = (event: React.DragEvent<HTMLDivElement>) => {
     setIsDragging(true);
     
+    
     if (flow) {
       const isOffChainFlow = typeof flow === 'string' && flow === 'off-chain';
       
@@ -57,6 +58,7 @@ export function InstructionCard({
         edges: actuallyOffChain ? [] : (flow?.edges || []),
         code: actuallyOffChain ? undefined : flow?.code
       };
+      
       
       event.dataTransfer.setData(
         "application/reactflow",
