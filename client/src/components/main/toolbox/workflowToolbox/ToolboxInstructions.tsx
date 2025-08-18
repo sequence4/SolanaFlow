@@ -32,11 +32,39 @@ export function InstructionCard({
   const handleDragStart = (event: React.DragEvent<HTMLDivElement>) => {
     setIsDragging(true);
     console.log("🚀 Dragging instruction:", name, "with flow:", flow);
+    
     if (flow) {
+      console.log("🔍 Flow object type:", typeof flow);
+      console.log("🔍 Flow object keys:", Object.keys(flow));
+      console.log("🔍 Flow.nodes:", flow.nodes);
+      console.log("🔍 Flow.nodes type:", typeof flow.nodes);
+      console.log("🔍 Flow.nodes isArray:", Array.isArray(flow.nodes));
+      
       const isOffChainFlow = typeof flow === 'string' && flow === 'off-chain';
+      
+      // Handle missing nodes array - create a fallback node
+      let nodes = flow.nodes || [];
+      if (!isOffChainFlow && (!nodes || nodes.length === 0)) {
+        console.warn("⚠️ Flow has empty nodes array, creating fallback node for:", name);
+        nodes = [{
+          id: `${name.toLowerCase().replace(/\s+/g, '-')}-fallback`,
+          type: 'instructionGroupNode',
+          position: { x: 0, y: 0 },
+          data: {
+            label: name,
+            description: flow.description || `${name} instruction`,
+            accounts: flow.accounts || [],
+            parameters: flow.parameters || [],
+            errorCodes: flow.errorCodes || [],
+            events: flow.events || [],
+            code: flow.code || '',
+          }
+        }];
+      }
+      
       const draggedData = {
         category: isOffChainFlow ? 'offChain' : 'onChain',
-        nodes: isOffChainFlow && nodeDefinition ? [nodeDefinition] : (flow.nodes || []),
+        nodes: isOffChainFlow && nodeDefinition ? [nodeDefinition] : nodes,
         edges: isOffChainFlow ? [] : (flow.edges || []),
         code: isOffChainFlow ? undefined : flow.code
       };
@@ -44,6 +72,10 @@ export function InstructionCard({
       console.log("📦 Drag data:", draggedData);
       console.log("🎯 Nodes count:", draggedData.nodes.length);
       console.log("🔗 Edges count:", draggedData.edges.length);
+      
+      if (draggedData.nodes.length > 0) {
+        console.log("📋 First node:", draggedData.nodes[0]);
+      }
       
       event.dataTransfer.setData(
         "application/reactflow",
