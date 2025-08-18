@@ -34,6 +34,12 @@ export interface ProjectStateType {
   /** Workflow graph — list of edges connecting nodes */
   edges?: any[]
 
+  /** Instructions added to the workflow */
+  instructions?: InstructionType[]
+
+  /** Project files (lib, mod, state) */
+  projectFiles?: ProjectFileType
+
   /** Arbitrary config object for the workflow / build */
   config?: Record<string, unknown>
 }

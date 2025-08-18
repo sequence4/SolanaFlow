@@ -32,8 +32,17 @@ export async function handleDrop(
 ) {
     event.preventDefault();
 
-    const draggedData: { nodes: any[]; code?: any; category?: string } = JSON.parse(event.dataTransfer.getData("application/reactflow"));
-    if (!Array.isArray(draggedData.nodes) || draggedData.nodes.length === 0) return;
+    console.log("🎯 Drop event received");
+    const rawData = event.dataTransfer.getData("application/reactflow");
+    console.log("📄 Raw drop data:", rawData);
+    
+    const draggedData: { nodes: any[]; code?: any; category?: string } = JSON.parse(rawData);
+    console.log("📦 Parsed drag data:", draggedData);
+    
+    if (!Array.isArray(draggedData.nodes) || draggedData.nodes.length === 0) {
+        console.error("❌ No valid nodes found in drag data");
+        return;
+    }
 
     const reactFlowBounds = event.currentTarget.getBoundingClientRect();
     
@@ -50,20 +59,26 @@ export async function handleDrop(
     }
 
     let { newNodes, newEdges } = duplicateFlowNodesAndEdges(draggedData, dropPosition.x, dropPosition.y);
-    console.log("New nodes:", newNodes);
+    console.log("🔧 New nodes generated:", newNodes);
+    console.log("🔗 New edges generated:", newEdges);
 
     const isOnChain = isOnChainData(draggedData);
-    console.log("Is node on-chain:", isOnChain);
-    console.log("Project ID for injection:", projectId);
+    console.log("⛓️ Is node on-chain:", isOnChain);
+    console.log("🆔 Project ID for injection:", projectId);
 
     if (isOnChain) newNodes = handleOnChainNodeOverrides(newNodes, walletPubkey);
     else newNodes = handleOffChainNodeOverrides(newNodes, walletPubkey);
 
     setProjectState((prev) => {
-        const currentInstructionCount = prev.nodes.filter((n: any) => n.type === "instructionGroupNode").length;
+        console.log("💾 setProjectState called - Previous state:", prev);
+        
+        const currentInstructionCount = (prev.nodes || []).filter((n: any) => n.type === "instructionGroupNode").length;
         const incomingInstructionCount = newNodes.filter((n: any) => n.type === "instructionGroupNode").length;
+        
+        console.log(`📊 Current instruction count: ${currentInstructionCount}, incoming: ${incomingInstructionCount}`);
 
         if (currentInstructionCount + incomingInstructionCount > maxInstructions) {
+            console.error(`❌ Maximum of ${maxInstructions} instructions exceeded`);
             alert(`Maximum of ${maxInstructions} instructions allowed`);
             return prev;
         }
@@ -78,17 +93,24 @@ export async function handleDrop(
                 code: node.data?.code ?? "",
             }));
 
-        return {
+        console.log("📝 New instructions created:", newInstructions);
+
+        const newState = {
             ...prev,
-            nodes: [...prev.nodes, ...newNodes],
-            edges: [...prev.edges, ...newEdges],
+            nodes: [...(prev.nodes || []), ...newNodes],
+            edges: [...(prev.edges || []), ...newEdges],
             instructions: [...(prev.instructions ?? []), ...newInstructions],
             projectFiles: {
-                lib: draggedData.code?.lib ?? prev.projectFiles.lib,
-                mod: draggedData.code?.mod ?? prev.projectFiles.mod,
-                state: draggedData.code?.state ?? prev.projectFiles.state,
+                lib: draggedData.code?.lib ?? prev.projectFiles?.lib ?? "",
+                mod: draggedData.code?.mod ?? prev.projectFiles?.mod ?? "",
+                state: draggedData.code?.state ?? prev.projectFiles?.state ?? "",
             },
         };
+        
+        console.log("✅ New project state:", newState);
+        console.log(`🎯 Total nodes after update: ${newState.nodes.length}`);
+        
+        return newState;
     });
     
     if (!isOnChain && projectId) {

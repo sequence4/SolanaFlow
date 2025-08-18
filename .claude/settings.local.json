@@ -14,7 +14,8 @@
       "Bash(npm run:*)",
       "mcp__ide__getDiagnostics",
       "Bash(git pull:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": [],

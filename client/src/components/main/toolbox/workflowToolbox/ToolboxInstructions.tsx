@@ -31,6 +31,7 @@ export function InstructionCard({
   
   const handleDragStart = (event: React.DragEvent<HTMLDivElement>) => {
     setIsDragging(true);
+    console.log("🚀 Dragging instruction:", name, "with flow:", flow);
     if (flow) {
       const isOffChainFlow = typeof flow === 'string' && flow === 'off-chain';
       const draggedData = {
@@ -40,11 +41,17 @@ export function InstructionCard({
         code: isOffChainFlow ? undefined : flow.code
       };
       
+      console.log("📦 Drag data:", draggedData);
+      console.log("🎯 Nodes count:", draggedData.nodes.length);
+      console.log("🔗 Edges count:", draggedData.edges.length);
+      
       event.dataTransfer.setData(
         "application/reactflow",
         JSON.stringify(draggedData)
       );
       event.dataTransfer.effectAllowed = "move";
+    } else {
+      console.error("❌ No flow data available for:", name);
     }
   };
 

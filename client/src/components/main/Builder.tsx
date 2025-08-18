@@ -161,7 +161,7 @@ const Builder = () => {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
             className="relative flex-1 h-[98%] p-2 w-full flex flex-col justify-center items-center bg-background">
-        >
+        
             <Tabs
                 value={activeTab}
                 onValueChange={(val) => setActiveTab(val as ActiveTab)}
