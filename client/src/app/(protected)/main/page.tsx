@@ -41,7 +41,7 @@ export default function MainPage() {
     <>
       <Header />
       
-      <div className="flex flex-1 overflow-hidden">        
+      <div className="flex flex-1 overflow-hidden bg-background">        
         <div className="flex-1">
           <Tabs 
             value={activeTab}
