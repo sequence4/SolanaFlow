@@ -15,18 +15,16 @@ const defaultValue: IProjectContextValue = {
     containerUrl: '',
     injectingNodeTypes: [],
     details: {
-      programId: null, // Add programId at the details level
+      programId: undefined, // Add programId at the details level
       projectState: {
-        mode: 'basic',
         nodes: [],
         edges: [],
         config: {},
         instructions: [],
         projectFiles: { lib: '', mod: '', state: '' },
-        fileTree: undefined,
         built: false,
         deployed: false,
-        idl: null,
+        idl: undefined,
         idls: [],
       },
       setProjectState: () => {},

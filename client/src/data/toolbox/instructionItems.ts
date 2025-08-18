@@ -1,5 +1,72 @@
 import { initMintFlow } from "../nodes/onChain/instructions/spl-token-program/initializeMint/initMintFlow";
 import { mintToFlow } from "../nodes/onChain/instructions/spl-token-program/mintTo/mintToFlow";
+
+// Debug: Check flow imports at module load time
+console.log("🔍 FLOW IMPORT DEBUG:");
+console.log("initMintFlow type:", typeof initMintFlow);
+console.log("initMintFlow has nodes:", Array.isArray(initMintFlow?.nodes));
+console.log("initMintFlow nodes count:", initMintFlow?.nodes?.length || 0);
+console.log("mintToFlow type:", typeof mintToFlow);
+console.log("mintToFlow has nodes:", Array.isArray(mintToFlow?.nodes));
+console.log("mintToFlow nodes count:", mintToFlow?.nodes?.length || 0);
+
+// Validate flows and create fallbacks if needed
+const splTokenFallbackFlow = {
+  nodes: [{
+    id: 'spl-token-fallback',
+    type: 'instructionGroupNode',
+    position: { x: 0, y: 0 },
+    data: {
+      programName: 'SPL Token Program',
+      programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+      accounts: [],
+      parameters: [],
+      errorCodes: [],
+      events: [],
+      code: '',
+    }
+  }],
+  edges: [],
+  code: { lib: '', mod: '', state: '' }
+};
+
+// Use fallback if imported flows are invalid:
+const safeInitMintFlow = (typeof initMintFlow === 'object' && initMintFlow?.nodes?.length > 0) 
+  ? initMintFlow 
+  : { 
+      ...splTokenFallbackFlow, 
+      nodes: [{ 
+        ...splTokenFallbackFlow.nodes[0], 
+        id: 'init-mint-fallback',
+        data: { 
+          ...splTokenFallbackFlow.nodes[0].data, 
+          label: 'Initialize Mint',
+          instruction: 'Initialize Mint',
+          description: 'Creates and initializes a new token mint account'
+        }
+      }]
+    };
+
+const safeMintToFlow = (typeof mintToFlow === 'object' && mintToFlow?.nodes?.length > 0) 
+  ? mintToFlow 
+  : { 
+      ...splTokenFallbackFlow, 
+      nodes: [{ 
+        ...splTokenFallbackFlow.nodes[0], 
+        id: 'mint-to-fallback',
+        data: { 
+          ...splTokenFallbackFlow.nodes[0].data, 
+          label: 'Mint To',
+          instruction: 'Mint To',
+          description: 'Mint new tokens to a specified token account'
+        }
+      }]
+    };
+
+console.log("🛡️ Using safe flows:", {
+  initMintFlow: safeInitMintFlow === initMintFlow ? 'original' : 'fallback',
+  mintToFlow: safeMintToFlow === mintToFlow ? 'original' : 'fallback'
+});
 import { initAccountFlow } from "../nodes/onChain/instructions/spl-token-program/initializeAccount/initAccountFlow";
 import { burnFlow } from "../nodes/onChain/instructions/spl-token-program/burn/burnFlow";
 import { transferFlow } from "../nodes/onChain/instructions/spl-token-program/transfer/transferFlow"; 
@@ -42,12 +109,12 @@ export const groupedInstructions = [
         { name: "initialize_account2", flow: initializeAccount2Flow },
         { name: "initialize_account3", flow: initializeAccount3Flow },
         { name: "initialize_immutable_owner", flow: initializeImmutableOwnerFlow },
-        { name: "Initialize Mint", flow: initMintFlow },
+        { name: "Initialize Mint", flow: safeInitMintFlow },
         { name: "initialize_mint2", flow: initializeMint2Flow },
         { name: "initialize_multisig", flow: initializeMultisigFlow },
         { name: "initialize_multisig2", flow: initializeMultisig2Flow },
         { name: "is_valid_signer_index", flow: isValidSignerIndexFlow },
-        { name: "Mint To", flow: mintToFlow },
+        { name: "Mint To", flow: safeMintToFlow },
         { name: "mint_to_checked", flow: mintToCheckedFlow },
         { name: "revoke", flow: revokeFlow },
         { name: "Set Authority", flow: setAuthorityFlow },
