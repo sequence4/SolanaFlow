@@ -26,7 +26,7 @@ export function RightPanel() {
   }
 
   return (
-    <div className="w-80 bg-sidebar border-l border-sidebar-border flex flex-col shadow-sm">
+    <div className="w-96 bg-card border-l border-border flex flex-col shadow-sm">
       <div className="flex-1 min-h-0">
         <Chat />
       </div>

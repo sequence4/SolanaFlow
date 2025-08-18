@@ -43,7 +43,6 @@ import {
 } from "lucide-react";
 import MarkdownRenderer from '@/components/main/code/markdown/MarkdownRenderer';
 import ChatChecklistBubble from './ChatChecklistBubble';
-import { darkTheme } from '@/styles/theme';
 
 export interface AIMessageType {
   text: string;
@@ -376,29 +375,22 @@ const Chat: React.FC = () => {
 
     return (
         <div
-            className={`flex flex-col ${isExpanded ? "fixed inset-4 z-50" : "w-full h-full max-h-full"} transition-all duration-300 ease-in-out`}
+            className={`flex flex-col h-full ${isExpanded ? "fixed inset-4 z-50" : ""} transition-all duration-300 ease-in-out`}
         >
             <div 
-                className="flex flex-col h-full backdrop-blur-xl overflow-hidden border shadow-2xl"
-                style={{
-                    backgroundColor: darkTheme.background.secondary,
-                    borderColor: darkTheme.border.default,
-                    backdropFilter: `blur(${darkTheme.glass.blur})`,
-                    height: '100%',
-                    maxHeight: '100%'
-                }}
+                className="flex flex-col h-full bg-card border-border overflow-hidden"
             >
                 {/* Header */}
-                <div className="flex items-center justify-between px-4 py-3 bg-white/5 backdrop-blur-sm border-b border-white/10 flex-shrink-0">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
                     <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 rounded-full bg-green-500 shadow-lg shadow-green-500/50 animate-pulse"></div>
-                        <h4 className="font-medium text-sm text-gray-300">AI Assistant</h4>
+                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                        <h4 className="font-medium text-sm text-foreground">AI Assistant</h4>
                     </div>
                     <div className="flex items-center space-x-1">
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-white/10 backdrop-blur-sm transition-all duration-200 hover:scale-105"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
                             onClick={() => setIsExpanded(!isExpanded)}
                         >
                             {isExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
@@ -406,7 +398,7 @@ const Chat: React.FC = () => {
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-white/10 backdrop-blur-sm transition-all duration-200 hover:scale-105"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
                             onClick={clearChat}
                         >
                             <Trash2 size={14} />
@@ -414,7 +406,7 @@ const Chat: React.FC = () => {
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-white/10 backdrop-blur-sm transition-all duration-200 hover:scale-105"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
                         >
                             <X size={14} />
                         </Button>
@@ -423,11 +415,7 @@ const Chat: React.FC = () => {
 
                 {/* Messages */}
                 <div 
-                    className="text-xs flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent min-h-0"
-                    style={{ 
-                        maxHeight: 'calc(100% - 120px)', // Account for header + input + status bar
-                        height: '100%'
-                    }}
+                    className="text-sm flex-1 overflow-y-auto p-4 space-y-4 min-h-0"
                 >
                     <AnimatePresence>
                         {messages.map((message, index) => {
@@ -448,10 +436,10 @@ const Chat: React.FC = () => {
                                     <div
                                         className={`max-w-[85%] rounded-lg ${
                                             isUser
-                                                ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-tr-none shadow-lg shadow-blue-500/25 backdrop-blur-sm"
+                                                ? "bg-primary text-primary-foreground"
                                                 : isLog
-                                                  ? "bg-transparent text-cyan-300"
-                                                  : "bg-white/5 backdrop-blur-xl text-gray-100 rounded-tl-none border border-white/10 shadow-lg"
+                                                  ? "bg-transparent text-muted-foreground"
+                                                  : "bg-muted text-foreground"
                                         }`}
                                         style={{
                                             whiteSpace: 'pre-wrap',
@@ -463,8 +451,8 @@ const Chat: React.FC = () => {
                                         <div className="p-3">
                                             <div className="flex items-start gap-2">
                                                 {!isUser && (
-                                                    <div className="mt-1 bg-white/10 backdrop-blur-sm p-1 rounded-full border border-white/10">
-                                                        <Bot size={14} className="text-blue-400" />
+                                                    <div className="mt-1 bg-muted-foreground/10 p-1 rounded-full">
+                                                        <Bot size={14} className="text-muted-foreground" />
                                                     </div>
                                                 )}
                                                 <div className="leading-relaxed">
@@ -475,7 +463,7 @@ const Chat: React.FC = () => {
                                             </div>
                                         </div>
                                         <div
-                                            className={`flex items-center justify-between text-[10px] px-3 pb-1.5 ${isUser ? "text-blue-50" : "text-gray-500"}`}
+                                            className={`flex items-center justify-between text-xs px-3 pb-1.5 ${isUser ? "text-primary-foreground/70" : "text-muted-foreground"}`}
                                         >
                                             <span className="font-mono">{displayTime}</span>
                                             {isUser && (
@@ -493,7 +481,7 @@ const Chat: React.FC = () => {
                     {/* Typing indicator */}
                     {isTyping && (
                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
-                            <div className="bg-white/5 backdrop-blur-xl text-gray-100 rounded-lg rounded-tl-none border border-white/10 p-3 max-w-[85%] shadow-lg"
+                            <div className="bg-muted text-foreground rounded-lg p-3 max-w-[85%]"
                                 style={{
                                     whiteSpace: 'pre-wrap',
                                     wordWrap: 'break-word', 
@@ -502,13 +490,13 @@ const Chat: React.FC = () => {
                                 }}
                             >
                                 <div className="flex items-center gap-2">
-                                    <div className="bg-white/10 backdrop-blur-sm p-1 rounded-full border border-white/10">
-                                        <Bot size={14} className="text-blue-400" />
+                                    <div className="bg-muted-foreground/10 p-1 rounded-full">
+                                        <Bot size={14} className="text-muted-foreground" />
                                     </div>
                                     <div className="flex space-x-1">
-                                        <div className="w-2 h-2 rounded-full bg-gray-400 animate-pulse"></div>
-                                        <div className="w-2 h-2 rounded-full bg-gray-400 animate-pulse delay-150"></div>
-                                        <div className="w-2 h-2 rounded-full bg-gray-400 animate-pulse delay-300"></div>
+                                        <div className="w-2 h-2 rounded-full bg-muted-foreground animate-pulse"></div>
+                                        <div className="w-2 h-2 rounded-full bg-muted-foreground animate-pulse delay-150"></div>
+                                        <div className="w-2 h-2 rounded-full bg-muted-foreground animate-pulse delay-300"></div>
                                     </div>
                                 </div>
                             </div>
@@ -519,51 +507,51 @@ const Chat: React.FC = () => {
                 </div>
 
                 {/* Input area */}
-                <div className="p-3 bg-white/5 backdrop-blur-sm border-t border-white/10 flex-shrink-0">
+                <div className="p-3 border-t border-border flex-shrink-0">
                     <div className="flex flex-col space-y-2">
                         <div className="flex items-center gap-1 px-2">
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-white/10 backdrop-blur-sm transition-all duration-200 hover:scale-105"
+                                className="h-7 w-7 text-muted-foreground hover:text-foreground"
                             >
                                 <Code size={14} />
                             </Button>
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-white/10 backdrop-blur-sm transition-all duration-200 hover:scale-105"
+                                className="h-7 w-7 text-muted-foreground hover:text-foreground"
                             >
                                 <Image size={14} />
                             </Button>
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-white/10 backdrop-blur-sm transition-all duration-200 hover:scale-105"
+                                className="h-7 w-7 text-muted-foreground hover:text-foreground"
                             >
                                 <Paperclip size={14} />
                             </Button>
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-white/10 backdrop-blur-sm transition-all duration-200 hover:scale-105"
+                                className="h-7 w-7 text-muted-foreground hover:text-foreground"
                             >
                                 <Plus size={14} />
                             </Button>
                             <div className="flex-1"></div>
-                            <div className="text-xs text-gray-500 font-mono">
+                            <div className="text-xs text-muted-foreground font-mono">
                                 {input.length > 0 ? `${input.length} chars` : "gpt-4o"}
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-2 bg-white/5 backdrop-blur-sm rounded-lg p-1 border border-white/10 focus-within:ring-1 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all duration-200">
+                        <div className="flex items-center gap-2 bg-background rounded-lg p-1 border border-border focus-within:ring-1 focus-within:ring-ring transition-all duration-200">
                             <textarea
                                 ref={textareaRef}
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 onKeyDown={handleKeyPress}
                                 placeholder="Message the AI Assistant"
-                                className="flex-1 bg-transparent text-gray-200 px-2 py-1.5 min-h-[40px] max-h-[120px] resize-none focus:outline-none text-xs"
+                                className="flex-1 bg-transparent text-foreground px-2 py-1.5 min-h-[40px] max-h-[120px] resize-none focus:outline-none text-sm"
                                 rows={1}
                             />
 
@@ -572,23 +560,23 @@ const Chat: React.FC = () => {
                                 disabled={input.trim() === ""}
                                 className={`rounded-lg px-3 py-1.5 h-auto transition-all duration-200 ${
                                     input.trim() === ""
-                                        ? "bg-white/10 text-gray-500"
-                                        : "bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-lg shadow-blue-500/25 hover:scale-105"
+                                        ? "bg-muted text-muted-foreground"
+                                        : "bg-primary hover:bg-primary/90 text-primary-foreground"
                                 }`}
                             >
                                 <Send size={12} className="mr-2" />
-                                <span className="text-xs font-medium">Send</span>
+                                <span className="text-sm font-medium">Send</span>
                             </Button>
                         </div>
                     </div>
                 </div>
 
                 {/* Status bar */}
-                <div className="px-4 py-1.5 bg-white/5 backdrop-blur-sm border-t border-white/10 flex items-center justify-between flex-shrink-0">
-                    <div className="text-xs text-gray-500 font-mono">v1.0.0</div>
+                <div className="px-4 py-1.5 border-t border-border flex items-center justify-between flex-shrink-0">
+                    <div className="text-xs text-muted-foreground font-mono">v1.0.0</div>
                     <div className="flex items-center space-x-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-lg shadow-green-500/50 animate-pulse"></div>
-                        <span className="text-xs text-gray-500 font-mono">ONLINE</span>
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                        <span className="text-xs text-muted-foreground font-mono">ONLINE</span>
                     </div>
                 </div>
             </div>
