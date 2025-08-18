@@ -1,5 +1,9 @@
 @import "tailwindcss";
 @import "./global-enhancements.css";
+@import "./toolbox/modern-toolbox.css";
+@import "./chat/modern-chat.css";
+@import "./header/modern-header.css";
+@import "./enhanced-instruction-node.css";
 
 @theme {
   /* Enhanced AI-themed color scheme */

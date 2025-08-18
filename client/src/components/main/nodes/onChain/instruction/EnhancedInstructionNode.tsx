@@ -9,8 +9,6 @@ import {
   ACCOUNT_TYPE_ICONS
 } from '@/types/EnhancedInstructionTypes';
 
-import '@/styles/enhanced-instruction-node.css';
-
 // Account type to emoji mapping
 const ACCOUNT_TYPE_EMOJIS = {
   'AccountInfo': '📝',

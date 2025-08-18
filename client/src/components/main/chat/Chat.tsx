@@ -18,7 +18,6 @@ import { taskApi } from '@/api/taskApi';
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import '@/styles/chat/modern-chat.css';
 import { useTaskLogs } from "@/context/logs/useTaskLogs";
 import eventBus from '@/lib/eventBus';
 import {

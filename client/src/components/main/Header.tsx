@@ -2,7 +2,6 @@
 
 import React, { useContext } from "react";
 import UxContext from "@/context/ux/UxContext";
-import '@/styles/header/modern-header.css';
 import FileContext from "@/context/file/FileContext";
 import { useTaskLogs } from "@/context/logs/useTaskLogs";
 import type { FileTreeItemType } from "@/interfaces/FileTreeItemType";

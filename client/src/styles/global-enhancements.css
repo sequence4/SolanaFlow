@@ -66,37 +66,31 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
-/* Enhanced scrollbars for entire application */
-@layer utilities {
-  .ai-scrollbar {
-    scrollbar-width: thin;
-    scrollbar-color: var(--ai-border-glow) transparent;
-  }
-
-  .ai-scrollbar::-webkit-scrollbar {
-    width: 8px;
-  }
-
-  .ai-scrollbar::-webkit-scrollbar-track {
-    background: rgba(20, 20, 35, 0.3);
-    border-radius: 4px;
-  }
-
-  .ai-scrollbar::-webkit-scrollbar-thumb {
-    background: var(--ai-border-glow);
-    border-radius: 4px;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .ai-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: var(--ai-glow-primary);
-    box-shadow: 0 0 8px var(--ai-glow-primary);
-  }
-}
 
 /* Apply AI scrollbar globally */
 * {
-  @apply ai-scrollbar;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ai-border-glow) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: rgba(20, 20, 35, 0.3);
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--ai-border-glow);
+  border-radius: 4px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--ai-glow-primary);
+  box-shadow: 0 0 8px var(--ai-glow-primary);
 }
 
 /* AI-inspired animations */
