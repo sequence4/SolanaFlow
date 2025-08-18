@@ -23,23 +23,23 @@ export const EventsNode = ({ data }: { data: EventsNodeData }) => {
 
   return (
     <div
-      className="flex flex-col min-w-[280px] max-w-[320px] rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.3)] border border-[#2a2b36] transition-all duration-300 hover:shadow-[0_8px_30px_rgba(0,0,0,0.4)]"
+      className="flex flex-col min-w-[280px] max-w-[320px] rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.3)] border border-border transition-all duration-300 hover:shadow-[0_8px_30px_rgba(0,0,0,0.4)]"
       style={{
-        background: "linear-gradient(to bottom, #1a1e2e, #141824)",
+        background: "hsl(var(--card))",
       }}
     >
       {/* Header */}
       <div 
         className="flex flex-row justify-start items-center gap-2 p-3 text-sm font-semibold rounded-t-lg"
-        style={{ background: "linear-gradient(to right, #1e2235, #1a1e2e)", borderBottom: "1px solid #2a2b36" }}
+        style={{ background: "hsl(var(--muted))", borderBottom: "1px solid hsl(var(--border))" }}
       >
-        <div className="bg-[#f59e0b] w-1.5 h-6 rounded-sm mr-3"></div>
-        <BiBell className="h-4 w-4 text-[#f59e0b] mr-2" />
+        <div className="bg-primary w-1.5 h-6 rounded-sm mr-3"></div>
+        <BiBell className="h-4 w-4 text-primary mr-2" />
         <span className="font-medium tracking-wide">{label} Events</span>
         <div className="flex-grow"></div>
         <Badge 
           variant="outline" 
-          className="bg-[#1e2235] text-[#f59e0b] border-[#f59e0b]/30 text-xs px-2"
+          className="bg-muted text-primary border-primary/30 text-xs px-2"
         >
           Events
         </Badge>
@@ -50,14 +50,14 @@ export const EventsNode = ({ data }: { data: EventsNodeData }) => {
         {events && events.map((event, idx) => (
           <div 
             key={idx} 
-            className="bg-[#161a28] rounded-md p-3 transition-all duration-200 hover:shadow-md"
+            className="bg-muted rounded-md p-3 transition-all duration-200 hover:shadow-md"
           >
             <div className="flex items-center mb-1">
-              <div className="h-2 w-2 rounded-full bg-[#f59e0b] mr-2"></div>
+              <div className="h-2 w-2 rounded-full bg-primary mr-2"></div>
               <span className="font-medium">{event.name}</span> 
             </div>
             <div 
-              className="ml-4 text-sm text-gray-400 border-l-2 border-[#2a2b36] pl-2"
+              className="ml-4 text-sm text-muted-foreground border-l-2 border-border pl-2"
             >
               {event.description}
             </div>
@@ -71,11 +71,11 @@ export const EventsNode = ({ data }: { data: EventsNodeData }) => {
         type="source"
         position={Position.Left}
         style={{
-          background: "#2a2b36",
+          background: "hsl(var(--border))",
           width: "10px",
           height: "10px",
           borderRadius: "50%",
-          border: "2px solid white",
+          border: "2px solid hsl(var(--foreground)),"
         }}
       />
     </div>

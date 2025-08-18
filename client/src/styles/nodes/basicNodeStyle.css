@@ -1,11 +1,11 @@
 :root {
     /* Dark background gradients */
-    --dark-gradient-start: #1a1e2e;
-    --dark-gradient-end: #141824;
+    --dark-gradient-start: oklch(0.275 0 0);
+    --dark-gradient-end: oklch(0.245 0 0);
     
     /* Lighter (header) background gradient */
-    --header-gradient-start: #1e2235;
-    --header-gradient-end: #1a1e2e;
+    --header-gradient-start: oklch(0.309 0 0);
+    --header-gradient-end: oklch(0.275 0 0);
     
     /* Node backgrounds */
     --node-background-light: white;
@@ -13,7 +13,7 @@
   
     /* Borders */
     --node-border-light: gray;
-    --node-border-dark: #2a2b36;
+    --node-border-dark: oklch(0.309 0 0);
   
     /* Headers */
     --node-header-bg-light: #f0f0f0;
@@ -21,10 +21,10 @@
   
     /* Text colors */
     --node-text-light: #000;
-    --node-text-dark: #d5d8e2;
+    --node-text-dark: oklch(0.985 0 0);
   
     --node-text-muted-light: #666;
-    --node-text-muted-dark: #6e717f;
+    --node-text-muted-dark: oklch(0.708 0 0);
   
     /* Accent colors */
     --node-accent-light: #00a6ed;
@@ -62,21 +62,21 @@
 
     /* Handles */
     --node-handle-light: #ffffff;
-    --node-handle-dark: #293035;  
+    --node-handle-dark: oklch(0.329 0 0);  
     
     /* Input elements */
     --node-input-light: #e0e0e0;
-    --node-input-dark: #13141f;
+    --node-input-dark: oklch(0.245 0 0);
 
     --node-input-border-light: #e0e0e0;
-    --node-input-border-dark: #2a2b36;
+    --node-input-border-dark: oklch(0.309 0 0);
 
     --node-input-text-light: #000;
-    --node-input-text-dark: #d5d8e2;
+    --node-input-text-dark: oklch(0.985 0 0);
     
     /* Sections background */
     --node-section-bg-light: #f7f7f7;
-    --node-section-bg-dark: #161a28;
+    --node-section-bg-dark: oklch(0.285 0 0);
     
     /* Badge backgrounds */
     --blue-badge-bg: rgba(77, 171, 247, 0.1);

@@ -1165,7 +1165,7 @@ export function ProgramDeployer({
               </div>
 
               {!wallet.publicKey && (
-                <div className="bg-[#2a2a2d] p-4 rounded-md flex items-start space-x-2 mt-2">
+                <div className="bg-muted p-4 rounded-md flex items-start space-x-2 mt-2">
                   <AlertTriangle className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />
                   <div>
                     <p 

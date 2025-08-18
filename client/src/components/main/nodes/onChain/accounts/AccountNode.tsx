@@ -82,7 +82,7 @@ function FieldInput({ fieldValue, onChange, label }: FieldInputProps) {
             }}
             onClick={() => onChange("")} // or open a menu, etc.
           >
-            <LuPlus color="#9de19f" size={22}/>
+            <LuPlus className="text-primary" size={22}/>
             <span className="text-xs">Select Key</span>
           </Button>
 
@@ -95,7 +95,7 @@ function FieldInput({ fieldValue, onChange, label }: FieldInputProps) {
             }}
             onClick={() => /* your connect logic */ {}}
           >
-            <RiWallet3Line color="#9de19f" size={10}/>
+            <RiWallet3Line className="text-primary" size={10}/>
             <span>Connect</span>
           </Button>
         </div>
@@ -113,7 +113,7 @@ function FieldInput({ fieldValue, onChange, label }: FieldInputProps) {
                 color: sectionTitleColor,
               }}
             >
-              <LuPlus color="#9de19f" />
+              <LuPlus className="text-primary" />
               <span className="text-xs">Select Key</span>
             </Button>
           </DropdownMenuTrigger>
