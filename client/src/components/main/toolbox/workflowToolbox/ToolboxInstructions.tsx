@@ -32,18 +32,7 @@ export function InstructionCard({
   const handleDragStart = (event: React.DragEvent<HTMLDivElement>) => {
     setIsDragging(true);
     
-    console.log("🚀 Dragging instruction:", name, "with flow:", flow);
-    
     if (flow) {
-      // Debug flow object
-      console.log("🔍 Flow categorization debug:", {
-        name,
-        flowType: typeof flow,
-        flowValue: flow,
-        isString: typeof flow === 'string',
-        stringValue: typeof flow === 'string' ? flow : 'not a string'
-      });
-      
       const isOffChainFlow = typeof flow === 'string' && flow === 'off-chain';
       
       // SPL Token instructions should NEVER be off-chain
@@ -62,45 +51,12 @@ export function InstructionCard({
       // Override: Force SPL token instructions to be onChain
       const actuallyOffChain = isOffChainFlow && !isSPLTokenInstruction;
       
-      console.log("🔍 Categorization result:", {
-        isOffChainFlow,
-        isSPLTokenInstruction,
-        actuallyOffChain,
-        finalCategory: actuallyOffChain ? 'offChain' : 'onChain'
-      });
-      
-      // Handle missing nodes array - create a fallback node  
-      let nodes = flow?.nodes || [];
-      if (!actuallyOffChain && (!nodes || nodes.length === 0)) {
-        console.warn("⚠️ Creating fallback node for SPL instruction:", name);
-        nodes = [{
-          id: `${name.toLowerCase().replace(/\s+/g, '-')}-instruction`,
-          type: 'instructionGroupNode',
-          position: { x: 0, y: 0 },
-          data: {
-            label: name,
-            instruction: name,
-            programName: 'SPL Token Program',
-            programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
-            description: `${name} instruction from SPL Token Program`,
-            accounts: flow?.accounts || [],
-            parameters: flow?.parameters || [],
-            errorCodes: flow?.errorCodes || [],
-            events: flow?.events || [],
-            code: flow?.code || '',
-          }
-        }];
-      }
-      
       const draggedData = {
-        category: actuallyOffChain ? 'offChain' : 'onChain', // Fixed category
-        nodes: actuallyOffChain && nodeDefinition ? [nodeDefinition] : nodes,
+        category: actuallyOffChain ? 'offChain' : 'onChain',
+        nodes: actuallyOffChain && nodeDefinition ? [nodeDefinition] : (flow?.nodes || []),
         edges: actuallyOffChain ? [] : (flow?.edges || []),
         code: actuallyOffChain ? undefined : flow?.code
       };
-      
-      console.log("📦 Final drag data:", draggedData);
-      console.log("🎯 Nodes count:", draggedData.nodes.length);
       
       event.dataTransfer.setData(
         "application/reactflow",

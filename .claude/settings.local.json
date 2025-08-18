@@ -15,7 +15,9 @@
       "mcp__ide__getDiagnostics",
       "Bash(git pull:*)",
       "Bash(git stash:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": [],
