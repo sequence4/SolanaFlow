@@ -160,8 +160,7 @@ const Builder = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
-            className="relative flex-1 h-[98%] p-2 w-full flex flex-col justify-center items-center"
-            style={{ backgroundColor: darkTheme.background.primary }}
+            className="relative flex-1 h-[98%] p-2 w-full flex flex-col justify-center items-center bg-background">
         >
             <Tabs
                 value={activeTab}
@@ -219,7 +218,7 @@ const Builder = () => {
                             animate={{ x: 0, opacity: 1 }}
                             exit={{ x: 300, opacity: 0 }}
                             transition={{ duration: 0.3, ease: "easeInOut" }}
-                            className="fixed right-0 top-[180px] z-[9999] w-[300px] h-[calc(100vh-210px)] border-l border-white/10 bg-gradient-to-br from-slate-900/50 via-slate-800/30 to-slate-900/50 backdrop-blur-xl shadow-2xl"
+                            className="fixed right-0 top-[180px] z-[9999] w-[300px] h-[calc(100vh-210px)] border-l border-border bg-card shadow-2xl"
                         >
                             <Chat />
                         </motion.div>

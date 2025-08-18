@@ -607,8 +607,8 @@ export const Toolbox = () => {
             <Dialog open={isProjectListModalOpen} onOpenChange={(open) => setIsProjectListModalOpen(open)}>
                 <DialogContent 
                     aria-describedby="project-list-desc"
-                    className="bg-[#111827] text-slate-100" 
-                    style={{width: "fit-content", border: "1px solid rgb(36, 45, 68)"}}>
+                    className="bg-card text-foreground border-border" 
+                    style={{width: "fit-content"}}>
                     <DialogDescription id="project-list-desc" className="sr-only">
                         Select a project from your list of SolanaFlow projects.
                     </DialogDescription>

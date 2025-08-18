@@ -76,11 +76,11 @@ const Code = () => {
     const terminalBorder = useColorModeValue('var(--border-2-light)', 'var(--border-2-dark)');
     
     return (
-      <div className="flex flex-col w-full h-full" style={{ background: codeBg }}>
+      <div className="flex flex-col w-full h-full bg-card">
         <div className="flex-1 min-h-0">
           <CodeEditor language={getLanguage(selectedFile?.ext)} />
         </div>
-        <div style={{ height: "32%" }} className="border-t border-[#2a2a2d]">
+        <div style={{ height: "32%" }} className="border-t border-border">
           <SolanaTerminal />
         </div>
       </div>

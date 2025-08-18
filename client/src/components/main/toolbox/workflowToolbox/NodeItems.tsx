@@ -81,9 +81,9 @@ export const NodeItems = forwardRef<{ setActiveChainTab: (tab: string) => void }
                             display: activeChainTab === "onChain" ? "flex" : "none", 
                             flexDirection: "column", 
                             overflow: "hidden", 
-                            marginTop: 0, 
-                            backgroundColor: "#121214" 
+                            marginTop: 0
                         }}
+                        className="bg-card"
                     >
                         <Tabs 
                             defaultValue="instructions" 

@@ -382,16 +382,16 @@ const Interface = () => {
     }, [isLocalDev, projectId, containerUrl]);
 
     return (
-        <div className="flex flex-col w-full h-full bg-[#111827] text-white">
+        <div className="flex flex-col w-full h-full bg-card text-foreground">
             {/* ───── URL bar ───── */}
-            <div className="flex items-center justify-between p-2 border-b border-gray-700">
+            <div className="flex items-center justify-between p-2 border-b border-border">
                 <div className="flex-1 px-2">
                     <input
                         type="text"
                         value={manualUrl}
                         onChange={(e) => setManualUrl(e.target.value)}
                         placeholder={containerUrl || "Enter URL manually..."}
-                        className="w-full px-2 py-1 bg-[#1F2937] text-white border border-gray-600 rounded"
+                        className="w-full px-2 py-1 bg-background text-foreground border border-border rounded"
                     />
                 </div>
 
@@ -401,7 +401,7 @@ const Interface = () => {
                         disabled={isRefreshing}
                         variant="ghost"
                         size="sm"
-                        className="h-8 text-gray-400 hover:text-white hover:bg-[#1F2937]"
+                        className="h-8 text-muted-foreground hover:text-foreground hover:bg-muted"
                     >
                         <RefreshCw
                             className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`}
@@ -413,7 +413,7 @@ const Interface = () => {
                         variant="ghost"
                         size="sm"
                         disabled={!activeUrl}
-                        className="h-8 text-gray-400 hover:text-white hover:bg-[#1F2937]"
+                        className="h-8 text-muted-foreground hover:text-foreground hover:bg-muted"
                     >
                         <ExternalLink className="h-4 w-4 mr-2" />
                         Open
@@ -438,8 +438,8 @@ const Interface = () => {
                 ) : (
                     /* fallback when we have no URL yet */
                     <div className="flex flex-col items-center justify-center w-full h-full space-y-4">
-                        <Loader2 className="w-12 h-12 text-blue-400 animate-spin" />
-                        <p className="text-gray-400">
+                        <Loader2 className="w-12 h-12 text-primary animate-spin" />
+                        <p className="text-muted-foreground">
                             Waiting for container URL… or paste one above.
                         </p>
                     </div>

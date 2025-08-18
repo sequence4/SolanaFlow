@@ -163,7 +163,7 @@ const CodeEditor = ({ language: lang = "typescript" }) => {
               size="icon"
               className="cursor-pointer p-[5px]"
             >
-              <IoSettingsSharp className="text-gray-500" />
+              <IoSettingsSharp className="text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>
 
