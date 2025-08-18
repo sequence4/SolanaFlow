@@ -108,12 +108,12 @@
 
 /* Enhance the selection appearance */
 .react-flow__node.selected .node-header {
-  background-color: #1c2649;
+  background-color: oklch(0.245 0 0);
 }
 
 /* Enhanced dark theme for nodes */
 .react-flow {
-  background-color: #121214;
+  background-color: oklch(0.185 0 0);
 }
 
 .react-flow__node {

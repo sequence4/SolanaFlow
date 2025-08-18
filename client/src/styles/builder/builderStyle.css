@@ -2,12 +2,12 @@
     --wallet-connected-bg-light: #f0f0f0;
     --wallet-connected-color-light: #868686;
 
-    --wallet-connected-bg-dark: #202a46;
+    --wallet-connected-bg-dark: oklch(0.245 0 0);
     --wallet-connected-color-dark: #bdc3d6;
 
     --wallet-menu-bg-light: #f0f0f0;
     --wallet-menu-text-color-light: #868686;
 
-    --wallet-menu-bg-dark: #313e63;
+    --wallet-menu-bg-dark: oklch(0.309 0 0);
     --wallet-menu-text-color-dark: #bdc3d6;
 }

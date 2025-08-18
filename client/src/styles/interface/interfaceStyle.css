@@ -9,16 +9,16 @@
     --workflow-canvas-controls-fg-dark: #6a6a6a;
 
     --workflow-canvas-border-light: #9c9c9c;
-    --workflow-canvas-border-dark: #1c2230; 
+    --workflow-canvas-border-dark: oklch(0.309 0 0); 
 
     --workflow-canvas-controls-fg-light-hover: #292929;
     --workflow-canvas-controls-fg-dark-hover: #6a6a6a;
 
     --toolbox-item-bg-color-light: #fbfbfb;
-    --toolbox-item-bg-color-dark: #131724;  
+    --toolbox-item-bg-color-dark: oklch(0.245 0 0);  
     
     --toolbox-item-border-color-light: #9c9c9c;
-    --toolbox-item-border-color-dark: #26293f;
+    --toolbox-item-border-color-dark: oklch(0.309 0 0);
 
     --toolbox-item-text-color-light: #000000;
     --toolbox-item-text-color-dark: #bdc1d0;    
