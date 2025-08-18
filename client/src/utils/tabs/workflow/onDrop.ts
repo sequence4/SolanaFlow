@@ -61,6 +61,23 @@ export async function handleDrop(
     let { newNodes, newEdges } = duplicateFlowNodesAndEdges(draggedData, dropPosition.x, dropPosition.y);
     console.log("🔧 New nodes generated:", newNodes);
     console.log("🔗 New edges generated:", newEdges);
+    
+    // Additional debug for rich instruction data
+    newNodes.forEach((node, index) => {
+        if (node.type === "instructionGroupNode") {
+            console.log(`📋 Rich data for node ${index}:`, {
+                id: node.id,
+                label: node.data?.label,
+                description: node.data?.description,
+                accountsCount: node.data?.accounts?.length || 0,
+                parametersCount: node.data?.parameters?.length || 0,
+                errorCodesCount: node.data?.errorCodes?.length || 0,
+                eventsCount: node.data?.events?.length || 0,
+                hasCode: !!node.data?.code,
+                hasUi: !!node.data?.ui
+            });
+        }
+    });
 
     const isOnChain = isOnChainData(draggedData);
     console.log("⛓️ Is node on-chain:", isOnChain);

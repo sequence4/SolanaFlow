@@ -2,6 +2,7 @@
 import { initMintFlow } from "../nodes/onChain/instructions/spl-token-program/initializeMint/initMintFlow";
 import { mintToFlow } from "../nodes/onChain/instructions/spl-token-program/mintTo/mintToFlow";
 
+
 import { transferFlow } from "../nodes/onChain/instructions/spl-token-program/transfer/transferFlow";
 import { burnFlow } from "../nodes/onChain/instructions/spl-token-program/burn/burnFlow";
 import { approveFlow } from "../nodes/onChain/instructions/spl-token-program/approve/approveFlow";
@@ -29,6 +30,29 @@ import { uiAmountToAmountFlow } from "../nodes/onChain/instructions/spl-token-pr
 
 // NFT/Metaplex instructions
 import { createMetadataFlow } from "../nodes/onChain/instructions/metaplex-token-metadata/createMetadata/createMetadataFlow";
+
+// Debug: Verify flows are loaded correctly - only in development
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  console.log("🔍 SPL Token Flows Verification:");
+  [
+    { name: "Initialize Mint", flow: initMintFlow },
+    { name: "Mint Tokens", flow: mintToFlow },
+    { name: "Transfer Tokens", flow: transferFlow },
+    { name: "Burn Tokens", flow: burnFlow },
+    { name: "Approve Delegate", flow: approveFlow },
+  ].forEach(({ name, flow }) => {
+    console.log(`${name}:`, {
+      exists: !!flow,
+      hasNodes: !!flow?.nodes,
+      nodesCount: flow?.nodes?.length,
+      firstNodeLabel: flow?.nodes?.[0]?.data?.label,
+      accountsCount: flow?.nodes?.[0]?.data?.accounts?.length,
+      parametersCount: flow?.nodes?.[0]?.data?.parameters?.length,
+      errorCodesCount: flow?.nodes?.[0]?.data?.errorCodes?.length,
+      eventsCount: flow?.nodes?.[0]?.data?.events?.length
+    });
+  });
+}
 
 
 export const groupedInstructions = [

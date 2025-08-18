@@ -52,12 +52,28 @@ export function InstructionCard({
       // Override: Force SPL token instructions to be onChain
       const actuallyOffChain = isOffChainFlow && !isSPLTokenInstruction;
       
+      // CRITICAL FIX: Properly structure the drag data with actual flow nodes
       const draggedData = {
         category: actuallyOffChain ? 'offChain' : 'onChain',
-        nodes: actuallyOffChain && nodeDefinition ? [nodeDefinition] : (flow?.nodes || []),
-        edges: actuallyOffChain ? [] : (flow?.edges || []),
+        nodes: !actuallyOffChain && flow?.nodes ? flow.nodes : (actuallyOffChain && nodeDefinition ? [nodeDefinition] : []),
+        edges: !actuallyOffChain && flow?.edges ? flow.edges : [],
+        flowName: flow?.name || name,
+        instructionName: name,
         code: actuallyOffChain ? undefined : flow?.code
       };
+      
+      // Debug log to verify data is being sent correctly
+      console.log("🚀 Dragging instruction:", {
+        name,
+        category: draggedData.category,
+        nodesCount: draggedData.nodes?.length || 0,
+        hasFlowNodes: !!flow?.nodes,
+        flowNodesLength: flow?.nodes?.length,
+        firstNodeData: draggedData.nodes?.[0]?.data,
+        actuallyOffChain,
+        isSPLTokenInstruction
+      });
+      
       
       
       event.dataTransfer.setData(
