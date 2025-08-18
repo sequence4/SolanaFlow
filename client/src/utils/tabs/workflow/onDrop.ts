@@ -63,7 +63,7 @@ export async function handleDrop(
     console.log("🔗 New edges generated:", newEdges);
     
     // Additional debug for rich instruction data
-    newNodes.forEach((node, index) => {
+    newNodes.forEach((node: any, index: number) => {
         if (node.type === "instructionGroupNode") {
             console.log(`📋 Rich data for node ${index}:`, {
                 id: node.id,

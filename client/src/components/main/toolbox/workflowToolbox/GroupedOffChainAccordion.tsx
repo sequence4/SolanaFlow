@@ -8,6 +8,17 @@ import {
 import { InstructionCard } from "./ToolboxInstructions";
 import { createNftNode } from "../../../../data/nodes/offChain/nftMetaplex/createNftNodeData";
 import { mintNftNode } from "../../../../data/nodes/offChain/nftMetaplex/mintNftNodeData";
+
+// Import SPL token flows for off-chain representations
+import { initMintFlow } from "../../../../data/nodes/onChain/instructions/spl-token-program/initializeMint/initMintFlow";
+import { mintToFlow } from "../../../../data/nodes/onChain/instructions/spl-token-program/mintTo/mintToFlow";
+import { transferFlow } from "../../../../data/nodes/onChain/instructions/spl-token-program/transfer/transferFlow";
+import { burnFlow } from "../../../../data/nodes/onChain/instructions/spl-token-program/burn/burnFlow";
+import { initAccountFlow } from "../../../../data/nodes/onChain/instructions/spl-token-program/initializeAccount/initAccountFlow";
+import { freezeAccountFlow } from "../../../../data/nodes/onChain/instructions/spl-token-program/freezeAccount/freezeAccountFlow";
+import { thawAccountFlow } from "../../../../data/nodes/onChain/instructions/spl-token-program/thawAccount/thawAccountFlow";
+import { setAuthorityFlow } from "../../../../data/nodes/onChain/instructions/spl-token-program/setAuthority/setAuthorityFlow";
+import { closeAccountFlow } from "../../../../data/nodes/onChain/instructions/spl-token-program/closeAccount/closeAccountFlow";
 import { 
     ChevronDown, 
     ChevronUp, 
@@ -34,15 +45,15 @@ const offChainInstructions = [
         color: "blue",
         gradient: "from-muted to-muted",
         items: [
-            { name: "Create a Token Mint", flow: "off-chain" },
-            { name: "Mint a Token", flow: "off-chain" },
-            { name: "Transfer a Token", flow: "off-chain" },
-            { name: "Burn a Token", flow: "off-chain" },
-            { name: "Create Associated Token Account", flow: "off-chain" },
-            { name: "Freeze a Token Account", flow: "off-chain" },
-            { name: "Thaw a Frozen Token Account", flow: "off-chain" },
-            { name: "Set Token Authority", flow: "off-chain" },
-            { name: "Close a Token Account", flow: "off-chain" },
+            { name: "Create a Token Mint", flow: initMintFlow },
+            { name: "Mint a Token", flow: mintToFlow },
+            { name: "Transfer a Token", flow: transferFlow },
+            { name: "Burn a Token", flow: burnFlow },
+            { name: "Create Associated Token Account", flow: initAccountFlow },
+            { name: "Freeze a Token Account", flow: freezeAccountFlow },
+            { name: "Thaw a Frozen Token Account", flow: thawAccountFlow },
+            { name: "Set Token Authority", flow: setAuthorityFlow },
+            { name: "Close a Token Account", flow: closeAccountFlow },
         ]
     },
     {
