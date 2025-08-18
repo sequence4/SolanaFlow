@@ -2,6 +2,7 @@
 
 import React, { useContext, useState, useRef, useEffect, useCallback } from 'react';
 import '@/styles/toolbox/toolboxStyle.css';
+import '@/styles/toolbox/modern-toolbox.css';
 import { NodeItems } from '@/components/main/toolbox/workflowToolbox/NodeItems';
 import FileExplorer from '@/components/code/FileExplorer';
 import ProjectContext from '@/context/project/ProjectContext';

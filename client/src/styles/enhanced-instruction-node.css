@@ -122,9 +122,9 @@
     word-break: break-all;
 }
 
-/* Node Body */
+/* Node Body - Compact */
 .node-body {
-    padding: 16px;
+    padding: 12px 14px;
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
@@ -157,7 +157,7 @@
 }
 
 .section {
-    margin-bottom: 16px;
+    margin-bottom: 12px;
 }
 
 .section:last-child {
@@ -168,7 +168,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 
 .section-title {
@@ -183,27 +183,31 @@
 }
 
 .badge {
-    background: rgba(139, 92, 246, 0.2);
+    background: rgba(139, 92, 246, 0.15);
     color: #a78bfa;
-    padding: 2px 6px;
-    border-radius: 10px;
-    font-size: 10px;
-    font-weight: 600;
+    padding: 1px 5px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 700;
+    min-width: 16px;
+    text-align: center;
+    border: 1px solid rgba(139, 92, 246, 0.2);
 }
 
-/* Account Items - Professional Design */
+/* Account Items - Compact Professional Design */
 .account-item {
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 6px;
-    padding: 12px 16px;
-    margin-bottom: 8px;
+    padding: 8px 12px;
+    margin-bottom: 6px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     backdrop-filter: blur(4px);
+    min-height: 56px;
 }
 
 .account-item:hover {
@@ -223,34 +227,42 @@
 }
 
 .account-name {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     color: #ffffff;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
     letter-spacing: -0.01em;
+    line-height: 1.2;
 }
 
 .account-address {
-    font-size: 11px;
+    font-size: 10px;
     color: #9ca3af;
     font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
     font-weight: 400;
     letter-spacing: 0.02em;
+    opacity: 0.8;
 }
 
 .account-flags {
     display: flex;
-    gap: 6px;
+    gap: 4px;
+    flex-wrap: wrap;
 }
 
 .flag {
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 10px;
-    font-weight: 500;
-    text-transform: none;
-    letter-spacing: 0.01em;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
     border: 1px solid transparent;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-width: fit-content;
+    white-space: nowrap;
 }
 
 .flag.signer {
@@ -271,13 +283,13 @@
     border-color: rgba(168, 85, 247, 0.2);
 }
 
-/* Data Fields - Professional Design */
+/* Data Fields - Compact Professional Design */
 .data-field {
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 6px;
-    padding: 12px 16px;
-    margin-bottom: 8px;
+    padding: 8px 12px;
+    margin-bottom: 6px;
     backdrop-filter: blur(4px);
 }
 
@@ -285,7 +297,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .data-field-name {
@@ -296,14 +308,16 @@
 }
 
 .data-field-type {
-    font-size: 10px;
+    font-size: 9px;
     color: #8b5cf6;
     background: rgba(139, 92, 246, 0.08);
-    padding: 3px 8px;
-    border-radius: 4px;
+    padding: 2px 6px;
+    border-radius: 3px;
     font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
-    font-weight: 500;
+    font-weight: 600;
     border: 1px solid rgba(139, 92, 246, 0.15);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
 }
 
 .data-field-input {

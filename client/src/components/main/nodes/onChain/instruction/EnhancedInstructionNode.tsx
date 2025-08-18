@@ -27,9 +27,9 @@ const ACCOUNT_TYPE_EMOJIS = {
 const AccountCard: React.FC<{ account: EnhancedAccount; index: number }> = ({ account, index }) => {
   const getAccountFlags = () => {
     const flags = [];
-    if (account?.isSigner) flags.push({ label: 'Signer', class: 'signer' });
-    if (account?.isWritable) flags.push({ label: 'Writable', class: 'writable' });
-    if (account?.label?.toLowerCase().includes('payer')) flags.push({ label: 'Payer', class: 'payer' });
+    if (account?.isSigner) flags.push({ label: '◆ S', class: 'signer', title: 'Signer' });
+    if (account?.isWritable) flags.push({ label: '▲ W', class: 'writable', title: 'Writable' });
+    if (account?.label?.toLowerCase().includes('payer')) flags.push({ label: '● P', class: 'payer', title: 'Payer' });
     return flags;
   };
 
@@ -50,7 +50,7 @@ const AccountCard: React.FC<{ account: EnhancedAccount; index: number }> = ({ ac
       </div>
       <div className="account-flags">
         {getAccountFlags().map((flag, idx) => (
-          <span key={idx} className={`flag ${flag.class}`}>
+          <span key={idx} className={`flag ${flag.class}`} title={flag.title}>
             {flag.label}
           </span>
         ))}
@@ -179,7 +179,7 @@ export const EnhancedInstructionNode: React.FC<{ data: EnhancedInstructionNodeDa
           <div className="section">
             <div className="section-header">
               <div className="section-title">
-                📝 Accounts
+                Accounts
                 <span className="badge">{accounts.length}</span>
               </div>
             </div>
@@ -195,7 +195,7 @@ export const EnhancedInstructionNode: React.FC<{ data: EnhancedInstructionNodeDa
           <div className="section">
             <div className="section-header">
               <div className="section-title">
-                ⚡ Instruction Data
+                Instruction Data
                 <span className="badge">{parameters.length}</span>
               </div>
             </div>

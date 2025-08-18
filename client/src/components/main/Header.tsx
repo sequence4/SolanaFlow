@@ -2,6 +2,7 @@
 
 import React, { useContext } from "react";
 import UxContext from "@/context/ux/UxContext";
+import '@/styles/header/modern-header.css';
 import FileContext from "@/context/file/FileContext";
 import { useTaskLogs } from "@/context/logs/useTaskLogs";
 import type { FileTreeItemType } from "@/interfaces/FileTreeItemType";
@@ -29,16 +30,16 @@ export default function Header() {
   const hasFiles = fileTree ? nodeHasFile(fileTree) : false;
 
   return (
-    <TabsList className="bg-[var(--foreground-dark)] p-2 pb-4 flex gap-2">
+    <TabsList className="tab-list-modern bg-[var(--foreground-dark)] p-2 pb-4 flex gap-2">
       <TabsTrigger
         value="workflow"
-        className={`cursor-pointer ${activeTab === "workflow" ? "tab-active" : "tab-inactive"}`}
+        className={`tab-trigger cursor-pointer ${activeTab === "workflow" ? "tab-active" : "tab-inactive"}`}
       >
         workflow
       </TabsTrigger>
       <TabsTrigger
         value="interface"
-        className={`${(!hasFiles || isBuilding) ? "cursor-not-allowed" : "cursor-pointer"} ${activeTab === "interface" ? "tab-active animate-pulse" : "tab-inactive"}`}
+        className={`tab-trigger ${(!hasFiles || isBuilding) ? "cursor-not-allowed" : "cursor-pointer"} ${activeTab === "interface" ? "tab-active animate-pulse" : "tab-inactive"}`}
         disabled={!hasFiles || isBuilding}
       >
         interface
@@ -46,7 +47,7 @@ export default function Header() {
       <TabsTrigger
         value="code"
         /* visually muted while building, but NOT disabled */
-        className={`${(!hasFiles || isBuilding) ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${activeTab === "code" ? "tab-active" : "tab-inactive"}`}
+        className={`tab-trigger ${(!hasFiles || isBuilding) ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${activeTab === "code" ? "tab-active" : "tab-inactive"}`}
       >
         code
       </TabsTrigger>

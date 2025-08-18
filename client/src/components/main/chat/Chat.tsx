@@ -18,6 +18,7 @@ import { taskApi } from '@/api/taskApi';
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import '@/styles/chat/modern-chat.css';
 import { useTaskLogs } from "@/context/logs/useTaskLogs";
 import eventBus from '@/lib/eventBus';
 import {
@@ -378,10 +379,10 @@ const Chat: React.FC = () => {
             className={`flex flex-col h-full ${isExpanded ? "fixed inset-4 z-50" : ""} transition-all duration-300 ease-in-out`}
         >
             <div 
-                className="flex flex-col h-full bg-card border-border overflow-hidden"
+                className="chat-container flex flex-col h-full bg-card border-border overflow-hidden"
             >
                 {/* Header */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
+                <div className="chat-header flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
                     <div className="flex items-center space-x-2">
                         <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
                         <h4 className="font-medium text-sm text-foreground">AI Assistant</h4>
@@ -415,7 +416,7 @@ const Chat: React.FC = () => {
 
                 {/* Messages */}
                 <div 
-                    className="text-sm flex-1 overflow-y-auto p-4 space-y-4 min-h-0"
+                    className="messages-area text-sm flex-1 overflow-y-auto p-4 space-y-4 min-h-0"
                 >
                     <AnimatePresence>
                         {messages.map((message, index) => {
@@ -436,10 +437,10 @@ const Chat: React.FC = () => {
                                     <div
                                         className={`max-w-[85%] rounded-lg ${
                                             isUser
-                                                ? "bg-primary text-primary-foreground"
+                                                ? "user-message bg-primary text-primary-foreground"
                                                 : isLog
-                                                  ? "bg-transparent text-muted-foreground"
-                                                  : "bg-muted text-foreground"
+                                                  ? "log-message bg-transparent text-muted-foreground"
+                                                  : "ai-message bg-muted text-foreground"
                                         }`}
                                         style={{
                                             whiteSpace: 'pre-wrap',
@@ -451,8 +452,8 @@ const Chat: React.FC = () => {
                                         <div className="p-3">
                                             <div className="flex items-start gap-2">
                                                 {!isUser && (
-                                                    <div className="mt-1 bg-muted-foreground/10 p-1 rounded-full">
-                                                        <Bot size={14} className="text-muted-foreground" />
+                                                    <div className="bot-icon-container mt-1 bg-muted-foreground/10 p-1 rounded-full">
+                                                        <Bot size={14} className="bot-icon text-muted-foreground" />
                                                     </div>
                                                 )}
                                                 <div className="leading-relaxed">
@@ -481,7 +482,7 @@ const Chat: React.FC = () => {
                     {/* Typing indicator */}
                     {isTyping && (
                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
-                            <div className="bg-muted text-foreground rounded-lg p-3 max-w-[85%]"
+                            <div className="typing-indicator bg-muted text-foreground rounded-lg p-3 max-w-[85%]"
                                 style={{
                                     whiteSpace: 'pre-wrap',
                                     wordWrap: 'break-word', 
@@ -490,13 +491,13 @@ const Chat: React.FC = () => {
                                 }}
                             >
                                 <div className="flex items-center gap-2">
-                                    <div className="bg-muted-foreground/10 p-1 rounded-full">
-                                        <Bot size={14} className="text-muted-foreground" />
+                                    <div className="bot-icon-container bg-muted-foreground/10 p-1 rounded-full">
+                                        <Bot size={14} className="bot-icon text-muted-foreground" />
                                     </div>
                                     <div className="flex space-x-1">
-                                        <div className="w-2 h-2 rounded-full bg-muted-foreground animate-pulse"></div>
-                                        <div className="w-2 h-2 rounded-full bg-muted-foreground animate-pulse delay-150"></div>
-                                        <div className="w-2 h-2 rounded-full bg-muted-foreground animate-pulse delay-300"></div>
+                                        <div className="typing-dot ai-thinking-dot w-2 h-2 rounded-full bg-muted-foreground animate-pulse"></div>
+                                        <div className="typing-dot ai-thinking-dot w-2 h-2 rounded-full bg-muted-foreground animate-pulse delay-150"></div>
+                                        <div className="typing-dot ai-thinking-dot w-2 h-2 rounded-full bg-muted-foreground animate-pulse delay-300"></div>
                                     </div>
                                 </div>
                             </div>
@@ -507,39 +508,39 @@ const Chat: React.FC = () => {
                 </div>
 
                 {/* Input area */}
-                <div className="p-3 border-t border-border flex-shrink-0">
+                <div className="input-area p-3 border-t border-border flex-shrink-0">
                     <div className="flex flex-col space-y-2">
                         <div className="flex items-center gap-1 px-2">
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                className="tool-button h-7 w-7 text-muted-foreground hover:text-foreground"
                             >
                                 <Code size={14} />
                             </Button>
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                className="tool-button h-7 w-7 text-muted-foreground hover:text-foreground"
                             >
                                 <Image size={14} />
                             </Button>
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                className="tool-button h-7 w-7 text-muted-foreground hover:text-foreground"
                             >
                                 <Paperclip size={14} />
                             </Button>
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                className="tool-button h-7 w-7 text-muted-foreground hover:text-foreground"
                             >
                                 <Plus size={14} />
                             </Button>
                             <div className="flex-1"></div>
-                            <div className="text-xs text-muted-foreground font-mono">
+                            <div className="char-count text-xs text-muted-foreground font-mono">
                                 {input.length > 0 ? `${input.length} chars` : "gpt-4o"}
                             </div>
                         </div>
@@ -551,7 +552,7 @@ const Chat: React.FC = () => {
                                 onChange={(e) => setInput(e.target.value)}
                                 onKeyDown={handleKeyPress}
                                 placeholder="Message the AI Assistant"
-                                className="flex-1 bg-transparent text-foreground px-2 py-1.5 min-h-[40px] max-h-[120px] resize-none focus:outline-none text-sm"
+                                className="chat-input flex-1 bg-transparent text-foreground px-2 py-1.5 min-h-[40px] max-h-[120px] resize-none focus:outline-none text-sm"
                                 rows={1}
                             />
 
@@ -560,8 +561,8 @@ const Chat: React.FC = () => {
                                 disabled={input.trim() === ""}
                                 className={`rounded-lg px-3 py-1.5 h-auto transition-all duration-200 ${
                                     input.trim() === ""
-                                        ? "bg-muted text-muted-foreground"
-                                        : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                                        ? "send-button-inactive bg-muted text-muted-foreground"
+                                        : "send-button-active bg-primary hover:bg-primary/90 text-primary-foreground"
                                 }`}
                             >
                                 <Send size={12} className="mr-2" />
@@ -572,10 +573,10 @@ const Chat: React.FC = () => {
                 </div>
 
                 {/* Status bar */}
-                <div className="px-4 py-1.5 border-t border-border flex items-center justify-between flex-shrink-0">
+                <div className="status-bar px-4 py-1.5 border-t border-border flex items-center justify-between flex-shrink-0">
                     <div className="text-xs text-muted-foreground font-mono">v1.0.0</div>
                     <div className="flex items-center space-x-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                        <div className="status-online-dot w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
                         <span className="text-xs text-muted-foreground font-mono">ONLINE</span>
                     </div>
                 </div>

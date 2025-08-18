@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./global-enhancements.css";
 
 @theme {
   --color-background: oklch(0.185 0 0);
