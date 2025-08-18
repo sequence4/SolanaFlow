@@ -47,13 +47,13 @@ export const ToolboxPrograms = () => {
     const getGradientClasses = (color: string) => {
         switch (color) {
             case 'blue':
-                return 'from-blue-500 to-cyan-500';
+                return 'from-muted to-muted';
             case 'purple':
-                return 'from-purple-500 to-pink-500';
+                return 'from-muted to-muted';
             case 'green':
-                return 'from-emerald-500 to-teal-500';
+                return 'from-muted to-muted';
             default:
-                return 'from-blue-500 to-cyan-500';
+                return 'from-muted to-muted';
         }
     };
 
@@ -76,7 +76,7 @@ export const ToolboxPrograms = () => {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, delay: index * 0.1 }}
                     whileHover={{ scale: 1.02 }}
-                    className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-sm border border-white/10 p-4 transition-all duration-300 hover:shadow-2xl hover:shadow-blue-500/20 cursor-pointer"
+                    className="group relative overflow-hidden rounded-xl bg-card backdrop-blur-sm border border-border p-4 transition-all duration-300 hover:shadow-2xl hover:shadow-primary/20 cursor-pointer"
                 >
                     {/* Animated gradient background on hover */}
                     <div className={`absolute inset-0 bg-gradient-to-r ${getGradientClasses(program.color)}/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
@@ -85,20 +85,20 @@ export const ToolboxPrograms = () => {
                     <div className="relative z-10">
                         <div className="flex items-start justify-between mb-3">
                             <div className="flex items-center space-x-3">
-                                <div className={`h-8 w-8 rounded-lg bg-gradient-to-r ${getGradientClasses(program.color)} flex items-center justify-center text-sm font-bold text-white shadow-lg shadow-${program.color}-500/25`}>
+                                <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center text-sm font-bold text-foreground border border-border">
                                     {program.icon}
                                 </div>
                                 <div>
                                     <div className="flex items-center space-x-2">
-                                        <h3 className="text-sm font-semibold text-white">{program.name}</h3>
+                                        <h3 className="text-sm font-semibold text-foreground">{program.name}</h3>
                                         {program.verified && (
                                             <div className="flex items-center space-x-1">
                                                 <Shield className="h-3 w-3 text-emerald-400" />
-                                                <span className="text-xs text-emerald-400">Verified</span>
+                                                <span className="text-xs text-green-400">Verified</span>
                                             </div>
                                         )}
                                     </div>
-                                    <span className="text-xs text-slate-400 font-mono">{program.version}</span>
+                                    <span className="text-xs text-muted-foreground font-mono">{program.version}</span>
                                 </div>
                             </div>
                             
@@ -108,7 +108,7 @@ export const ToolboxPrograms = () => {
                                     whileHover={{ scale: 1.1 }}
                                     whileTap={{ scale: 0.95 }}
                                     onClick={() => copyToClipboard(program.id, program.id)}
-                                    className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                                    className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                                     title="Copy Program ID"
                                 >
                                     {copiedId === program.id ? (
@@ -121,7 +121,7 @@ export const ToolboxPrograms = () => {
                                     whileHover={{ scale: 1.1 }}
                                     whileTap={{ scale: 0.95 }}
                                     onClick={() => window.open(`https://explorer.solana.com/address/${program.id}?cluster=devnet`, '_blank')}
-                                    className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                                    className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                                     title="View on Solana Explorer"
                                 >
                                     <ExternalLink className="h-4 w-4" />
@@ -129,16 +129,16 @@ export const ToolboxPrograms = () => {
                             </div>
                         </div>
                         
-                        <p className="text-xs text-slate-300 mb-3 leading-relaxed">{program.description}</p>
+                        <p className="text-xs text-muted-foreground mb-3 leading-relaxed">{program.description}</p>
                         
                         {/* Program ID with click to copy */}
                         <motion.div 
                             whileHover={{ scale: 1.01 }}
                             onClick={() => copyToClipboard(program.id, program.id)}
-                            className="bg-black/20 rounded-lg p-2 border border-white/5 hover:border-white/10 transition-colors cursor-pointer"
+                            className="bg-muted/50 rounded-lg p-2 border border-border hover:border-primary transition-colors cursor-pointer"
                         >
                             <div className="flex items-center justify-between">
-                                <p className="text-xs text-slate-400 font-mono truncate pr-2">{program.id}</p>
+                                <p className="text-xs text-muted-foreground font-mono truncate pr-2">{program.id}</p>
                                 <motion.div
                                     animate={copiedId === program.id ? { scale: [1, 1.2, 1] } : {}}
                                     transition={{ duration: 0.2 }}
@@ -146,7 +146,7 @@ export const ToolboxPrograms = () => {
                                     {copiedId === program.id ? (
                                         <CheckCircle className="h-3 w-3 text-emerald-400 flex-shrink-0" />
                                     ) : (
-                                        <Copy className="h-3 w-3 text-slate-500 flex-shrink-0" />
+                                        <Copy className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                                     )}
                                 </motion.div>
                             </div>

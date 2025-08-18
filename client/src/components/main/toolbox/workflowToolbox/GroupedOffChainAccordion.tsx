@@ -32,7 +32,7 @@ const offChainInstructions = [
         label: "Fungible Tokens",
         icon: <Coins className="h-4 w-4 text-white" />,
         color: "blue",
-        gradient: "from-blue-500 to-cyan-500",
+        gradient: "from-muted to-muted",
         items: [
             { name: "Create a Token Mint", flow: "off-chain" },
             { name: "Mint a Token", flow: "off-chain" },
@@ -112,8 +112,8 @@ export function GroupedOffChainAccordion() {
                                 <AccordionItemTrigger
                                     className="group flex items-center justify-between w-full px-3 py-2 text-sm font-medium transition-all duration-300 backdrop-blur-sm relative hover:bg-muted/5 bg-transparent"
                                 >
-                                    {/* Gradient background on hover */}
-                                    <div className={`absolute inset-0 bg-gradient-to-r ${group.gradient}/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
+                                    {/* Muted background on hover */}
+                                    <div className="absolute inset-0 bg-muted/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                                     
                                     <div className="flex items-center gap-2 relative z-10">
                                         <motion.div
