@@ -173,34 +173,72 @@ const Chat: React.FC = () => {
         );
 
         if (visible.length) {
+            console.log('[CHAT] Processing system logs:', visible.length, 'new lines');
+            
             const logMessages: AIMessageType[] = [];
             
             for (const line of visible) {
-                // Check if this is a special code generation message
+                console.log('[CHAT] Processing line:', line);
+                
+                // Check if this is a JSON message first
                 try {
-                    const parsed = JSON.parse(line);
-                    
-                    // Handle code-generation messages with file lists
-                    if (parsed.type === 'code-generation' && parsed.files) {
-                        logMessages.push({
-                            text: parsed.message || '🦀 Generating Solana program files...',
-                            sender: 'ai',
-                            timestamp: new Date(),
-                            status: 'sent',
-                            codeGenFiles: parsed.files
-                        });
-                        continue;
+                    if (line.startsWith('{') && line.includes('type')) {
+                        const parsed = JSON.parse(line);
+                        console.log('[CHAT] Parsed JSON message:', parsed);
+                        
+                        // Check for code generation messages with files
+                        if (parsed.type === 'code-generation' && parsed.files && parsed.files.length > 0) {
+                            console.log('[CHAT] Found code-generation message with', parsed.files.length, 'files');
+                            
+                            // Remove any existing code-gen messages to avoid duplicates
+                            setMessages(prev => {
+                                const filtered = prev.filter(m => !m.codeGenFiles);
+                                console.log('[CHAT] Filtered out previous code-gen messages, remaining:', filtered.length);
+                                return filtered;
+                            });
+                            
+                            // Add the new code generation message with files
+                            const codeGenMessage = {
+                                text: parsed.message || '🦀 Generating Solana program files...',
+                                sender: 'ai' as const,
+                                timestamp: new Date(),
+                                status: 'sent' as const,
+                                codeGenFiles: parsed.files
+                            };
+                            
+                            console.log('[CHAT] Creating code-gen message:', codeGenMessage);
+                            logMessages.push(codeGenMessage);
+                            continue;
+                        }
+                        
+                        // Handle progress-only messages (during dependency installation, etc.)
+                        if (parsed.type === 'progress' && parsed.message && parsed.pct !== undefined) {
+                            console.log('[CHAT] Found progress message:', parsed.message, 'at', parsed.pct + '%');
+                            
+                            // Add as regular log message but with progress info
+                            logMessages.push({
+                                text: `${parsed.message} (${parsed.pct}%)`,
+                                sender: 'ai',
+                                timestamp: new Date(),
+                                status: 'sent',
+                                isLogLine: true,
+                                pct: parsed.pct,
+                                stage: parsed.stage
+                            });
+                            continue;
+                        }
                     }
                 } catch (e) {
                     // Not JSON, check if it's a progress percentage line
                     if (line.includes('%') && (line.includes('Building') || line.includes('Generating'))) {
-                        // Only show % progress lines during BUILD - skip individual messages
+                        console.log('[CHAT] Skipping progress line:', line);
                         continue;
                     }
                 }
                 
                 // Add regular log line (but suppress most during build process)
                 if (!taskLogs.isBuilding || line.includes('ERROR') || line.includes('WARN')) {
+                    console.log('[CHAT] Adding regular log line:', line);
                     logMessages.push({
                         text: line,
                         sender: 'ai',
@@ -212,7 +250,12 @@ const Chat: React.FC = () => {
             }
 
             if (logMessages.length > 0) {
-                setMessages(prev => [...prev, ...logMessages]);
+                console.log('[CHAT] Adding', logMessages.length, 'new messages to chat');
+                setMessages(prev => {
+                    const newMessages = [...prev, ...logMessages];
+                    console.log('[CHAT] Total messages after update:', newMessages.length);
+                    return newMessages;
+                });
                 // Reset user scroll state when new messages arrive
                 setUserHasScrolled(false);
                 // Smart scroll to bottom

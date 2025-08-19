@@ -7,6 +7,9 @@ interface CodeFile {
 }
 
 const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
+  console.log('[SEQUENTIAL-DISPLAY] Component rendered with files:', files);
+  console.log('[SEQUENTIAL-DISPLAY] Files count:', files?.length || 0);
+  
   const [currentIndex, setCurrentIndex] = useState(-1);
   const [fileStates, setFileStates] = useState<Array<{ 
     expanded: boolean; 
@@ -18,7 +21,15 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
   
   // Initialize file states
   useEffect(() => {
-    if (!files || files.length === 0) return;
+    console.log('[SEQUENTIAL-DISPLAY] useEffect triggered with files:', files?.length || 0);
+    
+    if (!files || files.length === 0) {
+      console.log('[SEQUENTIAL-DISPLAY] No files provided, skipping initialization');
+      return;
+    }
+    
+    console.log('[SEQUENTIAL-DISPLAY] Initializing file states for', files.length, 'files');
+    console.log('[SEQUENTIAL-DISPLAY] File names:', files.map(f => f.filename));
     
     setFileStates(files.map(() => ({
       expanded: false,
@@ -29,6 +40,7 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
     
     // Start after brief delay
     const startTimer = setTimeout(() => {
+      console.log('[SEQUENTIAL-DISPLAY] Starting animation sequence');
       setHasStarted(true);
       setCurrentIndex(0);
     }, 1000);
@@ -38,7 +50,14 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
   
   // Handle file expansion and typewriter effect
   useEffect(() => {
-    if (!hasStarted || !files || currentIndex < 0 || currentIndex >= files.length) return;
+    console.log('[SEQUENTIAL-DISPLAY] Animation effect triggered:', { hasStarted, currentIndex, filesLength: files?.length });
+    
+    if (!hasStarted || !files || currentIndex < 0 || currentIndex >= files.length) {
+      console.log('[SEQUENTIAL-DISPLAY] Skipping animation - conditions not met');
+      return;
+    }
+    
+    console.log('[SEQUENTIAL-DISPLAY] Starting animation for file', currentIndex, ':', files[currentIndex].filename);
     
     // Expand current file
     setFileStates(prev => prev.map((state, idx) => 
@@ -47,6 +66,8 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
     
     const currentFile = files[currentIndex];
     let charIndex = 0;
+    
+    console.log('[SEQUENTIAL-DISPLAY] Starting typewriter for:', currentFile.filename, 'content length:', currentFile.content.length);
     
     // Very slow typewriter effect - 150ms per character
     const typeTimer = setInterval(() => {
@@ -58,7 +79,12 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
         ));
         
         charIndex++;
+        
+        if (charIndex % 10 === 0) { // Log every 10 characters
+          console.log('[SEQUENTIAL-DISPLAY] Typewriter progress:', charIndex, '/', currentFile.content.length);
+        }
       } else {
+        console.log('[SEQUENTIAL-DISPLAY] Typewriter completed for', currentFile.filename);
         clearInterval(typeTimer);
         
         // Mark current file as complete
@@ -69,7 +95,10 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
         // Wait 2 seconds then move to next file
         setTimeout(() => {
           if (currentIndex < files.length - 1) {
+            console.log('[SEQUENTIAL-DISPLAY] Moving to next file:', currentIndex + 1);
             setCurrentIndex(currentIndex + 1);
+          } else {
+            console.log('[SEQUENTIAL-DISPLAY] All files completed');
           }
         }, 2000);
       }

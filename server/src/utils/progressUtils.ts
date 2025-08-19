@@ -124,30 +124,24 @@ export const sendEnvironmentProgress = async (
 
 /**
  * Send progress updates for code generation - starts at 0% with smooth increments
+ * Note: This function is designed to work with the global file collection system in handleGenerateCode.ts
+ * The actual progress is now controlled by file generation events rather than time-based increments
  */
 export const sendCodeGenProgress = (sendProgress: (data: any) => void): Promise<void> => {
   return new Promise((resolve) => {
-    let currentPct = 0; // START AT 0, not 10
-    const targetPct = 100;
+    console.log('[PROGRESS] Starting code generation progress at 0%');
     
-    // Smooth increments over time
-    const interval = setInterval(() => {
-      // Small random increments (2-5%)
-      const increment = Math.floor(Math.random() * 4) + 2;
-      currentPct = Math.min(currentPct + increment, targetPct);
-      
-      sendProgress({
-        stage: 'code-gen',
-        status: 'active',
-        message: `Generating Solana program files... ${currentPct}%`,
-        pct: currentPct
-      });
-      
-      if (currentPct >= targetPct) {
-        clearInterval(interval);
-        resolve();
-      }
-    }, 300); // Update every 300ms for smooth progress
+    // Simply send the initial 0% progress and resolve immediately
+    // The actual progress updates are now handled by the file generation process
+    sendProgress({
+      stage: 'code-gen',
+      status: 'active',
+      message: '🦀 Starting Solana program generation...',
+      pct: 0
+    });
+    
+    console.log('[PROGRESS] Initial progress sent, file-based progress will take over');
+    resolve();
   });
 };
 

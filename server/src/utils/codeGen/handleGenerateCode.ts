@@ -23,7 +23,9 @@ import { Keypair } from '@solana/web3.js';
 import pool from '../../config/database';
 import { normalizeProjectName } from '../stringUtils';
 import { saveProgramSecret, awsSecretsEnabled } from '../awsSecrets';
-import { sendCodeGenProgress } from '../progressUtils';
+
+// Global file collector for ALL generated files (frontend + Rust)
+const allGeneratedFiles: Array<{filename: string, content: string, language: string}> = [];
 
 /** Extract all file paths from a file tree recursively. */
 function flattenPaths(tree: any[]): string[] {
@@ -127,57 +129,79 @@ async function waitForAll(taskIds: string[]): Promise<{
   return { succeeded, failed };
 }
 
-/** Helper to emit progress event when each file is written */
-const emitFileWritten = (sendProgress: (data: unknown) => void): ((path: string, content: string) => Promise<void>) => async (path, content) => {
-  // Include content for frontend but avoid logging it to console
-  sendProgress({
-    event: 'file-written',
-    path,
-    content, // Include actual content for frontend
-  });
-
-  // Send progress update with code snippet for key files during generation
-  const filename = path.split('/').pop() || '';
-  const isKeyFile = filename === 'lib.rs' || filename === 'mod.rs' || filename.endsWith('.rs') ||
-                    filename.endsWith('.ts') || filename.endsWith('.tsx') ||
-                    filename.endsWith('.js') || filename.endsWith('.jsx');
-  
-  if (isKeyFile && content.trim() && content.length > 20) {
-    // Determine language based on file extension
-    const language = filename.endsWith('.rs') ? 'rust' : 
-                     filename.endsWith('.ts') || filename.endsWith('.tsx') ? 'typescript' :
-                     filename.endsWith('.js') || filename.endsWith('.jsx') ? 'javascript' :
-                     'text';
+/** Helper to collect and emit ALL files (frontend + Rust) for sequential display */
+const emitFileWritten = (sendProgress: (data: unknown) => void, isRustPhase: boolean = false): ((path: string, content: string) => Promise<void>) => {
+  return async (path, content) => {
+    const filename = path.split('/').pop() || '';
     
-    // Calculate progressive percentage based on file type and order - START FROM 0
-    let progressPct = 10; // default  
-    if (filename === 'lib.rs') progressPct = 5;
-    else if (filename === 'mod.rs') progressPct = 15;
-    else if (filename.includes('instruction')) progressPct = 35;
-    else if (filename.includes('account')) progressPct = 55;
-    else if (filename.includes('state')) progressPct = 75;
-    else if (filename.includes('error')) progressPct = 90;
-    else progressPct = Math.min(80, Math.random() * 30 + 20);
+    console.log(`[FILE-EMIT] Processing file: ${path} (${filename}) - Phase: ${isRustPhase ? 'Rust' : 'Frontend'}, Length: ${content.length}`);
     
-    // Count lines for display
-    const lineCount = content.split('\n').length;
-    
+    // Include content for frontend but avoid logging it to console
     sendProgress({
-      stage: 'code-gen',
-      status: 'active',
-      message: `Generating ${filename}... (${lineCount} lines)`,
-      pct: progressPct,
-      codeSnippet: {
-        language,
-        content: content.length > 1000 ? content.substring(0, 1000) + '\n\n// ... (truncated for display)' : content,
-        filename,
-        lineCount
-      }
+      event: 'file-written',
+      path,
+      content, // Include actual content for frontend
     });
+
+    // Determine if this is a file we want to show in the animation
+    const isImportantFile = 
+      filename.endsWith('.rs') ||
+      filename.endsWith('.tsx') ||
+      filename.endsWith('.ts') ||
+      filename === 'package.json' ||
+      filename === 'tsconfig.json' ||
+      filename === 'tailwind.config.js' ||
+      filename === 'next.config.js' ||
+      filename.endsWith('.json');
     
-    // Small delay to make file generation feel more sequential
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
+    if (isImportantFile && content.trim() && content.length > 20) {
+      // Determine language for syntax highlighting
+      const language = 
+        filename.endsWith('.rs') ? 'rust' :
+        filename.endsWith('.tsx') || filename.endsWith('.ts') ? 'typescript' :
+        filename.endsWith('.json') ? 'json' :
+        filename.endsWith('.js') ? 'javascript' : 'text';
+      
+      // Truncate content for display (first 400 chars)
+      const displayContent = content.length > 400 
+        ? content.substring(0, 400) + '\n\n// ... (truncated)'
+        : content;
+      
+      // Add to global collection
+      allGeneratedFiles.push({
+        filename: path,
+        content: displayContent,
+        language
+      });
+      
+      console.log(`[FILE-COLLECT] ✅ COLLECTED file ${allGeneratedFiles.length}: ${filename} (${language}), content length: ${content.length}`);
+      console.log(`[FILE-COLLECT] Total files in collection: ${allGeneratedFiles.length}`);
+      
+      // Calculate progress (0-95%, estimate ~25 total files)
+      const progressPct = Math.min(
+        Math.round((allGeneratedFiles.length / 25) * 95), // Scale to 95% max
+        95 // Cap at 95% until dependencies are installed
+      );
+      
+      // Send as object for SSE (auto-converted to JSON)
+      sendProgress({
+        type: 'code-generation',  // Special type for frontend to recognize
+        stage: 'code-gen',
+        status: 'active',
+        message: isRustPhase 
+          ? `🦀 Generated ${allGeneratedFiles.length} program files...`
+          : `🎨 Generated ${allGeneratedFiles.length} frontend files...`,
+        pct: progressPct,
+        files: [...allGeneratedFiles]  // Send all files collected so far
+      });
+      
+      console.log(`[PROGRESS-SEND] 📤 SENT JSON progress message: ${allGeneratedFiles.length} files at ${progressPct}%`);
+      console.log(`[PROGRESS-SEND] Message type: code-generation, files array length: ${allGeneratedFiles.length}`);
+    }
+    
+    // Small delay between files for visibility
+    await new Promise(resolve => setTimeout(resolve, 50));
+  };
 };
 
 interface Args {
@@ -286,15 +310,7 @@ export const handleGenerateCode = async ({
           projectId,
           existingFilePaths,
           creatorId,
-          async (path, code) => {
-            sendProgress({ 
-              event: 'file-written', 
-              path,
-              content: code, // Include actual content for frontend
-            });
-            if (path.endsWith('tsconfig.json'))
-              console.log('[GEN] Wrote tsconfig.json file');
-          },
+          emitFileWritten(sendProgress, false)  // false = frontend phase
         );
 
         // block until every UI-write task is complete
@@ -331,7 +347,25 @@ export const handleGenerateCode = async ({
               'yarn --cwd web install --lockfile-only --network-timeout 600000"' // ⬅ --cwd web
           ].join(' ');
 
+          // Before lockfile generation
+          sendProgress({
+            type: 'progress',
+            stage: 'code-gen',
+            status: 'active',
+            message: '📦 Generating package lockfile...',
+            pct: 60
+          });
+
           await runCommand(lockfileCmd, '.', projectId);
+
+          // Before dependency installation
+          sendProgress({
+            type: 'progress',
+            stage: 'code-gen',
+            status: 'active',
+            message: '📦 Installing dependencies...',
+            pct: 70
+          });
 
           sendProgress({ stage: 'deps', message: 'yarn.lock updated; installing deps…' });
 
@@ -347,6 +381,15 @@ export const handleGenerateCode = async ({
           ].join(' ');
 
           await runCommand(installCmd, '.', projectId);
+
+          // After dependency installation
+          sendProgress({
+            type: 'progress',
+            stage: 'code-gen',
+            status: 'active',
+            message: '✅ Dependencies installed successfully',
+            pct: 85
+          });
 
           /* shadcn-ui CLI init REMOVED
              Reason: `npx shadcn-ui init` overwrites tailwind.config.js and
@@ -673,65 +716,20 @@ EOF'`,
         /* --------------------------------------------------------------- *
          * write the src tree into the workspace
          * --------------------------------------------------------------- */
-        // After generating source files, collect all Rust files
-        const collectRustFiles = (): Array<{filename: string, content: string}> => {
-          const rustFiles: Array<{filename: string, content: string}> = [];
-          
-          const traverse = (node: FileTreeItem, path: string = '') => {
-            if (node.type === 'file' && node.name.endsWith('.rs')) {
-              rustFiles.push({
-                filename: path ? `${path}/${node.name}` : node.name,
-                content: node.code || ''
-              });
-            }
-            if (node.children) {
-              for (const child of node.children) {
-                traverse(child, path ? `${path}/${node.name}` : node.name);
-              }
-            }
-          };
-          
-          traverse(srcTree);
-          return rustFiles;
-        };
+        console.log('[GEN] Code generation will collect files through emitFileWritten callback');
 
-        // Send all Rust files for display
-        const rustFiles = collectRustFiles();
-
-        // Filter to only important on-chain files
-        const importantFiles = rustFiles.filter(f => 
-          f.filename.includes('lib.rs') ||
-          f.filename.includes('state.rs') ||
-          f.filename.includes('error.rs') ||
-          f.filename.includes('/instructions/') ||
-          f.filename.includes('mod.rs')
-        ).sort((a, b) => {
-          // Order: lib.rs first, then state.rs, then instructions
-          if (a.filename.includes('lib.rs')) return -1;
-          if (b.filename.includes('lib.rs')) return 1;
-          if (a.filename.includes('state.rs')) return -1;
-          if (b.filename.includes('state.rs')) return 1;
-          return a.filename.localeCompare(b.filename);
-        });
-
-        // Send all files as a single chat message for sequential display
-        console.log(`[GEN] Sending ${importantFiles.length} Rust files for sequential display`);
+        // Clear the global file collector and send initial progress
+        allGeneratedFiles.length = 0;
         
-        // This will be processed by Chat.tsx as a single AI message with file animation
-        console.log(JSON.stringify({
-          type: 'code-generation',
-          stage: 'code-gen', 
-          message: `🦀 Generated ${importantFiles.length} Solana program files`,
-          files: importantFiles.map(f => ({
-            filename: f.filename,
-            content: f.content,
-            language: 'rust'
-          }))
-        }));
-
-        // Start smooth code generation progress
-        const codeGenPromise = sendCodeGenProgress(sendProgress);
-        console.log(`[GEN] Generating ${importantFiles.length} Rust source files`);
+        // Send initial 0% progress - no separate progress timeline  
+        sendProgress({
+          type: 'progress',
+          stage: 'code-gen',
+          status: 'active',
+          message: '🦀 Starting Solana program generation...',
+          pct: 0
+        });
+        console.log('[GEN] STARTED - Global file array cleared, sent initial progress. File collection will start now.');
         
         function writeFilesAndEmitTree(
           rootNode: FileTreeItem,
@@ -741,7 +739,7 @@ EOF'`,
           sendProgress: (d: unknown) => void,
         ): Promise<string> {
           return (async () => {
-            const writeTaskIds = await insertSrcFiles(rootNode, projectId, existingFilePaths, creatorId, emitFileWritten(sendProgress));
+            const writeTaskIds = await insertSrcFiles(rootNode, projectId, existingFilePaths, creatorId, emitFileWritten(sendProgress, true)); // true = Rust phase
             
             // 🟢 NEW – wait until every write-file task finishes
             for (const tId of writeTaskIds) {
@@ -770,14 +768,8 @@ EOF'`,
           sendProgress,
         );
 
-        // Wait for code generation progress to complete
-        await codeGenPromise;
-        sendProgress({ 
-          stage: 'code-gen', 
-          status: 'completed',
-          message: 'Code generation complete!',
-          pct: 100
-        });
+        // Progress is now managed by file generation events
+        console.log('[GEN] Code generation phase completed, moving to dependency management');
         sendProgress({ stage: "ui-complete" });
 
 
@@ -879,6 +871,15 @@ EOF'`,
           }
           await updateTaskStatus(dumpTaskId, 'succeed', 'Tree dumped and files printed');
         }
+        
+        // Final progress update - code generation complete at 100%
+        sendProgress({
+          type: 'progress',
+          stage: 'code-gen',
+          status: 'complete',
+          message: '✅ Code generation completed successfully!',
+          pct: 100
+        });
         
         // ─── end of function ────────────────────────────────
         return { sentinelId, programName };
