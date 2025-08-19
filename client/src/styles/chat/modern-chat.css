@@ -9,9 +9,9 @@ body .chat-container,
   box-shadow: 
     0 8px 32px rgba(0, 0, 0, 0.4),
     inset 0 1px 0 rgba(255, 255, 255, 0.02) !important;
-  width: 420px !important; /* Increased from default width for more space */
-  min-width: 420px !important;
-  max-width: 500px !important; /* Allow some flexibility but maintain compactness */
+  width: 100% !important; /* Fill parent container completely */
+  min-width: 0 !important; /* Remove min-width constraint */
+  max-width: 100% !important; /* Allow full width of parent */
 }
 
 /* Chat header */

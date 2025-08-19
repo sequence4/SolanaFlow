@@ -435,3 +435,24 @@ body, html, #__next {
   flex: 3 0 0 !important; /* 3/5 = 60% of remaining space */
   min-width: 0 !important;
 }
+
+/* Force Chat component to fill its parent completely */
+.chat-container {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+/* Ensure RightPanel contains Chat properly */
+.right-panel > * {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* Override any chat styling that might constrain width */
+.right-panel .chat-container,
+.right-panel .flex.flex-col {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
