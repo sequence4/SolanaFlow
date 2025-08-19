@@ -43,6 +43,7 @@ import {
 } from "lucide-react";
 import MarkdownRenderer from '@/components/main/code/markdown/MarkdownRenderer';
 import ChatChecklistBubble from './ChatChecklistBubble';
+import LogCodeDisplay from './LogCodeDisplay';
 
 export interface AIMessageType {
   text: string;
@@ -52,6 +53,11 @@ export interface AIMessageType {
   status?: 'sending' | 'sent' | 'error';
   isLogLine?: boolean;
   isChecklist?: boolean;
+  codeGenFiles?: Array<{
+    filename: string;
+    content: string;
+    language: string;
+  }>;
 }
 
 const Chat: React.FC = () => {
@@ -286,13 +292,20 @@ const Chat: React.FC = () => {
 
                 setIsTyping(false);
 
+                // Parse code generation files if present
+                const codeGenFiles = parseCodeGenFiles(responseText);
+                
                 setMessages(prevMessages => [
                     ...prevMessages,
                     {
                         text: responseText,
                         sender: 'ai',
                         timestamp: new Date(),
-                        status: 'sent'
+                        status: 'sent',
+                        codeGenFiles: codeGenFiles?.map(file => ({
+                            ...file,
+                            status: 'pending' as const
+                        })) || undefined
                     },
                 ]);
             } catch (error) {
@@ -373,6 +386,38 @@ const Chat: React.FC = () => {
         localStorage.removeItem('chatMessages');
     };
 
+    // Helper function to detect and parse code generation messages
+    const parseCodeGenFiles = (messageText: string) => {
+        // Look for patterns indicating code generation with multiple files
+        const codeGenPatterns = [
+            /Generating.*files?:/i,
+            /Creating.*files?:/i,
+            /Code generation complete/i,
+            /Generated.*files?/i
+        ];
+
+        const isCodeGenMessage = codeGenPatterns.some(pattern => pattern.test(messageText));
+        if (!isCodeGenMessage) return null;
+
+        // Extract code blocks with filenames
+        const codeBlockRegex = /```(\w+)?\s*(?:\/\/\s*(.+\.(?:rs|toml|js|ts|json|md|yml|yaml)))?[\s\S]*?\n([\s\S]*?)```/g;
+        const files = [];
+        let match;
+
+        while ((match = codeBlockRegex.exec(messageText)) !== null) {
+            const [, language = 'rust', filename, content] = match;
+            if (content && content.trim()) {
+                files.push({
+                    filename: filename || `file_${files.length + 1}.${language === 'rust' ? 'rs' : 'txt'}`,
+                    content: content.trim(),
+                    language: language || 'rust'
+                });
+            }
+        }
+
+        return files.length > 1 ? files : null; // Only use LogCodeDisplay for multiple files
+    };
+
     return (
         <div
             className={`flex flex-col h-full ${isExpanded ? "fixed inset-4 z-50" : ""} transition-all duration-300 ease-in-out`}
@@ -431,7 +476,7 @@ const Chat: React.FC = () => {
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ duration: 0.3 }}
-                                    className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+                                    className={`flex ${isUser ? "justify-end" : "justify-start"} w-full px-2`}
                                 >
                                     <div
                                         className={`rounded-lg ${
@@ -447,24 +492,35 @@ const Chat: React.FC = () => {
                                             overflowWrap: 'break-word'
                                         }}
                                     >
-                                        <div className="p-3">
-                                            <div className="flex items-start gap-2">
+                                        <div className="p-3 w-full">
+                                            <div className="flex items-start gap-2 w-full">
                                                 {!isUser && (
-                                                    <div className="bot-icon-container mt-1 bg-muted-foreground/10 p-1 rounded-full">
+                                                    <div className="bot-icon-container mt-1 bg-muted-foreground/10 p-1 rounded-full flex-shrink-0">
                                                         <Bot size={14} className="bot-icon text-muted-foreground" />
                                                     </div>
                                                 )}
-                                                <div className="leading-relaxed">
-                                                    {message.isChecklist
-                                                        ? <ChatChecklistBubble />
-                                                        : <MarkdownRenderer 
-                                                            content={message.text} 
-                                                            enableCodeTypewriter={!isUser && !isLog && message.text.includes('```')}
-                                                            onCodeTypewriterComplete={() => {
-                                                              // Code typewriter completed - could add any completion logic here
-                                                              console.log('Code typewriter completed for message', index);
+                                                <div className="leading-relaxed w-full min-w-0">
+                                                    {message.isChecklist ? (
+                                                        <ChatChecklistBubble />
+                                                    ) : message.codeGenFiles ? (
+                                                        <LogCodeDisplay 
+                                                            files={message.codeGenFiles}
+                                                            onAllFilesComplete={() => {
+                                                                console.log('All files completed for message', index);
                                                             }}
-                                                          />}
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full max-w-full overflow-hidden">
+                                                            <MarkdownRenderer 
+                                                                content={message.text} 
+                                                                enableCodeTypewriter={!isUser && !isLog && message.text.includes('```')}
+                                                                onCodeTypewriterComplete={() => {
+                                                                  // Code typewriter completed - could add any completion logic here
+                                                                  console.log('Code typewriter completed for message', index);
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>

@@ -7,7 +7,7 @@ import Interface from "@/components/main/interface/Interface";
 import Code from "@/components/main/code/Code";
 import Chat from "@/components/main/chat/Chat";
 import Header from "@/components/main/Header";
-import { Filetree } from "@/components/main/toolbox/codeToolbox/Filetree";
+import Filetree from "@/components/main/toolbox/codeToolbox/Filetree";
 
 // Hooks    
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -162,40 +162,41 @@ const Builder = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
-            className="relative flex-1 h-[98%] p-2 w-full flex flex-col justify-center items-center bg-background">
+            className="relative flex-1 h-[98%] p-2 w-full flex flex-col bg-background">
         
-            <Tabs
-                value={activeTab}
-                onValueChange={(val) => setActiveTab(val as ActiveTab)}
-                className="h-full w-full"
-                
-            >
-                <Header />
-                <ProjectInfo />
-                <div className="w-full h-full flex">
-                    {/* Left side: main content (60%) - FIXED WIDTH */}
-                    <div className="w-[60%] flex-shrink-0 flex">
-                        <TabsContent value="workflow" className="h-full w-full flex">
+            <Header />
+            <ProjectInfo />
+            
+            {/* Main content area - split 60%/40% */}
+            <div className="builder-layout flex h-full w-full">
+                {/* Left side: Tabs content (60%) - FIXED WIDTH */}
+                <div className="main-content-60 w-[60%] flex-shrink-0 h-full">
+                    <Tabs
+                        value={activeTab}
+                        onValueChange={(val) => setActiveTab(val as ActiveTab)}
+                        className="h-full w-full"
+                    >
+                        <TabsContent value="workflow" className="tabs-content-container h-full">
                             <motion.div 
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.4, delay: 0.1 }}
-                                className="w-full h-full"
+                                className="workflow-container w-full h-full"
                             >
                                 <Workflow />
                             </motion.div>
                         </TabsContent>
-                        <TabsContent value="interface" className="h-full w-full flex">
+                        <TabsContent value="interface" className="tabs-content-container h-full">
                             <motion.div 
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.4, delay: 0.1 }}
-                                className="w-full h-full"
+                                className="interface-container w-full h-full"
                             >
                                 <Interface />
                             </motion.div>
                         </TabsContent>
-                        <TabsContent value="code" className="h-full w-full flex">
+                        <TabsContent value="code" className="tabs-content-container h-full">
                             <motion.div 
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -216,14 +217,14 @@ const Builder = () => {
                                 </div>
                             </motion.div>
                         </TabsContent>
-                    </div>
-                    
-                    {/* Right side: AI Chat (40%) - FIXED WIDTH */}
-                    <div className="w-[40%] flex-shrink-0 flex flex-col h-full overflow-hidden border-l border-border bg-card">
-                        <Chat />
-                    </div>
+                    </Tabs>
                 </div>
-            </Tabs>
+                
+                {/* Right side: AI Chat (40%) - ALWAYS VISIBLE */}
+                <div className="chat-content-40 w-[40%] flex-shrink-0 h-full border-l border-border bg-card">
+                    <Chat />
+                </div>
+            </div>
         </motion.div>
     );
 };

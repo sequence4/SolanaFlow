@@ -99,3 +99,204 @@
   border-radius: 9999px;
   transition: width 0.3s ease-in-out;
 }
+
+/* Force message bubbles to contain their content */
+.log-message,
+.ai-message {
+  max-width: 95% !important;
+  word-break: break-word;
+  box-sizing: border-box;
+}
+
+/* Constrain code blocks within messages */
+.log-message pre,
+.ai-message pre,
+.log-message .code-snippet-wrapper,
+.ai-message .code-snippet-wrapper {
+  max-width: 100% !important;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* Prevent code from expanding beyond container */
+.log-message code,
+.ai-message code {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-break: break-all;
+}
+
+/* Specific fix for typewriter code blocks */
+.code-snippet-container {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.code-snippet-container pre {
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* CodeMirror specific constraints */
+.cm-editor {
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+.cm-content {
+  max-width: 100%;
+}
+
+/* Ensure chat always fills its space */
+.chat-container {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Prevent any flex items from shrinking unexpectedly */
+.flex > * {
+  flex-shrink: 0;
+}
+
+/* Force proper containment for all message types */
+.message-content {
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+/* Markdown renderer constraints */
+.markdown-content {
+  max-width: 100%;
+}
+
+.markdown-content pre {
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* File generation queue specific styles */
+.file-generation-queue {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Checklist bubble constraints */
+.checklist-bubble {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+/* LogCodeDisplay specific styles */
+.log-code-display {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.log-code-display .compact-code-container {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* Prevent TabsContent from having blank space */
+.tabs-content-container {
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+/* Ensure proper 60%/40% split without gaps */
+.builder-layout {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  gap: 0;
+  overflow: hidden;
+}
+
+.builder-layout .main-content-60 {
+  width: 60% !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  height: 100%;
+  overflow: hidden;
+  max-width: 60% !important;
+}
+
+.builder-layout .chat-content-40 {
+  width: 40% !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  height: 100%;
+  overflow: hidden;
+  max-width: 40% !important;
+}
+
+/* Force proper dimensions for all tab contents */
+[role="tabpanel"] {
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+/* Ensure Tabs component fills its container */
+.main-content-60 > [data-state] {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Target specific tab panels */
+[role="tabpanel"][data-state="active"] {
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Prevent workflow and interface tabs from showing blank space */
+.workflow-container,
+.interface-container {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  overflow: hidden !important;
+}
+
+/* Force ReactFlow to take full dimensions */
+.react-flow__renderer {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.react-flow__viewport {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Interface iframe container should fill completely */
+.interface-container iframe {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+}
+
+/* Ensure CodeMirror in LogCodeDisplay has proper constraints */
+.log-code-display .cm-editor {
+  max-width: 100% !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Prevent any component inside tabs from overflowing */
+.tabs-content-wrapper > * {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}

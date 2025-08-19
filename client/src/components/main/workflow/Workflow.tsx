@@ -133,7 +133,7 @@ const ReactFlowContent = ({
     }, [uxOpenPanel, setUxOpenPanel]);
     
     return (
-        <div className="relative h-full">
+        <div className="workflow-container relative w-full h-full overflow-hidden">
             <ReactFlow 
                 nodes={projectState.nodes} 
                 edges={projectState.edges} 
