@@ -31,22 +31,21 @@ const CodeSnippet: React.FC<CodeSnippetProps> = ({ children, enableTypewriter = 
     setIsTyping(true);
     setDisplayedCode('');
     
-    const STEP = 1;   // 1 character at a time for visibility
-    const SPEED = 50; // 50ms per character for clear visibility
+    // MUCH SLOWER for visibility
+    const STEP = 1;   // Only 1 character at a time
+    const SPEED = 50; // 50ms per character (was 25ms)
     
     let pos = 0;
     const id = setInterval(() => {
-      pos += STEP;
-      const currentText = codeString.slice(0, pos);
-      setDisplayedCode(currentText);
-      
-      if (pos >= codeString.length) {
+      if (pos < codeString.length) {
+        setDisplayedCode(codeString.slice(0, pos + 1));
+        pos += STEP;
+      } else {
         clearInterval(id);
         setIsTyping(false);
-        // Longer delay to let animation finish and be visible
         setTimeout(() => {
           onTypewriterComplete?.();
-        }, 1000);
+        }, 1000); // Wait 1 second after completion
       }
     }, SPEED);
 

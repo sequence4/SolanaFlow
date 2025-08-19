@@ -123,51 +123,32 @@ export const sendEnvironmentProgress = async (
 };
 
 /**
- * Send progress updates for code generation - starts at 0%
+ * Send progress updates for code generation - starts at 0% with smooth increments
  */
-export const sendCodeGenProgress = async (
-  sendProgress: (data: any) => void,
-  totalFiles: number = 5
-): Promise<void> => {
-  // Start at 0% explicitly
-  sendProgress({
-    stage: 'code-gen',
-    status: 'active',
-    message: 'Starting code generation...',
-    pct: 0
+export const sendCodeGenProgress = (sendProgress: (data: any) => void): Promise<void> => {
+  return new Promise((resolve) => {
+    let currentPct = 0; // START AT 0, not 10
+    const targetPct = 100;
+    
+    // Smooth increments over time
+    const interval = setInterval(() => {
+      // Small random increments (2-5%)
+      const increment = Math.floor(Math.random() * 4) + 2;
+      currentPct = Math.min(currentPct + increment, targetPct);
+      
+      sendProgress({
+        stage: 'code-gen',
+        status: 'active',
+        message: `Generating Solana program files... ${currentPct}%`,
+        pct: currentPct
+      });
+      
+      if (currentPct >= targetPct) {
+        clearInterval(interval);
+        resolve();
+      }
+    }, 300); // Update every 300ms for smooth progress
   });
-  
-  await new Promise(resolve => setTimeout(resolve, 200)); // Small delay to show 0%
-  
-  const pctPerFile = 80 / totalFiles; // Leave 20% for final steps
-  
-  for (let i = 0; i < totalFiles; i++) {
-    const targetPct = Math.round((i + 1) * pctPerFile);
-    await sendSmoothProgress(
-      sendProgress,
-      'code-gen',
-      targetPct,
-      `Generating file ${i + 1}/${totalFiles}...`,
-      300 // Slower updates for visibility
-    );
-  }
-  
-  // Final steps
-  await sendSmoothProgress(
-    sendProgress,
-    'code-gen',
-    95,
-    'Finalizing code generation...',
-    200
-  );
-  
-  await sendSmoothProgress(
-    sendProgress,
-    'code-gen',
-    100,
-    'Code generation complete!',
-    200
-  );
 };
 
 /**

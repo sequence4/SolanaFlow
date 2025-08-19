@@ -673,69 +673,64 @@ EOF'`,
         /* --------------------------------------------------------------- *
          * write the src tree into the workspace
          * --------------------------------------------------------------- */
-        // Collect all Rust files from the generated tree
-        const collectRustFiles = (tree: FileTreeItem): Array<{filename: string, content: string, path: string}> => {
-          const rustFiles: Array<{filename: string, content: string, path: string}> = [];
+        // After generating source files, collect all Rust files
+        const collectRustFiles = (): Array<{filename: string, content: string}> => {
+          const rustFiles: Array<{filename: string, content: string}> = [];
           
-          const traverse = (node: FileTreeItem, currentPath: string = '') => {
-            const fullPath = currentPath ? `${currentPath}/${node.name}` : node.name;
-            
+          const traverse = (node: FileTreeItem, path: string = '') => {
             if (node.type === 'file' && node.name.endsWith('.rs')) {
               rustFiles.push({
-                filename: node.name,
-                content: node.code || '',
-                path: fullPath
+                filename: path ? `${path}/${node.name}` : node.name,
+                content: node.code || ''
               });
             }
             if (node.children) {
               for (const child of node.children) {
-                traverse(child, fullPath);
+                traverse(child, path ? `${path}/${node.name}` : node.name);
               }
             }
           };
           
-          traverse(tree);
+          traverse(srcTree);
           return rustFiles;
         };
 
-        // Collect all Rust files from the source tree
-        const allRustFiles = collectRustFiles(srcTree);
-        
-        // Filter to only important on-chain files and sort them by importance
-        const importantFiles = allRustFiles.filter(f => 
-          f.filename === 'lib.rs' ||
-          f.filename === 'state.rs' ||
-          f.filename === 'error.rs' ||
-          f.path.includes('/instructions/') ||
-          f.filename === 'mod.rs'
+        // Send all Rust files for display
+        const rustFiles = collectRustFiles();
+
+        // Filter to only important on-chain files
+        const importantFiles = rustFiles.filter(f => 
+          f.filename.includes('lib.rs') ||
+          f.filename.includes('state.rs') ||
+          f.filename.includes('error.rs') ||
+          f.filename.includes('/instructions/') ||
+          f.filename.includes('mod.rs')
         ).sort((a, b) => {
-          // Order: lib.rs first, then state.rs, then instructions, then others
-          if (a.filename === 'lib.rs') return -1;
-          if (b.filename === 'lib.rs') return 1;
-          if (a.filename === 'state.rs') return -1;
-          if (b.filename === 'state.rs') return 1;
-          if (a.path.includes('/instructions/') && !b.path.includes('/instructions/')) return -1;
-          if (b.path.includes('/instructions/') && !a.path.includes('/instructions/')) return 1;
+          // Order: lib.rs first, then state.rs, then instructions
+          if (a.filename.includes('lib.rs')) return -1;
+          if (b.filename.includes('lib.rs')) return 1;
+          if (a.filename.includes('state.rs')) return -1;
+          if (b.filename.includes('state.rs')) return 1;
           return a.filename.localeCompare(b.filename);
         });
 
-        // Send initial progress with file information for sequential display
+        // Send progress with all files
         sendProgress({
           stage: 'code-gen',
           status: 'active',
           message: 'Generating Solana program files...',
-          pct: 0,
+          pct: 0, // Start at 0
           files: importantFiles.map(f => ({
-            filename: f.path,
-            content: f.content.substring(0, 500) + (f.content.length > 500 ? '\n\n// ... (truncated for display)' : ''),
+            filename: f.filename,
+            content: f.content.substring(0, 500), // Truncate for display
             language: 'rust',
             fullContent: f.content
           })),
-          type: 'sequential-code'
+          type: 'log'
         });
 
-        // Start smooth code generation progress  
-        const codeGenPromise = sendCodeGenProgress(sendProgress, importantFiles.length);
+        // Start smooth code generation progress
+        const codeGenPromise = sendCodeGenProgress(sendProgress);
         console.log(`[GEN] Generating ${importantFiles.length} Rust source files`);
         
         function writeFilesAndEmitTree(

@@ -140,10 +140,8 @@ const Chat: React.FC = () => {
         /* 🔽 skip the environment / progress status lines we don't want in chat */
         const IGNORE_PREFIXES = [
           "Preparing your build environment",
-          "Container is up",
+          "Container is up", 
           "Container URL",
-          "Generating Anchor code",
-          "Code generation complete",
           "Building program",
           "Linking target/deploy",
           "Collecting project files"
@@ -154,13 +152,33 @@ const Chat: React.FC = () => {
         );
 
         if (visible.length) {
-            const logMessages: AIMessageType[] = visible.map(line => ({
-                text: line,
-                sender: 'ai',           // show as if the assistant "thinks out loud"
-                timestamp: new Date(),
-                status: 'sent',
-                isLogLine: true,
-            }));
+            const logMessages: AIMessageType[] = visible.map(line => {
+                // Check if this is a special code generation log message
+                try {
+                    const parsed = JSON.parse(line);
+                    if (parsed.type === 'log' && parsed.stage === 'code-gen' && parsed.files) {
+                        return {
+                            text: parsed.message || 'Generating Solana program files...',
+                            sender: 'ai',
+                            timestamp: new Date(),
+                            status: 'sent',
+                            stage: parsed.stage,
+                            pct: parsed.pct,
+                            files: parsed.files
+                        } as any;
+                    }
+                } catch (e) {
+                    // Not JSON, treat as regular log line
+                }
+                
+                return {
+                    text: line,
+                    sender: 'ai',           // show as if the assistant "thinks out loud"
+                    timestamp: new Date(),
+                    status: 'sent',
+                    isLogLine: true,
+                };
+            });
 
             setMessages(prev => [...prev, ...logMessages]);
             setLastLogIndex(systemLogs.length);
@@ -169,30 +187,6 @@ const Chat: React.FC = () => {
         }
     }, [systemLogs, lastLogIndex, taskLogs.isBuilding, messages]);
 
-    // ———————————————————————————————
-    //  Listen for sequential code generation messages
-    // ———————————————————————————————
-    useEffect(() => {
-        const onCodeGenProgress = (data: any) => {
-            if (data.type === 'sequential-code' && data.files && data.files.length > 0) {
-                setMessages(prev => [
-                    ...prev,
-                    {
-                        text: data.message || "Generating Solana program files...",
-                        sender: "ai",
-                        timestamp: new Date(),
-                        status: "sent",
-                        stage: data.stage,
-                        pct: data.pct,
-                        type: data.type,
-                        codeGenFiles: data.files
-                    }
-                ]);
-            }
-        };
-        eventBus.on("code-gen-progress", onCodeGenProgress);
-        return () => eventBus.off("code-gen-progress", onCodeGenProgress);
-    }, []);
 
     // ———————————————————————————————
     //  Inject a friendly AI note once the build completes
@@ -529,34 +523,38 @@ const Chat: React.FC = () => {
                                                     </div>
                                                 )}
                                                 <div className="leading-relaxed w-full min-w-0">
-                                                    {message.isChecklist ? (
-                                                        <ChatChecklistBubble />
-                                                    ) : message.type === 'sequential-code' && message.codeGenFiles ? (
-                                                        <SequentialCodeDisplay 
-                                                            files={message.codeGenFiles}
-                                                            onAllFilesComplete={() => {
-                                                                console.log('All sequential files completed for message', index);
-                                                            }}
-                                                        />
-                                                    ) : message.codeGenFiles ? (
-                                                        <LogCodeDisplay 
-                                                            files={message.codeGenFiles}
-                                                            onAllFilesComplete={() => {
-                                                                console.log('All files completed for message', index);
-                                                            }}
-                                                        />
-                                                    ) : (
-                                                        <div className="w-full max-w-full overflow-hidden">
-                                                            <MarkdownRenderer 
-                                                                content={message.text} 
-                                                                enableCodeTypewriter={!isUser && !isLog && message.text.includes('```')}
-                                                                onCodeTypewriterComplete={() => {
-                                                                  // Code typewriter completed - could add any completion logic here
-                                                                  console.log('Code typewriter completed for message', index);
-                                                                }}
-                                                            />
-                                                        </div>
-                                                    )}
+                                                    {/* Check if message has files for sequential display */}
+                                                    {(() => {
+                                                        const hasCodeFiles = (message as any).files && (message as any).files.length > 0 && (message as any).stage === 'code-gen';
+                                                        
+                                                        if (message.isChecklist) {
+                                                            return <ChatChecklistBubble />;
+                                                        } else if (hasCodeFiles) {
+                                                            return <SequentialCodeDisplay files={(message as any).files} />;
+                                                        } else if (message.codeGenFiles) {
+                                                            return (
+                                                                <LogCodeDisplay 
+                                                                    files={message.codeGenFiles}
+                                                                    onAllFilesComplete={() => {
+                                                                        console.log('All files completed for message', index);
+                                                                    }}
+                                                                />
+                                                            );
+                                                        } else {
+                                                            return (
+                                                                <div className="w-full max-w-full overflow-hidden">
+                                                                    <MarkdownRenderer 
+                                                                        content={message.text} 
+                                                                        enableCodeTypewriter={!isUser && !isLog && message.text.includes('```')}
+                                                                        onCodeTypewriterComplete={() => {
+                                                                          // Code typewriter completed - could add any completion logic here
+                                                                          console.log('Code typewriter completed for message', index);
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            );
+                                                        }
+                                                    })()}
                                                 </div>
                                             </div>
                                         </div>
