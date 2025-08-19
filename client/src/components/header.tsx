@@ -35,7 +35,7 @@ export function Header() {
 
   const hasFiles = fileTree ? treeHasFile(fileTree) : false
   return (
-    <header className="h-14 border-b border-border bg-card flex items-center justify-between px-6 shadow-sm">
+    <header className="h-14 w-full border-b border-border bg-card flex items-center justify-between px-6 shadow-sm flex-shrink-0">
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-gradient-to-br from-primary to-purple-600 rounded-lg flex items-center justify-center shadow-md">

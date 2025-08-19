@@ -12,7 +12,7 @@ export default function MainLayout({
   useInitializeTaskLogger();
   
   return (
-    <div className="h-screen flex flex-col bg-background text-foreground">
+    <div className="main-layout-wrapper h-screen flex flex-col bg-background text-foreground">
       {children}
       <TaskLogsToast />
     </div>

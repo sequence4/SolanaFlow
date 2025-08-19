@@ -41,7 +41,7 @@ export default function MainPage() {
     <>
       <Header />
       
-      <div className="main-page-layout flex flex-1 overflow-hidden bg-background">        
+      <div className="main-page-content main-page-layout flex flex-1 overflow-hidden bg-background">        
         <Toolbox />
         <div className="main-content-area flex-1 min-w-0">
           <Tabs 

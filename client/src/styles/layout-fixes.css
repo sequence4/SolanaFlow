@@ -349,7 +349,89 @@ html, body {
 
 /* Force main container to fill viewport */
 #__next {
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  overflow-x: hidden !important;
+}
+
+/* Force all parent containers to full width */
+html, body, #__next, [data-nextjs-app] {
+  width: 100vw !important;
+  max-width: 100vw !important;
+  overflow-x: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Force main layout container to full width */
+.main-layout-wrapper {
+  width: 100vw !important;
+  max-width: 100vw !important;
+  height: 100vh !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Force main page content to full width */
+.main-page-content {
+  width: 100vw !important;
+  max-width: 100vw !important;
+  flex: 1 !important;
+  display: flex !important;
+  overflow: hidden !important;
+}
+
+/* Absolutely force no gaps anywhere */
+* {
+  box-sizing: border-box !important;
+}
+
+/* Override any container max-width constraints */
+.container, .max-w-full, .max-w-screen-xl, .max-w-7xl, .mx-auto {
+  max-width: 100vw !important;
+  width: 100vw !important;
+}
+
+/* Force header to full width */
+header {
+  width: 100vw !important;
+  max-width: 100vw !important;
+  margin: 0 !important;
+  padding-left: 1.5rem !important;
+  padding-right: 1.5rem !important;
+}
+
+/* Ensure flex layouts don't create gaps */
+.flex {
+  gap: 0 !important;
+}
+
+/* Override any padding/margin that might create gaps */
+body, html, #__next {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Force toolbox to exact width */
+.app-sidebar {
+  width: 300px !important;
+  min-width: 300px !important;
+  max-width: 300px !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+}
+
+/* Force chat panel to take remaining 40% */
+.right-panel {
+  width: auto !important;
+  min-width: 0 !important;
+  flex: 2 0 0 !important; /* 2/5 = 40% of remaining space */
+}
+
+/* Force main content to take 60% */
+.main-content-area {
+  flex: 3 0 0 !important; /* 3/5 = 60% of remaining space */
+  min-width: 0 !important;
 }
