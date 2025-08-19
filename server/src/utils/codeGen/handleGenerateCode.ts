@@ -714,20 +714,20 @@ EOF'`,
           return a.filename.localeCompare(b.filename);
         });
 
-        // Send progress with all files
-        sendProgress({
-          stage: 'code-gen',
-          status: 'active',
-          message: 'Generating Solana program files...',
-          pct: 0, // Start at 0
+        // Send all files as a single chat message for sequential display
+        console.log(`[GEN] Sending ${importantFiles.length} Rust files for sequential display`);
+        
+        // This will be processed by Chat.tsx as a single AI message with file animation
+        console.log(JSON.stringify({
+          type: 'code-generation',
+          stage: 'code-gen', 
+          message: `🦀 Generated ${importantFiles.length} Solana program files`,
           files: importantFiles.map(f => ({
             filename: f.filename,
-            content: f.content.substring(0, 500), // Truncate for display
-            language: 'rust',
-            fullContent: f.content
-          })),
-          type: 'log'
-        });
+            content: f.content,
+            language: 'rust'
+          }))
+        }));
 
         // Start smooth code generation progress
         const codeGenPromise = sendCodeGenProgress(sendProgress);

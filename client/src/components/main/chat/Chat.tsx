@@ -152,38 +152,51 @@ const Chat: React.FC = () => {
         );
 
         if (visible.length) {
-            const logMessages: AIMessageType[] = visible.map(line => {
-                // Check if this is a special code generation log message
+            const logMessages: AIMessageType[] = [];
+            
+            for (const line of visible) {
+                // Check if this is a special code generation message
                 try {
                     const parsed = JSON.parse(line);
-                    if (parsed.type === 'log' && parsed.stage === 'code-gen' && parsed.files) {
-                        return {
-                            text: parsed.message || 'Generating Solana program files...',
+                    
+                    // Handle code-generation messages with file lists
+                    if (parsed.type === 'code-generation' && parsed.files) {
+                        logMessages.push({
+                            text: parsed.message || '🦀 Generating Solana program files...',
                             sender: 'ai',
                             timestamp: new Date(),
                             status: 'sent',
-                            stage: parsed.stage,
-                            pct: parsed.pct,
-                            files: parsed.files
-                        } as any;
+                            codeGenFiles: parsed.files
+                        });
+                        continue;
                     }
                 } catch (e) {
-                    // Not JSON, treat as regular log line
+                    // Not JSON, check if it's a progress percentage line
+                    if (line.includes('%') && (line.includes('Building') || line.includes('Generating'))) {
+                        // Only show % progress lines during BUILD - skip individual messages
+                        continue;
+                    }
                 }
                 
-                return {
-                    text: line,
-                    sender: 'ai',           // show as if the assistant "thinks out loud"
-                    timestamp: new Date(),
-                    status: 'sent',
-                    isLogLine: true,
-                };
-            });
+                // Add regular log line (but suppress most during build process)
+                if (!taskLogs.isBuilding || line.includes('ERROR') || line.includes('WARN')) {
+                    logMessages.push({
+                        text: line,
+                        sender: 'ai',
+                        timestamp: new Date(),
+                        status: 'sent',
+                        isLogLine: true,
+                    });
+                }
+            }
 
-            setMessages(prev => [...prev, ...logMessages]);
+            if (logMessages.length > 0) {
+                setMessages(prev => [...prev, ...logMessages]);
+                // Ensure scroll sticks to bottom
+                scrollToBottom();
+            }
+            
             setLastLogIndex(systemLogs.length);
-            // Ensure scroll sticks to bottom
-            scrollToBottom();
         }
     }, [systemLogs, lastLogIndex, taskLogs.isBuilding, messages]);
 
@@ -523,23 +536,13 @@ const Chat: React.FC = () => {
                                                     </div>
                                                 )}
                                                 <div className="leading-relaxed w-full min-w-0">
-                                                    {/* Check if message has files for sequential display */}
+                                                    {/* Render message content */}
                                                     {(() => {
-                                                        const hasCodeFiles = (message as any).files && (message as any).files.length > 0 && (message as any).stage === 'code-gen';
-                                                        
                                                         if (message.isChecklist) {
                                                             return <ChatChecklistBubble />;
-                                                        } else if (hasCodeFiles) {
-                                                            return <SequentialCodeDisplay files={(message as any).files} />;
-                                                        } else if (message.codeGenFiles) {
-                                                            return (
-                                                                <LogCodeDisplay 
-                                                                    files={message.codeGenFiles}
-                                                                    onAllFilesComplete={() => {
-                                                                        console.log('All files completed for message', index);
-                                                                    }}
-                                                                />
-                                                            );
+                                                        } else if (message.codeGenFiles && message.codeGenFiles.length > 0) {
+                                                            // Show sequential file display for code generation
+                                                            return <SequentialCodeDisplay files={message.codeGenFiles} />;
                                                         } else {
                                                             return (
                                                                 <div className="w-full max-w-full overflow-hidden">
@@ -547,7 +550,6 @@ const Chat: React.FC = () => {
                                                                         content={message.text} 
                                                                         enableCodeTypewriter={!isUser && !isLog && message.text.includes('```')}
                                                                         onCodeTypewriterComplete={() => {
-                                                                          // Code typewriter completed - could add any completion logic here
                                                                           console.log('Code typewriter completed for message', index);
                                                                         }}
                                                                     />
