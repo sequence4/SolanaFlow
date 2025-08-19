@@ -370,7 +370,7 @@ export const Toolbox = () => {
 
     return (
         <div
-            className="app-sidebar w-[20%] flex flex-col h-full backdrop-blur-xl border-r overflow-hidden shadow-sm bg-card text-foreground border-border"
+            className="app-sidebar w-[300px] flex-shrink-0 flex flex-col h-full backdrop-blur-xl border-r overflow-hidden shadow-sm bg-card text-foreground border-border"
         >
             {/* Compact Project Controls Section */}
             <div 

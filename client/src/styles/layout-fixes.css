@@ -300,3 +300,56 @@
   max-width: 100% !important;
   box-sizing: border-box !important;
 }
+
+/* Fix main page layout to eliminate gaps */
+.main-page-layout {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Ensure toolbox has fixed width */
+.app-sidebar {
+  width: 300px !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+}
+
+/* Main content should take remaining space */
+.main-content-area {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Right panel should be exactly 40% of remaining space after toolbox */
+.right-panel {
+  width: calc(40% * (100vw - 300px) / 100vw) !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  max-width: none !important;
+}
+
+/* Alternative approach: use flex-basis for better calculation */
+.main-page-layout .main-content-area {
+  flex: 6 1 0% !important; /* 60% of remaining space */
+}
+
+.main-page-layout .right-panel {
+  flex: 4 0 0% !important; /* 40% of remaining space */
+  width: auto !important; /* Let flex handle the width */
+}
+
+/* Ensure no horizontal overflow on body */
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+}
+
+/* Force main container to fill viewport */
+#__next {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}

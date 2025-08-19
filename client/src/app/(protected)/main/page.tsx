@@ -41,8 +41,9 @@ export default function MainPage() {
     <>
       <Header />
       
-      <div className="flex flex-1 overflow-hidden bg-background">        
-        <div className="flex-1">
+      <div className="main-page-layout flex flex-1 overflow-hidden bg-background">        
+        <Toolbox />
+        <div className="main-content-area flex-1 min-w-0">
           <Tabs 
             value={activeTab}
             onValueChange={(value) => {
@@ -67,8 +68,6 @@ export default function MainPage() {
             </TabsContent>
           </Tabs>
         </div>
-        
-        <Toolbox />
         <RightPanel />
       </div>
     </>
