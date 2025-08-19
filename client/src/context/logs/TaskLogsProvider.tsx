@@ -175,6 +175,14 @@ export default function TaskLogsProvider({
         if (payload.programId) {
           addSystemLog(`🔑 Program ID: ${payload.programId}`);
         }
+        if (payload.event === 'file-written' && payload.path && payload.content) {
+          // Forward file-written events to the file generation queue
+          eventBus.emit('file-written', {
+            event: 'file-written',
+            path: payload.path,
+            content: payload.content
+          });
+        }
         if (['deploy-done', 'done', 'completed'].includes(payload.stage)) {
           addSystemLog("✅ Deployment complete!");
           setTimeout(() => setIsVisible(false), 3000);

@@ -1,0 +1,101 @@
+/* Layout Fixes - Prevent shifts and ensure consistent sizing */
+
+/* Main layout container */
+.main-layout {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+/* Prevent any component from growing beyond its allocation */
+.main-layout > * {
+  flex-shrink: 0 !important;
+}
+
+/* Chat container - always 40% width */
+.chat-container {
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  width: 40% !important;
+}
+
+/* Main content - always 60% width */
+.main-content {
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  width: 60% !important;
+}
+
+/* File explorer - fixed width */
+.file-explorer {
+  flex-shrink: 0 !important;
+  width: 256px !important; /* 16rem */
+}
+
+/* Prevent any component from growing beyond its allocation */
+* {
+  max-width: 100%;
+}
+
+/* Code snippet containers */
+.code-snippet-container {
+  max-width: 100%;
+  overflow: auto;
+}
+
+/* Log message specific constraints */
+.log-message {
+  max-width: 100% !important;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.log-message pre {
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+/* Code snippets inside log messages */
+.log-message .code-snippet-in-log {
+  width: calc(100% - 20px);
+  margin: 10px 0;
+  max-height: 200px;
+  overflow-y: auto;
+  overflow-x: auto;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 8px;
+}
+
+/* Ensure code blocks don't break layout */
+.log-message .cm-editor {
+  max-width: 100%;
+  font-size: 12px;
+}
+
+/* Build process log styling */
+.build-log-message {
+  width: 100%;
+  padding: 16px;
+  background: rgba(17, 24, 39, 0.5);
+  border-radius: 8px;
+  margin: 8px 0;
+}
+
+/* Progress bar container */
+.progress-container {
+  width: 100%;
+  background: rgba(55, 65, 81, 1);
+  border-radius: 9999px;
+  height: 8px;
+  margin: 12px 0;
+}
+
+.progress-bar {
+  background: linear-gradient(to right, #3b82f6, #8b5cf6);
+  height: 8px;
+  border-radius: 9999px;
+  transition: width 0.3s ease-in-out;
+}

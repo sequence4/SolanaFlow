@@ -11,7 +11,7 @@ export async function insertSrcFiles(
   existingFilePaths: Set<string>,
   // basePath?: string, // Keep original basePath if needed by calling logic, or remove if rootPath from handleGenerateCode is always project root
   creatorId: string | null = null,
-  onFile: (path: string, content: string) => void = () => {},
+  onFile: (path: string, content: string) => Promise<void> = async () => {},
 ): Promise<string[]> {
   const fileTaskIds: string[] = [];
   const queue: { node: FileTreeItem }[] = [
@@ -67,7 +67,7 @@ export async function insertSrcFiles(
         console.log(`[INSERT] File task created for: ${projectRelativePath}`);
         
         // stream the file *now* – don't block the queue
-        if (onFile) onFile(projectRelativePath, node.code || '');
+        if (onFile) await onFile(projectRelativePath, node.code || '');
         
         fileTaskIds.push(taskId);
       }

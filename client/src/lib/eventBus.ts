@@ -10,6 +10,7 @@ type BusEvents = {
   'file-arrival': string;      // Event emitted when a file arrives (for ticker)
   'typing-start': void;        // Event emitted when file content typing starts
   'typing-done': void;         // Event emitted when file content typing completes
+  'file-written': { event: 'file-written'; path: string; content: string; }; // Server sent file data
 };
 
 const eventBus = mitt<BusEvents>();

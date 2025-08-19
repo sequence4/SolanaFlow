@@ -378,8 +378,7 @@ const Chat: React.FC = () => {
             className={`flex flex-col h-full ${isExpanded ? "fixed inset-4 z-50" : ""} transition-all duration-300 ease-in-out`}
         >
             <div 
-                className="chat-container flex flex-col h-full bg-card border-border overflow-hidden"
-                style={{ maxWidth: '900px', width: '65vw' }}
+                className="chat-container flex flex-col h-full bg-card border-border overflow-hidden w-full"
             >
                 {/* Header */}
                 <div className="chat-header flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
@@ -435,18 +434,17 @@ const Chat: React.FC = () => {
                                     className={`flex ${isUser ? "justify-end" : "justify-start"}`}
                                 >
                                     <div
-                                        className={`max-w-[85%] rounded-lg ${
+                                        className={`rounded-lg ${
                                             isUser
-                                                ? "user-message bg-primary text-primary-foreground"
+                                                ? "user-message bg-primary text-primary-foreground max-w-[85%]"
                                                 : isLog
-                                                  ? "log-message bg-transparent text-muted-foreground"
-                                                  : "ai-message bg-muted text-foreground"
-                                        }`}
+                                                  ? "log-message bg-gray-900/50 text-foreground w-full max-w-[95%]"
+                                                  : "ai-message bg-muted text-foreground max-w-[95%]"
+                                        } overflow-hidden`}
                                         style={{
                                             whiteSpace: 'pre-wrap',
                                             wordWrap: 'break-word', 
-                                            overflowWrap: 'break-word',
-                                            overflowX: 'hidden'
+                                            overflowWrap: 'break-word'
                                         }}
                                     >
                                         <div className="p-3">
@@ -462,6 +460,10 @@ const Chat: React.FC = () => {
                                                         : <MarkdownRenderer 
                                                             content={message.text} 
                                                             enableCodeTypewriter={!isUser && !isLog && message.text.includes('```')}
+                                                            onCodeTypewriterComplete={() => {
+                                                              // Code typewriter completed - could add any completion logic here
+                                                              console.log('Code typewriter completed for message', index);
+                                                            }}
                                                           />}
                                                 </div>
                                             </div>
@@ -485,12 +487,11 @@ const Chat: React.FC = () => {
                     {/* Typing indicator */}
                     {isTyping && (
                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
-                            <div className="typing-indicator bg-muted text-foreground rounded-lg p-3 max-w-[85%]"
+                            <div className="typing-indicator bg-muted text-foreground rounded-lg p-3 max-w-[95%] overflow-hidden"
                                 style={{
                                     whiteSpace: 'pre-wrap',
                                     wordWrap: 'break-word', 
-                                    overflowWrap: 'break-word',
-                                    overflowX: 'hidden'
+                                    overflowWrap: 'break-word'
                                 }}
                             >
                                 <div className="flex items-center gap-2">

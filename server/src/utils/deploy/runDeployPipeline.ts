@@ -16,6 +16,7 @@ import { PublicKey, Keypair } from "@solana/web3.js";
 import { attachFileContents } from "../fileUtils/attachFileContents";
 import { readContainerFile } from "../fileUtils/attachFileContents";
 import { v4 as uuidv4 } from "uuid";
+import { sendEnvironmentProgress, sendBuildProgress, resetProgress } from "../progressUtils";
 
 // ─── unified progress payload ────────────────────────────
 interface ProgressEvent {
@@ -77,12 +78,11 @@ export async function runDeployPipeline({
   let programKeypair: Keypair | null = null;
   let programIdStr: string | null = null;
   
-  sendProgress(<ProgressEvent>{
-    stage: "environment",
-    status: "active",
-    message: "Preparing your build environment…",
-    pct: 10
-  });
+  // Reset progress tracking to prevent wobbling
+  resetProgress();
+  
+  // Start environment setup with smooth progress
+  const environmentPromise = sendEnvironmentProgress(sendProgress);
 
   // declare outside try so `finally` can see it
   let workspace: WorkspaceHandle | null = null;
@@ -92,20 +92,8 @@ export async function runDeployPipeline({
   try {
     workspace = await prepEnv(projectId, userId, devMode);
 
-    sendProgress(<ProgressEvent>{
-      stage: 'environment',
-      status: 'active',
-      message: 'Pulling tool-chain image…',
-      pct: 50
-    });
-    
-    // emit the container URL so the UI can tune in
-    sendProgress(<ProgressEvent>{
-      stage: 'environment',
-      status: 'active',
-      message: 'Image pulled — starting container…',
-      pct: 80
-    });
+    // Wait for environment progress animation to complete
+    await environmentPromise;
 
     sendProgress(<ProgressEvent>{
       stage: "environment",
@@ -163,12 +151,8 @@ export async function runDeployPipeline({
     // allow up to 3 min for large repos (90 × 2 s)
     await waitForTaskCompletion(sentinelId, 90, 2_000);
     
-    sendProgress(<ProgressEvent>{
-      stage: "build",
-      status: "active",
-      message: "Building program…",
-      pct: 20
-    });
+    // Start smooth build progress
+    const buildPromise = sendBuildProgress(sendProgress);
     const buildTask = await startAnchorBuildTask(projectId, userId);
     
     // Compute retry count based on configured build timeout
@@ -190,12 +174,7 @@ export async function runDeployPipeline({
       // fall back to a helper that reads solanaproject.root_path
       // projectFolder is already defined earlier (after code‑gen); reuse it here.
 
-      sendProgress(<ProgressEvent>{
-        stage: "build",
-        status: "active",
-        message: "Linking target/deploy → /usr/src/target/deploy",
-        pct: 60
-      });
+      // Smooth build progress continues in background
 
       // One-liner executed *inside* the running container
       const linkCmd = [
@@ -226,12 +205,8 @@ export async function runDeployPipeline({
     /* ---------------------------------------------------------------- *
      * 3c ─ build finished → gather file-tree with eager code
      * ---------------------------------------------------------------- */
-    sendProgress(<ProgressEvent>{
-      stage: "build",
-      status: "active", 
-      message: "Collecting project files…",
-      pct: 90
-    });
+    // Wait for build progress animation to complete
+    await buildPromise;
 
     // (1) build the raw tree via the existing utility
     const rootPath = workspace.rootPath ?? (

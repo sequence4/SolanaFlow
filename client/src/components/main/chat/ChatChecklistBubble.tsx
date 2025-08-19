@@ -5,6 +5,7 @@ import { Progress } from "../../../components/ui/progress";
 import { useChecklistProgress } from "../../../hooks/useChecklistProgress";
 import CodeSnippet from "../code/markdown/CodeSnippet";
 import CompactCodeSnippet from "../code/markdown/CompactCodeSnippet";
+import FileGenerationQueue from "./FileGenerationQueue";
 
 export default function ChatChecklistBubble() {
   const steps = useChecklistProgress();
@@ -21,16 +22,20 @@ export default function ChatChecklistBubble() {
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
               {step.status === "done" && (
-                <Check className="h-4 w-4 text-green-500" />
+                <div className="flex items-center justify-center h-4 w-4 bg-green-500 rounded-full">
+                  <Check className="h-2.5 w-2.5 text-white" />
+                </div>
               )}
               {step.status === "error" && (
-                <AlertTriangle className="h-4 w-4 text-red-500" />
+                <div className="flex items-center justify-center h-4 w-4 bg-red-500 rounded-full">
+                  <AlertTriangle className="h-2.5 w-2.5 text-white" />
+                </div>
               )}
               {step.status === "pending" && (
-                <div className="h-4 w-4 border-2 border-gray-600 rounded-full" />
+                <div className="h-4 w-4 border-2 border-gray-600 rounded-full opacity-50" />
               )}
               {step.status === "active" && (
-                <div className="h-4 w-4 animate-pulse bg-cyan-500 rounded-full" />
+                <div className="h-4 w-4 bg-cyan-500 rounded-full animate-pulse shadow-lg shadow-cyan-500/50" />
               )}
               <span className="text-xs font-medium">{step.title}</span>
             </div>
@@ -63,16 +68,8 @@ export default function ChatChecklistBubble() {
           )}
 
           {step.stage === "code-gen" && step.status === "active" && (
-            <div className="mt-2 space-y-1">
-              <div className="text-[10px] text-gray-400 mb-2">Generated Files:</div>
-              <div className="grid grid-cols-2 gap-1 text-[9px]">
-                <div className="text-green-400">✅ lib.rs</div>
-                <div className="text-green-400">✅ mod.rs</div>
-                <div className="text-cyan-400 animate-pulse">⏳ {step.codeSnippet?.filename || 'instructions.rs'}</div>
-                <div className="text-gray-500">⏸️ accounts.rs</div>
-                <div className="text-gray-500">⏸️ state.rs</div>
-                <div className="text-gray-500">⏸️ error.rs</div>
-              </div>
+            <div className="mt-3">
+              <FileGenerationQueue />
             </div>
           )}
         </motion.div>

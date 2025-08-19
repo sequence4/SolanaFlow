@@ -23,6 +23,7 @@ import { Keypair } from '@solana/web3.js';
 import pool from '../../config/database';
 import { normalizeProjectName } from '../stringUtils';
 import { saveProgramSecret, awsSecretsEnabled } from '../awsSecrets';
+import { sendCodeGenProgress } from '../progressUtils';
 
 /** Extract all file paths from a file tree recursively. */
 function flattenPaths(tree: any[]): string[] {
@@ -127,7 +128,7 @@ async function waitForAll(taskIds: string[]): Promise<{
 }
 
 /** Helper to emit progress event when each file is written */
-const emitFileWritten = (sendProgress: (data: unknown) => void): ((path: string, content: string) => void) => (path, content) => {
+const emitFileWritten = (sendProgress: (data: unknown) => void): ((path: string, content: string) => Promise<void>) => async (path, content) => {
   // Include content for frontend but avoid logging it to console
   sendProgress({
     event: 'file-written',
@@ -285,7 +286,7 @@ export const handleGenerateCode = async ({
           projectId,
           existingFilePaths,
           creatorId,
-          (path, code) => {
+          async (path, code) => {
             sendProgress({ 
               event: 'file-written', 
               path,
@@ -672,12 +673,8 @@ EOF'`,
         /* --------------------------------------------------------------- *
          * write the src tree into the workspace
          * --------------------------------------------------------------- */
-        sendProgress({ 
-          stage: 'code-gen', 
-          status: 'active',
-          message: 'Starting Rust code generation...',
-          pct: 10
-        });
+        // Start smooth code generation progress
+        const codeGenPromise = sendCodeGenProgress(sendProgress);
         console.log('[GEN] Generating Rust source files');
         
         function writeFilesAndEmitTree(
@@ -719,6 +716,8 @@ EOF'`,
           sendProgress,
         );
 
+        // Wait for code generation progress to complete
+        await codeGenPromise;
         sendProgress({ 
           stage: 'code-gen', 
           status: 'completed',

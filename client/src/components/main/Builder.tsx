@@ -7,6 +7,7 @@ import Interface from "@/components/main/interface/Interface";
 import Code from "@/components/main/code/Code";
 import Chat from "@/components/main/chat/Chat";
 import Header from "@/components/main/Header";
+import { Filetree } from "@/components/main/toolbox/codeToolbox/Filetree";
 
 // Hooks    
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -21,6 +22,7 @@ import { ActiveTab } from "@/context/ux/UxContextTypes";
 
 // Styles
 import "@/styles/body/bodyStyles.css";
+import "@/styles/layout-fixes.css";
 
 // shadcn UI components
 import {
@@ -170,60 +172,57 @@ const Builder = () => {
             >
                 <Header />
                 <ProjectInfo />
-                <div className="w-full h-full flex">                        
-                    <TabsContent value="workflow" className="h-full w-full">
-                        <motion.div 
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.4, delay: 0.1 }}
-                            className="w-full h-full flex"
-                        >
-                            {/* Left side: main content */}
-                            <div className="flex-auto">
+                <div className="w-full h-full flex">
+                    {/* Left side: main content (60%) - FIXED WIDTH */}
+                    <div className="w-[60%] flex-shrink-0 flex">
+                        <TabsContent value="workflow" className="h-full w-full flex">
+                            <motion.div 
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.4, delay: 0.1 }}
+                                className="w-full h-full"
+                            >
                                 <Workflow />
-                            </div>
-                        </motion.div>
-                    </TabsContent>
-                    <TabsContent value="interface" className="h-full w-full">
-                        <motion.div 
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.4, delay: 0.1 }}
-                            className="w-full h-full flex"
-                        >
-                            <div className="flex-auto">
+                            </motion.div>
+                        </TabsContent>
+                        <TabsContent value="interface" className="h-full w-full flex">
+                            <motion.div 
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.4, delay: 0.1 }}
+                                className="w-full h-full"
+                            >
                                 <Interface />
-                            </div>
-                        </motion.div>
-                    </TabsContent>
-                    <TabsContent value="code" className="h-full w-full">
-                        <motion.div 
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.4, delay: 0.1 }}
-                            className="w-full h-full flex"
-                        >
-                            <div className="flex-auto">
-                                <Code />
-                            </div>
-                        </motion.div>
-                    </TabsContent>
+                            </motion.div>
+                        </TabsContent>
+                        <TabsContent value="code" className="h-full w-full flex">
+                            <motion.div 
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.4, delay: 0.1 }}
+                                className="w-full h-full flex"
+                            >
+                                {/* File Explorer - FIXED WIDTH */}
+                                <div className="w-64 flex-shrink-0 border-r border-border bg-card">
+                                    <div className="p-2 border-b border-border text-sm font-medium">Files</div>
+                                    <div className="flex-1 overflow-y-auto">
+                                        <Filetree />
+                                    </div>
+                                </div>
+                                
+                                {/* Code Editor - takes remaining space */}
+                                <div className="flex-1 min-w-0">
+                                    <Code />
+                                </div>
+                            </motion.div>
+                        </TabsContent>
+                    </div>
+                    
+                    {/* Right side: AI Chat (40%) - FIXED WIDTH */}
+                    <div className="w-[40%] flex-shrink-0 flex flex-col h-full overflow-hidden border-l border-border bg-card">
+                        <Chat />
+                    </div>
                 </div>
-                
-                {/* Fixed Chat Panel */}
-                <AnimatePresence>
-                    {isChatOpen && (
-                        <motion.div 
-                            initial={{ x: 300, opacity: 0 }}
-                            animate={{ x: 0, opacity: 1 }}
-                            exit={{ x: 300, opacity: 0 }}
-                            transition={{ duration: 0.3, ease: "easeInOut" }}
-                            className="fixed right-0 top-[180px] z-[9999] w-[300px] h-[calc(100vh-210px)] border-l border-border bg-card shadow-2xl"
-                        >
-                            <Chat />
-                        </motion.div>
-                    )}
-                </AnimatePresence>
             </Tabs>
         </motion.div>
     );

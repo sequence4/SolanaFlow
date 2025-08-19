@@ -3,6 +3,11 @@ import { Button } from "@/components/ui/button";
 import { GoCopy } from "react-icons/go";
 import { useColorModeValue } from '../../../ui/color-mode';
 import '@/styles/markdown/markdownStyle.css';
+import CodeMirror from '@uiw/react-codemirror';
+import { javascript } from '@codemirror/lang-javascript';
+import { rust } from '@codemirror/lang-rust';
+import { vscodeDark } from '@uiw/codemirror-theme-vscode';
+import { githubLight } from '@uiw/codemirror-theme-github';
 
 interface CompactCodeSnippetProps {
   children?: React.ReactNode;
@@ -11,6 +16,7 @@ interface CompactCodeSnippetProps {
   language?: string;
   lineCount?: number;
   typewriterSpeed?: number;
+  onTypewriterComplete?: () => void;
 }
 
 const CompactCodeSnippet: React.FC<CompactCodeSnippetProps> = ({ 
@@ -19,7 +25,8 @@ const CompactCodeSnippet: React.FC<CompactCodeSnippetProps> = ({
   filename,
   language = 'rust',
   lineCount,
-  typewriterSpeed = 1 
+  typewriterSpeed = 1,
+  onTypewriterComplete
 }) => {
   const [displayedCode, setDisplayedCode] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -45,11 +52,12 @@ const CompactCodeSnippet: React.FC<CompactCodeSnippetProps> = ({
       if (pos >= codeString.length) {
         clearInterval(id);
         setIsTyping(false);
+        onTypewriterComplete?.();
       }
     }, SPEED);
 
     return () => clearInterval(id);
-  }, [codeString, enableTypewriter, typewriterSpeed]);
+  }, [codeString, enableTypewriter, typewriterSpeed, onTypewriterComplete]);
 
   const handleCopy = async () => {
     if (typeof children === "string") {
@@ -57,12 +65,29 @@ const CompactCodeSnippet: React.FC<CompactCodeSnippetProps> = ({
     }
   };
 
-  const codeSnippetBgColor = useColorModeValue("var(--code-snippet-bg-light)", "#1a1a1a");
-  const codeSnippetTextColor = useColorModeValue("var(--code-snippet-text-light)", "#e1e5e9");
+  const isDark = useColorModeValue(false, true);
   const headerBgColor = useColorModeValue("#f5f5f5", "#2a2a2a");
 
+  // Get the appropriate language extension
+  const getLanguageExtension = () => {
+    switch (language.toLowerCase()) {
+      case 'rust':
+      case 'rs':
+        return [rust()];
+      case 'javascript':
+      case 'js':
+      case 'typescript':
+      case 'ts':
+      case 'jsx':
+      case 'tsx':
+        return [javascript({ jsx: true, typescript: language.includes('ts') })];
+      default:
+        return [javascript()];
+    }
+  };
+
   return (
-    <div className="compact-code-container">
+    <div className="compact-code-container border border-[rgb(54,65,92)] rounded-[4px] overflow-hidden">
       {(filename || language || lineCount) && (
         <div 
           className="code-header flex items-center justify-between px-3 py-1 text-xs border-b"
@@ -87,37 +112,36 @@ const CompactCodeSnippet: React.FC<CompactCodeSnippetProps> = ({
         </div>
       )}
       
-      <pre
-        className="relative p-3 text-xs overflow-y-auto"
-        style={{
-          maxHeight: "200px",
-          minHeight: "80px",
-          maxWidth: "100%",
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-word",
-          overflowWrap: "break-word",
-          backgroundColor: codeSnippetBgColor,
-          color: codeSnippetTextColor,
-          border: "1px solid rgb(54, 65, 92)",
-          borderRadius: "4px",
-          fontFamily: "'Fira Code', 'Monaco', 'Consolas', monospace",
-          lineHeight: "1.4",
-          fontSize: "12px"
-        }}
-      >
+      <div className="relative">
         {!filename && !language && (
           <Button
             variant="ghost"
             size="icon"
             onClick={handleCopy}
-            className="absolute top-1 right-1 z-[1000] h-5 w-5 p-0"
+            className="absolute top-2 right-2 z-[1000] h-5 w-5 p-0 bg-black/50 hover:bg-black/70"
           >
             <GoCopy className="text-xs" />
           </Button>
         )}
-        {displayedCode}
-        {isTyping && <span className="animate-pulse text-cyan-400">|</span>}
-      </pre>
+        <CodeMirror
+          value={displayedCode + (isTyping ? '|' : '')}
+          theme={isDark ? vscodeDark : githubLight}
+          extensions={getLanguageExtension()}
+          editable={false}
+          basicSetup={{
+            lineNumbers: false,
+            foldGutter: false,
+            dropCursor: false,
+            allowMultipleSelections: false,
+          }}
+          style={{
+            maxHeight: "200px",
+            minHeight: "80px",
+            fontSize: '12px',
+            fontFamily: "'Fira Code', 'Monaco', 'Consolas', monospace",
+          }}
+        />
+      </div>
     </div>
   );
 };

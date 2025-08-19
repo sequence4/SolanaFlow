@@ -59,9 +59,10 @@ const markdownOptions = {
 interface MarkdownRendererProps {
   content: string;
   enableCodeTypewriter?: boolean;
+  onCodeTypewriterComplete?: () => void;
 }
 
-const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, enableCodeTypewriter = false }) => {
+const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, enableCodeTypewriter = false, onCodeTypewriterComplete }) => {
   // Create dynamic options with typewriter control
   const dynamicOptions = {
     ...markdownOptions,
@@ -69,7 +70,10 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, enableCode
       ...markdownOptions.overrides,
       code: {
         component: (props: any) => (
-          <CodeSnippet enableTypewriter={enableCodeTypewriter}>
+          <CodeSnippet 
+            enableTypewriter={enableCodeTypewriter}
+            onTypewriterComplete={onCodeTypewriterComplete}
+          >
             {props.children}
           </CodeSnippet>
         )
