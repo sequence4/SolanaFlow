@@ -123,12 +123,22 @@ export const sendEnvironmentProgress = async (
 };
 
 /**
- * Send progress updates for code generation
+ * Send progress updates for code generation - starts at 0%
  */
 export const sendCodeGenProgress = async (
   sendProgress: (data: any) => void,
   totalFiles: number = 5
 ): Promise<void> => {
+  // Start at 0% explicitly
+  sendProgress({
+    stage: 'code-gen',
+    status: 'active',
+    message: 'Starting code generation...',
+    pct: 0
+  });
+  
+  await new Promise(resolve => setTimeout(resolve, 200)); // Small delay to show 0%
+  
   const pctPerFile = 80 / totalFiles; // Leave 20% for final steps
   
   for (let i = 0; i < totalFiles; i++) {
@@ -138,7 +148,7 @@ export const sendCodeGenProgress = async (
       'code-gen',
       targetPct,
       `Generating file ${i + 1}/${totalFiles}...`,
-      100
+      300 // Slower updates for visibility
     );
   }
   
@@ -148,7 +158,7 @@ export const sendCodeGenProgress = async (
     'code-gen',
     95,
     'Finalizing code generation...',
-    120
+    200
   );
   
   await sendSmoothProgress(
@@ -156,7 +166,7 @@ export const sendCodeGenProgress = async (
     'code-gen',
     100,
     'Code generation complete!',
-    100
+    200
   );
 };
 

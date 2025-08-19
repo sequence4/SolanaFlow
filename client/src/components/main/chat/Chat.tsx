@@ -44,6 +44,7 @@ import {
 import MarkdownRenderer from '@/components/main/code/markdown/MarkdownRenderer';
 import ChatChecklistBubble from './ChatChecklistBubble';
 import LogCodeDisplay from './LogCodeDisplay';
+import SequentialCodeDisplay from './SequentialCodeDisplay';
 
 export interface AIMessageType {
   text: string;
@@ -53,6 +54,9 @@ export interface AIMessageType {
   status?: 'sending' | 'sent' | 'error';
   isLogLine?: boolean;
   isChecklist?: boolean;
+  stage?: string;
+  pct?: number;
+  type?: string;
   codeGenFiles?: Array<{
     filename: string;
     content: string;
@@ -164,6 +168,31 @@ const Chat: React.FC = () => {
             scrollToBottom();
         }
     }, [systemLogs, lastLogIndex, taskLogs.isBuilding, messages]);
+
+    // ———————————————————————————————
+    //  Listen for sequential code generation messages
+    // ———————————————————————————————
+    useEffect(() => {
+        const onCodeGenProgress = (data: any) => {
+            if (data.type === 'sequential-code' && data.files && data.files.length > 0) {
+                setMessages(prev => [
+                    ...prev,
+                    {
+                        text: data.message || "Generating Solana program files...",
+                        sender: "ai",
+                        timestamp: new Date(),
+                        status: "sent",
+                        stage: data.stage,
+                        pct: data.pct,
+                        type: data.type,
+                        codeGenFiles: data.files
+                    }
+                ]);
+            }
+        };
+        eventBus.on("code-gen-progress", onCodeGenProgress);
+        return () => eventBus.off("code-gen-progress", onCodeGenProgress);
+    }, []);
 
     // ———————————————————————————————
     //  Inject a friendly AI note once the build completes
@@ -502,6 +531,13 @@ const Chat: React.FC = () => {
                                                 <div className="leading-relaxed w-full min-w-0">
                                                     {message.isChecklist ? (
                                                         <ChatChecklistBubble />
+                                                    ) : message.type === 'sequential-code' && message.codeGenFiles ? (
+                                                        <SequentialCodeDisplay 
+                                                            files={message.codeGenFiles}
+                                                            onAllFilesComplete={() => {
+                                                                console.log('All sequential files completed for message', index);
+                                                            }}
+                                                        />
                                                     ) : message.codeGenFiles ? (
                                                         <LogCodeDisplay 
                                                             files={message.codeGenFiles}

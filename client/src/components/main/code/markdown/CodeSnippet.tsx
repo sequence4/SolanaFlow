@@ -31,8 +31,8 @@ const CodeSnippet: React.FC<CodeSnippetProps> = ({ children, enableTypewriter = 
     setIsTyping(true);
     setDisplayedCode('');
     
-    const STEP = 3;  // chars per tick (slower for better effect)
-    const SPEED = 25; // ms per tick (slower speed)
+    const STEP = 1;   // 1 character at a time for visibility
+    const SPEED = 50; // 50ms per character for clear visibility
     
     let pos = 0;
     const id = setInterval(() => {
@@ -43,10 +43,10 @@ const CodeSnippet: React.FC<CodeSnippetProps> = ({ children, enableTypewriter = 
       if (pos >= codeString.length) {
         clearInterval(id);
         setIsTyping(false);
-        // Small delay before calling completion to let animation finish
+        // Longer delay to let animation finish and be visible
         setTimeout(() => {
           onTypewriterComplete?.();
-        }, 100);
+        }, 1000);
       }
     }, SPEED);
 

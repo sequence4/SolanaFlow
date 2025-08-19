@@ -149,15 +149,15 @@ const emitFileWritten = (sendProgress: (data: unknown) => void): ((path: string,
                      filename.endsWith('.js') || filename.endsWith('.jsx') ? 'javascript' :
                      'text';
     
-    // Calculate progressive percentage based on file type and order
-    let progressPct = 25; // default
-    if (filename === 'lib.rs') progressPct = 15;
-    else if (filename === 'mod.rs') progressPct = 25;
-    else if (filename.includes('instruction')) progressPct = 45;
-    else if (filename.includes('account')) progressPct = 65;
-    else if (filename.includes('state')) progressPct = 80;
+    // Calculate progressive percentage based on file type and order - START FROM 0
+    let progressPct = 10; // default  
+    if (filename === 'lib.rs') progressPct = 5;
+    else if (filename === 'mod.rs') progressPct = 15;
+    else if (filename.includes('instruction')) progressPct = 35;
+    else if (filename.includes('account')) progressPct = 55;
+    else if (filename.includes('state')) progressPct = 75;
     else if (filename.includes('error')) progressPct = 90;
-    else progressPct = Math.min(85, Math.random() * 40 + 30);
+    else progressPct = Math.min(80, Math.random() * 30 + 20);
     
     // Count lines for display
     const lineCount = content.split('\n').length;
@@ -673,14 +673,74 @@ EOF'`,
         /* --------------------------------------------------------------- *
          * write the src tree into the workspace
          * --------------------------------------------------------------- */
-        // Start smooth code generation progress
-        const codeGenPromise = sendCodeGenProgress(sendProgress);
-        console.log('[GEN] Generating Rust source files');
+        // Collect all Rust files from the generated tree
+        const collectRustFiles = (tree: FileTreeItem): Array<{filename: string, content: string, path: string}> => {
+          const rustFiles: Array<{filename: string, content: string, path: string}> = [];
+          
+          const traverse = (node: FileTreeItem, currentPath: string = '') => {
+            const fullPath = currentPath ? `${currentPath}/${node.name}` : node.name;
+            
+            if (node.type === 'file' && node.name.endsWith('.rs')) {
+              rustFiles.push({
+                filename: node.name,
+                content: node.code || '',
+                path: fullPath
+              });
+            }
+            if (node.children) {
+              for (const child of node.children) {
+                traverse(child, fullPath);
+              }
+            }
+          };
+          
+          traverse(tree);
+          return rustFiles;
+        };
+
+        // Collect all Rust files from the source tree
+        const allRustFiles = collectRustFiles(srcTree);
+        
+        // Filter to only important on-chain files and sort them by importance
+        const importantFiles = allRustFiles.filter(f => 
+          f.filename === 'lib.rs' ||
+          f.filename === 'state.rs' ||
+          f.filename === 'error.rs' ||
+          f.path.includes('/instructions/') ||
+          f.filename === 'mod.rs'
+        ).sort((a, b) => {
+          // Order: lib.rs first, then state.rs, then instructions, then others
+          if (a.filename === 'lib.rs') return -1;
+          if (b.filename === 'lib.rs') return 1;
+          if (a.filename === 'state.rs') return -1;
+          if (b.filename === 'state.rs') return 1;
+          if (a.path.includes('/instructions/') && !b.path.includes('/instructions/')) return -1;
+          if (b.path.includes('/instructions/') && !a.path.includes('/instructions/')) return 1;
+          return a.filename.localeCompare(b.filename);
+        });
+
+        // Send initial progress with file information for sequential display
+        sendProgress({
+          stage: 'code-gen',
+          status: 'active',
+          message: 'Generating Solana program files...',
+          pct: 0,
+          files: importantFiles.map(f => ({
+            filename: f.path,
+            content: f.content.substring(0, 500) + (f.content.length > 500 ? '\n\n// ... (truncated for display)' : ''),
+            language: 'rust',
+            fullContent: f.content
+          })),
+          type: 'sequential-code'
+        });
+
+        // Start smooth code generation progress  
+        const codeGenPromise = sendCodeGenProgress(sendProgress, importantFiles.length);
+        console.log(`[GEN] Generating ${importantFiles.length} Rust source files`);
         
         function writeFilesAndEmitTree(
           rootNode: FileTreeItem,
           projectId: string,
-          existing: Set<string>,
           creatorId: string | null,
           workspace: WorkspaceHandle,
           sendProgress: (d: unknown) => void,
@@ -710,7 +770,6 @@ EOF'`,
         const sentinelId = await writeFilesAndEmitTree(
           srcTree,
           projectId,
-          existingFilePaths,
           /* creatorId */ null,
           workspace,
           sendProgress,
@@ -739,7 +798,7 @@ EOF'`,
 
         // Amend config files **first** so IDL changes are in place for the build.
         const { anchorTaskId } = await amendConfigFiles(projectId, userId);
-        await sendProgress({
+        sendProgress({
           stage: "amend-done",
           anchorTaskId,
           message: "[handleGenerateCode] Amend done",
