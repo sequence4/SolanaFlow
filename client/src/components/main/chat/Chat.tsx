@@ -80,8 +80,10 @@ const Chat: React.FC = () => {
     const taskLogs = useTaskLogs();  // Complete taskLogs object including systemLogs and setSuppressToast
     const { systemLogs } = taskLogs;
     const [lastLogIndex, setLastLogIndex] = useState(0);  // 🟡 NEW
+    const [userHasScrolled, setUserHasScrolled] = useState(false); // Track if user manually scrolled
   
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
+    const messagesAreaRef = useRef<HTMLDivElement | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -91,9 +93,28 @@ const Chat: React.FC = () => {
         }
     };
 
+    // Enhanced scroll function that respects user scroll behavior
+    const smartScrollToBottom = () => {
+        if (!userHasScrolled && messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    };
+
+    // Detect user scroll behavior
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const element = e.target as HTMLDivElement;
+        const isAtBottom = element.scrollHeight - element.scrollTop <= element.clientHeight + 10;
+        
+        if (!isAtBottom) {
+            setUserHasScrolled(true);
+        } else {
+            setUserHasScrolled(false);
+        }
+    };
+
     useEffect(() => {
-        scrollToBottom();
-    }, [messages, isTyping]);
+        smartScrollToBottom();
+    }, [messages, isTyping, userHasScrolled]);
 
     useEffect(() => {
         console.log(selectedFile);
@@ -192,8 +213,10 @@ const Chat: React.FC = () => {
 
             if (logMessages.length > 0) {
                 setMessages(prev => [...prev, ...logMessages]);
-                // Ensure scroll sticks to bottom
-                scrollToBottom();
+                // Reset user scroll state when new messages arrive
+                setUserHasScrolled(false);
+                // Smart scroll to bottom
+                setTimeout(() => smartScrollToBottom(), 100);
             }
             
             setLastLogIndex(systemLogs.length);
@@ -215,6 +238,8 @@ const Chat: React.FC = () => {
                     status: "sent"
                 }
             ]);
+            // Reset scroll state for new message
+            setUserHasScrolled(false);
             taskLogs.setSuppressToast(false);      // re-enable normal task-log toasts
         };
         eventBus.on("build-complete", onComplete);
@@ -256,6 +281,7 @@ const Chat: React.FC = () => {
             { text: "", sender: 'ai', isChecklist: true, timestamp: new Date(), status: 'sent' }
           ]);
           setInput('');
+          setUserHasScrolled(false); // Reset scroll state
           return;                             // stop normal AI flow
         }
         
@@ -274,6 +300,7 @@ const Chat: React.FC = () => {
                 status: 'sending'
             }]);
             setInput('');
+            setUserHasScrolled(false); // Reset scroll state for new message
 
             setIsTyping(true);
 
@@ -496,7 +523,9 @@ const Chat: React.FC = () => {
 
                 {/* Messages */}
                 <div 
+                    ref={messagesAreaRef}
                     className="messages-area text-sm flex-1 overflow-y-auto p-4 space-y-4 min-h-0"
+                    onScroll={handleScroll}
                 >
                     <AnimatePresence>
                         {messages.map((message, index) => {

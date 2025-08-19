@@ -7,15 +7,27 @@ interface CodeFile {
 }
 
 const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
-  const [currentIndex, setCurrentIndex] = useState(-1); // Start with no file selected
-  const [displayedText, setDisplayedText] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(-1);
+  const [fileStates, setFileStates] = useState<Array<{ 
+    expanded: boolean; 
+    displayedText: string; 
+    isTyping: boolean;
+    isComplete: boolean;
+  }>>([]);
   const [hasStarted, setHasStarted] = useState(false);
   
-  // Start the animation after a brief delay
+  // Initialize file states
   useEffect(() => {
     if (!files || files.length === 0) return;
     
+    setFileStates(files.map(() => ({
+      expanded: false,
+      displayedText: '',
+      isTyping: false,
+      isComplete: false
+    })));
+    
+    // Start after brief delay
     const startTimer = setTimeout(() => {
       setHasStarted(true);
       setCurrentIndex(0);
@@ -24,32 +36,44 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
     return () => clearTimeout(startTimer);
   }, [files]);
   
-  // Handle typewriter effect for current file
+  // Handle file expansion and typewriter effect
   useEffect(() => {
     if (!hasStarted || !files || currentIndex < 0 || currentIndex >= files.length) return;
     
+    // Expand current file
+    setFileStates(prev => prev.map((state, idx) => 
+      idx === currentIndex ? { ...state, expanded: true, isTyping: true } : state
+    ));
+    
     const currentFile = files[currentIndex];
     let charIndex = 0;
-    setDisplayedText('');
-    setIsTyping(true);
     
-    // Much slower typewriter effect - 100ms per character
+    // Very slow typewriter effect - 150ms per character
     const typeTimer = setInterval(() => {
       if (charIndex < currentFile.content.length) {
-        setDisplayedText(currentFile.content.substring(0, charIndex + 1));
+        const newText = currentFile.content.substring(0, charIndex + 1);
+        
+        setFileStates(prev => prev.map((state, idx) => 
+          idx === currentIndex ? { ...state, displayedText: newText } : state
+        ));
+        
         charIndex++;
       } else {
         clearInterval(typeTimer);
-        setIsTyping(false);
         
-        // Wait 3 seconds then move to next file
+        // Mark current file as complete
+        setFileStates(prev => prev.map((state, idx) => 
+          idx === currentIndex ? { ...state, isTyping: false, isComplete: true } : state
+        ));
+        
+        // Wait 2 seconds then move to next file
         setTimeout(() => {
           if (currentIndex < files.length - 1) {
             setCurrentIndex(currentIndex + 1);
           }
-        }, 3000);
+        }, 2000);
       }
-    }, 100); // Much slower - 100ms per character
+    }, 150); // Very slow - 150ms per character for visibility
     
     return () => clearInterval(typeTimer);
   }, [currentIndex, files, hasStarted]);
@@ -73,54 +97,63 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold">🦀 Solana Program Files</span>
         <span className="text-xs text-gray-500">
-          {currentIndex >= 0 ? `${currentIndex + 1}/${files.length}` : '0/0'}
+          {currentIndex >= 0 ? `${fileStates.filter(s => s.isComplete).length}/${files.length} complete` : 'Starting...'}
         </span>
       </div>
       
-      {/* Animated file list that iterates down */}
+      {/* Multiple file boxes - all visible, expand one by one */}
       <div className="space-y-2">
-        {files.map((file, idx) => (
-          <div
-            key={idx}
-            className={`flex items-center gap-2 p-2 rounded transition-all duration-500 ${
-              idx < currentIndex ? 'bg-green-900/20 text-green-400' :
-              idx === currentIndex ? 'bg-blue-900/30 text-blue-300 shadow-md border border-blue-500/30' :
-              'bg-gray-800/30 text-gray-500'
-            }`}
-          >
-            <div className={`w-2 h-2 rounded-full transition-all duration-300 ${
-              idx < currentIndex ? 'bg-green-500' :
-              idx === currentIndex ? 'bg-blue-500 animate-pulse' :
-              'bg-gray-600'
-            }`} />
-            <span className="font-mono text-xs">{file.filename}</span>
-            {idx < currentIndex && <span className="text-xs text-green-400">✓</span>}
-            {idx === currentIndex && <span className="text-xs text-blue-400 animate-pulse">●</span>}
-          </div>
-        ))}
-      </div>
-      
-      {/* Small code snippet box - only shows current file */}
-      {currentIndex >= 0 && currentIndex < files.length && (
-        <div className="mt-4">
-          <div className="text-xs text-gray-400 mb-1 font-mono">
-            {files[currentIndex].filename}
-          </div>
-          <div className="bg-gray-900 rounded p-3 h-32 overflow-y-auto border border-gray-700">
-            <pre className="text-xs text-gray-100 font-mono leading-tight">
-              <code>
-                {displayedText}
-                {isTyping && <span className="text-blue-400 animate-pulse">|</span>}
-              </code>
-            </pre>
-          </div>
-          {isTyping && (
-            <div className="text-xs text-gray-500 mt-1">
-              Generating code... {Math.round((displayedText.length / files[currentIndex].content.length) * 100)}%
+        {files.map((file, idx) => {
+          const fileState = fileStates[idx] || { expanded: false, displayedText: '', isTyping: false, isComplete: false };
+          
+          return (
+            <div
+              key={idx}
+              className={`border rounded-lg transition-all duration-500 ${
+                fileState.isComplete ? 'border-green-500 bg-green-950/20' :
+                idx === currentIndex ? 'border-blue-500 bg-blue-950/20 shadow-lg' :
+                'border-gray-600 bg-gray-800/30'
+              }`}
+            >
+              {/* File header - always visible */}
+              <div className={`flex items-center gap-2 p-3 transition-colors ${
+                fileState.isComplete ? 'text-green-300' :
+                idx === currentIndex ? 'text-blue-300' :
+                'text-gray-400'
+              }`}>
+                <div className={`w-2 h-2 rounded-full transition-all ${
+                  fileState.isComplete ? 'bg-green-500' :
+                  idx === currentIndex ? 'bg-blue-500 animate-pulse' :
+                  'bg-gray-500'
+                }`} />
+                <span className="font-mono text-sm">{file.filename}</span>
+                {fileState.isComplete && <span className="text-green-400 text-sm">✓</span>}
+                {fileState.isTyping && <span className="text-blue-400 text-sm animate-pulse">●</span>}
+                {idx > currentIndex && <span className="text-gray-500 text-sm">○</span>}
+              </div>
+              
+              {/* Expandable code content */}
+              {fileState.expanded && (
+                <div className="px-3 pb-3">
+                  <div className="bg-gray-900 rounded p-3 h-32 overflow-y-auto border border-gray-700">
+                    <pre className="text-xs text-gray-100 font-mono leading-tight">
+                      <code>
+                        {fileState.displayedText}
+                        {fileState.isTyping && <span className="text-blue-400 animate-pulse">|</span>}
+                      </code>
+                    </pre>
+                  </div>
+                  {fileState.isTyping && (
+                    <div className="text-xs text-gray-500 mt-2">
+                      Generating... {Math.round((fileState.displayedText.length / file.content.length) * 100)}%
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 };
