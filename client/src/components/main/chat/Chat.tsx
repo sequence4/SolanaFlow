@@ -379,6 +379,7 @@ const Chat: React.FC = () => {
         >
             <div 
                 className="chat-container flex flex-col h-full bg-card border-border overflow-hidden"
+                style={{ maxWidth: '900px', width: '65vw' }}
             >
                 {/* Header */}
                 <div className="chat-header flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">

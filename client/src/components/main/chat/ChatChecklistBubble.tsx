@@ -4,6 +4,7 @@ import { Check, AlertTriangle } from "lucide-react";
 import { Progress } from "../../../components/ui/progress";
 import { useChecklistProgress } from "../../../hooks/useChecklistProgress";
 import CodeSnippet from "../code/markdown/CodeSnippet";
+import CompactCodeSnippet from "../code/markdown/CompactCodeSnippet";
 
 export default function ChatChecklistBubble() {
   const steps = useChecklistProgress();
@@ -49,15 +50,28 @@ export default function ChatChecklistBubble() {
 
           {step.codeSnippet && (
             <div className="mt-2">
-              {step.codeSnippet.filename && (
-                <div className="text-[10px] text-gray-500 mb-1 font-mono">
-                  📄 {step.codeSnippet.filename}
-                </div>
-              )}
-              <div className="text-[10px]">
-                <CodeSnippet enableTypewriter={step.status === "active"}>
-                  {step.codeSnippet.content}
-                </CodeSnippet>
+              <CompactCodeSnippet 
+                enableTypewriter={step.status === "active"}
+                filename={step.codeSnippet.filename}
+                language={step.codeSnippet.language}
+                lineCount={step.codeSnippet.lineCount}
+                typewriterSpeed={1}
+              >
+                {step.codeSnippet.content}
+              </CompactCodeSnippet>
+            </div>
+          )}
+
+          {step.stage === "code-gen" && step.status === "active" && (
+            <div className="mt-2 space-y-1">
+              <div className="text-[10px] text-gray-400 mb-2">Generated Files:</div>
+              <div className="grid grid-cols-2 gap-1 text-[9px]">
+                <div className="text-green-400">✅ lib.rs</div>
+                <div className="text-green-400">✅ mod.rs</div>
+                <div className="text-cyan-400 animate-pulse">⏳ {step.codeSnippet?.filename || 'instructions.rs'}</div>
+                <div className="text-gray-500">⏸️ accounts.rs</div>
+                <div className="text-gray-500">⏸️ state.rs</div>
+                <div className="text-gray-500">⏸️ error.rs</div>
               </div>
             </div>
           )}

@@ -137,7 +137,9 @@ const emitFileWritten = (sendProgress: (data: unknown) => void): ((path: string,
 
   // Send progress update with code snippet for key files during generation
   const filename = path.split('/').pop() || '';
-  const isKeyFile = filename === 'lib.rs' || filename === 'mod.rs' || filename.endsWith('.rs');
+  const isKeyFile = filename === 'lib.rs' || filename === 'mod.rs' || filename.endsWith('.rs') ||
+                    filename.endsWith('.ts') || filename.endsWith('.tsx') ||
+                    filename.endsWith('.js') || filename.endsWith('.jsx');
   
   if (isKeyFile && content.trim() && content.length > 20) {
     // Determine language based on file extension
@@ -146,17 +148,34 @@ const emitFileWritten = (sendProgress: (data: unknown) => void): ((path: string,
                      filename.endsWith('.js') || filename.endsWith('.jsx') ? 'javascript' :
                      'text';
     
+    // Calculate progressive percentage based on file type and order
+    let progressPct = 25; // default
+    if (filename === 'lib.rs') progressPct = 15;
+    else if (filename === 'mod.rs') progressPct = 25;
+    else if (filename.includes('instruction')) progressPct = 45;
+    else if (filename.includes('account')) progressPct = 65;
+    else if (filename.includes('state')) progressPct = 80;
+    else if (filename.includes('error')) progressPct = 90;
+    else progressPct = Math.min(85, Math.random() * 40 + 30);
+    
+    // Count lines for display
+    const lineCount = content.split('\n').length;
+    
     sendProgress({
       stage: 'code-gen',
       status: 'active',
-      message: `Generating ${filename}...`,
-      pct: Math.min(95, Math.random() * 30 + 20), // Random progress between 20-50%
+      message: `Generating ${filename}... (${lineCount} lines)`,
+      pct: progressPct,
       codeSnippet: {
         language,
-        content: content.length > 800 ? content.substring(0, 800) + '\n// ... (truncated)' : content,
-        filename
+        content: content.length > 1000 ? content.substring(0, 1000) + '\n\n// ... (truncated for display)' : content,
+        filename,
+        lineCount
       }
     });
+    
+    // Small delay to make file generation feel more sequential
+    await new Promise(resolve => setTimeout(resolve, 100));
   }
 };
 
