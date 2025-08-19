@@ -80,7 +80,8 @@ export async function runDeployPipeline({
   sendProgress(<ProgressEvent>{
     stage: "environment",
     status: "active",
-    message: "Preparing your build environment…"
+    message: "Preparing your build environment…",
+    pct: 10
   });
 
   // declare outside try so `finally` can see it
@@ -94,20 +95,23 @@ export async function runDeployPipeline({
     sendProgress(<ProgressEvent>{
       stage: 'environment',
       status: 'active',
-      message: 'Pulling tool-chain image…'    // new granular step
+      message: 'Pulling tool-chain image…',
+      pct: 50
     });
     
     // emit the container URL so the UI can tune in
     sendProgress(<ProgressEvent>{
       stage: 'environment',
       status: 'active',
-      message: 'Image pulled — starting container…'
+      message: 'Image pulled — starting container…',
+      pct: 80
     });
 
     sendProgress(<ProgressEvent>{
       stage: "environment",
       status: "completed",
       message: "Container is up",
+      pct: 100,
       containerUrl: workspace.containerUrl
     });
     
@@ -162,7 +166,8 @@ export async function runDeployPipeline({
     sendProgress(<ProgressEvent>{
       stage: "build",
       status: "active",
-      message: "Building program…"
+      message: "Building program…",
+      pct: 20
     });
     const buildTask = await startAnchorBuildTask(projectId, userId);
     
@@ -188,7 +193,8 @@ export async function runDeployPipeline({
       sendProgress(<ProgressEvent>{
         stage: "build",
         status: "active",
-        message: "Linking target/deploy → /usr/src/target/deploy"
+        message: "Linking target/deploy → /usr/src/target/deploy",
+        pct: 60
       });
 
       // One-liner executed *inside* the running container
@@ -222,8 +228,9 @@ export async function runDeployPipeline({
      * ---------------------------------------------------------------- */
     sendProgress(<ProgressEvent>{
       stage: "build",
-      status: "active",
-      message: "Collecting project files…"
+      status: "active", 
+      message: "Collecting project files…",
+      pct: 90
     });
 
     // (1) build the raw tree via the existing utility
@@ -418,6 +425,7 @@ export async function runDeployPipeline({
       stage   : "build",
       status  : "completed",
       message : "Build finished",
+      pct     : 100,
       artifact: base64So,
       fileTree,
       ...(idlContent ? { idl: idlContent } : {}),

@@ -75,9 +75,6 @@ const CodeEditor = ({ language: lang = "typescript" }) => {
   const [theme, setTheme] = useState(vscodeDark);
   const { colorMode } = useColorMode();
   
-  // --- auto-scroll control ----------------------------------------------
-  const viewRef    = useRef<any>(null);   // CodeMirror EditorView
-  const autoScroll = useRef(true);        // true until user scrolls up
 
   useEffect(() => {
     setTheme(colorMode === "dark" ? tokyoNight : githubLight);
@@ -86,29 +83,10 @@ const CodeEditor = ({ language: lang = "typescript" }) => {
   useEffect(() => {
     if (!selectedFile) return;
 
-    // every new file begins with auto-scroll ON
-    autoScroll.current = true;
-
     const fullContent =
       (selectedFile as any).content ?? (selectedFile as any).code ?? '';
 
-    const STEP  = 8;  // chars per tick
-    const SPEED = 2;  // ms per tick
-
-    let pos = 0;
-    setCode('');                   // clear first
-    eventBus.emit('typing-start'); // notify provider
-
-    const id = setInterval(() => {
-      pos += STEP;
-      setCode(fullContent.slice(0, pos));
-      if (pos >= fullContent.length) {
-        clearInterval(id);
-        eventBus.emit('typing-done');   // 👈 important
-      }
-    }, SPEED);
-
-    return () => clearInterval(id);     // cleanup if file changes
+    setCode(fullContent);
   }, [selectedFile]);
 
   const onChange = (value: string) => {
@@ -137,21 +115,6 @@ const CodeEditor = ({ language: lang = "typescript" }) => {
     color: menuColor,
   };
 
-  /* -------------------------------------------------- */
-  /* CodeMirror mount: capture view + watch scroll      */
-  const handleMount = (view: any /* EditorView */) => {
-    viewRef.current = view;
-    const dom = view.scrollDOM;
-    const onScroll = () => {
-      if (!autoScroll.current) return;                       // already off
-      const { scrollTop, clientHeight, scrollHeight } = dom;
-      // user scrolled up ⇒ disable future auto-scroll
-      if (scrollTop + clientHeight < scrollHeight - 20) {
-        autoScroll.current = false;
-      }
-    };
-    dom.addEventListener("scroll", onScroll);
-  };
 
   return (
     <div className="flex flex-col h-full w-full">
@@ -295,19 +258,6 @@ const CodeEditor = ({ language: lang = "typescript" }) => {
           theme={theme}
           extensions={[getLanguage()]}
           onChange={onChange}
-          /** capture EditorView on first mount */
-          onCreateEditor={handleMount}
-
-          /** scroll to bottom on every doc update IF autoScroll still true */
-          onUpdate={() => {
-            if (autoScroll.current && viewRef.current) {
-              // use rAF to ensure DOM updated before scroll
-              requestAnimationFrame(() => {
-                const dom = viewRef.current!.scrollDOM;
-                dom.scrollTop = dom.scrollHeight;
-              });
-            }
-          }}
         />
       </div>
     </div>

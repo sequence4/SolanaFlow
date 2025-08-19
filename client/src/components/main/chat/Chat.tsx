@@ -458,7 +458,10 @@ const Chat: React.FC = () => {
                                                 <div className="leading-relaxed">
                                                     {message.isChecklist
                                                         ? <ChatChecklistBubble />
-                                                        : <MarkdownRenderer content={message.text} />}
+                                                        : <MarkdownRenderer 
+                                                            content={message.text} 
+                                                            enableCodeTypewriter={!isUser && !isLog && message.text.includes('```')}
+                                                          />}
                                                 </div>
                                             </div>
                                         </div>

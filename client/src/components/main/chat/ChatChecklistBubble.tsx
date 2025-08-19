@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Check, AlertTriangle } from "lucide-react";
 import { Progress } from "../../../components/ui/progress";
 import { useChecklistProgress } from "../../../hooks/useChecklistProgress";
+import CodeSnippet from "../code/markdown/CodeSnippet";
 
 export default function ChatChecklistBubble() {
   const steps = useChecklistProgress();
@@ -44,6 +45,21 @@ export default function ChatChecklistBubble() {
             <p className="mt-2 text-[11px] text-gray-400">
               {step.description}
             </p>
+          )}
+
+          {step.codeSnippet && (
+            <div className="mt-2">
+              {step.codeSnippet.filename && (
+                <div className="text-[10px] text-gray-500 mb-1 font-mono">
+                  📄 {step.codeSnippet.filename}
+                </div>
+              )}
+              <div className="text-[10px]">
+                <CodeSnippet enableTypewriter={step.status === "active"}>
+                  {step.codeSnippet.content}
+                </CodeSnippet>
+              </div>
+            </div>
           )}
         </motion.div>
       ))}

@@ -8,6 +8,11 @@ export interface Step {
   description: string;
   status: "pending" | "active" | "done" | "error";
   pct?: number;
+  codeSnippet?: {
+    language: string;
+    content: string;
+    filename?: string;
+  };
 }
 
 const INITIAL: Step[] = [
@@ -41,7 +46,12 @@ export function useChecklistProgress() {
               ...s,
               status: nextStatus,
               description: payload.message ?? s.description,
-              pct
+              pct,
+              codeSnippet: payload.codeSnippet ? {
+                language: payload.codeSnippet.language || 'rust',
+                content: payload.codeSnippet.content || '',
+                filename: payload.codeSnippet.filename
+              } : s.codeSnippet
             };
           }
           return s;

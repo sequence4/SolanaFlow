@@ -1,10 +1,45 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { GoCopy } from "react-icons/go";
 import { useColorModeValue } from '../../../ui/color-mode';
 import '@/styles/markdown/markdownStyle.css';
 
-const CodeSnippet: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
+interface CodeSnippetProps {
+  children?: React.ReactNode;
+  enableTypewriter?: boolean;
+}
+
+const CodeSnippet: React.FC<CodeSnippetProps> = ({ children, enableTypewriter = false }) => {
+  const [displayedCode, setDisplayedCode] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  
+  const codeString = typeof children === "string" ? children : String(children);
+  
+  useEffect(() => {
+    if (!enableTypewriter || !codeString) {
+      setDisplayedCode(codeString);
+      return;
+    }
+
+    setIsTyping(true);
+    setDisplayedCode('');
+    
+    const STEP = 8;  // chars per tick
+    const SPEED = 2; // ms per tick
+    
+    let pos = 0;
+    const id = setInterval(() => {
+      pos += STEP;
+      setDisplayedCode(codeString.slice(0, pos));
+      if (pos >= codeString.length) {
+        clearInterval(id);
+        setIsTyping(false);
+      }
+    }, SPEED);
+
+    return () => clearInterval(id);
+  }, [codeString, enableTypewriter]);
+
   const handleCopy = async () => {
     if (typeof children === "string") {
       await navigator.clipboard.writeText(children);
@@ -39,7 +74,8 @@ const CodeSnippet: React.FC<{ children?: React.ReactNode }> = ({ children }) => 
       >
         <GoCopy />
       </Button>
-      {children}
+      {displayedCode}
+      {isTyping && <span className="animate-pulse">|</span>}
     </pre>
   );
 };

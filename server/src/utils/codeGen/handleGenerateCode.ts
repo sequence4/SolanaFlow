@@ -134,6 +134,30 @@ const emitFileWritten = (sendProgress: (data: unknown) => void): ((path: string,
     path,
     content, // Include actual content for frontend
   });
+
+  // Send progress update with code snippet for key files during generation
+  const filename = path.split('/').pop() || '';
+  const isKeyFile = filename === 'lib.rs' || filename === 'mod.rs' || filename.endsWith('.rs');
+  
+  if (isKeyFile && content.trim() && content.length > 20) {
+    // Determine language based on file extension
+    const language = filename.endsWith('.rs') ? 'rust' : 
+                     filename.endsWith('.ts') || filename.endsWith('.tsx') ? 'typescript' :
+                     filename.endsWith('.js') || filename.endsWith('.jsx') ? 'javascript' :
+                     'text';
+    
+    sendProgress({
+      stage: 'code-gen',
+      status: 'active',
+      message: `Generating ${filename}...`,
+      pct: Math.min(95, Math.random() * 30 + 20), // Random progress between 20-50%
+      codeSnippet: {
+        language,
+        content: content.length > 800 ? content.substring(0, 800) + '\n// ... (truncated)' : content,
+        filename
+      }
+    });
+  }
 };
 
 interface Args {
@@ -629,7 +653,12 @@ EOF'`,
         /* --------------------------------------------------------------- *
          * write the src tree into the workspace
          * --------------------------------------------------------------- */
-        sendProgress({ stage: 'src-gen', message: 'Generating Rust sources…' });
+        sendProgress({ 
+          stage: 'code-gen', 
+          status: 'active',
+          message: 'Starting Rust code generation...',
+          pct: 10
+        });
         console.log('[GEN] Generating Rust source files');
         
         function writeFilesAndEmitTree(
@@ -671,7 +700,12 @@ EOF'`,
           sendProgress,
         );
 
-        sendProgress({ stage: "src-gen-done", message: "Rust sources ready" });
+        sendProgress({ 
+          stage: 'code-gen', 
+          status: 'completed',
+          message: 'Code generation complete!',
+          pct: 100
+        });
         sendProgress({ stage: "ui-complete" });
 
 

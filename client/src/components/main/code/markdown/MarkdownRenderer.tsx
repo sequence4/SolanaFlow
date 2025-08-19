@@ -58,12 +58,28 @@ const markdownOptions = {
 
 interface MarkdownRendererProps {
   content: string;
+  enableCodeTypewriter?: boolean;
 }
 
-const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
+const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, enableCodeTypewriter = false }) => {
+  // Create dynamic options with typewriter control
+  const dynamicOptions = {
+    ...markdownOptions,
+    overrides: {
+      ...markdownOptions.overrides,
+      code: {
+        component: (props: any) => (
+          <CodeSnippet enableTypewriter={enableCodeTypewriter}>
+            {props.children}
+          </CodeSnippet>
+        )
+      }
+    }
+  };
+
   // @ts-ignore - Ignoring type errors for markdown-to-jsx options
   return (
-    <Markdown options={markdownOptions}>
+    <Markdown options={dynamicOptions}>
       {content}
     </Markdown>
   );
