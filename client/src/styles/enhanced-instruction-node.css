@@ -124,12 +124,14 @@ body .instruction-node,
     word-break: break-all;
 }
 
-/* Node Body - More Compact & Nicely Spaced */
+/* Node Body - Enhanced Modern Spacing */
 .node-body {
-    padding: 10px 12px; /* Reduced padding while maintaining nice spacing */
+    padding: 14px 16px; /* Slightly increased padding for modern appeal */
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.02), rgba(0, 0, 0, 0.05));
+    position: relative;
 }
 
 /* Custom scrollbar for node body */
@@ -159,18 +161,32 @@ body .instruction-node,
 }
 
 .section {
-    margin-bottom: 10px; /* Reduced margin for more compact spacing */
+    margin-bottom: 14px; /* Better spacing for modern appeal */
+    position: relative;
 }
 
 .section:last-child {
     margin-bottom: 0;
 }
 
+/* Add subtle section separators */
+.section:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    bottom: -7px;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.1), transparent);
+}
+
 .section-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 6px; /* Reduced margin for more compact spacing */
+    margin-bottom: 8px; /* Better spacing for modern appeal */
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(139, 92, 246, 0.08);
 }
 
 .section-title {
@@ -196,26 +212,28 @@ body .instruction-node,
     border: 1px solid rgba(139, 92, 246, 0.2);
 }
 
-/* Account Items - More Compact Professional Design */
+/* Account Items - Modern Eye-Appealing Design */
 .account-item {
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 5px; /* Slightly more compact corners */
-    padding: 6px 10px; /* Reduced padding for compactness */
-    margin-bottom: 5px; /* Reduced margin for tighter spacing */
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(139, 92, 246, 0.02));
+    border: 1px solid rgba(139, 92, 246, 0.12);
+    border-radius: 8px; /* More modern rounded corners */
+    padding: 10px 12px; /* Better padding for modern appeal */
+    margin-bottom: 8px; /* Improved spacing */
     display: flex;
     align-items: center;
     justify-content: space-between;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
-    backdrop-filter: blur(4px);
-    min-height: 48px; /* Reduced min-height for compactness */
+    backdrop-filter: blur(6px);
+    min-height: 52px; /* Better proportions */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .account-item:hover {
-    background: rgba(255, 255, 255, 0.04);
-    border-color: rgba(139, 92, 246, 0.2);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(139, 92, 246, 0.04));
+    border-color: rgba(139, 92, 246, 0.25);
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.1);
+    transform: translateY(-1px);
 }
 
 .account-info {
@@ -285,21 +303,30 @@ body .instruction-node,
     border-color: rgba(168, 85, 247, 0.2);
 }
 
-/* Data Fields - More Compact Professional Design */
+/* Data Fields - Modern Eye-Appealing Design */
 .data-field {
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 5px; /* Slightly more compact corners */
-    padding: 6px 10px; /* Reduced padding for compactness */
-    margin-bottom: 5px; /* Reduced margin for tighter spacing */
-    backdrop-filter: blur(4px);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(168, 85, 247, 0.02));
+    border: 1px solid rgba(168, 85, 247, 0.12);
+    border-radius: 8px; /* More modern rounded corners */
+    padding: 10px 12px; /* Better padding for modern appeal */
+    margin-bottom: 8px; /* Improved spacing */
+    backdrop-filter: blur(6px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.data-field:hover {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(168, 85, 247, 0.04));
+    border-color: rgba(168, 85, 247, 0.2);
+    box-shadow: 0 4px 8px rgba(168, 85, 247, 0.1);
+    transform: translateY(-1px);
 }
 
 .data-field-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 4px; /* Reduced margin for more compact spacing */
+    margin-bottom: 6px; /* Better spacing for modern appeal */
 }
 
 .data-field-name {
@@ -324,22 +351,26 @@ body .instruction-node,
 
 .data-field-input {
     width: 100%;
-    background: rgba(0, 0, 0, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-    padding: 6px 10px; /* Reduced padding for more compact inputs */
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(168, 85, 247, 0.15);
+    border-radius: 6px; /* More modern rounded corners */
+    padding: 8px 12px; /* Better padding for modern appeal */
     color: #ffffff;
     font-size: 12px;
     font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     font-weight: 400;
+    backdrop-filter: blur(2px);
 }
 
 .data-field-input:focus {
     outline: none;
-    border-color: rgba(139, 92, 246, 0.4);
-    background: rgba(139, 92, 246, 0.03);
-    box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.1);
+    border-color: rgba(168, 85, 247, 0.5);
+    background: rgba(168, 85, 247, 0.05);
+    box-shadow: 
+        0 0 0 1px rgba(168, 85, 247, 0.2),
+        0 4px 12px rgba(168, 85, 247, 0.1);
+    transform: translateY(-1px);
 }
 
 .data-field-input::placeholder {
@@ -348,18 +379,40 @@ body .instruction-node,
     font-style: normal;
 }
 
-/* Description - More Compact Professional Design */
+/* Description - Modern Eye-Appealing Design */
 .description {
-    background: rgba(59, 130, 246, 0.03);
-    border-left: 2px solid rgba(59, 130, 246, 0.3);
-    padding: 10px 12px; /* Reduced padding for compactness */
-    border-radius: 4px;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(139, 92, 246, 0.05));
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-left: 3px solid rgba(59, 130, 246, 0.5); /* Stronger accent border */
+    padding: 12px 14px; /* Slightly increased padding for better readability */
+    border-radius: 6px; /* More modern rounded corners */
     font-size: 12px;
-    color: #cbd5e1;
-    line-height: 1.4; /* Slightly reduced line height for compactness */
-    margin-top: 12px; /* Reduced margin for more compact spacing */
+    color: #e2e8f0; /* Brighter text for better readability */
+    line-height: 1.5; /* Better line height for readability */
+    margin-bottom: 12px; /* Now at top, so margin-bottom instead of margin-top */
     font-weight: 400;
-    letter-spacing: 0.01em;
+    letter-spacing: 0.005em;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+    backdrop-filter: blur(4px);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Add a subtle shine effect to description */
+.description::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    animation: shine 3s ease-in-out infinite;
+}
+
+@keyframes shine {
+    0% { left: -100%; }
+    100% { left: 100%; }
 }
 
 /* Removed footer styles - no longer needed */

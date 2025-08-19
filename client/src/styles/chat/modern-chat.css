@@ -139,13 +139,32 @@ body .chat-container,
     0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* Input field */
+/* Input field - Enhanced glassmorphic styling */
 .chat-input {
   background: rgba(255, 255, 255, 0.03) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border: none !important; /* Remove border since parent container handles it */
   color: #e0e0e0 !important;
   backdrop-filter: blur(8px);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  font-weight: 400 !important;
+  line-height: 1.5 !important;
+}
+
+/* Input container - Enhanced glassmorphic background */
+.input-area .bg-background.rounded-lg {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(139, 92, 246, 0.15) !important;
+  backdrop-filter: blur(12px) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.input-area .bg-background.rounded-lg:focus-within {
+  background: rgba(139, 92, 246, 0.05) !important;
+  border-color: rgba(139, 92, 246, 0.3) !important;
+  box-shadow: 
+    0 0 0 1px rgba(139, 92, 246, 0.1),
+    0 4px 12px rgba(139, 92, 246, 0.1) !important;
 }
 
 .chat-input:focus {

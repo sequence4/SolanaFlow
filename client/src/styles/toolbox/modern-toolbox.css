@@ -151,6 +151,96 @@ body .app-sidebar,
   background: rgba(0, 0, 0, 0.1);
 }
 
+/* Enhanced Instruction List Styling - Glassmorphic Design */
+.app-sidebar .bg-card {
+  background: rgba(20, 20, 35, 0.40) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(139, 92, 246, 0.08) !important;
+}
+
+/* Group headers in instruction list */
+.app-sidebar h3.font-semibold {
+  color: #f0f0f0 !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  letter-spacing: -0.01em !important;
+}
+
+/* Group divider line */
+.app-sidebar .h-px.bg-border {
+  background: rgba(139, 92, 246, 0.2) !important;
+}
+
+/* Group count badge */
+.app-sidebar .bg-muted.px-2.py-1.rounded-full {
+  background: rgba(139, 92, 246, 0.1) !important;
+  color: #a78bfa !important;
+  border: 1px solid rgba(139, 92, 246, 0.2) !important;
+  font-weight: 600 !important;
+  font-size: 9px !important;
+}
+
+/* Instruction cards - Enhanced glassmorphic styling */
+.app-sidebar .cursor-grab {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(139, 92, 246, 0.1) !important;
+  backdrop-filter: blur(8px) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.app-sidebar .cursor-grab:hover {
+  background: rgba(139, 92, 246, 0.06) !important;
+  border-color: rgba(139, 92, 246, 0.25) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 
+    0 4px 12px rgba(139, 92, 246, 0.15),
+    0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Instruction card text */
+.app-sidebar .cursor-grab .text-foreground {
+  color: #e0e0e0 !important;
+  font-weight: 500 !important;
+}
+
+/* Instruction card dot indicator */
+.app-sidebar .cursor-grab .bg-muted-foreground {
+  background: rgba(139, 92, 246, 0.6) !important;
+  box-shadow: 0 0 4px rgba(139, 92, 246, 0.4);
+}
+
+/* NEW badge styling */
+.app-sidebar .bg-muted\\/20.text-primary {
+  background: rgba(139, 92, 246, 0.15) !important;
+  color: #a78bfa !important;
+  border-color: rgba(139, 92, 246, 0.3) !important;
+  font-weight: 700 !important;
+}
+
+/* Action buttons (star, plus) */
+.app-sidebar .text-muted-foreground.hover\\:text-primary {
+  color: #9ca3af !important;
+  transition: all 0.2s ease !important;
+}
+
+.app-sidebar .text-muted-foreground.hover\\:text-primary:hover {
+  color: #a78bfa !important;
+  background: rgba(139, 92, 246, 0.1) !important;
+}
+
+/* Description tooltip */
+.app-sidebar .bg-muted\\/10 {
+  background: rgba(139, 92, 246, 0.05) !important;
+  border-left: 2px solid rgba(139, 92, 246, 0.3) !important;
+  backdrop-filter: blur(6px) !important;
+}
+
+/* Group color indicator */
+.app-sidebar .bg-primary.rounded-full {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.9), rgba(168, 85, 247, 0.9)) !important;
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.4) !important;
+}
+
 /* Scrollbar styling for sidebar */
 .app-sidebar ::-webkit-scrollbar {
   width: 6px;

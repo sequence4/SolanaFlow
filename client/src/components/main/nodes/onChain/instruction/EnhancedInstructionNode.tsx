@@ -164,14 +164,21 @@ export const EnhancedInstructionNode: React.FC<{ data: EnhancedInstructionNodeDa
         </div>
       </div>
 
-      {/* Program Info */}
-      <div className="program-info">
-        <div className="program-label">Program ID</div>
-        <div className="program-id">{truncateProgramId(safeData.programId)}</div>
-      </div>
-
       {/* Node Body */}
       <div className="node-body">
+        {/* Description - Now at the top for better UX */}
+        <div className="description">
+          {getDescription()}
+        </div>
+
+        {/* Program Info - Moved inside body */}
+        <div className="section">
+          <div className="section-header">
+            <div className="section-title">Program ID</div>
+          </div>
+          <div className="program-id">{truncateProgramId(safeData.programId)}</div>
+        </div>
+
         {/* Accounts Section */}
         {accounts.length > 0 && (
           <div className="section">
@@ -203,11 +210,6 @@ export const EnhancedInstructionNode: React.FC<{ data: EnhancedInstructionNodeDa
             ))}
           </div>
         )}
-
-        {/* Description */}
-        <div className="description">
-          {getDescription()}
-        </div>
       </div>
 
       {/* React Flow Handles */}
