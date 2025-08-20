@@ -324,24 +324,27 @@ const Chat: React.FC = () => {
           setInput('');
           setUserHasScrolled(false);
 
-          // 3) Show AI thinking state with specific message
+          // 3) Wait a moment before showing AI is thinking (more natural)
+          await new Promise(resolve => setTimeout(resolve, 800));
+
+          // 4) Show AI thinking state with specific message
           setIsThinking(true);
           setThinkingMessage('Analyzing your project structure and preparing build pipeline...');
           
-          // 4) Add a brief thinking delay (2-3 seconds)
-          await new Promise(resolve => setTimeout(resolve, 2500));
+          // 5) Add thinking delay (2 more seconds)
+          await new Promise(resolve => setTimeout(resolve, 2000));
           
-          // 5) Stop thinking and show checklist
+          // 6) Stop thinking and show checklist
           setIsThinking(false);
           setThinkingMessage('');
           
-          // 6) Add checklist bubble and forward build command
+          // 7) Add checklist bubble and forward build command
           setMessages(prev => [
             ...prev,
             { text: "", sender: 'ai', isChecklist: true, timestamp: new Date(), status: 'sent' }
           ]);
 
-          // 7) Forward build command globally after the delay
+          // 8) Forward build command globally after the delay
           eventBus.emit('chat-build-command');
           
           return; // stop normal AI flow
