@@ -5,7 +5,6 @@ import { Progress } from "../../../components/ui/progress";
 import { useChecklistProgress } from "../../../hooks/useChecklistProgress";
 import CodeSnippet from "../code/markdown/CodeSnippet";
 import CompactCodeSnippet from "../code/markdown/CompactCodeSnippet";
-import FileGenerationQueue from "./FileGenerationQueue";
 
 export default function ChatChecklistBubble() {
   const steps = useChecklistProgress();
@@ -90,8 +89,8 @@ export default function ChatChecklistBubble() {
             )}
 
             {step.stage === "code-gen" && step.status === "active" && (
-              <div className="mt-2">
-                <FileGenerationQueue />
+              <div className="mt-2 text-xs text-gray-500 italic">
+                Check chat above for generated files with typewriter effect...
               </div>
             )}
           </motion.div>

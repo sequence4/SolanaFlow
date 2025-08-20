@@ -156,7 +156,9 @@ const Chat: React.FC = () => {
         );
 
         if (visible.length) {
-            console.log('[CHAT] Processing system logs:', visible.length, 'new lines');
+            console.log('[CHAT] ====== PROCESSING SYSTEM LOGS ======');
+            console.log('[CHAT] Processing', visible.length, 'new lines');
+            console.log('[CHAT] Lines:', visible);
             
             const logMessages: AIMessageType[] = [];
             
@@ -180,9 +182,12 @@ const Chat: React.FC = () => {
                         
                         // Check for code generation messages with files
                         if (parsed.type === 'code-generation' && parsed.files && parsed.files.length > 0) {
+                            console.log('[CHAT] ====== CODE GENERATION DETECTED ======');
                             console.log('[CHAT] Found code-generation message with', parsed.files.length, 'files');
+                            console.log('[CHAT] Files:', parsed.files.map((f: any) => f.filename));
                             
                             // Show thinking state for code generation
+                            console.log('[CHAT] Triggering codegen thinking state...');
                             showThinkingForStage('codegen');
                             
                             // Remove any existing code-gen messages to avoid duplicates
@@ -192,34 +197,24 @@ const Chat: React.FC = () => {
                                 return filtered;
                             });
                             
-                            // Add the new code generation message with files
+                            // Add the new code generation message with files for SequentialCodeDisplay
                             const codeGenMessage = {
-                                text: parsed.message || '🦀 Generating Solana program files...',
+                                text: '', // Empty text, let SequentialCodeDisplay handle the display
                                 sender: 'ai' as const,
                                 timestamp: new Date(),
                                 status: 'sent' as const,
                                 codeGenFiles: parsed.files
                             };
                             
-                            console.log('[CHAT] Creating code-gen message:', codeGenMessage);
+                            console.log('[CHAT] Adding SequentialCodeDisplay message to chat flow');
+                            console.log('[CHAT] Message will trigger SequentialCodeDisplay with typewriter');
                             logMessages.push(codeGenMessage);
                             continue;
                         }
                         
-                        // Handle progress-only messages (during dependency installation, etc.)
+                        // Skip progress-only messages during code generation to avoid conflicts
                         if (parsed.type === 'progress' && parsed.message && parsed.pct !== undefined) {
-                            console.log('[CHAT] Found progress message:', parsed.message, 'at', parsed.pct + '%');
-                            
-                            // Add as regular log message but with progress info
-                            logMessages.push({
-                                text: `${parsed.message} (${parsed.pct}%)`,
-                                sender: 'ai',
-                                timestamp: new Date(),
-                                status: 'sent',
-                                isLogLine: true,
-                                pct: parsed.pct,
-                                stage: parsed.stage
-                            });
+                            console.log('[CHAT] Skipping progress message to avoid conflicts:', parsed.message, 'at', parsed.pct + '%');
                             continue;
                         }
                     }
@@ -227,6 +222,12 @@ const Chat: React.FC = () => {
                     // Not JSON, check if it's a progress percentage line
                     if (line.includes('%') && (line.includes('Building') || line.includes('Generating'))) {
                         console.log('[CHAT] Skipping progress line:', line);
+                        continue;
+                    }
+                    
+                    // Skip any other lines that might interfere with code generation display
+                    if (line.includes('Collecting project files') || line.includes('Preparing files')) {
+                        console.log('[CHAT] Skipping file preparation line:', line);
                         continue;
                     }
                 }
@@ -245,10 +246,19 @@ const Chat: React.FC = () => {
             }
 
             if (logMessages.length > 0) {
+                console.log('[CHAT] ====== ADDING MESSAGES TO CHAT ======');
                 console.log('[CHAT] Adding', logMessages.length, 'new messages to chat');
+                console.log('[CHAT] New messages:', logMessages.map(m => ({
+                    sender: m.sender,
+                    hasCodeGenFiles: !!m.codeGenFiles,
+                    fileCount: m.codeGenFiles?.length || 0,
+                    isChecklist: m.isChecklist,
+                    textPreview: m.text.substring(0, 50)
+                })));
                 setMessages(prev => {
                     const newMessages = [...prev, ...logMessages];
                     console.log('[CHAT] Total messages after update:', newMessages.length);
+                    console.log('[CHAT] Messages with codeGenFiles:', newMessages.filter(m => m.codeGenFiles).length);
                     return newMessages;
                 });
                 // Reset user scroll state when new messages arrive
@@ -645,7 +655,12 @@ const Chat: React.FC = () => {
                                                             return <ChatChecklistBubble />;
                                                         } else if (message.codeGenFiles && message.codeGenFiles.length > 0) {
                                                             // Show sequential file display for code generation
-                                                            return <SequentialCodeDisplay files={message.codeGenFiles} />;
+                                                            console.log('[CHAT] Rendering SequentialCodeDisplay with', message.codeGenFiles.length, 'files');
+                                                            return (
+                                                                <div className="w-full">
+                                                                    <SequentialCodeDisplay files={message.codeGenFiles} />
+                                                                </div>
+                                                            );
                                                         } else {
                                                             return (
                                                                 <div className="w-full max-w-full overflow-hidden">

@@ -107,12 +107,17 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
     );
   }
 
+  console.log('[SEQUENTIAL-DISPLAY] Rendering component with', files.length, 'files');
+  console.log('[SEQUENTIAL-DISPLAY] Files:', files.map((f: any) => f.filename));
+  console.log('[SEQUENTIAL-DISPLAY] Expanded files:', Array.from(expandedFiles));
+  console.log('[SEQUENTIAL-DISPLAY] Typing states:', typingStates.size);
+
   return (
-    <div className="code-generation-flow space-y-1">
-      <div className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-3 flex items-center gap-2">
-        <span>🦀 Generated Files</span>
-        <span className="bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded text-[10px]">
-          {files.length}
+    <div className="code-generation-flow space-y-1 bg-gray-900/10 rounded-lg p-4 border-l-4 border-cyan-500/50">
+      <div className="text-sm text-cyan-400 font-semibold mb-3 flex items-center gap-2">
+        <span>🦀 Generated Solana Program Files</span>
+        <span className="bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded text-xs">
+          {files.length} files
         </span>
       </div>
       
