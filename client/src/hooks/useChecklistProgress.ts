@@ -14,6 +14,11 @@ export interface Step {
     filename?: string;
     lineCount?: number;
   };
+  generatedFiles?: Array<{
+    filename: string;
+    content: string;
+    language: string;
+  }>;
 }
 
 const INITIAL: Step[] = [
@@ -113,7 +118,8 @@ export function useChecklistProgress() {
                 content: payload.codeSnippet.content || '',
                 filename: payload.codeSnippet.filename,
                 lineCount: payload.codeSnippet.lineCount
-              } : s.codeSnippet
+              } : s.codeSnippet,
+              generatedFiles: payload.files || s.generatedFiles
             };
           }
           return s;

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, Copy, Check } from 'lucide-react';
 
 interface CodeFile {
   filename: string;
@@ -9,222 +8,115 @@ interface CodeFile {
 }
 
 const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
-  console.log('[SEQUENTIAL-DISPLAY] ===================== COMPONENT MOUNT =====================');
-  console.log('[SEQUENTIAL-DISPLAY] Component rendered with files:', files);
-  console.log('[SEQUENTIAL-DISPLAY] Files count:', files?.length || 0);
-  console.log('[SEQUENTIAL-DISPLAY] Files array:', files?.map(f => ({
-    filename: f.filename,
-    contentLength: f.content?.length,
-    language: f.language
-  })));
-  console.log('[SEQUENTIAL-DISPLAY] Component props type check:', { 
-    filesIsArray: Array.isArray(files),
-    filesType: typeof files,
-    firstFileType: files?.[0] ? typeof files[0] : 'undefined'
-  });
+  const [currentFileIndex, setCurrentFileIndex] = useState(0);
+  const [isTyping, setIsTyping] = useState(false);
+  const [displayedText, setDisplayedText] = useState('');
   
-  const [expandedFiles, setExpandedFiles] = useState<Set<number>>(new Set([0])); // First file expanded by default
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const [typingStates, setTypingStates] = useState<Map<number, {
-    isTyping: boolean;
-    displayedText: string;
-    fullText: string;
-  }>>(new Map());
-  
-  // Initialize with first file expanded
-  useEffect(() => {
-    if (!files || files.length === 0) return;
-    setExpandedFiles(new Set([0])); // Always expand first file
-    setTypingStates(new Map()); // Reset typing states
-  }, [files]);
-  
-  // Start typewriter when file is expanded for the first time
-  useEffect(() => {
-    expandedFiles.forEach(index => {
-      const file = files[index];
-      if (file && !typingStates.has(index)) {
-        startTypewriter(index, file.content);
-      }
-    });
-  }, [expandedFiles, files]);
-  
-  const toggleFile = (index: number) => {
-    const newExpanded = new Set(expandedFiles);
-    if (newExpanded.has(index)) {
-      newExpanded.delete(index);
-    } else {
-      newExpanded.add(index);
+  // Truncate content to show only first 8-10 lines
+  const getTruncatedContent = (content: string) => {
+    const lines = content.split('\n');
+    const maxLines = 8;
+    if (lines.length > maxLines) {
+      return lines.slice(0, maxLines).join('\n') + '\n// ... more';
     }
-    setExpandedFiles(newExpanded);
+    return content;
   };
   
-  const startTypewriter = (index: number, content: string) => {
-    console.log(`[SEQUENTIAL-DISPLAY] Starting typewriter for file ${index}: ${files[index]?.filename}`);
+  useEffect(() => {
+    if (!files || files.length === 0) return;
     
-    setTypingStates(prev => new Map(prev).set(index, {
-      isTyping: true,
-      displayedText: '',
-      fullText: content
-    }));
+    // Reset for new files
+    setCurrentFileIndex(0);
+    setIsTyping(false);
+    setDisplayedText('');
+  }, [files]);
+  
+  useEffect(() => {
+    if (!files || currentFileIndex >= files.length) return;
+    
+    const currentFile = files[currentFileIndex];
+    const truncatedContent = getTruncatedContent(currentFile.content);
+    
+    // Start typewriter effect
+    setIsTyping(true);
+    setDisplayedText('');
     
     let charIndex = 0;
     const timer = setInterval(() => {
-      if (charIndex < content.length) {
-        setTypingStates(prev => {
-          const newMap = new Map(prev);
-          const state = newMap.get(index);
-          if (state) {
-            newMap.set(index, {
-              ...state,
-              displayedText: content.substring(0, charIndex + 1)
-            });
-          }
-          return newMap;
-        });
+      if (charIndex < truncatedContent.length) {
+        setDisplayedText(truncatedContent.substring(0, charIndex + 1));
         charIndex++;
       } else {
-        console.log(`[SEQUENTIAL-DISPLAY] Typewriter completed for file ${index}`);
         clearInterval(timer);
-        setTypingStates(prev => {
-          const newMap = new Map(prev);
-          const state = newMap.get(index);
-          if (state) {
-            newMap.set(index, {
-              ...state,
-              isTyping: false
-            });
-          }
-          return newMap;
-        });
-      }
-    }, 20); // 20ms per character
-  };
-  
-  const copyToClipboard = async (content: string, index: number) => {
-    try {
-      await navigator.clipboard.writeText(content);
-      setCopiedIndex(index);
-      setTimeout(() => setCopiedIndex(null), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  };
-  
-  if (!files || files.length === 0) {
-    console.log('[SEQUENTIAL-DISPLAY] ❌ NO FILES - Component will show no-files message');
-    console.log('[SEQUENTIAL-DISPLAY] Files value:', files);
-    console.log('[SEQUENTIAL-DISPLAY] Files type:', typeof files);
-    console.log('[SEQUENTIAL-DISPLAY] Files array check:', Array.isArray(files));
-    return (
-      <div className="text-sm text-gray-500 italic p-4 border-l-4 border-red-600/30 pl-4 bg-red-900/10">
-        <div className="text-red-400 font-mono text-xs mb-2">DEBUG: No files provided</div>
-        <div>Files prop: {JSON.stringify(files, null, 2)}</div>
-        <div>Type: {typeof files}</div>
-        <div>Length: {files?.length}</div>
-      </div>
-    );
-  }
-
-  console.log('[SEQUENTIAL-DISPLAY] Rendering component with', files.length, 'files');
-  console.log('[SEQUENTIAL-DISPLAY] Files:', files.map((f: any) => f.filename));
-  console.log('[SEQUENTIAL-DISPLAY] Expanded files:', Array.from(expandedFiles));
-  console.log('[SEQUENTIAL-DISPLAY] Typing states:', typingStates.size);
-
-  return (
-    <div className="code-generation-flow space-y-1 bg-gray-900/10 rounded-lg p-4 border-l-4 border-cyan-500/50">
-      <div className="text-sm text-cyan-400 font-semibold mb-3 flex items-center gap-2">
-        <span>🦀 Generated Solana Program Files</span>
-        <span className="bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded text-xs">
-          {files.length} files
-        </span>
-      </div>
-      
-      {files.map((file, index) => {
-        const isExpanded = expandedFiles.has(index);
-        const isCopied = copiedIndex === index;
-        const typeState = typingStates.get(index);
-        const displayContent = typeState ? typeState.displayedText : file.content;
-        const isTyping = typeState?.isTyping || false;
+        setIsTyping(false);
         
-        return (
-          <motion.div 
-            key={index}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            className="file-item border-l-4 border-cyan-500/30 bg-gray-900/20 rounded-r-lg overflow-hidden"
-          >
-            {/* File Header */}
-            <div 
-              className="file-header flex items-center justify-between p-3 cursor-pointer hover:bg-gray-900/40 transition-colors duration-200"
-              onClick={() => toggleFile(index)}
-            >
-              <div className="flex items-center gap-3">
-                <motion.div
-                  animate={{ rotate: isExpanded ? 90 : 0 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <ChevronRight size={16} className="text-gray-500" />
-                </motion.div>
-                <span className="text-sm font-mono text-cyan-400">{file.filename}</span>
-                <span className="text-xs text-gray-500 bg-gray-800/50 px-2 py-0.5 rounded">
-                  {file.language}
-                </span>
-                <span className="text-xs text-gray-600">
-                  {file.content.split('\n').length} lines
-                </span>
-              </div>
-              
-              {isExpanded && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    copyToClipboard(file.content, index);
-                  }}
-                  className="flex items-center gap-1 text-xs text-gray-400 hover:text-cyan-400 transition-colors px-2 py-1 rounded hover:bg-gray-800/50"
-                >
-                  {isCopied ? <Check size={12} /> : <Copy size={12} />}
-                  {isCopied ? 'Copied!' : 'Copy'}
-                </button>
-              )}
+        // Move to next file after 2 seconds
+        setTimeout(() => {
+          if (currentFileIndex < files.length - 1) {
+            setCurrentFileIndex(prev => prev + 1);
+          }
+        }, 2000);
+      }
+    }, 15); // Fast typewriter speed
+    
+    return () => clearInterval(timer);
+  }, [currentFileIndex, files]);
+  
+  if (!files || files.length === 0) return null;
+  
+  const currentFile = files[currentFileIndex];
+  
+  return (
+    <div className="mt-2 mb-2">
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={currentFileIndex}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          className="bg-gray-900/30 rounded-lg p-3 border-l-4 border-cyan-500/50"
+        >
+          {/* File header */}
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-cyan-400">📄</span>
+              <span className="text-xs font-mono text-cyan-400">{currentFile.filename}</span>
+              <span className="text-xs text-gray-500">
+                ({currentFileIndex + 1}/{files.length})
+              </span>
             </div>
-            
-            {/* File Content */}
-            <AnimatePresence>
-              {isExpanded && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.3, ease: "easeInOut" }}
-                  className="overflow-hidden"
-                >
-                  <div className="border-t border-gray-700/50">
-                    <div className="bg-gray-950/50 p-4">
-                      <pre className="text-xs text-gray-300 font-mono whitespace-pre-wrap overflow-x-auto leading-relaxed">
-                        <code className={`language-${file.language}`}>
-                          {displayContent}
-                          {isTyping && <span className="text-cyan-400 animate-pulse ml-1">|</span>}
-                        </code>
-                      </pre>
-                      {isTyping && (
-                        <div className="text-xs text-gray-500 mt-2 flex items-center gap-2">
-                          <div className="flex space-x-1">
-                            <div className="w-1 h-1 bg-cyan-400 rounded-full animate-bounce"></div>
-                            <div className="w-1 h-1 bg-cyan-400 rounded-full animate-bounce delay-75"></div>
-                            <div className="w-1 h-1 bg-cyan-400 rounded-full animate-bounce delay-150"></div>
-                          </div>
-                          <span>Generating... {Math.round((displayContent.length / file.content.length) * 100)}%</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        );
-      })}
+            {!isTyping && currentFileIndex < files.length - 1 && (
+              <span className="text-xs text-gray-500">Next in 2s...</span>
+            )}
+          </div>
+          
+          {/* Code content */}
+          <div className="bg-gray-950/50 rounded p-2 max-h-48 overflow-hidden">
+            <pre className="text-xs text-gray-300 font-mono">
+              <code className={`language-${currentFile.language}`}>
+                {displayedText}
+                {isTyping && <span className="text-cyan-400 animate-pulse">|</span>}
+              </code>
+            </pre>
+          </div>
+          
+          {/* Progress dots */}
+          <div className="flex gap-1 mt-2 justify-center">
+            {files.map((_, idx) => (
+              <div
+                key={idx}
+                className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
+                  idx === currentFileIndex 
+                    ? 'bg-cyan-400 w-4' 
+                    : idx < currentFileIndex 
+                      ? 'bg-cyan-600' 
+                      : 'bg-gray-600'
+                }`}
+              />
+            ))}
+          </div>
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 };

@@ -770,14 +770,7 @@ const Chat: React.FC = () => {
                                                             })));
                                                             console.log('[RENDER] Component will be mounted with', message.codeGenFiles.length, 'files');
                                                             
-                                                            return (
-                                                                <div className="w-full mt-4 mb-4 p-2 border-2 border-cyan-500/50 rounded-lg bg-gray-900/20">
-                                                                    <div className="text-xs text-cyan-400 mb-2 font-mono">
-                                                                        DEBUG: SequentialCodeDisplay mounting with {message.codeGenFiles.length} files
-                                                                    </div>
-                                                                    <SequentialCodeDisplay files={message.codeGenFiles} />
-                                                                </div>
-                                                            );
+                                                            return <SequentialCodeDisplay files={message.codeGenFiles} />;
                                                         } else {
                                                             console.log('[RENDER] Rendering MarkdownRenderer for text message');
                                                             return (

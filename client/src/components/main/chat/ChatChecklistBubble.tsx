@@ -4,16 +4,23 @@ import { Check, AlertTriangle } from "lucide-react";
 import { Progress } from "../../../components/ui/progress";
 import { useChecklistProgress } from "../../../hooks/useChecklistProgress";
 import CompactCodeSnippet from "../code/markdown/CompactCodeSnippet";
+import SequentialCodeDisplay from "./SequentialCodeDisplay";
 
 export default function ChatChecklistBubble() {
   const steps = useChecklistProgress();
+  
+  // Find current step to hide future ones
+  const currentStepIndex = steps.findIndex(step => step.status === 'active');
+  const lastCompletedIndex = steps.reduce((lastIdx, step, idx) => 
+    step.status === 'done' ? idx : lastIdx, -1);
+  const visibleSteps = steps.slice(0, Math.max(currentStepIndex + 1, lastCompletedIndex + 2));
 
   return (
     <div className="checklist-flow space-y-1">
-      {steps.map((step, index) => (
+      {visibleSteps.map((step, index) => (
         <div key={step.id} className="relative">
-          {/* Connecting line */}
-          {index < steps.length - 1 && (
+          {/* Only show connecting line if not the last visible step */}
+          {index < visibleSteps.length - 1 && (
             <div className="connecting-line absolute left-2 top-12 w-0.5 h-8 bg-gray-600/30" />
           )}
           
@@ -84,6 +91,13 @@ export default function ChatChecklistBubble() {
                 >
                   {step.codeSnippet.content}
                 </CompactCodeSnippet>
+              </div>
+            )}
+
+            {/* Show generated files for Code Generation step when active/completed */}
+            {step.stage === "code-gen" && step.generatedFiles && step.generatedFiles.length > 0 && (step.status === "active" || step.status === "done") && (
+              <div className="mt-3">
+                <SequentialCodeDisplay files={step.generatedFiles} />
               </div>
             )}
 
