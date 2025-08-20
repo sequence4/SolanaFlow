@@ -11,9 +11,19 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [isTyping, setIsTyping] = useState(false);
   const [displayedText, setDisplayedText] = useState('');
+  const [mounted, setMounted] = useState(false);
+  
+  // Fix hydration issues
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  
+  // Validate files array
+  const validFiles = files?.filter(f => f && f.filename && f.content) || [];
   
   // Truncate content to show only first 8-10 lines
   const getTruncatedContent = (content: string) => {
+    if (!content) return '';
     const lines = content.split('\n');
     const maxLines = 8;
     if (lines.length > maxLines) {
@@ -23,18 +33,20 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
   };
   
   useEffect(() => {
-    if (!files || files.length === 0) return;
+    if (!validFiles.length) return;
     
     // Reset for new files
     setCurrentFileIndex(0);
     setIsTyping(false);
     setDisplayedText('');
-  }, [files]);
+  }, [files]); // Use original files prop for dependency
   
   useEffect(() => {
-    if (!files || currentFileIndex >= files.length) return;
+    if (!mounted || !validFiles.length || currentFileIndex >= validFiles.length) return;
     
-    const currentFile = files[currentFileIndex];
+    const currentFile = validFiles[currentFileIndex];
+    if (!currentFile) return; // Extra safety check
+    
     const truncatedContent = getTruncatedContent(currentFile.content);
     
     // Start typewriter effect
@@ -52,7 +64,7 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
         
         // Move to next file after 2 seconds
         setTimeout(() => {
-          if (currentFileIndex < files.length - 1) {
+          if (currentFileIndex < validFiles.length - 1) {
             setCurrentFileIndex(prev => prev + 1);
           }
         }, 2000);
@@ -60,17 +72,21 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
     }, 15); // Fast typewriter speed
     
     return () => clearInterval(timer);
-  }, [currentFileIndex, files]);
+  }, [currentFileIndex, validFiles.length, mounted]);
   
-  if (!files || files.length === 0) return null;
+  // Don't render on server to avoid hydration issues
+  if (!mounted) return null;
   
-  const currentFile = files[currentFileIndex];
+  if (!validFiles.length) return null;
+  
+  const currentFile = validFiles[currentFileIndex];
+  if (!currentFile) return null; // Safety check
   
   return (
     <div className="mt-2 mb-2">
       <AnimatePresence mode="wait">
         <motion.div
-          key={currentFileIndex}
+          key={`file-${currentFileIndex}`}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
@@ -80,12 +96,14 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <span className="text-xs text-cyan-400">📄</span>
-              <span className="text-xs font-mono text-cyan-400">{currentFile.filename}</span>
+              <span className="text-xs font-mono text-cyan-400">
+                {currentFile.filename || 'unknown.rs'}
+              </span>
               <span className="text-xs text-gray-500">
-                ({currentFileIndex + 1}/{files.length})
+                ({currentFileIndex + 1}/{validFiles.length})
               </span>
             </div>
-            {!isTyping && currentFileIndex < files.length - 1 && (
+            {!isTyping && currentFileIndex < validFiles.length - 1 && (
               <span className="text-xs text-gray-500">Next in 2s...</span>
             )}
           </div>
@@ -93,7 +111,7 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
           {/* Code content */}
           <div className="bg-gray-950/50 rounded p-2 max-h-48 overflow-hidden">
             <pre className="text-xs text-gray-300 font-mono">
-              <code className={`language-${currentFile.language}`}>
+              <code className={`language-${currentFile.language || 'rust'}`}>
                 {displayedText}
                 {isTyping && <span className="text-cyan-400 animate-pulse">|</span>}
               </code>
@@ -102,9 +120,9 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
           
           {/* Progress dots */}
           <div className="flex gap-1 mt-2 justify-center">
-            {files.map((_, idx) => (
+            {validFiles.map((_, idx) => (
               <div
-                key={idx}
+                key={`dot-${idx}`}
                 className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
                   idx === currentFileIndex 
                     ? 'bg-cyan-400 w-4' 

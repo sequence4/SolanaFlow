@@ -121,6 +121,13 @@ export function useChecklistProgress() {
               } : s.codeSnippet,
               generatedFiles: payload.files || s.generatedFiles
             };
+          } else if (s.status === "active" && payload.stage !== s.stage) {
+            // Clear generated files when moving to a different stage
+            return { 
+              ...s, 
+              status: "done", 
+              generatedFiles: s.stage === "code-gen" ? undefined : s.generatedFiles 
+            };
           }
           return s;
         }),

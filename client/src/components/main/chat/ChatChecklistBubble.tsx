@@ -94,10 +94,13 @@ export default function ChatChecklistBubble() {
               </div>
             )}
 
-            {/* Show generated files for Code Generation step when active/completed */}
-            {step.stage === "code-gen" && step.generatedFiles && step.generatedFiles.length > 0 && (step.status === "active" || step.status === "done") && (
+            {/* Show generated files ONLY for Code Generation step when ACTIVE (not done) */}
+            {step.stage === "code-gen" && step.generatedFiles && step.generatedFiles.length > 0 && step.status === "active" && (
               <div className="mt-3">
-                <SequentialCodeDisplay files={step.generatedFiles} />
+                <SequentialCodeDisplay 
+                  key={`checklist-code-${step.id}-${step.generatedFiles.length}`} 
+                  files={step.generatedFiles} 
+                />
               </div>
             )}
 

@@ -301,74 +301,7 @@ const Chat: React.FC = () => {
         };
     }, []);
 
-    // Add direct SSE listener to bypass systemLogs for code-generation
-    useEffect(() => {
-        const handleSSEProgress = (data: any) => {
-            console.log('[CHAT-SSE] Direct SSE progress event:', data);
-            
-            // Check for code-generation messages with files
-            if (data.type === 'code-generation' && data.files && data.files.length > 0) {
-                console.log('[CHAT-SSE] ✅ CODE GENERATION FILES RECEIVED!', data.files.length, 'files');
-                console.log('[CHAT-SSE] Files:', data.files.map((f: any) => f.filename));
-                
-                // IMMEDIATELY add to chat messages
-                setMessages(prev => {
-                    const filtered = prev.filter(m => !m.codeGenFiles);
-                    const newMessage = {
-                        text: '',
-                        sender: 'ai' as const,
-                        timestamp: new Date(),
-                        status: 'sent' as const,
-                        codeGenFiles: data.files
-                    };
-                    
-                    console.log('[CHAT-SSE] Adding code files to chat NOW');
-                    return [...filtered, newMessage];
-                });
-                
-                setUserHasScrolled(false);
-                setTimeout(() => smartScrollToBottom(), 100);
-            }
-        };
-        
-        // Listen to the progress event that comes from SSE
-        eventBus.on('progress', handleSSEProgress);
-        
-        // Also listen to direct code-generation events
-        const handleDirectCodeGeneration = (data: any) => {
-            console.log('[CHAT] ====== DIRECT CODE-GEN EVENT RECEIVED ======');
-            console.log('[CHAT] Event data:', data);
-            
-            if (data.type === 'code-generation' && data.files && data.files.length > 0) {
-                console.log('[CHAT] Processing direct code-gen event with', data.files.length, 'files');
-                
-                // Add immediately to messages
-                setMessages(prev => {
-                    const filtered = prev.filter(m => !m.codeGenFiles);
-                    const newMessage = {
-                        text: '',
-                        sender: 'ai' as const,
-                        timestamp: new Date(),
-                        status: 'sent' as const,
-                        codeGenFiles: data.files
-                    };
-                    
-                    console.log('[CHAT] Adding direct code-gen message to chat');
-                    return [...filtered, newMessage];
-                });
-                
-                setUserHasScrolled(false);
-                setTimeout(() => smartScrollToBottom(), 100);
-            }
-        };
-        
-        eventBus.on('code-generation', handleDirectCodeGeneration);
-        
-        return () => {
-            eventBus.off('progress', handleSSEProgress);
-            eventBus.off('code-generation', handleDirectCodeGeneration);
-        };
-    }, []);
+    // Remove duplicate SSE listeners - now handled by ChatChecklistBubble via useChecklistProgress
 
 
     // ———————————————————————————————
