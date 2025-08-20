@@ -197,6 +197,17 @@ const emitFileWritten = (sendProgress: (data: unknown) => void, isRustPhase: boo
       
       console.log(`[PROGRESS-SEND] 📤 SENT JSON progress message: ${allGeneratedFiles.length} files at ${progressPct}%`);
       console.log(`[PROGRESS-SEND] Message type: code-generation, files array length: ${allGeneratedFiles.length}`);
+      console.log(`[PROGRESS-SEND] Files being sent:`, allGeneratedFiles.map(f => ({ filename: f.filename, contentLength: f.content.length })));
+      console.log(`[PROGRESS-SEND] Full message being sent:`, JSON.stringify({
+        type: 'code-generation',
+        stage: 'code-gen',
+        status: 'active',
+        message: isRustPhase 
+          ? `🦀 Generated ${allGeneratedFiles.length} program files...`
+          : `🎨 Generated ${allGeneratedFiles.length} frontend files...`,
+        pct: progressPct,
+        files: allGeneratedFiles.map(f => ({ filename: f.filename, language: f.language, contentPreview: f.content.substring(0, 50) + '...' }))
+      }, null, 2));
     }
     
     // Small delay between files for visibility
@@ -223,6 +234,10 @@ export const handleGenerateCode = async ({
     const isDevServer = process.env.SF_DEV_SERVER === '1';
 
     console.log('[GEN] Starting code generation for project:', projectId);
+    
+    // Reset global file collection for this new code generation run
+    allGeneratedFiles.length = 0; // Clear the array
+    console.log('[GEN] ✅ Reset allGeneratedFiles array for new code generation run');
     
     try {
         // --------------------------------------------------------------------

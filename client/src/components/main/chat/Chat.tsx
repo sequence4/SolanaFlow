@@ -672,7 +672,7 @@ const Chat: React.FC = () => {
                                                 ? "user-message bg-gray-900/20 rounded-lg px-4 py-3 max-w-[80%] shadow-sm"
                                                 : isLog
                                                   ? "log-message text-foreground w-full font-mono text-sm text-gray-400 opacity-80"
-                                                  : "ai-message text-foreground w-full"
+                                                  : "w-full"
                                         } overflow-hidden`}
                                         style={{
                                             whiteSpace: 'pre-wrap',

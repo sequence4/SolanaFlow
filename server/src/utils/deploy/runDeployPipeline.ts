@@ -157,8 +157,17 @@ export async function runDeployPipeline({
     
     // Wrap sendProgress to coordinate with progress manager
     const managedProgressWrapper = (data: any) => {
-      if (data.type === 'code-generation' && data.pct) {
-        progressMgr.sendProgress('code-gen', data.pct, sendProgress, data.message, data);
+      if (data.type === 'code-generation') {
+        // ALWAYS pass through code-generation messages with files
+        console.log('[DEPLOY] Code-generation message detected, passing through:', {
+          type: data.type,
+          filesCount: data.files?.length || 0,
+          pct: data.pct,
+          message: data.message?.substring(0, 50)
+        });
+        sendProgress(data); // Pass the ORIGINAL data, not through progress manager
+      } else if (data.pct && data.stage) {
+        progressMgr.sendProgress(data.stage, data.pct, sendProgress, data.message, data);
       } else {
         sendProgress(data);
       }

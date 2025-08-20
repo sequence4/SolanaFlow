@@ -1,9 +1,8 @@
 "use client";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Check, AlertTriangle } from "lucide-react";
 import { Progress } from "../../../components/ui/progress";
 import { useChecklistProgress } from "../../../hooks/useChecklistProgress";
-import CodeSnippet from "../code/markdown/CodeSnippet";
 import CompactCodeSnippet from "../code/markdown/CompactCodeSnippet";
 
 export default function ChatChecklistBubble() {
