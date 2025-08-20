@@ -44,7 +44,17 @@ export function deployPipeline(
       try {
         const msg = JSON.parse(event.data);
         console.log(`[SSE] Received message:`, msg);
+        
+        // Emit BOTH the original progress event AND a specific code-generation event
         eventBus.emit('progress', msg);
+        
+        // Also emit a specific event for code generation
+        if (msg.type === 'code-generation' && msg.files) {
+          console.log('[SSE] ✅ Emitting code-generation event with', msg.files.length, 'files');
+          console.log('[SSE] Files being emitted:', msg.files.map((f: any) => f.filename));
+          eventBus.emit('code-generation', msg);
+        }
+        
         if (onProgress) {
           onProgress(msg);
         }

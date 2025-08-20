@@ -5,16 +5,15 @@ import { amendConfigFiles } from './amendConfigFiles';
 import { pollTaskStatus, createTask, updateTaskStatus, waitForTaskCompletion } from '../taskUtils';
 import { markWriteDone } from '../taskUtils/index';
 import { genSrcFiles } from './genSrcFiles';
-import { insertSrcFiles, InsertSrcProgressFn } from './insertSrcFiles';
+import { insertSrcFiles } from './insertSrcFiles';
 import { debugDumpContainerTree, debugPrintFiles } from '../containerUtils';
 import { ensureAnchorTomlProgram, ensureRootWorkspaceMembers } from './ensureConfigHelpers';
 import { parseNodeDetails } from './parseNodeDetails';
 import { lintWorkspaceManifests } from './cargoManifestLint';
 import { FileTreeItem } from '../../types/FileTreeItem';
-import { runCommand, runCommandDetached } from "../projectUtils";
+import { runCommand } from "../projectUtils";
 import { randomUUID } from 'crypto';
 import path from "path";
-import { execSync } from 'child_process';
 import { attachFileContents } from "../fileUtils/attachFileContents";
 import fs from 'fs/promises';            // promise-based FS API
 import fsSync from 'fs';                 // for existsSync in helper
@@ -247,7 +246,6 @@ export const handleGenerateCode = async ({
         const containerWebDir = `/usr/src/${workspace.rootPath}/web`;
 
         if (graph.nodes.length === 0) throw new Error('No nodes found');
-        let functionCode = null;
 
         // ───────────────── collect code blocks ───────────────────────────
         const functionParts = graph.nodes
@@ -265,8 +263,12 @@ export const handleGenerateCode = async ({
 
         console.log(`[GEN] Processing ${functionParts.length} code snippets from graph nodes`);
 
-        if (functionParts.length > 0) functionCode = functionParts.join('\n\n');
-        else console.log('[GEN] No valid function code found in nodes');
+        if (functionParts.length > 0) {
+            const functionCode = functionParts.join('\n\n');
+            console.log('[GEN] Combined function code length:', functionCode.length);
+        } else {
+            console.log('[GEN] No valid function code found in nodes');
+        }
         
         sendProgress({ stage: 'file-tree', message: 'Refreshing file tree…' });
         const fileTreeTaskIds = await refreshWorkspaceTree(projectId, userId);
@@ -895,6 +897,38 @@ EOF'`,
           message: '✅ Code generation completed successfully!',
           pct: 100
         });
+
+        // FORCE send all generated files at end to guarantee delivery
+        console.log('[GEN] ====== FORCE SENDING ALL GENERATED FILES ======');
+        console.log('[GEN] Total files to send:', allGeneratedFiles.length);
+        console.log('[GEN] Files to send:', allGeneratedFiles.map(f => ({ filename: f.filename, contentLength: f.content.length })));
+
+        if (allGeneratedFiles.length > 0) {
+          const forceSend = {
+            type: 'code-generation',
+            stage: 'code-gen',
+            status: 'active',
+            message: `🦀 Generated ${allGeneratedFiles.length} Solana program files`,
+            files: allGeneratedFiles,
+            pct: 100
+          };
+          
+          console.log('[GEN] FORCE SENDING:', {
+            type: forceSend.type,
+            filesCount: forceSend.files.length,
+            message: forceSend.message,
+            fileNames: forceSend.files.map(f => f.filename)
+          });
+          sendProgress(forceSend);
+          
+          // Send it TWICE to make sure it gets through
+          setTimeout(() => {
+            console.log('[GEN] SENDING AGAIN to ensure delivery');
+            sendProgress(forceSend);
+          }, 1000);
+        } else {
+          console.log('[GEN] ⚠️  No files in allGeneratedFiles to send!');
+        }
         
         // ─── end of function ────────────────────────────────
         return { sentinelId, programName };

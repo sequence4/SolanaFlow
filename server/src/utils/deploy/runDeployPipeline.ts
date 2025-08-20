@@ -10,9 +10,8 @@ import {
 } from "../projectUtils";
 import { waitForTaskCompletion } from "../taskUtils";
 import path from "path";
-import fs from "fs/promises";
 import { execSync } from "child_process"; 
-import { PublicKey, Keypair } from "@solana/web3.js";
+import { Keypair } from "@solana/web3.js";
 import { attachFileContents } from "../fileUtils/attachFileContents";
 import { readContainerFile } from "../fileUtils/attachFileContents";
 import { v4 as uuidv4 } from "uuid";
@@ -76,7 +75,6 @@ interface PipelineArgs {
   userId: string;
   graph: Graph; 
   sendProgress: (data: unknown) => void;
-  walletSigned?: boolean;
   devMode?: boolean;
 }
 
@@ -111,7 +109,6 @@ export async function runDeployPipeline({
   userId,
   graph,
   sendProgress,
-  walletSigned = false,
   devMode = false,
 }: PipelineArgs): Promise<void> {
   let programKeypair: Keypair | null = null;

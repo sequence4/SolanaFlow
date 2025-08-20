@@ -277,9 +277,65 @@ const Chat: React.FC = () => {
         }
     }, [systemLogs, lastLogIndex, taskLogs.isBuilding, messages]);
 
-    // Add direct event listener for code generation events
+    // Add comprehensive debugging to trace ALL events
     useEffect(() => {
-        const handleCodeGeneration = (data: any) => {
+        const logAllEvents = (eventName: string) => {
+            return (data: any) => {
+                console.log(`[CHAT-DEBUG] Event "${eventName}":`, data);
+                if (data.type === 'code-generation') {
+                    console.log('[CHAT-DEBUG] 🎯 CODE-GENERATION EVENT DETECTED!');
+                    console.log('[CHAT-DEBUG] Files count:', data.files?.length || 0);
+                    console.log('[CHAT-DEBUG] Files:', data.files?.map((f: any) => f.filename));
+                }
+            };
+        };
+        
+        eventBus.on('progress', logAllEvents('progress'));
+        eventBus.on('code-generation', logAllEvents('code-generation'));
+        eventBus.on('file-written', logAllEvents('file-written'));
+        
+        return () => {
+            eventBus.off('progress', logAllEvents('progress'));
+            eventBus.off('code-generation', logAllEvents('code-generation'));
+            eventBus.off('file-written', logAllEvents('file-written'));
+        };
+    }, []);
+
+    // Add direct SSE listener to bypass systemLogs for code-generation
+    useEffect(() => {
+        const handleSSEProgress = (data: any) => {
+            console.log('[CHAT-SSE] Direct SSE progress event:', data);
+            
+            // Check for code-generation messages with files
+            if (data.type === 'code-generation' && data.files && data.files.length > 0) {
+                console.log('[CHAT-SSE] ✅ CODE GENERATION FILES RECEIVED!', data.files.length, 'files');
+                console.log('[CHAT-SSE] Files:', data.files.map((f: any) => f.filename));
+                
+                // IMMEDIATELY add to chat messages
+                setMessages(prev => {
+                    const filtered = prev.filter(m => !m.codeGenFiles);
+                    const newMessage = {
+                        text: '',
+                        sender: 'ai' as const,
+                        timestamp: new Date(),
+                        status: 'sent' as const,
+                        codeGenFiles: data.files
+                    };
+                    
+                    console.log('[CHAT-SSE] Adding code files to chat NOW');
+                    return [...filtered, newMessage];
+                });
+                
+                setUserHasScrolled(false);
+                setTimeout(() => smartScrollToBottom(), 100);
+            }
+        };
+        
+        // Listen to the progress event that comes from SSE
+        eventBus.on('progress', handleSSEProgress);
+        
+        // Also listen to direct code-generation events
+        const handleDirectCodeGeneration = (data: any) => {
             console.log('[CHAT] ====== DIRECT CODE-GEN EVENT RECEIVED ======');
             console.log('[CHAT] Event data:', data);
             
@@ -306,8 +362,12 @@ const Chat: React.FC = () => {
             }
         };
         
-        eventBus.on('code-generation', handleCodeGeneration);
-        return () => eventBus.off('code-generation', handleCodeGeneration);
+        eventBus.on('code-generation', handleDirectCodeGeneration);
+        
+        return () => {
+            eventBus.off('progress', handleSSEProgress);
+            eventBus.off('code-generation', handleDirectCodeGeneration);
+        };
     }, []);
 
 
