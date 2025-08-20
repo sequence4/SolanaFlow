@@ -4,6 +4,7 @@ import { Handle, Position } from "@xyflow/react";
 // Styles
 import './style/instructionStyle.css';
 import "@/styles/nodes/basicNodeStyle.css";
+import '@/styles/modern-instruction-node.css';
 import { darkTheme } from '@/styles/theme';
 
 // Icons

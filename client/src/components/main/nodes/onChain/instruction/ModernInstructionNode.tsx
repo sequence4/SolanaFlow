@@ -2,28 +2,42 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { ChevronRight, Copy, Check } from 'lucide-react';
 
+// Styles
+import '@/styles/modern-instruction-node.css';
+
+// Types
 import {
   EnhancedInstructionNodeData,
   EnhancedAccount,
-  EnhancedParameter,
-  CATEGORY_COLORS,
-  ACCOUNT_TYPE_ICONS
+  EnhancedParameter
 } from '@/types/EnhancedInstructionTypes';
 
-// Import modern styles
-import '@/styles/modern-instruction-node.css';
+// Legacy types for backward compatibility
+interface Account {
+  label: string;
+  type: string;
+  description?: string;
+  info?: any;
+  isWritable?: boolean;
+  isSigner?: boolean;
+  publicKey?: string;
+}
 
-// Account type to emoji mapping
-const ACCOUNT_TYPE_EMOJIS = {
-  'AccountInfo': '📝',
-  'Program': '⚙️',
-  'Sysvar': '🔧',
-  'TokenAccount': '💰',
-  'Mint': '🔑',
-  'AssociatedTokenAccount': '🔗',
-  'Multisig': '👥',
-  'Unknown': '❓'
-};
+interface Parameter {
+  label: string;
+  type: string;
+  value?: string;
+}
+
+interface InstructionGroupNodeData {
+  label: string;
+  description?: string;
+  accounts?: Account[];
+  parameters?: Parameter[];
+  errorCodes?: any[];
+  events?: any[];
+  code?: string;
+}
 
 // Toast notification component
 const Toast: React.FC<{ message: string; onClose: () => void }> = ({ message, onClose }) => {
@@ -42,14 +56,18 @@ const Toast: React.FC<{ message: string; onClose: () => void }> = ({ message, on
   );
 };
 
-// Account Card Component - Modern Clean Design
-const AccountCard: React.FC<{ account: EnhancedAccount; index: number }> = ({ account, index }) => {
+// Account item component with modern design
+const AccountItem: React.FC<{ 
+  account: EnhancedAccount | Account; 
+  index: number 
+}> = ({ account, index }) => {
   const [showToast, setShowToast] = useState(false);
   
   const handleCopyAddress = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (account?.publicKey) {
-      navigator.clipboard.writeText(account.publicKey);
+    const address = 'publicKey' in account ? account.publicKey : '11111111111111111111111111111111';
+    if (address) {
+      navigator.clipboard.writeText(address);
       setShowToast(true);
     }
   };
@@ -60,7 +78,7 @@ const AccountCard: React.FC<{ account: EnhancedAccount; index: number }> = ({ ac
   };
 
   const getAccountTypeClass = () => {
-    const type = account?.type?.toLowerCase() || '';
+    const type = account.type?.toLowerCase() || '';
     if (type.includes('mint')) return 'mint';
     if (type.includes('authority')) return 'authority';  
     if (type.includes('program') || type.includes('sysvar')) return 'system';
@@ -69,9 +87,9 @@ const AccountCard: React.FC<{ account: EnhancedAccount; index: number }> = ({ ac
 
   const getCombinedFlags = () => {
     const flags = [];
-    if (account?.isSigner) flags.push('S');
-    if (account?.isWritable) flags.push('W');
-    if (account?.label?.toLowerCase().includes('payer')) flags.push('P');
+    if (account.isSigner) flags.push('S');
+    if (account.isWritable) flags.push('W');
+    if (account.label?.toLowerCase().includes('payer')) flags.push('P');
     return flags.join('');
   };
 
@@ -82,10 +100,10 @@ const AccountCard: React.FC<{ account: EnhancedAccount; index: number }> = ({ ac
       <div className={`modern-account-item ${getAccountTypeClass()}`}>
         <div className="modern-account-info">
           <div className="modern-account-name">
-            {account?.label || 'Unknown Account'}
+            {account.label || 'Unknown Account'}
           </div>
           <div className="modern-account-address">
-            {truncateAddress(account?.publicKey)}
+            {truncateAddress('publicKey' in account ? account.publicKey : undefined)}
             <button 
               className="modern-copy-button"
               onClick={handleCopyAddress}
@@ -120,28 +138,35 @@ const AccountCard: React.FC<{ account: EnhancedAccount; index: number }> = ({ ac
   );
 };
 
-// Data Field Component - Modern Design
-const DataField: React.FC<{ parameter: EnhancedParameter; index: number }> = ({ parameter, index }) => {
-  const [value, setValue] = useState(parameter?.value || '');
+// Data field component with inline editing
+const DataField: React.FC<{ 
+  parameter: EnhancedParameter | Parameter; 
+  index: number 
+}> = ({ parameter, index }) => {
+  const [value, setValue] = useState(parameter.value || '');
   const [isFocused, setIsFocused] = useState(false);
   
   const getPlaceholder = () => {
-    if (parameter?.placeholder) return parameter.placeholder;
-    if (parameter?.type?.toLowerCase().includes('option')) return `Optional: ${parameter.label}`;
-    if (parameter?.type === 'u8') return 'Enter number (0-255)';
-    if (parameter?.type === 'u64') return 'Enter large number';
-    if (parameter?.type?.toLowerCase().includes('pubkey')) return 'Enter public key';
-    return `Enter ${parameter?.label?.toLowerCase() || 'value'}`;
+    if ('placeholder' in parameter && parameter.placeholder) {
+      return parameter.placeholder;
+    }
+    
+    const type = parameter.type?.toLowerCase() || '';
+    if (type.includes('option')) return `Optional: ${parameter.label}`;
+    if (type === 'u8') return 'Enter number (0-255)';
+    if (type === 'u64') return 'Enter large number';
+    if (type.includes('pubkey')) return 'Enter public key';
+    return `Enter ${parameter.label?.toLowerCase() || 'value'}`;
   };
 
   return (
     <div className="modern-data-field">
       <div className="modern-data-field-header">
         <span className="modern-data-field-name">
-          {parameter?.label || 'Parameter'}
+          {parameter.label || 'Parameter'}
         </span>
         <span className="modern-data-field-type">
-          {parameter?.type || 'unknown'}
+          {parameter.type || 'unknown'}
         </span>
       </div>
       <input
@@ -152,28 +177,69 @@ const DataField: React.FC<{ parameter: EnhancedParameter; index: number }> = ({ 
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
         placeholder={getPlaceholder()}
-        aria-label={`Input for ${parameter?.label}`}
+        aria-label={`Input for ${parameter.label}`}
       />
     </div>
   );
 };
 
-// Main Enhanced Instruction Node Component
-export const EnhancedInstructionNode: React.FC<{ data: EnhancedInstructionNodeData }> = ({ data }) => {
-  // Handle cases where data might be missing - MUST BE DEFINED FIRST
+// Collapsible section component
+const CollapsibleSection: React.FC<{
+  title: string;
+  count?: number;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}> = ({ title, count, defaultOpen = true, children }) => {
+  const [isExpanded, setIsExpanded] = useState(defaultOpen);
+  
+  return (
+    <div className="modern-section">
+      <div 
+        className="modern-collapsible-header"
+        onClick={() => setIsExpanded(!isExpanded)}
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsExpanded(!isExpanded);
+          }
+        }}
+      >
+        <ChevronRight 
+          size={14} 
+          className={`modern-chevron ${isExpanded ? 'expanded' : ''}`} 
+        />
+        <span className="modern-section-title">{title}</span>
+        {count !== undefined && (
+          <span className="modern-badge">{count}</span>
+        )}
+      </div>
+      <div className={`modern-collapsible-content ${isExpanded ? 'expanded' : 'collapsed'}`}>
+        {children}
+      </div>
+    </div>
+  );
+};
+
+// Main Modern Instruction Node Component
+export const ModernInstructionNode: React.FC<{ 
+  data: EnhancedInstructionNodeData | InstructionGroupNodeData 
+}> = ({ data }) => {
+  // Safely handle both data formats
   const safeData = {
-    ...data,
-    programId: data.programId || 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
-    category: data.category || 'other',
-    validationStatus: data.validationStatus || 'valid'
+    label: data.label || 'Unknown Instruction',
+    programId: 'programId' in data ? data.programId : 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+    description: data.description,
+    accounts: data.accounts || [],
+    parameters: data.parameters || [],
+    validationStatus: 'validationStatus' in data ? data.validationStatus : 'valid'
   };
 
-  const accounts = data.accounts || [];
-  const parameters = data.parameters || [];
-  
-  // Get the instruction icon based on name
+  // Get instruction icon based on name
   const getInstructionIcon = () => {
-    const name = safeData.label?.toLowerCase() || '';
+    const name = safeData.label.toLowerCase();
     if (name.includes('mint')) return 'M';
     if (name.includes('transfer')) return 'T';
     if (name.includes('burn')) return 'B';
@@ -181,45 +247,7 @@ export const EnhancedInstructionNode: React.FC<{ data: EnhancedInstructionNodeDa
     if (name.includes('initialize') || name.includes('init')) return 'I';
     if (name.includes('create')) return 'C';
     if (name.includes('close')) return 'X';
-    return safeData.label?.charAt(0).toUpperCase() || 'N';
-  };
-
-  const getValidationStatus = () => {
-    switch (safeData.validationStatus) {
-      case 'valid': return '✓ Valid';
-      case 'warning': return '⚠ Warning';
-      case 'error': return '✗ Error';
-      case 'pending': return '⏳ Validating';
-      default: return '✓ Valid';
-    }
-  };
-
-  const truncateProgramId = (programId: string) => {
-    if (!programId || programId.length <= 16) return programId;
-    return programId;
-  };
-
-  // Generate description based on instruction type
-  const getDescription = () => {
-    if (safeData.description) return safeData.description;
-    
-    const name = safeData.label?.toLowerCase() || '';
-    if (name.includes('initialize') && name.includes('mint')) {
-      return 'Creates and initializes a new SPL token mint account with the specified decimals and authorities. This instruction must be called before any tokens can be minted.';
-    }
-    if (name.includes('mint')) {
-      return 'Mints new tokens to the specified destination account. Requires mint authority signature.';
-    }
-    if (name.includes('transfer')) {
-      return 'Transfers tokens from source account to destination account. Requires owner or delegate signature.';
-    }
-    if (name.includes('approve')) {
-      return 'Approves a delegate to spend tokens from the source account up to the specified amount.';
-    }
-    if (name.includes('burn')) {
-      return 'Burns tokens from the specified account, reducing the total supply. Requires owner or delegate signature.';
-    }
-    return `Executes ${safeData.label} instruction on the Solana blockchain.`;
+    return safeData.label.charAt(0).toUpperCase() || 'N';
   };
 
   // Get status dot class based on validation
@@ -229,6 +257,12 @@ export const EnhancedInstructionNode: React.FC<{ data: EnhancedInstructionNodeDa
       case 'error': return 'error';
       default: return '';
     }
+  };
+
+  // Truncate program ID for display
+  const truncateProgramId = (programId: string) => {
+    if (programId.length <= 16) return programId;
+    return `${programId.slice(0, 8)}...${programId.slice(-8)}`;
   };
 
   return (
@@ -253,52 +287,54 @@ export const EnhancedInstructionNode: React.FC<{ data: EnhancedInstructionNodeDa
       {/* Body with all sections in single scrollable view */}
       <div className="modern-node-body">
         {/* Description (if provided) */}
-        <div className="modern-section">
-          <div style={{ 
-            padding: '8px 12px', 
-            backgroundColor: 'rgba(59, 130, 246, 0.02)',
-            border: '1px solid rgba(59, 130, 246, 0.1)',
-            borderLeft: '3px solid var(--accent)',
-            borderRadius: '6px',
-            fontSize: '12px',
-            lineHeight: '1.4',
-            color: 'var(--text-secondary)',
-            marginBottom: '16px'
-          }}>
-            {getDescription()}
-          </div>
-        </div>
-
-        {/* Accounts Section */}
-        {accounts.length > 0 && (
+        {safeData.description && (
           <div className="modern-section">
             <div className="modern-section-header">
-              <span className="modern-section-title">Accounts</span>
-              <span className="modern-badge">{accounts.length}</span>
+              <span className="modern-section-title">Description</span>
             </div>
-            
-            {accounts.map((account, index) => (
-              <AccountCard key={index} account={account} index={index} />
-            ))}
+            <div style={{ 
+              padding: '8px 12px', 
+              backgroundColor: 'rgba(59, 130, 246, 0.02)',
+              border: '1px solid rgba(59, 130, 246, 0.1)',
+              borderLeft: '3px solid var(--accent)',
+              borderRadius: '6px',
+              fontSize: '12px',
+              lineHeight: '1.4',
+              color: 'var(--text-secondary)'
+            }}>
+              {safeData.description}
+            </div>
           </div>
+        )}
+
+        {/* Accounts Section */}
+        {safeData.accounts.length > 0 && (
+          <CollapsibleSection 
+            title="Accounts" 
+            count={safeData.accounts.length}
+            defaultOpen={true}
+          >
+            {safeData.accounts.map((account, index) => (
+              <AccountItem key={index} account={account} index={index} />
+            ))}
+          </CollapsibleSection>
         )}
 
         {/* Instruction Data Section */}
-        {parameters.length > 0 && (
-          <div className="modern-section">
-            <div className="modern-section-header">
-              <span className="modern-section-title">Instruction Data</span>
-              <span className="modern-badge">{parameters.length}</span>
-            </div>
-            
-            {parameters.map((parameter, index) => (
+        {safeData.parameters.length > 0 && (
+          <CollapsibleSection 
+            title="Instruction Data" 
+            count={safeData.parameters.length}
+            defaultOpen={true}
+          >
+            {safeData.parameters.map((parameter, index) => (
               <DataField key={index} parameter={parameter} index={index} />
             ))}
-          </div>
+          </CollapsibleSection>
         )}
 
         {/* Empty state when no accounts or parameters */}
-        {accounts.length === 0 && parameters.length === 0 && (
+        {safeData.accounts.length === 0 && safeData.parameters.length === 0 && (
           <div style={{
             textAlign: 'center',
             padding: '24px',
