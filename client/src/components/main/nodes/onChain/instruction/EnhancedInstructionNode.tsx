@@ -197,32 +197,9 @@ export const EnhancedInstructionNode: React.FC<{ data: EnhancedInstructionNodeDa
   const accounts = data.accounts || [];
   const parameters = data.parameters || [];
   
-  // Get the instruction icon based on name
-  const getInstructionIcon = () => {
-    const name = safeData.label?.toLowerCase() || '';
-    if (name.includes('mint')) return 'M';
-    if (name.includes('transfer')) return 'T';
-    if (name.includes('burn')) return 'B';
-    if (name.includes('approve')) return 'A';
-    if (name.includes('initialize') || name.includes('init')) return 'I';
-    if (name.includes('create')) return 'C';
-    if (name.includes('close')) return 'X';
-    return safeData.label?.charAt(0).toUpperCase() || 'N';
-  };
-
-  const getValidationStatus = () => {
-    switch (safeData.validationStatus) {
-      case 'valid': return '✓ Valid';
-      case 'warning': return '⚠ Warning';
-      case 'error': return '✗ Error';
-      case 'pending': return '⏳ Validating';
-      default: return '✓ Valid';
-    }
-  };
-
   const truncateProgramId = (programId: string) => {
     if (!programId || programId.length <= 16) return programId;
-    return programId;
+    return `${programId.slice(0, 8)}...${programId.slice(-8)}`;
   };
 
   // Generate description based on instruction type
@@ -253,9 +230,6 @@ export const EnhancedInstructionNode: React.FC<{ data: EnhancedInstructionNodeDa
       {/* Header with instruction name */}
       <div className="modern-node-header">
         <div className="modern-node-title">
-          <div className="modern-node-icon" aria-label="Instruction icon">
-            {getInstructionIcon()}
-          </div>
           <span className="modern-node-name">{safeData.label}</span>
           <div className="modern-program-id" title={safeData.programId}>
             {truncateProgramId(safeData.programId)}

@@ -237,28 +237,6 @@ export const ModernInstructionNode: React.FC<{
     validationStatus: 'validationStatus' in data ? data.validationStatus : 'valid'
   };
 
-  // Get instruction icon based on name
-  const getInstructionIcon = () => {
-    const name = safeData.label.toLowerCase();
-    if (name.includes('mint')) return 'M';
-    if (name.includes('transfer')) return 'T';
-    if (name.includes('burn')) return 'B';
-    if (name.includes('approve')) return 'A';
-    if (name.includes('initialize') || name.includes('init')) return 'I';
-    if (name.includes('create')) return 'C';
-    if (name.includes('close')) return 'X';
-    return safeData.label.charAt(0).toUpperCase() || 'N';
-  };
-
-  // Get status dot class based on validation
-  const getStatusClass = () => {
-    switch (safeData.validationStatus) {
-      case 'warning': return 'warning';
-      case 'error': return 'error';
-      default: return '';
-    }
-  };
-
   // Truncate program ID for display
   const truncateProgramId = (programId: string) => {
     if (programId.length <= 16) return programId;
@@ -270,9 +248,6 @@ export const ModernInstructionNode: React.FC<{
       {/* Header with instruction name */}
       <div className="modern-node-header">
         <div className="modern-node-title">
-          <div className="modern-node-icon" aria-label="Instruction icon">
-            {getInstructionIcon()}
-          </div>
           <span className="modern-node-name">{safeData.label}</span>
           <div className="modern-program-id" title={safeData.programId}>
             {truncateProgramId(safeData.programId)}
