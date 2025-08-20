@@ -19,14 +19,6 @@ const testData: EnhancedInstructionNodeData = {
       isSigner: false,
     },
     {
-      label: 'Rent Sysvar',
-      type: AccountType.SYSVAR,
-      publicKey: 'SysvarRent111111111111111111111111111111111',
-      description: 'Rent sysvar account',
-      isWritable: false,
-      isSigner: false,
-    },
-    {
       label: 'Mint Authority',
       type: AccountType.ACCOUNT_INFO,
       publicKey: 'AuthorityAccountForMintOperations123456789',
@@ -50,14 +42,6 @@ const testData: EnhancedInstructionNodeData = {
       placeholder: 'Enter mint authority public key',
       description: 'Public key of the mint authority',
       required: true,
-    },
-    {
-      label: 'Freeze Authority',
-      type: ParameterType.OPTIONAL,
-      value: '',
-      placeholder: 'Optional freeze authority',
-      description: 'Optional public key of the freeze authority',
-      required: false,
     },
   ],
 };

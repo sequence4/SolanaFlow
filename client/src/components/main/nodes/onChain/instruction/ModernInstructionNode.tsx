@@ -189,7 +189,7 @@ const CollapsibleSection: React.FC<{
   count?: number;
   defaultOpen?: boolean;
   children: React.ReactNode;
-}> = ({ title, count, defaultOpen = true, children }) => {
+}> = ({ title, count, defaultOpen = false, children }) => {
   const [isExpanded, setIsExpanded] = useState(defaultOpen);
   
   return (
@@ -208,7 +208,7 @@ const CollapsibleSection: React.FC<{
         }}
       >
         <ChevronRight 
-          size={14} 
+          size={12} 
           className={`modern-chevron ${isExpanded ? 'expanded' : ''}`} 
         />
         <span className="modern-section-title">{title}</span>
@@ -267,7 +267,7 @@ export const ModernInstructionNode: React.FC<{
 
   return (
     <div className="modern-instruction-node">
-      {/* Header with instruction name and status */}
+      {/* Header with instruction name */}
       <div className="modern-node-header">
         <div className="modern-node-title">
           <div className="modern-node-icon" aria-label="Instruction icon">
@@ -278,10 +278,6 @@ export const ModernInstructionNode: React.FC<{
             {truncateProgramId(safeData.programId)}
           </div>
         </div>
-        <div className={`modern-status-dot ${getStatusClass()}`} 
-             title={`Status: ${safeData.validationStatus || 'valid'}`}
-             aria-label={`Status: ${safeData.validationStatus || 'valid'}`}
-        />
       </div>
 
       {/* Body with all sections in single scrollable view */}
@@ -312,7 +308,7 @@ export const ModernInstructionNode: React.FC<{
           <CollapsibleSection 
             title="Accounts" 
             count={safeData.accounts.length}
-            defaultOpen={true}
+            defaultOpen={false}
           >
             {safeData.accounts.map((account, index) => (
               <AccountItem key={index} account={account} index={index} />
@@ -325,7 +321,7 @@ export const ModernInstructionNode: React.FC<{
           <CollapsibleSection 
             title="Instruction Data" 
             count={safeData.parameters.length}
-            defaultOpen={true}
+            defaultOpen={false}
           >
             {safeData.parameters.map((parameter, index) => (
               <DataField key={index} parameter={parameter} index={index} />

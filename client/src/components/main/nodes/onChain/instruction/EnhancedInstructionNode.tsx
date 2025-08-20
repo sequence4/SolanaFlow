@@ -1,29 +1,15 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { ChevronRight, Copy, Check } from 'lucide-react';
 
 import {
   EnhancedInstructionNodeData,
   EnhancedAccount,
-  EnhancedParameter,
-  CATEGORY_COLORS,
-  ACCOUNT_TYPE_ICONS
+  EnhancedParameter
 } from '@/types/EnhancedInstructionTypes';
 
 // Import modern styles
 import '@/styles/modern-instruction-node.css';
-
-// Account type to emoji mapping
-const ACCOUNT_TYPE_EMOJIS = {
-  'AccountInfo': '📝',
-  'Program': '⚙️',
-  'Sysvar': '🔧',
-  'TokenAccount': '💰',
-  'Mint': '🔑',
-  'AssociatedTokenAccount': '🔗',
-  'Multisig': '👥',
-  'Unknown': '❓'
-};
 
 // Toast notification component
 const Toast: React.FC<{ message: string; onClose: () => void }> = ({ message, onClose }) => {
@@ -158,6 +144,46 @@ const DataField: React.FC<{ parameter: EnhancedParameter; index: number }> = ({ 
   );
 };
 
+// Collapsible section component
+const CollapsibleSection: React.FC<{
+  title: string;
+  count?: number;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}> = ({ title, count, defaultOpen = false, children }) => {
+  const [isExpanded, setIsExpanded] = useState(defaultOpen);
+  
+  return (
+    <div className="modern-section">
+      <div 
+        className="modern-collapsible-header"
+        onClick={() => setIsExpanded(!isExpanded)}
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsExpanded(!isExpanded);
+          }
+        }}
+      >
+        <ChevronRight 
+          size={12} 
+          className={`modern-chevron ${isExpanded ? 'expanded' : ''}`} 
+        />
+        <span className="modern-section-title">{title}</span>
+        {count !== undefined && (
+          <span className="modern-badge">{count}</span>
+        )}
+      </div>
+      <div className={`modern-collapsible-content ${isExpanded ? 'expanded' : 'collapsed'}`}>
+        {children}
+      </div>
+    </div>
+  );
+};
+
 // Main Enhanced Instruction Node Component
 export const EnhancedInstructionNode: React.FC<{ data: EnhancedInstructionNodeData }> = ({ data }) => {
   // Handle cases where data might be missing - MUST BE DEFINED FIRST
@@ -222,18 +248,9 @@ export const EnhancedInstructionNode: React.FC<{ data: EnhancedInstructionNodeDa
     return `Executes ${safeData.label} instruction on the Solana blockchain.`;
   };
 
-  // Get status dot class based on validation
-  const getStatusClass = () => {
-    switch (safeData.validationStatus) {
-      case 'warning': return 'warning';
-      case 'error': return 'error';
-      default: return '';
-    }
-  };
-
   return (
     <div className="modern-instruction-node">
-      {/* Header with instruction name and status */}
+      {/* Header with instruction name */}
       <div className="modern-node-header">
         <div className="modern-node-title">
           <div className="modern-node-icon" aria-label="Instruction icon">
@@ -244,10 +261,6 @@ export const EnhancedInstructionNode: React.FC<{ data: EnhancedInstructionNodeDa
             {truncateProgramId(safeData.programId)}
           </div>
         </div>
-        <div className={`modern-status-dot ${getStatusClass()}`} 
-             title={`Status: ${safeData.validationStatus || 'valid'}`}
-             aria-label={`Status: ${safeData.validationStatus || 'valid'}`}
-        />
       </div>
 
       {/* Body with all sections in single scrollable view */}
@@ -271,30 +284,28 @@ export const EnhancedInstructionNode: React.FC<{ data: EnhancedInstructionNodeDa
 
         {/* Accounts Section */}
         {accounts.length > 0 && (
-          <div className="modern-section">
-            <div className="modern-section-header">
-              <span className="modern-section-title">Accounts</span>
-              <span className="modern-badge">{accounts.length}</span>
-            </div>
-            
+          <CollapsibleSection 
+            title="Accounts" 
+            count={accounts.length}
+            defaultOpen={false}
+          >
             {accounts.map((account, index) => (
               <AccountCard key={index} account={account} index={index} />
             ))}
-          </div>
+          </CollapsibleSection>
         )}
 
         {/* Instruction Data Section */}
         {parameters.length > 0 && (
-          <div className="modern-section">
-            <div className="modern-section-header">
-              <span className="modern-section-title">Instruction Data</span>
-              <span className="modern-badge">{parameters.length}</span>
-            </div>
-            
+          <CollapsibleSection 
+            title="Instruction Data" 
+            count={parameters.length}
+            defaultOpen={false}
+          >
             {parameters.map((parameter, index) => (
               <DataField key={index} parameter={parameter} index={index} />
             ))}
-          </div>
+          </CollapsibleSection>
         )}
 
         {/* Empty state when no accounts or parameters */}
