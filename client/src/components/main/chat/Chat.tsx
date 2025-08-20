@@ -77,6 +77,8 @@ const Chat: React.FC = () => {
     const [selectedModel, setSelectedModel] = useState('gpt-4o');
     const [isExpanded, setIsExpanded] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
+    const [isThinking, setIsThinking] = useState(false);
+    const [thinkingMessage, setThinkingMessage] = useState('');
     const taskLogs = useTaskLogs();  // Complete taskLogs object including systemLogs and setSuppressToast
     const { systemLogs } = taskLogs;
     const [lastLogIndex, setLastLogIndex] = useState(0);  // 🟡 NEW
@@ -114,7 +116,7 @@ const Chat: React.FC = () => {
 
     useEffect(() => {
         smartScrollToBottom();
-    }, [messages, isTyping, userHasScrolled]);
+    }, [messages, isTyping, isThinking, userHasScrolled]);
 
     useEffect(() => {
         console.log(selectedFile);
@@ -314,18 +316,35 @@ const Chat: React.FC = () => {
           // 1) prevent toast
           taskLogs.setSuppressToast(true);
 
-          // 2) forward build command globally
-          eventBus.emit('chat-build-command');
-
-          // 3) insert checklist bubble before returning
+          // 2) Add user message first
           setMessages(prev => [
             ...prev,
-            { text: input, sender: 'user', timestamp: new Date(), status: 'sent' },
-            { text: "", sender: 'ai', isChecklist: true, timestamp: new Date(), status: 'sent' }
+            { text: input, sender: 'user', timestamp: new Date(), status: 'sent' }
           ]);
           setInput('');
-          setUserHasScrolled(false); // Reset scroll state
-          return;                             // stop normal AI flow
+          setUserHasScrolled(false);
+
+          // 3) Show AI thinking state with specific message
+          setIsThinking(true);
+          setThinkingMessage('Analyzing your project structure and preparing build pipeline...');
+          
+          // 4) Add a brief thinking delay (2-3 seconds)
+          await new Promise(resolve => setTimeout(resolve, 2500));
+          
+          // 5) Stop thinking and show checklist
+          setIsThinking(false);
+          setThinkingMessage('');
+          
+          // 6) Add checklist bubble and forward build command
+          setMessages(prev => [
+            ...prev,
+            { text: "", sender: 'ai', isChecklist: true, timestamp: new Date(), status: 'sent' }
+          ]);
+
+          // 7) Forward build command globally after the delay
+          eventBus.emit('chat-build-command');
+          
+          return; // stop normal AI flow
         }
         
         if (input.trim()) {
@@ -648,8 +667,8 @@ const Chat: React.FC = () => {
                         })}
                     </AnimatePresence>
 
-                    {/* Typing indicator */}
-                    {isTyping && (
+                    {/* Typing/Thinking indicator */}
+                    {(isTyping || isThinking) && (
                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
                             <div className="typing-indicator bg-muted text-foreground rounded-lg p-3 max-w-[95%] overflow-hidden"
                                 style={{
@@ -658,14 +677,21 @@ const Chat: React.FC = () => {
                                     overflowWrap: 'break-word'
                                 }}
                             >
-                                <div className="flex items-center gap-2">
-                                    <div className="bot-icon-container bg-muted-foreground/10 p-1 rounded-full">
+                                <div className="flex items-start gap-2">
+                                    <div className="bot-icon-container bg-muted-foreground/10 p-1 rounded-full mt-1">
                                         <Bot size={14} className="bot-icon text-muted-foreground" />
                                     </div>
-                                    <div className="flex space-x-1">
-                                        <div className="typing-dot ai-thinking-dot w-2 h-2 rounded-full bg-muted-foreground animate-pulse"></div>
-                                        <div className="typing-dot ai-thinking-dot w-2 h-2 rounded-full bg-muted-foreground animate-pulse delay-150"></div>
-                                        <div className="typing-dot ai-thinking-dot w-2 h-2 rounded-full bg-muted-foreground animate-pulse delay-300"></div>
+                                    <div className="flex flex-col gap-2">
+                                        {isThinking && thinkingMessage && (
+                                            <div className="text-sm text-muted-foreground italic">
+                                                {thinkingMessage}
+                                            </div>
+                                        )}
+                                        <div className="flex space-x-1">
+                                            <div className="typing-dot ai-thinking-dot w-2 h-2 rounded-full bg-muted-foreground animate-pulse"></div>
+                                            <div className="typing-dot ai-thinking-dot w-2 h-2 rounded-full bg-muted-foreground animate-pulse delay-150"></div>
+                                            <div className="typing-dot ai-thinking-dot w-2 h-2 rounded-full bg-muted-foreground animate-pulse delay-300"></div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
