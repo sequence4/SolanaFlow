@@ -79,6 +79,7 @@ const Chat: React.FC = () => {
     const [isTyping, setIsTyping] = useState(false);
     const [isThinking, setIsThinking] = useState(false);
     const [thinkingMessage, setThinkingMessage] = useState('');
+    const [thinkingSteps, setThinkingSteps] = useState<Array<{text: string, completed: boolean}>>([]);
     const taskLogs = useTaskLogs();  // Complete taskLogs object including systemLogs and setSuppressToast
     const { systemLogs } = taskLogs;
     const [lastLogIndex, setLastLogIndex] = useState(0);  // 🟡 NEW
@@ -327,16 +328,36 @@ const Chat: React.FC = () => {
           // 3) Wait a moment before showing AI is thinking (more natural)
           await new Promise(resolve => setTimeout(resolve, 800));
 
-          // 4) Show AI thinking state with specific message
+          // 4) Show AI thinking state with structured thoughts
           setIsThinking(true);
-          setThinkingMessage('Analyzing your project structure and preparing build pipeline...');
           
-          // 5) Add thinking delay (2 more seconds)
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          const buildThoughts = [
+            "Scanning project directory structure...",
+            "Located Cargo.toml at /app",
+            "Detecting Solana program architecture...", 
+            "Found 3 instruction handlers in lib.rs",
+            "Analyzing dependencies: anchor-lang v0.30.1",
+            "Preparing containerized build environment...",
+            "Estimating build time: ~2 minutes"
+          ];
+          
+          // Show thinking steps progressively
+          setThinkingSteps([]);
+          for (const [index, thought] of buildThoughts.entries()) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+            setThinkingSteps(prev => [...prev, { text: thought, completed: false }]);
+            await new Promise(resolve => setTimeout(resolve, 300));
+            setThinkingSteps(prev => prev.map((step, i) => 
+              i === index ? { ...step, completed: true } : step
+            ));
+          }
+          
+          // 5) Brief pause before showing checklist
+          await new Promise(resolve => setTimeout(resolve, 500));
           
           // 6) Stop thinking and show checklist
           setIsThinking(false);
-          setThinkingMessage('');
+          setThinkingSteps([]);
           
           // 7) Add checklist bubble and forward build command
           setMessages(prev => [
@@ -589,7 +610,7 @@ const Chat: React.FC = () => {
                 {/* Messages */}
                 <div 
                     ref={messagesAreaRef}
-                    className="messages-area text-sm flex-1 overflow-y-auto p-4 space-y-4 min-h-0"
+                    className="messages-area text-sm flex-1 overflow-y-auto p-6 space-y-6 min-h-0"
                     onScroll={handleScroll}
                 >
                     <AnimatePresence>
@@ -603,18 +624,18 @@ const Chat: React.FC = () => {
                             return (
                                 <motion.div
                                     key={index}
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.3 }}
-                                    className={`flex ${isUser ? "justify-end" : "justify-start"} w-full px-2`}
+                                    initial={{ opacity: 0, y: 20, filter: "blur(4px)" }}
+                                    animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                                    transition={{ duration: 0.4, ease: "easeOut" }}
+                                    className={`w-full ${isUser ? "" : "border-l-2 border-gray-700"} py-4 ${isUser ? "flex justify-end" : "pl-4"}`}
                                 >
                                     <div
-                                        className={`rounded-lg ${
+                                        className={`${
                                             isUser
-                                                ? "user-message bg-primary text-primary-foreground max-w-[85%]"
+                                                ? "user-message bg-gray-900/20 rounded-lg px-4 py-3 max-w-[80%] shadow-sm"
                                                 : isLog
-                                                  ? "log-message bg-gray-900/50 text-foreground w-full max-w-[95%]"
-                                                  : "ai-message bg-muted text-foreground max-w-[95%]"
+                                                  ? "log-message text-foreground w-full font-mono text-sm text-gray-400 opacity-80"
+                                                  : "ai-message text-foreground w-full"
                                         } overflow-hidden`}
                                         style={{
                                             whiteSpace: 'pre-wrap',
@@ -622,14 +643,14 @@ const Chat: React.FC = () => {
                                             overflowWrap: 'break-word'
                                         }}
                                     >
-                                        <div className="p-3 w-full">
-                                            <div className="flex items-start gap-2 w-full">
-                                                {!isUser && (
-                                                    <div className="bot-icon-container mt-1 bg-muted-foreground/10 p-1 rounded-full flex-shrink-0">
-                                                        <Bot size={14} className="bot-icon text-muted-foreground" />
+                                        <div className={`${isUser ? "" : ""} w-full`}>
+                                            <div className="flex items-start gap-3 w-full">
+                                                {!isUser && !isLog && (
+                                                    <div className="ai-avatar mt-1 flex-shrink-0">
+                                                        <Bot size={16} className="text-gray-400" />
                                                     </div>
                                                 )}
-                                                <div className="leading-relaxed w-full min-w-0">
+                                                <div className="leading-relaxed w-full min-w-0 flex-1">
                                                     {/* Render message content */}
                                                     {(() => {
                                                         if (message.isChecklist) {
@@ -654,15 +675,16 @@ const Chat: React.FC = () => {
                                                 </div>
                                             </div>
                                         </div>
-                                        <div
-                                            className={`flex items-center justify-between text-xs px-3 pb-1.5 ${isUser ? "text-primary-foreground/70" : "text-muted-foreground"}`}
-                                        >
-                                            <span className="font-mono">{displayTime}</span>
-                                            {isUser && (
-                                                <span className="flex items-center">
-                                                    {message.status === "sending" ? <Loader2 size={10} className="animate-spin mr-1" /> : "✓"}
-                                                </span>
-                                            )}
+                                        {/* Timestamp */}
+                                        <div className={`text-xs mt-2 ${isUser ? "text-gray-500" : "text-gray-500"}`}>
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-mono">{displayTime}</span>
+                                                {isUser && (
+                                                    <span className="flex items-center">
+                                                        {message.status === "sending" ? <Loader2 size={10} className="animate-spin mr-1" /> : "✓"}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </motion.div>
@@ -672,30 +694,56 @@ const Chat: React.FC = () => {
 
                     {/* Typing/Thinking indicator */}
                     {(isTyping || isThinking) && (
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
-                            <div className="typing-indicator bg-muted text-foreground rounded-lg p-3 max-w-[95%] overflow-hidden"
-                                style={{
-                                    whiteSpace: 'pre-wrap',
-                                    wordWrap: 'break-word', 
-                                    overflowWrap: 'break-word'
-                                }}
-                            >
-                                <div className="flex items-start gap-2">
-                                    <div className="bot-icon-container bg-muted-foreground/10 p-1 rounded-full mt-1">
-                                        <Bot size={14} className="bot-icon text-muted-foreground" />
-                                    </div>
-                                    <div className="flex flex-col gap-2">
-                                        {isThinking && thinkingMessage && (
-                                            <div className="text-sm text-muted-foreground italic">
-                                                {thinkingMessage}
-                                            </div>
-                                        )}
-                                        <div className="flex space-x-1">
-                                            <div className="typing-dot ai-thinking-dot w-2 h-2 rounded-full bg-muted-foreground animate-pulse"></div>
-                                            <div className="typing-dot ai-thinking-dot w-2 h-2 rounded-full bg-muted-foreground animate-pulse delay-150"></div>
-                                            <div className="typing-dot ai-thinking-dot w-2 h-2 rounded-full bg-muted-foreground animate-pulse delay-300"></div>
+                        <motion.div 
+                            initial={{ opacity: 0, y: 10 }} 
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="w-full border-l-2 border-gray-600/50 pl-4 py-4"
+                        >
+                            <div className="flex items-start gap-3">
+                                <div className="ai-avatar mt-1">
+                                    <Bot size={16} className="text-gray-400" />
+                                </div>
+                                <div className="flex-1">
+                                    {isThinking && thinkingSteps.length > 0 ? (
+                                        <div className="thinking-steps space-y-2">
+                                            {thinkingSteps.map((step, index) => (
+                                                <motion.div
+                                                    key={index}
+                                                    initial={{ opacity: 0, x: -10 }}
+                                                    animate={{ opacity: 1, x: 0 }}
+                                                    transition={{ delay: index * 0.1 }}
+                                                    className="flex items-center gap-2 text-gray-500 text-sm"
+                                                >
+                                                    <span className="text-sm">
+                                                        {step.completed ? '●' : '○'}
+                                                    </span>
+                                                    <span className="text-sm">{step.text}</span>
+                                                </motion.div>
+                                            ))}
                                         </div>
-                                    </div>
+                                    ) : (
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-sm text-gray-500 italic">Thinking...</span>
+                                            <div className="flex space-x-1">
+                                                {[0, 1, 2].map(i => (
+                                                    <motion.div
+                                                        key={i}
+                                                        className="w-2 h-2 bg-gray-400 rounded-full"
+                                                        animate={{
+                                                            scale: [1, 1.2, 1],
+                                                            opacity: [0.3, 1, 0.3]
+                                                        }}
+                                                        transition={{
+                                                            duration: 1.5,
+                                                            repeat: Infinity,
+                                                            delay: i * 0.2
+                                                        }}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </motion.div>
