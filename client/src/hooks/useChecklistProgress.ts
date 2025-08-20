@@ -25,6 +25,7 @@ const INITIAL: Step[] = [
 export function useChecklistProgress() {
   const [steps, setSteps] = useState<Step[]>(INITIAL);
   const [animatingSteps, setAnimatingSteps] = useState<{[stepId: number]: NodeJS.Timeout}>({});
+  const [lastProgressMap, setLastProgressMap] = useState<Map<string, number>>(new Map());
 
   // Smooth percentage animation function
   const animatePercentage = (stepId: number, currentPct: number, targetPct: number) => {
@@ -69,6 +70,7 @@ export function useChecklistProgress() {
   useEffect(() => {
     const onMsg = (payload: any) => {
       if (!payload.stage) return;
+      
       setSteps(prev =>
         prev.map(s => {
           if (s.stage === payload.stage) {
@@ -84,18 +86,28 @@ export function useChecklistProgress() {
               (payload.status === "completed" ? 100 :
                payload.status === "active"     ? 50  : 0);
             
+            // Get last known progress for this stage to prevent regression
+            const lastPct = lastProgressMap.get(payload.stage) || 0;
             const currentPct = s.pct || 0;
             
+            // Never allow progress to go backwards
+            const safePct = Math.max(targetPct, lastPct, currentPct);
+            
+            // Update last progress map
+            setLastProgressMap(prev => new Map(prev).set(payload.stage, safePct));
+            
             // Animate percentage smoothly if it's increasing
-            if (targetPct > currentPct) {
-              animatePercentage(s.id, currentPct, targetPct);
+            if (safePct > currentPct) {
+              animatePercentage(s.id, currentPct, safePct);
             }
+            
+            console.log('[PROGRESS] Stage:', payload.stage, 'Target:', targetPct, 'Last:', lastPct, 'Current:', currentPct, 'Safe:', safePct);
             
             return {
               ...s,
               status: nextStatus,
               description: payload.message ?? s.description,
-              pct: targetPct > currentPct ? currentPct : targetPct, // Keep current if animating
+              pct: safePct > currentPct ? currentPct : safePct, // Keep current if animating
               codeSnippet: payload.codeSnippet ? {
                 language: payload.codeSnippet.language || 'rust',
                 content: payload.codeSnippet.content || '',
@@ -110,7 +122,7 @@ export function useChecklistProgress() {
     };
     eventBus.on("progress", onMsg);
     return () => eventBus.off("progress", onMsg);
-  }, []);
+  }, [lastProgressMap]);
 
   return steps;
 } 

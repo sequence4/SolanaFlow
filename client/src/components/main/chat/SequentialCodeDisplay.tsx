@@ -9,8 +9,19 @@ interface CodeFile {
 }
 
 const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
+  console.log('[SEQUENTIAL-DISPLAY] ===================== COMPONENT MOUNT =====================');
   console.log('[SEQUENTIAL-DISPLAY] Component rendered with files:', files);
   console.log('[SEQUENTIAL-DISPLAY] Files count:', files?.length || 0);
+  console.log('[SEQUENTIAL-DISPLAY] Files array:', files?.map(f => ({
+    filename: f.filename,
+    contentLength: f.content?.length,
+    language: f.language
+  })));
+  console.log('[SEQUENTIAL-DISPLAY] Component props type check:', { 
+    filesIsArray: Array.isArray(files),
+    filesType: typeof files,
+    firstFileType: files?.[0] ? typeof files[0] : 'undefined'
+  });
   
   const [expandedFiles, setExpandedFiles] = useState<Set<number>>(new Set([0])); // First file expanded by default
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
@@ -100,9 +111,16 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
   };
   
   if (!files || files.length === 0) {
+    console.log('[SEQUENTIAL-DISPLAY] ❌ NO FILES - Component will show no-files message');
+    console.log('[SEQUENTIAL-DISPLAY] Files value:', files);
+    console.log('[SEQUENTIAL-DISPLAY] Files type:', typeof files);
+    console.log('[SEQUENTIAL-DISPLAY] Files array check:', Array.isArray(files));
     return (
-      <div className="text-sm text-gray-500 italic p-4 border-l-4 border-gray-600/30 pl-4">
-        No files to display
+      <div className="text-sm text-gray-500 italic p-4 border-l-4 border-red-600/30 pl-4 bg-red-900/10">
+        <div className="text-red-400 font-mono text-xs mb-2">DEBUG: No files provided</div>
+        <div>Files prop: {JSON.stringify(files, null, 2)}</div>
+        <div>Type: {typeof files}</div>
+        <div>Length: {files?.length}</div>
       </div>
     );
   }

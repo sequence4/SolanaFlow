@@ -88,11 +88,6 @@ export default function ChatChecklistBubble() {
               </div>
             )}
 
-            {step.stage === "code-gen" && step.status === "active" && (
-              <div className="mt-2 text-xs text-gray-500 italic">
-                Check chat above for generated files with typewriter effect...
-              </div>
-            )}
           </motion.div>
         </div>
       ))}

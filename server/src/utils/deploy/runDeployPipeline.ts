@@ -26,6 +26,45 @@ interface ProgressEvent {
   pct?: number;
   [k: string]: unknown;      
 }
+
+// ─── Progress Manager to prevent overlapping stages ──────
+class ProgressManager {
+  private currentStage: string = '';
+  private stageProgress: Map<string, number> = new Map();
+  
+  sendProgress(stage: string, pct: number, sendProgress: Function, message: string, extraData: any = {}) {
+    // Only send if this is the active stage or if transitioning
+    if (this.currentStage !== stage) {
+      console.log(`[PROGRESS-MGR] Stage transition: ${this.currentStage} → ${stage}`);
+      this.currentStage = stage;
+    }
+    
+    // Never send lower progress for the same stage
+    const lastPct = this.stageProgress.get(stage) || 0;
+    const newPct = Math.max(pct, lastPct);
+    this.stageProgress.set(stage, newPct);
+    
+    console.log(`[PROGRESS-MGR] ${stage}: ${lastPct}% → ${newPct}% (${message})`);
+    
+    sendProgress({
+      stage,
+      status: 'active',
+      message,
+      pct: newPct,
+      ...extraData
+    });
+  }
+  
+  completeStage(stage: string, sendProgress: Function, message: string) {
+    this.stageProgress.set(stage, 100);
+    sendProgress({
+      stage,
+      status: 'completed',
+      message,
+      pct: 100
+    });
+  }
+}
 // ──────────────────────────────────────────────────────────────
 
 // TODO: chunk really large fileTree payloads (> ~16 MB) – Chrome drops giant SSE frames.
@@ -81,6 +120,9 @@ export async function runDeployPipeline({
   // Reset progress tracking to prevent wobbling
   resetProgress();
   
+  // Create progress manager to coordinate stages
+  const progressMgr = new ProgressManager();
+  
   // Start environment setup with smooth progress
   const environmentPromise = sendEnvironmentProgress(sendProgress);
 
@@ -110,14 +152,20 @@ export async function runDeployPipeline({
  
     
     // 2 ─ code generation ─────────────────────────────────────────────────
-    sendProgress(<ProgressEvent>{
-      stage: "code-gen",
-      status: "active",
-      message: "Generating Anchor code…"
-    });
-    sendProgress({ stage: "code-gen", message: "Generating Anchor code…" });
+    console.log('[DEPLOY] Starting code generation phase with managed progress');
+    progressMgr.sendProgress('code-gen', 0, sendProgress, '🦀 Starting Solana program generation...');
+    
+    // Wrap sendProgress to coordinate with progress manager
+    const managedProgressWrapper = (data: any) => {
+      if (data.type === 'code-generation' && data.pct) {
+        progressMgr.sendProgress('code-gen', data.pct, sendProgress, data.message, data);
+      } else {
+        sendProgress(data);
+      }
+    };
+    
     const { sentinelId, programName } =
-          await handleGenerateCode({ projectId, graph, workspace, sendProgress, userId });
+          await handleGenerateCode({ projectId, graph, workspace, sendProgress: managedProgressWrapper, userId });
 
     // ✅ Code generation is done – **re‑use** the deterministic key‑pair that
     // was written during code‑gen. Never generate a second one.
@@ -136,12 +184,7 @@ export async function runDeployPipeline({
     programKeypair    = Keypair.fromSecretKey(Uint8Array.from(secretArr));
     programIdStr      = programKeypair.publicKey.toBase58();
     // Notify the frontend of the re‑used Program ID
-    sendProgress(<ProgressEvent>{
-      stage: "code-gen",
-      status: "completed",
-      message: `Code generation complete — Program ID: ${programIdStr}`,
-      programId: programIdStr
-    });
+    progressMgr.completeStage('code-gen', sendProgress, `Code generation complete — Program ID: ${programIdStr}`);
 
     /* 3 ─ build program --------------------------------------------------- */
     
@@ -149,7 +192,9 @@ export async function runDeployPipeline({
     // allow up to 3 min for large repos (90 × 2 s)
     await waitForTaskCompletion(sentinelId, 90, 2_000);
     
-    // Start smooth build progress
+    // Start smooth build progress using progress manager
+    console.log('[DEPLOY] Starting build phase with managed progress');
+    progressMgr.sendProgress('build', 10, sendProgress, 'Starting Rust compilation...');
     const buildPromise = sendBuildProgress(sendProgress);
     const buildTask = await startAnchorBuildTask(projectId, userId);
     

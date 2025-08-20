@@ -190,26 +190,32 @@ const Chat: React.FC = () => {
                             console.log('[CHAT] Triggering codegen thinking state...');
                             showThinkingForStage('codegen');
                             
-                            // Remove any existing code-gen messages to avoid duplicates
+                            // IMMEDIATELY add to messages, don't wait for batch
                             setMessages(prev => {
+                                // Remove any existing code-gen messages to avoid duplicates
                                 const filtered = prev.filter(m => !m.codeGenFiles);
                                 console.log('[CHAT] Filtered out previous code-gen messages, remaining:', filtered.length);
-                                return filtered;
+                                
+                                const newMessage = {
+                                    text: '', // Empty text, let SequentialCodeDisplay handle the display
+                                    sender: 'ai' as const,
+                                    timestamp: new Date(),
+                                    status: 'sent' as const,
+                                    codeGenFiles: parsed.files
+                                };
+                                
+                                console.log('[CHAT] Adding code gen message IMMEDIATELY to chat');
+                                console.log('[CHAT] Total messages after immediate update will be:', filtered.length + 1);
+                                return [...filtered, newMessage];
                             });
                             
-                            // Add the new code generation message with files for SequentialCodeDisplay
-                            const codeGenMessage = {
-                                text: '', // Empty text, let SequentialCodeDisplay handle the display
-                                sender: 'ai' as const,
-                                timestamp: new Date(),
-                                status: 'sent' as const,
-                                codeGenFiles: parsed.files
-                            };
+                            // Reset user scroll state when new messages arrive
+                            setUserHasScrolled(false);
+                            // Smart scroll to bottom
+                            setTimeout(() => smartScrollToBottom(), 100);
                             
-                            console.log('[CHAT] Adding SequentialCodeDisplay message to chat flow');
-                            console.log('[CHAT] Message will trigger SequentialCodeDisplay with typewriter');
-                            logMessages.push(codeGenMessage);
-                            continue;
+                            // DON'T add to logMessages - we already added directly
+                            continue; // Skip the rest of the loop
                         }
                         
                         // Skip progress-only messages during code generation to avoid conflicts
@@ -270,6 +276,39 @@ const Chat: React.FC = () => {
             setLastLogIndex(systemLogs.length);
         }
     }, [systemLogs, lastLogIndex, taskLogs.isBuilding, messages]);
+
+    // Add direct event listener for code generation events
+    useEffect(() => {
+        const handleCodeGeneration = (data: any) => {
+            console.log('[CHAT] ====== DIRECT CODE-GEN EVENT RECEIVED ======');
+            console.log('[CHAT] Event data:', data);
+            
+            if (data.type === 'code-generation' && data.files && data.files.length > 0) {
+                console.log('[CHAT] Processing direct code-gen event with', data.files.length, 'files');
+                
+                // Add immediately to messages
+                setMessages(prev => {
+                    const filtered = prev.filter(m => !m.codeGenFiles);
+                    const newMessage = {
+                        text: '',
+                        sender: 'ai' as const,
+                        timestamp: new Date(),
+                        status: 'sent' as const,
+                        codeGenFiles: data.files
+                    };
+                    
+                    console.log('[CHAT] Adding direct code-gen message to chat');
+                    return [...filtered, newMessage];
+                });
+                
+                setUserHasScrolled(false);
+                setTimeout(() => smartScrollToBottom(), 100);
+            }
+        };
+        
+        eventBus.on('code-generation', handleCodeGeneration);
+        return () => eventBus.off('code-generation', handleCodeGeneration);
+    }, []);
 
 
     // ———————————————————————————————
@@ -651,17 +690,36 @@ const Chat: React.FC = () => {
                                                 <div className="leading-relaxed w-full min-w-0 flex-1">
                                                     {/* Render message content */}
                                                     {(() => {
+                                                        console.log(`[RENDER] Message ${index} render check:`, {
+                                                            isChecklist: message.isChecklist,
+                                                            hasCodeGenFiles: !!message.codeGenFiles,
+                                                            fileCount: message.codeGenFiles?.length || 0,
+                                                            sender: message.sender,
+                                                            textPreview: message.text?.substring(0, 30) || 'empty'
+                                                        });
+                                                        
                                                         if (message.isChecklist) {
+                                                            console.log('[RENDER] Rendering ChatChecklistBubble');
                                                             return <ChatChecklistBubble />;
                                                         } else if (message.codeGenFiles && message.codeGenFiles.length > 0) {
-                                                            // Show sequential file display for code generation
-                                                            console.log('[CHAT] Rendering SequentialCodeDisplay with', message.codeGenFiles.length, 'files');
+                                                            console.log('[RENDER] ================ RENDERING SequentialCodeDisplay ================');
+                                                            console.log('[RENDER] Files to display:', message.codeGenFiles.map((f: any) => ({ 
+                                                                filename: f.filename, 
+                                                                contentLength: f.content?.length || 0,
+                                                                language: f.language 
+                                                            })));
+                                                            console.log('[RENDER] Component will be mounted with', message.codeGenFiles.length, 'files');
+                                                            
                                                             return (
-                                                                <div className="w-full">
+                                                                <div className="w-full mt-4 mb-4 p-2 border-2 border-cyan-500/50 rounded-lg bg-gray-900/20">
+                                                                    <div className="text-xs text-cyan-400 mb-2 font-mono">
+                                                                        DEBUG: SequentialCodeDisplay mounting with {message.codeGenFiles.length} files
+                                                                    </div>
                                                                     <SequentialCodeDisplay files={message.codeGenFiles} />
                                                                 </div>
                                                             );
                                                         } else {
+                                                            console.log('[RENDER] Rendering MarkdownRenderer for text message');
                                                             return (
                                                                 <div className="w-full max-w-full overflow-hidden">
                                                                     <MarkdownRenderer 
