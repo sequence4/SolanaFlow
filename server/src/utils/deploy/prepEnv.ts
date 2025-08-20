@@ -84,7 +84,7 @@ export async function prepEnv(
       }
       containerUrl = container.containerUrl;
     } catch (err: any) {
-      console.error('[ENV] Container cold-start failed');
+      console.error('❌ Container cold-start failed');
       throw new Error(`Container creation failed: ${err.message}`);
     }
   }
@@ -124,7 +124,6 @@ export async function prepEnv(
     // ─── bootstrap workspace if Cargo.toml is missing ──────────────────────
     const hasCargo = await folderExists(containerName, `${projectDir}/Cargo.toml`);
     if (!hasCargo) {
-      console.log(`[ENV] Bootstrapping workspace in container`);
 
       // ─── thin-copy constants ────────────────────────────────────────────────
       const FREE_BYTES_NEEDED = 500 * 1024 * 1024;      // 500 MB safety margin
@@ -133,7 +132,6 @@ export async function prepEnv(
       try {
         hasRoom = getWorkspaceFreeBytes(containerName) >= FREE_BYTES_NEEDED;
       } catch (e) {
-        console.warn("[ENV] Free space check failed");
         hasRoom = false;           // default to safe path
       }
 
@@ -151,10 +149,8 @@ export async function prepEnv(
           );
           copied = true;
         } catch (copyErr) {
-          console.warn("[ENV] Template copy failed, falling back to anchor init");
         }
       } else {
-        console.warn("[ENV] Workspace almost full - skipping template copy");
       }
 
       if (!copied) {
@@ -180,7 +176,6 @@ export async function prepEnv(
         probeTaskId,
         { skipSuccessUpdate: true }
       );
-      console.log(`[ENV] Container status: ${psOutput.trim()}`);
 
       // 2) check solana / anchor versions inside
       const solanaVer = await runCommand(
@@ -196,7 +191,6 @@ export async function prepEnv(
         probeTaskId,
         { skipSuccessUpdate: true }
       );
-      console.log('[ENV] Toolchain: Solana and Anchor verified');
 
       // 3) quick rust+cargo sanity
       const rustcVer = await runCommand(
@@ -212,9 +206,8 @@ export async function prepEnv(
         probeTaskId,
         { skipSuccessUpdate: true }
       );
-      console.log('[ENV] Rust toolchain verified');
     } catch (probeErr) {
-      console.warn('[ENV] Environment health check failed');
+      console.warn('⚠️  Environment health check failed');
     }
     // ────────────────────────────────────────────────────────────
 
@@ -222,7 +215,6 @@ export async function prepEnv(
   } catch (err) {
     if (rented) {
       await releaseContainerToPool(rented.name);
-      console.log('[ENV] Released container back to pool due to error');
     }
     throw err;
   }

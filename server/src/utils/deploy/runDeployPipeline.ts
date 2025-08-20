@@ -103,11 +103,10 @@ export async function runDeployPipeline({
       containerUrl: workspace.containerUrl
     });
     
-    // Start a keep-alive ping to prevent SSE connection from timing out
+    // Keep SSE connection alive
     keepAliveInterval = setInterval(() => {
-      console.log("[PIPELINE] Sending keep-alive ping");
       sendProgress({ stage: "ping" });
-    }, 15000); // Send ping every 15 seconds
+    }, 15000);
  
     
     // 2 ─ code generation ─────────────────────────────────────────────────
@@ -145,7 +144,6 @@ export async function runDeployPipeline({
     });
 
     /* 3 ─ build program --------------------------------------------------- */
-    console.log("[PIPELINE] ⏳ anchor build started…");
     
     // wait until all src + UI files are on disk
     // allow up to 3 min for large repos (90 × 2 s)
@@ -194,7 +192,6 @@ export async function runDeployPipeline({
                        ".", symlinkTaskId, { skipSuccessUpdate: true });
     }
     
-    console.log("[PIPELINE] Build task completed successfully");
 
     /* 3b ─ fetch artefact ------------------------------------------------ */
     const { base64So } = await getBuildArtifactTask(projectId);
@@ -336,8 +333,8 @@ export async function runDeployPipeline({
                 idlContent = content;
               }
             }
-          } catch (err) {
-            console.error(`[pipeline] Failed to parse IDL JSON: ${err}`);
+          } catch {
+            // Skip invalid IDL files
           }
         }
         if (node.children) {
@@ -347,7 +344,6 @@ export async function runDeployPipeline({
     };
     
     findIdls(fileTree);
-    console.log(`[PIPELINE] Found ${idls.length} IDL file(s)`);
     
     /* ──────────────────────────────────────────────────────────────
      * Patch   idl.metadata.address  →  compiled program public key
@@ -363,12 +359,10 @@ export async function runDeployPipeline({
           ...(idlContent.metadata ?? {}),
           address: programId,
         };
-        console.log(`[PIPELINE] Updated IDL metadata with program ID: ${programId}`);
 
         /* ---------- ensure the front-end sees the Program ID ---------- */
         try {
           await writeProgramIdEnv(programId, absRoot);
-          console.log(`[PIPELINE] Program ID written to .env file`);
 
           /* ----------------------------------------------------------
            * The file change happens *after* the Next.js dev server
@@ -382,17 +376,14 @@ export async function runDeployPipeline({
               uuidv4(),               // fresh task-ID
               { skipSuccessUpdate: true }   // don't spam progress
             );
-            console.log("[PIPELINE] Restarted container to reload environment variables");
           } catch (restartErr) {
-            console.warn(
-              `[PIPELINE] Could not restart container: ${restartErr}`
-            );
+            console.warn(`⚠️  Container restart failed: ${restartErr}`);
           }
         } catch (envErr) {
-          console.warn(`[PIPELINE] Failed to write .env(.local): ${envErr}`);
+          console.warn(`⚠️  .env write failed: ${envErr}`);
         }
       } catch (err) {
-        console.warn(`[PIPELINE] Could not patch metadata.address automatically: ${err}`);
+        console.warn(`⚠️  IDL metadata patch failed: ${err}`);
       }
     }
     
@@ -421,13 +412,10 @@ export async function runDeployPipeline({
      * ---------------------------------------------------------------- */
     if (workspace) {
       await markContainerForCleanup(projectId, workspace.containerName);
-      console.log(`[PIPELINE] Container ${workspace.containerName} queued for later cleanup`);
     }
     
-    // Clear keep-alive interval
     if (keepAliveInterval) {
       clearInterval(keepAliveInterval);
-      console.log("[PIPELINE] Cleared keep-alive interval");
     }
   }
 }
