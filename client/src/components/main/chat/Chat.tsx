@@ -17,15 +17,8 @@ import { taskApi } from '@/api/taskApi';
 // UI Components
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { useTaskLogs } from "@/context/logs/useTaskLogs";
 import eventBus from '@/lib/eventBus';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 // Icons
 import { 
@@ -34,16 +27,11 @@ import {
   Loader2, 
   X, 
   Maximize2, 
-  Minimize2, 
-  Code, 
-  Image, 
-  Paperclip,
-  Plus,
+  Minimize2,
   Trash2
 } from "lucide-react";
 import MarkdownRenderer from '@/components/main/code/markdown/MarkdownRenderer';
 import ChatChecklistBubble from './ChatChecklistBubble';
-import LogCodeDisplay from './LogCodeDisplay';
 import SequentialCodeDisplay from './SequentialCodeDisplay';
 
 export interface AIMessageType {
@@ -67,19 +55,17 @@ export interface AIMessageType {
 const Chat: React.FC = () => {
     const { projectContext } = useContext(ProjectContext);
     const { 
-        selectedFile, 
-        fileTree 
+        selectedFile
     } = useContext(FileContext);
 
-    const [additionalFiles, setAdditionalFiles] = useState<FileTreeItemType[]>([]);
+    const [additionalFiles] = useState<FileTreeItemType[]>([]);
     const [messages, setMessages] = useState<AIMessageType[]>([]);
     const [input, setInput] = useState('');
-    const [selectedModel, setSelectedModel] = useState('gpt-4o');
     const [isExpanded, setIsExpanded] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
     const [isThinking, setIsThinking] = useState(false);
-    const [thinkingMessage, setThinkingMessage] = useState('');
     const [thinkingSteps, setThinkingSteps] = useState<Array<{text: string, completed: boolean}>>([]);
+    const [currentThinkingStage, setCurrentThinkingStage] = useState<string | null>(null);
     const taskLogs = useTaskLogs();  // Complete taskLogs object including systemLogs and setSuppressToast
     const { systemLogs } = taskLogs;
     const [lastLogIndex, setLastLogIndex] = useState(0);  // 🟡 NEW
@@ -88,13 +74,7 @@ const Chat: React.FC = () => {
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const messagesAreaRef = useRef<HTMLDivElement | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-    const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-    const scrollToBottom = () => {
-        if (messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-        }
-    };
 
     // Enhanced scroll function that respects user scroll behavior
     const smartScrollToBottom = () => {
@@ -183,6 +163,15 @@ const Chat: React.FC = () => {
             for (const line of visible) {
                 console.log('[CHAT] Processing line:', line);
                 
+                // Detect different build phases and show thinking states
+                if (line.includes("Preparing your build environment")) {
+                    console.log('[CHAT] Detected environment setup phase');
+                    showThinkingForStage('environment');
+                } else if (line.includes("Building program")) {
+                    console.log('[CHAT] Detected build phase');
+                    showThinkingForStage('build');
+                }
+                
                 // Check if this is a JSON message first
                 try {
                     if (line.startsWith('{') && line.includes('type')) {
@@ -192,6 +181,9 @@ const Chat: React.FC = () => {
                         // Check for code generation messages with files
                         if (parsed.type === 'code-generation' && parsed.files && parsed.files.length > 0) {
                             console.log('[CHAT] Found code-generation message with', parsed.files.length, 'files');
+                            
+                            // Show thinking state for code generation
+                            showThinkingForStage('codegen');
                             
                             // Remove any existing code-gen messages to avoid duplicates
                             setMessages(prev => {
@@ -292,15 +284,6 @@ const Chat: React.FC = () => {
         return () => eventBus.off("build-complete", onComplete);
     }, [taskLogs]);
 
-    const fetchFileContent = async (projectId: string, filePath: string): Promise<string> => {
-        try {
-            const data = await fileApi.getFileContent(projectId, filePath);
-            return data.message;
-        } catch (error) {
-            console.error(`Error fetching content for ${filePath}:`, error);
-            return 'Error loading content.';
-        }
-    };
 
     const { publicKey, connected } = useWallet();
 
@@ -329,35 +312,10 @@ const Chat: React.FC = () => {
           await new Promise(resolve => setTimeout(resolve, 800));
 
           // 4) Show AI thinking state with structured thoughts
-          setIsThinking(true);
-          
-          const buildThoughts = [
-            "Scanning project directory structure...",
-            "Located Cargo.toml at /app",
-            "Detecting Solana program architecture...", 
-            "Found 3 instruction handlers in lib.rs",
-            "Analyzing dependencies: anchor-lang v0.30.1",
-            "Preparing containerized build environment...",
-            "Estimating build time: ~2 minutes"
-          ];
-          
-          // Show thinking steps progressively
-          setThinkingSteps([]);
-          for (const [index, thought] of buildThoughts.entries()) {
-            await new Promise(resolve => setTimeout(resolve, 200));
-            setThinkingSteps(prev => [...prev, { text: thought, completed: false }]);
-            await new Promise(resolve => setTimeout(resolve, 300));
-            setThinkingSteps(prev => prev.map((step, i) => 
-              i === index ? { ...step, completed: true } : step
-            ));
-          }
+          await showThinkingForStage('initial-build');
           
           // 5) Brief pause before showing checklist
           await new Promise(resolve => setTimeout(resolve, 500));
-          
-          // 6) Stop thinking and show checklist
-          setIsThinking(false);
-          setThinkingSteps([]);
           
           // 7) Add checklist bubble and forward build command
           setMessages(prev => [
@@ -480,17 +438,6 @@ const Chat: React.FC = () => {
         }
     };
 
-    const handleFileSelect = (file: FileTreeItemType) => {
-        if (!additionalFiles.find((f) => f.path === file.path)) {
-            setAdditionalFiles(prev => [...prev, file]);
-        }
-    };
-
-    const removeFile = (path: string) => {
-        setAdditionalFiles(prevFiles => 
-            prevFiles.filter((file) => file.path !== path)
-        );
-    };
 
     const getAllFiles = (nodes: FileTreeItemType[], basePath = ''): FileTreeItemType[] => {
         let allFiles: FileTreeItemType[] = [];
@@ -505,23 +452,6 @@ const Chat: React.FC = () => {
         return allFiles;
     };
 
-    const allFiles = fileTree ? getAllFiles([fileTree as FileTreeItemType]) : [];
-
-    const handleCustomFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            const newFile: FileTreeItemType = {
-                name: file.name,
-                path: `custom/${file.name}`,
-                type: 'file',
-            };
-            setAdditionalFiles([...additionalFiles, newFile]);
-            toast.success("File added", {
-                description: `${file.name} has been added to the chat context.`,
-                duration: 3000,
-            });
-        }
-    };
 
     const formatTime = (dateValue?: Date | string) => {
         if (!dateValue) return "";
@@ -536,6 +466,64 @@ const Chat: React.FC = () => {
     };
 
     // Helper function to detect and parse code generation messages
+    // Show thinking states for different build phases
+    const showThinkingForStage = async (stage: string) => {
+      // Prevent duplicate thinking states
+      if (currentThinkingStage === stage) return;
+      setCurrentThinkingStage(stage);
+      
+      setIsThinking(true);
+      
+      const stageThoughts = {
+        'initial-build': [
+          "Scanning project directory structure...",
+          "Located Cargo.toml at /app",
+          "Detecting Solana program architecture...", 
+          "Found 3 instruction handlers in lib.rs",
+          "Analyzing dependencies: anchor-lang v0.30.1",
+          "Preparing containerized build environment...",
+          "Estimating build time: ~2 minutes"
+        ],
+        'environment': [
+          "Initializing Docker container...",
+          "Loading Solana build tools...",
+          "Configuring Rust toolchain...",
+          "Setting up workspace dependencies..."
+        ],
+        'codegen': [
+          "Analyzing program structure...",
+          "Generating instruction handlers...",
+          "Creating account definitions...",
+          "Building state management logic...",
+          "Optimizing for Solana runtime..."
+        ],
+        'build': [
+          "Compiling Rust source files...",
+          "Linking Solana BPF modules...",
+          "Optimizing bytecode...",
+          "Generating deployment artifacts..."
+        ]
+      };
+      
+      const thoughts = stageThoughts[stage as keyof typeof stageThoughts] || [];
+      setThinkingSteps([]);
+      
+      for (const [index, thought] of thoughts.entries()) {
+        await new Promise(resolve => setTimeout(resolve, 150));
+        setThinkingSteps(prev => [...prev, { text: thought, completed: false }]);
+        await new Promise(resolve => setTimeout(resolve, 200));
+        setThinkingSteps(prev => prev.map((step, i) => 
+          i === index ? { ...step, completed: true } : step
+        ));
+      }
+      
+      // Clear thinking after brief pause
+      await new Promise(resolve => setTimeout(resolve, 300));
+      setIsThinking(false);
+      setThinkingSteps([]);
+      setCurrentThinkingStage(null);
+    };
+
     const parseCodeGenFiles = (messageText: string) => {
         // Look for patterns indicating code generation with multiple files
         const codeGenPatterns = [
@@ -755,38 +743,9 @@ const Chat: React.FC = () => {
                 {/* Input area */}
                 <div className="input-area p-3 border-t border-border flex-shrink-0">
                     <div className="flex flex-col space-y-2">
-                        <div className="flex items-center gap-1 px-2">
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="tool-button h-7 w-7 text-muted-foreground hover:text-foreground"
-                            >
-                                <Code size={14} />
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="tool-button h-7 w-7 text-muted-foreground hover:text-foreground"
-                            >
-                                <Image size={14} />
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="tool-button h-7 w-7 text-muted-foreground hover:text-foreground"
-                            >
-                                <Paperclip size={14} />
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="tool-button h-7 w-7 text-muted-foreground hover:text-foreground"
-                            >
-                                <Plus size={14} />
-                            </Button>
-                            <div className="flex-1"></div>
+                        <div className="flex items-center justify-end px-2">
                             <div className="char-count text-xs text-muted-foreground font-mono">
-                                {input.length > 0 ? `${input.length} chars` : "gpt-4o"}
+                                {input.length > 0 ? `${input.length} chars` : "Claude AI"}
                             </div>
                         </div>
 

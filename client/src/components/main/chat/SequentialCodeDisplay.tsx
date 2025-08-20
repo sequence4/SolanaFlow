@@ -14,12 +14,28 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
   
   const [expandedFiles, setExpandedFiles] = useState<Set<number>>(new Set([0])); // First file expanded by default
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [typingStates, setTypingStates] = useState<Map<number, {
+    isTyping: boolean;
+    displayedText: string;
+    fullText: string;
+  }>>(new Map());
   
   // Initialize with first file expanded
   useEffect(() => {
     if (!files || files.length === 0) return;
     setExpandedFiles(new Set([0])); // Always expand first file
+    setTypingStates(new Map()); // Reset typing states
   }, [files]);
+  
+  // Start typewriter when file is expanded for the first time
+  useEffect(() => {
+    expandedFiles.forEach(index => {
+      const file = files[index];
+      if (file && !typingStates.has(index)) {
+        startTypewriter(index, file.content);
+      }
+    });
+  }, [expandedFiles, files]);
   
   const toggleFile = (index: number) => {
     const newExpanded = new Set(expandedFiles);
@@ -29,6 +45,48 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
       newExpanded.add(index);
     }
     setExpandedFiles(newExpanded);
+  };
+  
+  const startTypewriter = (index: number, content: string) => {
+    console.log(`[SEQUENTIAL-DISPLAY] Starting typewriter for file ${index}: ${files[index]?.filename}`);
+    
+    setTypingStates(prev => new Map(prev).set(index, {
+      isTyping: true,
+      displayedText: '',
+      fullText: content
+    }));
+    
+    let charIndex = 0;
+    const timer = setInterval(() => {
+      if (charIndex < content.length) {
+        setTypingStates(prev => {
+          const newMap = new Map(prev);
+          const state = newMap.get(index);
+          if (state) {
+            newMap.set(index, {
+              ...state,
+              displayedText: content.substring(0, charIndex + 1)
+            });
+          }
+          return newMap;
+        });
+        charIndex++;
+      } else {
+        console.log(`[SEQUENTIAL-DISPLAY] Typewriter completed for file ${index}`);
+        clearInterval(timer);
+        setTypingStates(prev => {
+          const newMap = new Map(prev);
+          const state = newMap.get(index);
+          if (state) {
+            newMap.set(index, {
+              ...state,
+              isTyping: false
+            });
+          }
+          return newMap;
+        });
+      }
+    }, 20); // 20ms per character
   };
   
   const copyToClipboard = async (content: string, index: number) => {
@@ -61,6 +119,9 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
       {files.map((file, index) => {
         const isExpanded = expandedFiles.has(index);
         const isCopied = copiedIndex === index;
+        const typeState = typingStates.get(index);
+        const displayContent = typeState ? typeState.displayedText : file.content;
+        const isTyping = typeState?.isTyping || false;
         
         return (
           <motion.div 
@@ -119,9 +180,20 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
                     <div className="bg-gray-950/50 p-4">
                       <pre className="text-xs text-gray-300 font-mono whitespace-pre-wrap overflow-x-auto leading-relaxed">
                         <code className={`language-${file.language}`}>
-                          {file.content}
+                          {displayContent}
+                          {isTyping && <span className="text-cyan-400 animate-pulse ml-1">|</span>}
                         </code>
                       </pre>
+                      {isTyping && (
+                        <div className="text-xs text-gray-500 mt-2 flex items-center gap-2">
+                          <div className="flex space-x-1">
+                            <div className="w-1 h-1 bg-cyan-400 rounded-full animate-bounce"></div>
+                            <div className="w-1 h-1 bg-cyan-400 rounded-full animate-bounce delay-75"></div>
+                            <div className="w-1 h-1 bg-cyan-400 rounded-full animate-bounce delay-150"></div>
+                          </div>
+                          <span>Generating... {Math.round((displayContent.length / file.content.length) * 100)}%</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </motion.div>
