@@ -75,6 +75,7 @@ interface PipelineArgs {
   userId: string;
   graph: Graph; 
   sendProgress: (data: unknown) => void;
+  walletSigned?: boolean;
   devMode?: boolean;
 }
 
@@ -109,6 +110,7 @@ export async function runDeployPipeline({
   userId,
   graph,
   sendProgress,
+  walletSigned = false,
   devMode = false,
 }: PipelineArgs): Promise<void> {
   let programKeypair: Keypair | null = null;
