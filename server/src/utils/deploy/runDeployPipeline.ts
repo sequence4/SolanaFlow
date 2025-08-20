@@ -192,6 +192,7 @@ export async function runDeployPipeline({
                        ".", symlinkTaskId, { skipSuccessUpdate: true });
     }
     
+    console.log("🔨 Build task completed successfully");
 
     /* 3b ─ fetch artefact ------------------------------------------------ */
     const { base64So } = await getBuildArtifactTask(projectId);
@@ -344,6 +345,7 @@ export async function runDeployPipeline({
     };
     
     findIdls(fileTree);
+    console.log(`📋 Found ${idls.length} IDL file(s)`);
     
     /* ──────────────────────────────────────────────────────────────
      * Patch   idl.metadata.address  →  compiled program public key
@@ -359,10 +361,12 @@ export async function runDeployPipeline({
           ...(idlContent.metadata ?? {}),
           address: programId,
         };
+        console.log(`🔑 Updated IDL metadata with program ID: ${programId}`);
 
         /* ---------- ensure the front-end sees the Program ID ---------- */
         try {
           await writeProgramIdEnv(programId, absRoot);
+          console.log(`📄 Program ID written to .env file`);
 
           /* ----------------------------------------------------------
            * The file change happens *after* the Next.js dev server
