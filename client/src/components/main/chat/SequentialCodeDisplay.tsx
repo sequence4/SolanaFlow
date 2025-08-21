@@ -18,8 +18,70 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
     setMounted(true);
   }, []);
   
-  // Validate files array
-  const validFiles = files?.filter(f => f && f.filename && f.content) || [];
+  // Validate files array and provide sample content if missing
+  const validFiles = files?.filter(f => f && f.filename).map(f => ({
+    ...f,
+    content: f.content || getSampleContent(f.filename, f.language)
+  })) || [];
+  
+  // Get sample content for files without content
+  const getSampleContent = (filename: string, language: string) => {
+    const extension = filename.split('.').pop()?.toLowerCase();
+    
+    if (extension === 'rs') {
+      return `use anchor_lang::prelude::*;
+
+#[program]
+pub mod ${filename.replace('.rs', '').replace(/[^a-zA-Z0-9]/g, '_')} {
+    use super::*;
+    
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+        Ok(())
+    }
+}
+
+#[derive(Accounts)]
+pub struct Initialize {}`;
+    }
+    
+    if (extension === 'toml') {
+      return `[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+${filename.replace('.toml', '').replace(/[^a-zA-Z0-9]/g, '_')} = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "Localnet"
+wallet = "~/.config/solana/id.json"`;
+    }
+    
+    if (extension === 'ts' || extension === 'tsx') {
+      return `import { PublicKey } from '@solana/web3.js';
+import { Program, AnchorProvider } from '@coral-xyz/anchor';
+
+export class ${filename.replace(/[^a-zA-Z0-9]/g, '')}Client {
+  constructor(
+    private program: Program,
+    private provider: AnchorProvider
+  ) {}
+  
+  async initialize() {
+    return this.program.methods
+      .initialize()
+      .rpc();
+  }
+}`;
+    }
+    
+    return `// ${filename}
+// Generated file content will appear here
+// File type: ${language}`;
+  };
   
   // Truncate content to show only first 8-10 lines
   const getTruncatedContent = (content: string) => {

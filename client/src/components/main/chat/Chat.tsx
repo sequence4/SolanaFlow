@@ -78,70 +78,46 @@ const Chat: React.FC = () => {
     const contentHeightRef = useRef(0);
     const isAutoScrollingRef = useRef(false);
     const scrollStateRef = useRef({
-        isScrolling: false,
-        lastScrollTime: 0,
-        userScrollPosition: -1,  // Track user's scroll position
-        autoScrollEnabled: true  // Whether auto-scroll is enabled
+        userHasScrolledUp: false,  // Track if user has manually scrolled up
+        lastUserMessageCount: 0,   // Track user messages to trigger scroll resets
     });
 
 
-    // Smart scroll that respects user position
-    const smartScrollToBottom = useCallback(() => {
-        // Only scroll if auto-scroll is enabled
-        if (!scrollStateRef.current.autoScrollEnabled) {
-            return;
-        }
+    // Simple scroll to bottom function
+    const scrollToBottom = useCallback((force = false) => {
+        if (!messagesAreaRef.current) return;
         
-        if (messagesAreaRef.current) {
-            const container = messagesAreaRef.current;
-            const targetScroll = container.scrollHeight - container.clientHeight;
-            
-            // Smooth scroll to bottom
-            requestAnimationFrame(() => {
-                container.scrollTo({
-                    top: targetScroll,
-                    behavior: 'smooth'
-                });
+        const container = messagesAreaRef.current;
+        
+        // Only scroll if user hasn't scrolled up, OR if forced (user message)
+        if (force || !scrollStateRef.current.userHasScrolledUp) {
+            container.scrollTo({
+                top: container.scrollHeight,
+                behavior: 'smooth'
             });
         }
     }, []);
     
-    // Force scroll only for critical messages (user messages, errors)
-    const forceScrollToBottom = useCallback(() => {
-        if (messagesAreaRef.current) {
-            const container = messagesAreaRef.current;
-            container.scrollTop = container.scrollHeight;
-            scrollStateRef.current.autoScrollEnabled = true;
-            setUserHasScrolled(false);
-        }
-    }, []);
-    
-    // Keep compatibility
-    const smoothScrollToBottom = smartScrollToBottom;
-    const stableScrollToBottom = smartScrollToBottom;
+    // Keep compatibility with existing calls
+    const smartScrollToBottom = scrollToBottom;
+    const forceScrollToBottom = useCallback(() => scrollToBottom(true), [scrollToBottom]);
+    const smoothScrollToBottom = scrollToBottom;
+    const stableScrollToBottom = scrollToBottom;
 
-    // Enhanced scroll detection that properly respects user intent
+    // Simple scroll detection - just track if user has scrolled up
     const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
         const element = e.target as HTMLDivElement;
         const scrollTop = element.scrollTop;
         const scrollHeight = element.scrollHeight;
         const clientHeight = element.clientHeight;
         
-        // Calculate if user is near bottom (within 100px tolerance)
+        // Check if user is at the bottom (within 100px tolerance)
         const isNearBottom = scrollHeight - scrollTop <= clientHeight + 100;
         
-        // If user scrolled up significantly, disable auto-scroll
-        if (!isNearBottom && scrollTop < scrollStateRef.current.userScrollPosition - 50) {
-            scrollStateRef.current.autoScrollEnabled = false;
-            setUserHasScrolled(true);
-        }
-        // Re-enable auto-scroll if user scrolls back to bottom
-        else if (isNearBottom) {
-            scrollStateRef.current.autoScrollEnabled = true;
-            setUserHasScrolled(false);
-        }
-        
-        scrollStateRef.current.userScrollPosition = scrollTop;
+        // Update user scroll state
+        const hasScrolledUp = !isNearBottom;
+        scrollStateRef.current.userHasScrolledUp = hasScrolledUp;
+        setUserHasScrolled(hasScrolledUp);
     }, []);
 
     // Replace MutationObserver with more controlled approach
@@ -180,25 +156,28 @@ const Chat: React.FC = () => {
         }
     }, [stableScrollToBottom]);
 
-    // Fix message scrolling for user vs AI messages
+    // Handle scrolling based on message type
     useEffect(() => {
-        if (messages.length > 0) {
-            const lastMessage = messages[messages.length - 1];
+        if (messages.length === 0) return;
+        
+        const lastMessage = messages[messages.length - 1];
+        const currentUserMessageCount = messages.filter(m => m.sender === 'user').length;
+        
+        // When a new user message is sent, reset scroll behavior and force scroll
+        if (lastMessage.sender === 'user') {
+            scrollStateRef.current.userHasScrolledUp = false;
+            scrollStateRef.current.lastUserMessageCount = currentUserMessageCount;
+            setUserHasScrolled(false);
             
-            // Only force scroll for user messages or critical AI responses
-            if (lastMessage.sender === 'user') {
-                // Always scroll to bottom for user messages
-                scrollStateRef.current.autoScrollEnabled = true;
-                setUserHasScrolled(false);
-                setTimeout(forceScrollToBottom, 100);
-            } else if (lastMessage.sender === 'ai') {
-                // For AI messages, only auto-scroll if user hasn't scrolled up
-                if (!userHasScrolled) {
-                    setTimeout(smartScrollToBottom, 100);
-                }
-            }
+            // Force scroll to bottom for user messages
+            setTimeout(() => scrollToBottom(true), 100);
         }
-    }, [messages, userHasScrolled, forceScrollToBottom, smartScrollToBottom]);
+        // For AI messages, only scroll if user hasn't scrolled up
+        else if (lastMessage.sender === 'ai') {
+            // Auto-scroll for AI messages unless user has scrolled up
+            setTimeout(() => scrollToBottom(false), 100);
+        }
+    }, [messages, scrollToBottom]);
 
     useEffect(() => {
         smartScrollToBottom();
