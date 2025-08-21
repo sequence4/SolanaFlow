@@ -34,6 +34,17 @@ class ProgressManager {
   private batchTimeout: NodeJS.Timeout | null = null;
   private sequenceNumber = 0;
   private isTransitioning = false;
+  private generatedFiles: any[] = [];
+  private collectedFiles = 0;
+  private expectedCollectionFiles = 10;
+  
+  private progressDistribution = {
+    'code-gen': {
+      fileGeneration: 60,    // 0-60% for file generation
+      fileCollection: 35,     // 60-95% for collecting files
+      finalization: 5        // 95-100% for final steps
+    }
+  };
   
   constructor(private deploymentId: string, private sendProgress: Function) {}
   
@@ -141,16 +152,35 @@ class ProgressManager {
   }
   
   addCodeGenerationEvent(fileName: string, content: string) {
-    // Add to batch buffer instead of sending immediately
-    this.eventBuffer.push({
-      type: 'code-generation',
-      fileName,
-      content,
-      files: [{ filename: fileName, content, language: this.getLanguageFromFilename(fileName) }]
-    });
+    // Track individual file generation for smooth progress
+    this.generatedFiles.push({ fileName, content });
     
-    // Schedule batched update
-    this.scheduleBatchUpdate();
+    // Calculate progress based on expected files (estimate ~12-15 files)
+    const expectedFiles = 15;
+    const fileProgress = Math.min((this.generatedFiles.length / expectedFiles) * this.progressDistribution['code-gen'].fileGeneration, this.progressDistribution['code-gen'].fileGeneration);
+    
+    this.updateProgress('code-gen', fileProgress, `Generating file ${this.generatedFiles.length}: ${fileName}`);
+    
+    // Send individual file updates to frontend immediately
+    this.sendProgress({
+      type: 'file-generated',
+      stage: 'code-gen',
+      fileName,
+      fileIndex: this.generatedFiles.length,
+      totalFiles: this.generatedFiles.length,
+      pct: fileProgress,
+      timestamp: Date.now(),
+      sequence: ++this.sequenceNumber
+    });
+  }
+  
+  handleFileCollection(fileName: string, success: boolean) {
+    this.collectedFiles++;
+    const collectionProgress = this.progressDistribution['code-gen'].fileGeneration + 
+      (this.collectedFiles / this.expectedCollectionFiles) * this.progressDistribution['code-gen'].fileCollection;
+    
+    this.updateProgress('code-gen', collectionProgress, 
+      success ? `Collected: ${fileName}` : `Waiting for: ${fileName}`);
   }
   
   private getLanguageFromFilename(filename: string): string {
@@ -281,11 +311,11 @@ export async function runDeployPipeline({
     console.log('[DEPLOY] Starting code generation phase with managed progress');
     await progressMgr.transitionToStage('code-gen', '🦀 Starting Solana program generation...');
     
-    // Enhanced progress wrapper with batching
+    // Enhanced progress wrapper with individual file tracking
     const managedProgressWrapper = (data: any) => {
       if (data.type === 'code-generation' && data.fileName && data.content) {
-        // Add individual files to batch instead of sending immediately
-        console.log('[DEPLOY] Batching code-generation file:', data.fileName);
+        // Send individual file generation events immediately
+        console.log('[DEPLOY] Processing code-generation file:', data.fileName);
         progressMgr.addCodeGenerationEvent(data.fileName, data.content);
       } else if (data.pct && data.stage) {
         progressMgr.updateProgress(data.stage, data.pct, data.message, data);
@@ -471,9 +501,7 @@ export async function runDeployPipeline({
     
     if (!soFileExists) {
       console.error('[FILE-OPS] WARNING: .so file not found after retries');
-      progressMgr.updateProgress('build', 95, 'Build artifacts missing - continuing anyway...', {
-        warning: 'Build artifacts not ready yet'
-      });
+      progressMgr.handleFileCollection(programName + '.so', false);
     } else {
       console.log('[FILE-OPS] .so file found, proceeding with copy');
       await readContainerFile(
@@ -482,7 +510,7 @@ export async function runDeployPipeline({
         projectId,
         userId
       );
-      progressMgr.updateProgress('build', 98, 'Collecting build artifacts...');
+      progressMgr.handleFileCollection(programName + '.so', true);
     }
     
     // Check for Anchor.toml with fallback
@@ -490,8 +518,36 @@ export async function runDeployPipeline({
     if (tomlExists) {
       await readContainerFile(workspace.containerName, tomlFile, projectId, userId);
       console.log('[FILE-OPS] Anchor.toml collected');
+      progressMgr.handleFileCollection('Anchor.toml', true);
     } else {
       console.warn('[FILE-OPS] Anchor.toml not found at expected location');
+      progressMgr.handleFileCollection('Anchor.toml', false);
+    }
+    
+    // Collect additional project files for file tree
+    const additionalFiles = [
+      { path: `${projectFolder}/src/lib.rs`, name: 'lib.rs' },
+      { path: `${projectFolder}/web/package.json`, name: 'package.json' },
+      { path: `${projectFolder}/web/src/App.tsx`, name: 'App.tsx' },
+      { path: `${projectFolder}/web/src/App.css`, name: 'App.css' },
+      { path: `${projectFolder}/README.md`, name: 'README.md' }
+    ];
+    
+    for (const file of additionalFiles) {
+      try {
+        const exists = await checkFileExists(workspace.containerName, file.path);
+        if (exists) {
+          await readContainerFile(workspace.containerName, file.path, projectId, userId);
+          progressMgr.handleFileCollection(file.name, true);
+        } else {
+          progressMgr.handleFileCollection(file.name, false);
+        }
+        // Small delay to show progress
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error) {
+        console.log(`[FILE-OPS] Error collecting ${file.name}:`, error);
+        progressMgr.handleFileCollection(file.name, false);
+      }
     }
 
     /* ----------------------------------------------------------------
@@ -514,6 +570,12 @@ export async function runDeployPipeline({
       }
     }
     
+    // Final phase of code generation
+    progressMgr.updateProgress('code-gen', 98, 'Finalizing code generation...');
+    await new Promise(resolve => setTimeout(resolve, 500));
+    progressMgr.updateProgress('code-gen', 100, 'Code generation complete!');
+    
+    // Update build progress separately
     progressMgr.updateProgress('build', 99, 'Finalizing build artifacts...');
 
     /* ---- host copy removed: program ID is read in-container below ---- */

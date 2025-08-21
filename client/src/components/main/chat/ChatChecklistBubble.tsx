@@ -1,7 +1,7 @@
 "use client";
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Check, AlertTriangle } from "lucide-react";
+import { Check, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 import { Progress } from "../../../components/ui/progress";
 import { useChecklistProgress, Step } from "../../../hooks/useChecklistProgress";
 import CompactCodeSnippet from "../code/markdown/CompactCodeSnippet";
@@ -79,6 +79,8 @@ interface StepItemProps {
 }
 
 const StepItem = React.memo(({ step, index, isLastStep }: StepItemProps) => {
+  const [expandedFiles, setExpandedFiles] = useState(false);
+  
   const stepProgress = useMemo(() => {
     return step.pct ?? (step.status === "done" ? 100 : step.status === "active" ? 50 : 0);
   }, [step.pct, step.status]);
@@ -133,13 +135,67 @@ const StepItem = React.memo(({ step, index, isLastStep }: StepItemProps) => {
           </div>
         )}
 
-        {/* Show generated files ONLY for Code Generation step when ACTIVE (not done) */}
+        {/* Enhanced file list display for Code Generation */}
         {step.stage === "code-gen" && step.generatedFiles && step.generatedFiles.length > 0 && step.status === "active" && (
-          <div className="mt-3">
-            <SequentialCodeDisplay 
-              key={`checklist-code-${step.id}-${step.generatedFiles.length}`} 
-              files={step.generatedFiles} 
-            />
+          <div className="mt-3 space-y-2">
+            {/* File counter with expand/collapse */}
+            <div className="flex items-center justify-between text-xs bg-gray-800/30 rounded px-2 py-1">
+              <span className="text-cyan-400 font-medium flex items-center gap-1">
+                <span>📁</span>
+                Generated Files ({step.generatedFiles.length})
+              </span>
+              <button
+                onClick={() => setExpandedFiles(!expandedFiles)}
+                className="text-gray-400 hover:text-cyan-400 transition-colors flex items-center gap-1"
+              >
+                {expandedFiles ? (
+                  <><ChevronUp size={12} /> Hide</>
+                ) : (
+                  <><ChevronDown size={12} /> Show all</>
+                )}
+              </button>
+            </div>
+            
+            {/* File list grid */}
+            <div className={`transition-all duration-200 overflow-hidden ${
+              !expandedFiles ? 'max-h-16' : 'max-h-48'
+            }`}>
+              <div className="grid grid-cols-2 gap-1 text-xs">
+                {step.generatedFiles.slice(0, expandedFiles ? step.generatedFiles.length : 4).map((file, idx) => (
+                  <motion.div
+                    key={idx}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    className="flex items-center gap-1 text-gray-400 bg-gray-900/40 rounded px-2 py-1 hover:bg-gray-800/40 transition-colors"
+                  >
+                    <span className="text-cyan-500 flex-shrink-0">
+                      {getFileIcon(file.filename)}
+                    </span>
+                    <span className="truncate text-xs">{file.filename}</span>
+                  </motion.div>
+                ))}
+              </div>
+              
+              {!expandedFiles && step.generatedFiles.length > 4 && (
+                <div className="text-center mt-1">
+                  <span className="text-xs text-gray-500">
+                    +{step.generatedFiles.length - 4} more files...
+                  </span>
+                </div>
+              )}
+            </div>
+            
+            {/* Code preview - only show latest file in compact form */}
+            {step.generatedFiles.length > 0 && (
+              <div className="mt-2">
+                <div className="text-xs text-gray-500 mb-1">Latest file preview:</div>
+                <SequentialCodeDisplay 
+                  key={`checklist-code-${step.id}-${step.generatedFiles.length}`}
+                  files={[step.generatedFiles[step.generatedFiles.length - 1]]}
+                />
+              </div>
+            )}
           </div>
         )}
       </motion.div>
@@ -199,6 +255,22 @@ const StatusIcon = React.memo(({ status }: StatusIconProps) => {
       return <div className="h-4 w-4 border-2 border-gray-600/50 rounded-full" />;
   }
 });
+
+// Helper function for file icons
+function getFileIcon(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase();
+  switch(ext) {
+    case 'rs': return '🦀';
+    case 'toml': return '📋';
+    case 'tsx': case 'jsx': return '⚛️';
+    case 'ts': case 'js': return '📘';
+    case 'json': return '📄';
+    case 'md': return '📝';
+    case 'css': return '🎨';
+    case 'html': return '🌐';
+    default: return '📄';
+  }
+}
 
 ChatChecklistBubble.displayName = 'ChatChecklistBubble';
 StepItem.displayName = 'StepItem';

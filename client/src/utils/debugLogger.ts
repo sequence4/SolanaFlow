@@ -18,6 +18,7 @@ export class PipelineDebugger {
   private eventLog: DebugEvent[] = [];
   private stageTransitions: Map<string, number> = new Map();
   private renderCounts: Map<string, number> = new Map();
+  private fileGenerationLog: Map<string, number> = new Map();
   private maxLogSize = 200;
   
   static getInstance(): PipelineDebugger {
@@ -95,6 +96,26 @@ export class PipelineDebugger {
     this.logEvent('SCROLL', eventType, details);
   }
   
+  logFileGeneration(fileName: string, index: number, total: number) {
+    this.fileGenerationLog.set(fileName, Date.now());
+    
+    this.logEvent('FILE-GEN', `${index}/${total}: ${fileName}`, {
+      fileName,
+      index,
+      total,
+      progress: Math.round((index / total) * 100)
+    });
+    
+    // Warn if file generation appears stalled
+    if (index > 4 && index === total) {
+      const firstFileTime = Array.from(this.fileGenerationLog.values())[0] || 0;
+      const totalTime = Date.now() - firstFileTime;
+      if (totalTime > 10000) {
+        console.warn(`[FILE-GEN] File generation took ${totalTime}ms for ${total} files`);
+      }
+    }
+  }
+  
   getPerformanceReport(): string {
     const now = Date.now();
     const recentEvents = this.eventLog.filter(e => now - e.timestamp < 60000); // Last minute
@@ -116,7 +137,11 @@ export class PipelineDebugger {
       excessiveRenders,
       stageTransitions: Array.from(this.stageTransitions.entries()),
       topEventCategories: this.getTopEventCategories(),
-      recentErrorEvents: this.eventLog.filter(e => e.category === 'ERROR').slice(-5)
+      recentErrorEvents: this.eventLog.filter(e => e.category === 'ERROR').slice(-5),
+      fileGenerationStats: {
+        totalFiles: this.fileGenerationLog.size,
+        files: Array.from(this.fileGenerationLog.entries()).slice(-10)
+      }
     };
     
     return JSON.stringify(report, null, 2);

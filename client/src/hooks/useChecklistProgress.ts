@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import eventBus, { ProgressPayload } from "../lib/eventBus";
+import { debugLogger } from "../utils/debugLogger";
 
 export interface Step {
   id: number;
@@ -161,9 +162,63 @@ export function useChecklistProgress() {
     setAnimatingSteps(prev => ({ ...prev, [stepId]: intervalId }));
   }, [animatingSteps]);
 
-  // Enhanced message handling with hash-based deduplication
+  // Helper function to get language from filename
+  const getLanguageFromFilename = useCallback((filename: string): string => {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    const langMap: Record<string, string> = {
+      'rs': 'rust',
+      'ts': 'typescript',
+      'tsx': 'typescript',
+      'js': 'javascript',
+      'jsx': 'javascript',
+      'json': 'json',
+      'toml': 'toml',
+      'yml': 'yaml',
+      'yaml': 'yaml',
+      'css': 'css',
+      'html': 'html',
+      'md': 'markdown'
+    };
+    return langMap[ext || ''] || 'text';
+  }, []);
+
+  // Enhanced message handling with individual file events
   const handleProgressMessage = useCallback((payload: any) => {
     if (!payload.stage) return;
+    
+    // Handle individual file-generated events separately
+    if (payload.type === 'file-generated') {
+      console.log('[PROGRESS] File generated:', payload.fileName, `(${payload.fileIndex}/${payload.totalFiles})`);
+      debugLogger.logFileGeneration(payload.fileName, payload.fileIndex, payload.totalFiles);
+      
+      setSteps(prevSteps => {
+        return prevSteps.map(step => {
+          if (step.stage === 'code-gen') {
+            const currentFiles = step.generatedFiles || [];
+            
+            // Add new file if not already present
+            const fileExists = currentFiles.some(f => f.filename === payload.fileName);
+            if (!fileExists) {
+              const newFile = {
+                filename: payload.fileName,
+                content: '', // Don't store full content to save memory
+                language: getLanguageFromFilename(payload.fileName)
+              };
+              
+              return {
+                ...step,
+                generatedFiles: [...currentFiles, newFile],
+                pct: payload.pct || step.pct,
+                description: `Generated ${payload.totalFiles} files`,
+                status: 'active' as const
+              };
+            }
+          }
+          return step;
+        });
+      });
+      return; // Don't process as regular progress event
+    }
     
     // Create unique hash for event deduplication
     const eventHash = `${payload.stage}-${payload.status}-${payload.pct || 0}-${payload.files?.length || 0}`;
@@ -212,7 +267,7 @@ export function useChecklistProgress() {
     // Debounce processing for code-gen events to allow batching
     const delay = payload.stage === 'code-gen' ? 300 : 0;
     setTimeout(processUpdateQueue, delay);
-  }, [processUpdateQueue]);
+  }, [processUpdateQueue, getLanguageFromFilename]);
 
   // Cleanup intervals on unmount
   useEffect(() => {

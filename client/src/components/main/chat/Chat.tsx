@@ -77,6 +77,7 @@ const Chat: React.FC = () => {
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
     const contentHeightRef = useRef(0);
     const isAutoScrollingRef = useRef(false);
+    const scrollDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
 
     // Enhanced scroll functions
@@ -94,12 +95,35 @@ const Chat: React.FC = () => {
         }
     }, []);
     
-    const smartScrollToBottom = useCallback(() => {
-        if (!userHasScrolled && messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
-            debugLogger.logScrollEvent('auto', { userHasScrolled });
+    // Debounced smooth scroll
+    const smoothScrollToBottom = useCallback(() => {
+        if (scrollDebounceRef.current) {
+            clearTimeout(scrollDebounceRef.current);
         }
+        
+        scrollDebounceRef.current = setTimeout(() => {
+            if (messagesAreaRef.current && !userHasScrolled) {
+                const scrollContainer = messagesAreaRef.current;
+                const targetScroll = scrollContainer.scrollHeight - scrollContainer.clientHeight;
+                
+                // Only scroll if we're not already at bottom
+                if (Math.abs(scrollContainer.scrollTop - targetScroll) > 10) {
+                    scrollContainer.scrollTo({
+                        top: targetScroll,
+                        behavior: 'smooth'
+                    });
+                    debugLogger.logScrollEvent('auto', { 
+                        userHasScrolled, 
+                        targetScroll, 
+                        currentScroll: scrollContainer.scrollTop 
+                    });
+                }
+            }
+        }, 100); // Debounce for 100ms
     }, [userHasScrolled]);
+    
+    // Keep old function name for compatibility
+    const smartScrollToBottom = smoothScrollToBottom;
 
     // Detect user scroll behavior with better tolerance
     const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
@@ -121,26 +145,28 @@ const Chat: React.FC = () => {
         setUserHasScrolled(!isAtBottom);
     }, [userHasScrolled]);
 
-    // Monitor content height changes for dynamic content
+    // Replace ResizeObserver with MutationObserver for better performance
     useEffect(() => {
         if (messagesAreaRef.current) {
-            const observer = new ResizeObserver((entries) => {
-                for (let entry of entries) {
-                    const newHeight = entry.contentRect.height;
-                    if (newHeight > contentHeightRef.current) {
-                        // Content grew, scroll if user hasn't manually scrolled
-                        if (!userHasScrolled) {
-                            forceScrollToBottom();
-                        }
-                    }
-                    contentHeightRef.current = newHeight;
+            const observer = new MutationObserver(() => {
+                // Only trigger scroll if content was added (not modified)
+                const currentHeight = messagesAreaRef.current?.scrollHeight || 0;
+                if (currentHeight > contentHeightRef.current) {
+                    smoothScrollToBottom();
                 }
+                contentHeightRef.current = currentHeight;
             });
             
-            observer.observe(messagesAreaRef.current);
+            observer.observe(messagesAreaRef.current, {
+                childList: true,
+                subtree: true,
+                characterData: false, // Don't watch text changes
+                attributes: false     // Don't watch attribute changes
+            });
+            
             return () => observer.disconnect();
         }
-    }, [userHasScrolled, forceScrollToBottom]);
+    }, [smoothScrollToBottom]);
 
     // Reset scroll state when new messages arrive
     useEffect(() => {
@@ -149,13 +175,13 @@ const Chat: React.FC = () => {
             if (lastMessage.sender === 'ai' && (lastMessage.codeGenFiles || lastMessage.isChecklist)) {
                 // Force scroll for important AI messages
                 setUserHasScrolled(false);
-                setTimeout(forceScrollToBottom, 100);
+                setTimeout(forceScrollToBottom, 150);
             } else {
                 // Regular scroll behavior
-                smartScrollToBottom();
+                smoothScrollToBottom();
             }
         }
-    }, [messages, forceScrollToBottom, smartScrollToBottom]);
+    }, [messages, forceScrollToBottom, smoothScrollToBottom]);
 
     useEffect(() => {
         smartScrollToBottom();
