@@ -79,97 +79,70 @@ const Chat: React.FC = () => {
     const isAutoScrollingRef = useRef(false);
     const scrollStateRef = useRef({
         isScrolling: false,
-        scrollTimeout: null as NodeJS.Timeout | null,
         lastScrollTime: 0,
-        pendingScroll: false
+        userScrollPosition: -1,  // Track user's scroll position
+        autoScrollEnabled: true  // Whether auto-scroll is enabled
     });
-    // Add scroll lock to prevent bouncing
-    const scrollLockRef = useRef(false);
 
 
-    // Enhanced scroll functions
-    const forceScrollToBottom = useCallback(() => {
+    // Smart scroll that respects user position
+    const smartScrollToBottom = useCallback(() => {
+        // Only scroll if auto-scroll is enabled
+        if (!scrollStateRef.current.autoScrollEnabled) {
+            return;
+        }
+        
         if (messagesAreaRef.current) {
-            isAutoScrollingRef.current = true;
-            messagesAreaRef.current.scrollTop = messagesAreaRef.current.scrollHeight;
-            debugLogger.logScrollEvent('force', {
-                scrollHeight: messagesAreaRef.current.scrollHeight,
-                scrollTop: messagesAreaRef.current.scrollTop
+            const container = messagesAreaRef.current;
+            const targetScroll = container.scrollHeight - container.clientHeight;
+            
+            // Smooth scroll to bottom
+            requestAnimationFrame(() => {
+                container.scrollTo({
+                    top: targetScroll,
+                    behavior: 'smooth'
+                });
             });
-            setTimeout(() => {
-                isAutoScrollingRef.current = false;
-            }, 100);
         }
     }, []);
     
-    // Stabilized scroll with throttling
-    const stableScrollToBottom = useCallback(() => {
-        if (scrollLockRef.current) return;
-        
-        const state = scrollStateRef.current;
-        
-        if (state.isScrolling) {
-            state.pendingScroll = true;
-            return;
+    // Force scroll only for critical messages (user messages, errors)
+    const forceScrollToBottom = useCallback(() => {
+        if (messagesAreaRef.current) {
+            const container = messagesAreaRef.current;
+            container.scrollTop = container.scrollHeight;
+            scrollStateRef.current.autoScrollEnabled = true;
+            setUserHasScrolled(false);
         }
-        
-        const now = Date.now();
-        // Increase minimum time between scrolls
-        if (now - state.lastScrollTime < 500) { // Increased from 200ms
-            state.pendingScroll = true;
-            return;
-        }
-        
-        state.isScrolling = true;
-        state.lastScrollTime = now;
-        scrollLockRef.current = true; // Lock scrolling
-        
-        requestAnimationFrame(() => {
-            if (messagesAreaRef.current && !userHasScrolled) {
-                const container = messagesAreaRef.current;
-                const targetScroll = container.scrollHeight - container.clientHeight;
-                const currentScroll = container.scrollTop;
-                const scrollDistance = Math.abs(targetScroll - currentScroll);
-                
-                // Only scroll if significant content change
-                if (scrollDistance > 50) { // Increased threshold
-                    container.scrollTop = targetScroll; // Always instant for stability
-                }
-            }
-            
-            state.isScrolling = false;
-            scrollLockRef.current = false; // Unlock
-            
-            if (state.pendingScroll) {
-                state.pendingScroll = false;
-                setTimeout(() => stableScrollToBottom(), 500); // Longer delay
-            }
-        });
-    }, [userHasScrolled]);
+    }, []);
     
-    // Keep old function names for compatibility
-    const smoothScrollToBottom = stableScrollToBottom;
-    const smartScrollToBottom = stableScrollToBottom;
+    // Keep compatibility
+    const smoothScrollToBottom = smartScrollToBottom;
+    const stableScrollToBottom = smartScrollToBottom;
 
-    // Detect user scroll behavior with better tolerance
+    // Enhanced scroll detection that properly respects user intent
     const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-        if (isAutoScrollingRef.current) return;
-        
         const element = e.target as HTMLDivElement;
-        const isAtBottom = element.scrollHeight - element.scrollTop <= element.clientHeight + 50; // More tolerance
+        const scrollTop = element.scrollTop;
+        const scrollHeight = element.scrollHeight;
+        const clientHeight = element.clientHeight;
         
-        if (isAtBottom !== !userHasScrolled) {
-            debugLogger.logScrollEvent('user', {
-                isAtBottom,
-                scrollTop: element.scrollTop,
-                scrollHeight: element.scrollHeight,
-                clientHeight: element.clientHeight,
-                wasScrolled: userHasScrolled
-            });
+        // Calculate if user is near bottom (within 100px tolerance)
+        const isNearBottom = scrollHeight - scrollTop <= clientHeight + 100;
+        
+        // If user scrolled up significantly, disable auto-scroll
+        if (!isNearBottom && scrollTop < scrollStateRef.current.userScrollPosition - 50) {
+            scrollStateRef.current.autoScrollEnabled = false;
+            setUserHasScrolled(true);
+        }
+        // Re-enable auto-scroll if user scrolls back to bottom
+        else if (isNearBottom) {
+            scrollStateRef.current.autoScrollEnabled = true;
+            setUserHasScrolled(false);
         }
         
-        setUserHasScrolled(!isAtBottom);
-    }, [userHasScrolled]);
+        scrollStateRef.current.userScrollPosition = scrollTop;
+    }, []);
 
     // Replace MutationObserver with more controlled approach
     useEffect(() => {
@@ -207,20 +180,25 @@ const Chat: React.FC = () => {
         }
     }, [stableScrollToBottom]);
 
-    // Reset scroll state when new messages arrive
+    // Fix message scrolling for user vs AI messages
     useEffect(() => {
         if (messages.length > 0) {
             const lastMessage = messages[messages.length - 1];
-            if (lastMessage.sender === 'ai' && (lastMessage.codeGenFiles || lastMessage.isChecklist)) {
-                // Force scroll for important AI messages
+            
+            // Only force scroll for user messages or critical AI responses
+            if (lastMessage.sender === 'user') {
+                // Always scroll to bottom for user messages
+                scrollStateRef.current.autoScrollEnabled = true;
                 setUserHasScrolled(false);
-                setTimeout(forceScrollToBottom, 150);
-            } else {
-                // Regular scroll behavior
-                smoothScrollToBottom();
+                setTimeout(forceScrollToBottom, 100);
+            } else if (lastMessage.sender === 'ai') {
+                // For AI messages, only auto-scroll if user hasn't scrolled up
+                if (!userHasScrolled) {
+                    setTimeout(smartScrollToBottom, 100);
+                }
             }
         }
-    }, [messages, forceScrollToBottom, smoothScrollToBottom]);
+    }, [messages, userHasScrolled, forceScrollToBottom, smartScrollToBottom]);
 
     useEffect(() => {
         smartScrollToBottom();
@@ -318,11 +296,27 @@ const Chat: React.FC = () => {
                     if (processedEventsRef.current.has(lineKey)) continue;
                     processedEventsRef.current.add(lineKey);
                     
-                    // Detect build phases
-                    if (line.includes("Preparing your build environment")) {
+                    // Add more thinking triggers based on log content
+                    if (line.includes("Starting Docker container")) {
+                        showThinkingForStage('environment');
+                    } else if (line.includes("Generating") && line.includes("files")) {
+                        showThinkingForStage('codegen-files');
+                    } else if (line.includes("Compilation progress")) {
+                        showThinkingForStage('build-progress');
+                    } else if (line.includes("Build completed successfully")) {
+                        showThinkingForStage('deployment-ready');
+                    } else if (line.includes("Preparing your build environment")) {
                         showThinkingForStage('environment');
                     } else if (line.includes("Building program")) {
                         showThinkingForStage('build');
+                    } else if (line.includes("cargo build-sbf")) {
+                        showThinkingForStage('build');
+                    } else if (line.includes("Compiling") && line.includes("Rust")) {
+                        showThinkingForStage('build-progress');
+                    } else if (line.includes("TypeScript bindings")) {
+                        showThinkingForStage('codegen');
+                    } else if (line.includes("Program ID generated")) {
+                        showThinkingForStage('deployment-ready');
                     }
                     
                     // Handle JSON messages
@@ -670,65 +664,93 @@ const Chat: React.FC = () => {
       
       const stageThoughts = {
         'initial-build': [
-          "Analyzing project structure...",
-          "Detecting Solana program configuration...",
-          "Validating Anchor.toml settings...",
-          "Checking dependencies versions...",
-          "Planning optimal build strategy...",
-          "Allocating container resources...",
-          "Estimated time: ~2-3 minutes"
+          "🔍 Analyzing project structure...",
+          "📋 Validating Anchor.toml configuration...",
+          "🔧 Checking Rust toolchain compatibility...",
+          "📦 Scanning dependencies and versions...",
+          "🎯 Identifying program entry points...",
+          "⚡ Planning optimal build strategy...",
+          "🐳 Preparing Docker container...",
+          "⏱️ Estimated time: 2-3 minutes"
         ],
         'environment': [
-          "Spinning up Docker container...",
-          "Installing Solana CLI tools...",
-          "Configuring Rust toolchain 1.75...",
-          "Setting up Anchor framework...",
-          "Mounting project volumes...",
-          "Initializing build cache...",
-          "Container ready for compilation"
+          "🐳 Starting Docker container...",
+          "🔄 Mounting project volumes...",
+          "🦀 Installing Rust 1.75.0...",
+          "⚓ Setting up Anchor framework v0.30...",
+          "🔗 Configuring Solana CLI tools...",
+          "📚 Loading build dependencies...",
+          "💾 Initializing build cache...",
+          "✅ Container ready for compilation"
         ],
         'codegen': [
-          "Parsing program instructions...",
-          "Generating TypeScript bindings...",
-          "Creating React components...",
-          "Building wallet adapters...",
-          "Structuring frontend hooks...",
-          "Optimizing bundle size...",
-          "Generating documentation..."
+          "📝 Parsing program instructions...",
+          "🔍 Analyzing account structures...",
+          "🏗️ Generating TypeScript bindings...",
+          "⚛️ Creating React components...",
+          "🔌 Building wallet adapter hooks...",
+          "🎨 Generating UI components...",
+          "📄 Creating IDL definitions...",
+          "🚀 Optimizing for production..."
+        ],
+        'codegen-files': [
+          "📄 Creating lib.rs with program logic...",
+          "📄 Generating instruction handlers...",
+          "🔐 Setting up account validators...",
+          "🎯 Building state management...",
+          "💼 Creating wallet integration...",
+          "🌐 Generating API endpoints...",
+          "📊 Building data structures..."
         ],
         'build': [
-          "Compiling Rust to BPF bytecode...",
-          "Running cargo build-sbf...",
-          "Optimizing for Solana runtime...",
-          "Generating program keypair...",
-          "Creating IDL definitions...",
-          "Verifying build artifacts...",
-          "Preparing deployment package..."
+          "🔨 Starting cargo build-sbf...",
+          "🦀 Compiling Rust to BPF bytecode...",
+          "⚡ Optimizing for Solana runtime...",
+          "🔑 Generating program keypair...",
+          "📦 Creating deployment package...",
+          "🔍 Running safety checks...",
+          "📋 Generating IDL metadata...",
+          "✨ Finalizing build artifacts..."
         ],
-        'finalization': [
-          "Collecting build artifacts...",
-          "Updating environment variables...",
-          "Syncing IDL with frontend...",
-          "Verifying program integrity...",
-          "Preparing deployment summary..."
+        'build-progress': [
+          "📊 Compilation progress: 25%...",
+          "⚙️ Linking dependencies...",
+          "📊 Compilation progress: 50%...",
+          "🔧 Optimizing bytecode...",
+          "📊 Compilation progress: 75%...",
+          "🎯 Finalizing program binary...",
+          "📊 Compilation progress: 95%...",
+          "✅ Build verification complete"
+        ],
+        'deployment-ready': [
+          "🎉 Build completed successfully!",
+          "📦 Artifacts ready for deployment",
+          "🔑 Program ID generated",
+          "🌐 Frontend connected to program",
+          "✨ Ready to deploy to Solana!"
         ]
       };
       
       const thoughts = stageThoughts[stage as keyof typeof stageThoughts] || [];
       setThinkingSteps([]);
       
-      // Show thoughts progressively with varying speeds
+      // Progressive reveal with better timing
       for (const [index, thought] of thoughts.entries()) {
-        await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 100));
+        // Initial delay before showing thought
+        await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 150));
+        
+        // Add the thought as pending
         setThinkingSteps(prev => [...prev, { text: thought, completed: false }]);
-        await new Promise(resolve => setTimeout(resolve, 150 + Math.random() * 150));
+        
+        // Mark as completed after a delay
+        await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 200));
         setThinkingSteps(prev => prev.map((step, i) => 
           i === index ? { ...step, completed: true } : step
         ));
       }
       
-      // Clear thinking after brief pause
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Keep final state visible briefly
+      await new Promise(resolve => setTimeout(resolve, 500));
       setIsThinking(false);
       setThinkingSteps([]);
       setCurrentThinkingStage(null);
