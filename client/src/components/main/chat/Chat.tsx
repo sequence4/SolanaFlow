@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useContext } from 'react';
+import React, { useState, useRef, useEffect, useContext, useCallback } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -33,6 +33,7 @@ import {
 import MarkdownRenderer from '@/components/main/code/markdown/MarkdownRenderer';
 import ChatChecklistBubble from './ChatChecklistBubble';
 import SequentialCodeDisplay from './SequentialCodeDisplay';
+import { debugLogger } from '@/utils/debugLogger';
 
 export interface AIMessageType {
   text: string;
@@ -74,30 +75,91 @@ const Chat: React.FC = () => {
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const messagesAreaRef = useRef<HTMLDivElement | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+    const contentHeightRef = useRef(0);
+    const isAutoScrollingRef = useRef(false);
 
 
-    // Enhanced scroll function that respects user scroll behavior
-    const smartScrollToBottom = () => {
+    // Enhanced scroll functions
+    const forceScrollToBottom = useCallback(() => {
+        if (messagesAreaRef.current) {
+            isAutoScrollingRef.current = true;
+            messagesAreaRef.current.scrollTop = messagesAreaRef.current.scrollHeight;
+            debugLogger.logScrollEvent('force', {
+                scrollHeight: messagesAreaRef.current.scrollHeight,
+                scrollTop: messagesAreaRef.current.scrollTop
+            });
+            setTimeout(() => {
+                isAutoScrollingRef.current = false;
+            }, 100);
+        }
+    }, []);
+    
+    const smartScrollToBottom = useCallback(() => {
         if (!userHasScrolled && messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+            messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            debugLogger.logScrollEvent('auto', { userHasScrolled });
         }
-    };
+    }, [userHasScrolled]);
 
-    // Detect user scroll behavior
-    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-        const element = e.target as HTMLDivElement;
-        const isAtBottom = element.scrollHeight - element.scrollTop <= element.clientHeight + 10;
+    // Detect user scroll behavior with better tolerance
+    const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+        if (isAutoScrollingRef.current) return;
         
-        if (!isAtBottom) {
-            setUserHasScrolled(true);
-        } else {
-            setUserHasScrolled(false);
+        const element = e.target as HTMLDivElement;
+        const isAtBottom = element.scrollHeight - element.scrollTop <= element.clientHeight + 50; // More tolerance
+        
+        if (isAtBottom !== !userHasScrolled) {
+            debugLogger.logScrollEvent('user', {
+                isAtBottom,
+                scrollTop: element.scrollTop,
+                scrollHeight: element.scrollHeight,
+                clientHeight: element.clientHeight,
+                wasScrolled: userHasScrolled
+            });
         }
-    };
+        
+        setUserHasScrolled(!isAtBottom);
+    }, [userHasScrolled]);
+
+    // Monitor content height changes for dynamic content
+    useEffect(() => {
+        if (messagesAreaRef.current) {
+            const observer = new ResizeObserver((entries) => {
+                for (let entry of entries) {
+                    const newHeight = entry.contentRect.height;
+                    if (newHeight > contentHeightRef.current) {
+                        // Content grew, scroll if user hasn't manually scrolled
+                        if (!userHasScrolled) {
+                            forceScrollToBottom();
+                        }
+                    }
+                    contentHeightRef.current = newHeight;
+                }
+            });
+            
+            observer.observe(messagesAreaRef.current);
+            return () => observer.disconnect();
+        }
+    }, [userHasScrolled, forceScrollToBottom]);
+
+    // Reset scroll state when new messages arrive
+    useEffect(() => {
+        if (messages.length > 0) {
+            const lastMessage = messages[messages.length - 1];
+            if (lastMessage.sender === 'ai' && (lastMessage.codeGenFiles || lastMessage.isChecklist)) {
+                // Force scroll for important AI messages
+                setUserHasScrolled(false);
+                setTimeout(forceScrollToBottom, 100);
+            } else {
+                // Regular scroll behavior
+                smartScrollToBottom();
+            }
+        }
+    }, [messages, forceScrollToBottom, smartScrollToBottom]);
 
     useEffect(() => {
         smartScrollToBottom();
-    }, [messages, isTyping, isThinking, userHasScrolled]);
+    }, [isTyping, isThinking, smartScrollToBottom]);
 
     useEffect(() => {
         console.log(selectedFile);

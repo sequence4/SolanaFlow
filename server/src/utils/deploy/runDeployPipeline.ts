@@ -415,44 +415,106 @@ export async function runDeployPipeline({
     ];
     const tomlFile  = `/usr/src/${projectFolder}/Anchor.toml`;
 
-    /* ── NEW: copy only the artefacts we really need ─────────────────────────
+    /* ── Enhanced file collection with existence checking and retries ──────────
      * NEVER copy `${programName}-keypair.json`; it contains the 64‑byte secret
      * key and must stay inside the container.
      * ----------------------------------------------------------------------*/
-    await readContainerFile(
-      workspace.containerName,
-      path.posix.join(deployDir, `${programName}.so`),   // compiled program
-      projectId,
-      userId
-    );
-    await readContainerFile(workspace.containerName, tomlFile, projectId, userId);
-
-    /* ── NEW: copy only the artefacts we really need ─────────────────────────
-     * NEVER copy `${programName}-keypair.json`; it contains the 64‑byte secret
-     * key and must stay inside the container.
-     * ----------------------------------------------------------------------*/
-    await readContainerFile(
-      workspace.containerName,
-      path.posix.join(deployDir, `${programName}.so`),   // compiled program
-      projectId,
-      userId
-    );
-    await readContainerFile(workspace.containerName, tomlFile, projectId, userId);
+    console.log('[FILE-OPS] Starting file collection phase');
+    console.log('[FILE-OPS] Project folder:', projectFolder);
+    console.log('[FILE-OPS] Deploy directory:', deployDir);
+    
+    // Helper functions for file operations
+    const checkFileExists = async (containerName: string, filePath: string): Promise<boolean> => {
+      try {
+        const result = execSync(
+          `docker exec ${containerName} test -f "${filePath}" && echo "exists" || echo "missing"`,
+          { encoding: 'utf8' }
+        ).trim();
+        return result === 'exists';
+      } catch (error) {
+        console.error(`[FILE-CHECK] Error checking file ${filePath}:`, error);
+        return false;
+      }
+    };
+    
+    const listDirectory = async (containerName: string, dirPath: string) => {
+      try {
+        const files = execSync(
+          `docker exec ${containerName} ls -la "${dirPath}" 2>/dev/null || echo "Directory not found"`,
+          { encoding: 'utf8' }
+        );
+        console.log(`[DIR-LISTING] Contents of ${dirPath}:\n${files}`);
+        return files;
+      } catch (error) {
+        console.error(`[DIR-LISTING] Error listing ${dirPath}:`, error);
+        return null;
+      }
+    };
+    
+    // List the deploy directory to see what's actually there
+    await listDirectory(workspace.containerName, deployDir);
+    
+    // Check for .so file with retries
+    const soFilePath = path.posix.join(deployDir, `${programName}.so`);
+    let soFileExists = false;
+    let retryCount = 0;
+    
+    while (!soFileExists && retryCount < 5) {
+      soFileExists = await checkFileExists(workspace.containerName, soFilePath);
+      if (!soFileExists) {
+        console.log(`[FILE-OPS] .so file not found yet, retry ${retryCount + 1}/5`);
+        progressMgr.updateProgress('build', 92 + retryCount, `Waiting for build artifacts (${retryCount + 1}/5)...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        retryCount++;
+      }
+    }
+    
+    if (!soFileExists) {
+      console.error('[FILE-OPS] WARNING: .so file not found after retries');
+      progressMgr.updateProgress('build', 95, 'Build artifacts missing - continuing anyway...', {
+        warning: 'Build artifacts not ready yet'
+      });
+    } else {
+      console.log('[FILE-OPS] .so file found, proceeding with copy');
+      await readContainerFile(
+        workspace.containerName,
+        soFilePath,
+        projectId,
+        userId
+      );
+      progressMgr.updateProgress('build', 98, 'Collecting build artifacts...');
+    }
+    
+    // Check for Anchor.toml with fallback
+    const tomlExists = await checkFileExists(workspace.containerName, tomlFile);
+    if (tomlExists) {
+      await readContainerFile(workspace.containerName, tomlFile, projectId, userId);
+      console.log('[FILE-OPS] Anchor.toml collected');
+    } else {
+      console.warn('[FILE-OPS] Anchor.toml not found at expected location');
+    }
 
     /* ----------------------------------------------------------------
-       Copy every *.json found under each IDL dir instead of trying to
-       stream the directory itself (which triggers "cat: … Is a directory")
+       Copy every *.json found under each IDL dir with better error handling
        ---------------------------------------------------------------- */
     for (const d of idlDirs) {
       try {
-        await runCommand(
-          `docker exec ${workspace.containerName} bash -c 'shopt -s nullglob && for f in "${d}"/*.json; do cat "$f"; done'`,
+        console.log(`[IDL-COPY] Checking directory: ${d}`);
+        await listDirectory(workspace.containerName, d);
+        
+        const result = await runCommand(
+          `docker exec ${workspace.containerName} bash -c 'shopt -s nullglob && for f in "${d}"/*.json; do echo "Found: $f" && cat "$f" 2>/dev/null || echo "Failed to read: $f"; done'`,
           ".",
           `copy-idl-${Date.now()}`,
           { skipSuccessUpdate: true },
         );
-      } catch { /* dir may not exist – fine */ }
+        console.log(`[IDL-COPY] Result from ${d}:`, result);
+      } catch (err) {
+        console.log(`[IDL-COPY] Directory ${d} not accessible:`, err);
+      }
     }
+    
+    progressMgr.updateProgress('build', 99, 'Finalizing build artifacts...');
 
     /* ---- host copy removed: program ID is read in-container below ---- */
     
@@ -565,6 +627,9 @@ export async function runDeployPipeline({
         console.warn(`⚠️  IDL metadata patch failed: ${err}`);
       }
     }
+    
+    // Complete the build stage properly
+    await progressMgr.completeStage('build', `Build finished successfully - Program ID: ${programIdStr}`);
     
     sendProgress(<ProgressEvent>{
       stage   : "build",

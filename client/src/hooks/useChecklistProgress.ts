@@ -50,10 +50,12 @@ export function useChecklistProgress() {
   const [animatingSteps, setAnimatingSteps] = useState<{[stepId: number]: NodeJS.Timeout}>({});
   const lastProgressMapRef = useRef(new Map<string, number>());
   
-  // Refs for optimization
+  // Refs for optimization and deduplication
   const updateQueueRef = useRef<StageUpdate[]>([]);
   const processingRef = useRef(false);
   const lastUpdateTimeRef = useRef<Map<string, number>>(new Map());
+  const processedEventHashesRef = useRef(new Set<string>());
+  const lastEventTimestampRef = useRef<{[key: string]: number}>({});
 
   // Debounced update processing to prevent rapid re-renders
   const processUpdateQueue = useCallback(() => {
@@ -159,11 +161,33 @@ export function useChecklistProgress() {
     setAnimatingSteps(prev => ({ ...prev, [stepId]: intervalId }));
   }, [animatingSteps]);
 
-  // Enhanced message handling with deduplication and throttling
+  // Enhanced message handling with hash-based deduplication
   const handleProgressMessage = useCallback((payload: any) => {
     if (!payload.stage) return;
     
+    // Create unique hash for event deduplication
+    const eventHash = `${payload.stage}-${payload.status}-${payload.pct || 0}-${payload.files?.length || 0}`;
     const now = Date.now();
+    
+    // Skip duplicate events within 500ms window
+    if (processedEventHashesRef.current.has(eventHash)) {
+      const lastTime = lastEventTimestampRef.current[eventHash] || 0;
+      if (now - lastTime < 500) {
+        console.log('[PROGRESS] Skipping duplicate event:', eventHash);
+        return;
+      }
+    }
+    
+    processedEventHashesRef.current.add(eventHash);
+    lastEventTimestampRef.current[eventHash] = now;
+    
+    // For code-gen stage, batch file updates to prevent accumulation
+    if (payload.stage === 'code-gen' && payload.files) {
+      // Clear any pending updates for code-gen to prevent accumulation
+      updateQueueRef.current = updateQueueRef.current.filter(u => u.stage !== 'code-gen');
+      console.log('[PROGRESS] Batching code-gen files:', payload.files.length);
+    }
+    
     const lastUpdate = lastUpdateTimeRef.current.get(payload.stage) || 0;
     
     // Throttle rapid updates for the same stage (except completion)
@@ -173,7 +197,7 @@ export function useChecklistProgress() {
     
     lastUpdateTimeRef.current.set(payload.stage, now);
     
-    // Add to update queue with sequence number for deduplication
+    // Add to update queue
     const update: StageUpdate = {
       stage: payload.stage,
       status: payload.status,
@@ -185,8 +209,9 @@ export function useChecklistProgress() {
     
     updateQueueRef.current.push(update);
     
-    // Process updates in next tick to allow batching
-    setTimeout(processUpdateQueue, 0);
+    // Debounce processing for code-gen events to allow batching
+    const delay = payload.stage === 'code-gen' ? 300 : 0;
+    setTimeout(processUpdateQueue, delay);
   }, [processUpdateQueue]);
 
   // Cleanup intervals on unmount
@@ -198,6 +223,23 @@ export function useChecklistProgress() {
     };
   }, [animatingSteps]);
 
+  // Clear old hashes periodically to prevent memory leaks
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      // Clear hashes older than 5 minutes
+      Object.keys(lastEventTimestampRef.current).forEach(hash => {
+        if (now - lastEventTimestampRef.current[hash] > 300000) {
+          processedEventHashesRef.current.delete(hash);
+          delete lastEventTimestampRef.current[hash];
+        }
+      });
+      console.log('[PROGRESS] Cleaned up old event hashes');
+    }, 60000); // Clean every minute
+    
+    return () => clearInterval(interval);
+  }, []);
+
   // Event bus subscription with cleanup
   useEffect(() => {
     const eventHandler = handleProgressMessage;
@@ -208,6 +250,9 @@ export function useChecklistProgress() {
       // Clear any pending updates
       updateQueueRef.current = [];
       processingRef.current = false;
+      // Clear deduplication data
+      processedEventHashesRef.current.clear();
+      lastEventTimestampRef.current = {};
     };
   }, [handleProgressMessage]);
 

@@ -6,6 +6,7 @@ import { Progress } from "../../../components/ui/progress";
 import { useChecklistProgress, Step } from "../../../hooks/useChecklistProgress";
 import CompactCodeSnippet from "../code/markdown/CompactCodeSnippet";
 import SequentialCodeDisplay from "./SequentialCodeDisplay";
+import { debugLogger } from "../../../utils/debugLogger";
 
 interface ChatChecklistBubbleProps {
   key?: string;
@@ -13,6 +14,15 @@ interface ChatChecklistBubbleProps {
 
 const ChatChecklistBubble = React.memo(({ key }: ChatChecklistBubbleProps) => {
   const steps = useChecklistProgress();
+  
+  // Debug logging
+  React.useEffect(() => {
+    debugLogger.logRender('ChatChecklistBubble', { 
+      stepsCount: steps.length, 
+      visibleSteps: visibleSteps.length,
+      overallProgress 
+    });
+  });
   
   // Memoize visible steps calculation to prevent unnecessary re-renders
   const visibleSteps = useMemo(() => {
