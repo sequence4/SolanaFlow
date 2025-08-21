@@ -16,6 +16,7 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
   
   // Fix hydration issues
   useEffect(() => {
+    console.log('[SequentialCodeDisplay] COMPONENT MOUNTING - Setting mounted to true');
     setMounted(true);
   }, []);
   
@@ -97,10 +98,14 @@ export class ${filename.replace(/[^a-zA-Z0-9]/g, '')}Client {
   
   // Process files and create final display array
   useEffect(() => {
+    console.log('[SequentialCodeDisplay] Processing files - received:', files?.length || 0, 'files');
+    console.log('[SequentialCodeDisplay] Valid files:', validFiles.length);
+    
     let processedFiles = validFiles;
     
     // Add fallback test files if no valid files
     if (!validFiles.length) {
+      console.log('[SequentialCodeDisplay] No valid files, using fallback');
       processedFiles = [
         {
           filename: 'lib.rs',
@@ -123,6 +128,7 @@ pub struct Initialize {}`,
       ];
     }
     
+    console.log('[SequentialCodeDisplay] Final files to display:', processedFiles.length);
     setFinalFilesToDisplay(processedFiles);
     
     // Reset for new files
@@ -132,12 +138,23 @@ pub struct Initialize {}`,
   }, [files, validFiles.length]);
   
   useEffect(() => {
+    console.log('[SequentialCodeDisplay] Typewriter effect check:', {
+      mounted,
+      finalFilesLength: finalFilesToDisplay.length,
+      currentFileIndex,
+      willReturn: !mounted || !finalFilesToDisplay.length || currentFileIndex >= finalFilesToDisplay.length
+    });
+    
     if (!mounted || !finalFilesToDisplay.length || currentFileIndex >= finalFilesToDisplay.length) return;
     
     const currentFile = finalFilesToDisplay[currentFileIndex];
-    if (!currentFile) return;
+    if (!currentFile) {
+      console.log('[SequentialCodeDisplay] No current file available');
+      return;
+    }
     
     const truncatedContent = getTruncatedContent(currentFile.content);
+    console.log('[SequentialCodeDisplay] Starting typewriter for:', currentFile.filename, 'with', truncatedContent.length, 'chars');
     
     // Start typewriter effect immediately
     setIsTyping(true);
@@ -149,12 +166,14 @@ pub struct Initialize {}`,
         setDisplayedText(truncatedContent.substring(0, charIndex + 1));
         charIndex++;
       } else {
+        console.log('[SequentialCodeDisplay] Typewriter complete for:', currentFile.filename);
         clearInterval(timer);
         setIsTyping(false);
         
         // Move to next file after 2 seconds
         setTimeout(() => {
           if (currentFileIndex < finalFilesToDisplay.length - 1) {
+            console.log('[SequentialCodeDisplay] Moving to next file');
             setCurrentFileIndex(prev => prev + 1);
           }
         }, 2000);
