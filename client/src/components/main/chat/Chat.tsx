@@ -738,32 +738,55 @@ const Chat: React.FC = () => {
     const parseCodeGenFiles = (messageText: string) => {
         // Look for patterns indicating code generation with multiple files
         const codeGenPatterns = [
-            /Generating.*files?:/i,
-            /Creating.*files?:/i,
-            /Code generation complete/i,
-            /Generated.*files?/i
+            /Generating.*files?/i,
+            /Creating.*files?/i,
+            /Code generation/i,
+            /Generated.*files?/i,
+            /Here.*(?:is|are).*(?:files?|code)/i,
+            /```(?:rust|toml|typescript|javascript)/i, // Any code blocks with these languages
+            /\.rs|\.toml|\.ts|\.js/i // Any mention of these file extensions
         ];
 
         const isCodeGenMessage = codeGenPatterns.some(pattern => pattern.test(messageText));
+        console.log('[parseCodeGenFiles] Is code generation message:', isCodeGenMessage);
+        console.log('[parseCodeGenFiles] Matched patterns:', codeGenPatterns.filter(pattern => pattern.test(messageText)));
+        
         if (!isCodeGenMessage) return null;
 
-        // Extract code blocks with filenames
-        const codeBlockRegex = /```(\w+)?\s*(?:\/\/\s*(.+\.(?:rs|toml|js|ts|json|md|yml|yaml)))?[\s\S]*?\n([\s\S]*?)```/g;
+        // Extract code blocks with filenames - more flexible pattern
+        const codeBlockRegex = /```(\w+)?\s*(?:(?:\/\/|#|<!--)\s*(.+\.\w+))?.*?\n([\s\S]*?)```/g;
         const files = [];
         let match;
 
+        console.log('[parseCodeGenFiles] Searching for code blocks in message');
+        console.log('[parseCodeGenFiles] Message preview:', messageText.substring(0, 200));
+
         while ((match = codeBlockRegex.exec(messageText)) !== null) {
-            const [, language = 'rust', filename, content] = match;
+            const [fullMatch, language = 'rust', filename, content] = match;
+            console.log('[parseCodeGenFiles] Found code block:', {
+                language,
+                filename,
+                contentLength: content?.length || 0,
+                fullMatchPreview: fullMatch.substring(0, 100)
+            });
+            
             if (content && content.trim()) {
+                // Generate filename if not provided
+                const finalFilename: string = filename || `generated_${files.length + 1}.${language === 'rust' ? 'rs' : language === 'typescript' ? 'ts' : 'txt'}`;
+                
                 files.push({
-                    filename: filename || `file_${files.length + 1}.${language === 'rust' ? 'rs' : 'txt'}`,
+                    filename: finalFilename,
                     content: content.trim(),
                     language: language || 'rust'
                 });
+                
+                console.log('[parseCodeGenFiles] Added file:', finalFilename);
             }
         }
+        
+        console.log('[parseCodeGenFiles] Total files found:', files.length);
 
-        return files.length > 1 ? files : null; // Only use LogCodeDisplay for multiple files
+        return files.length > 0 ? files : null; // Use SequentialCodeDisplay for any files found
     };
 
     return (
