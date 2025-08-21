@@ -77,7 +77,12 @@ const Chat: React.FC = () => {
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
     const contentHeightRef = useRef(0);
     const isAutoScrollingRef = useRef(false);
-    const scrollDebounceRef = useRef<NodeJS.Timeout | null>(null);
+    const scrollStateRef = useRef({
+        isScrolling: false,
+        scrollTimeout: null as NodeJS.Timeout | null,
+        lastScrollTime: 0,
+        pendingScroll: false
+    });
 
 
     // Enhanced scroll functions
@@ -95,35 +100,68 @@ const Chat: React.FC = () => {
         }
     }, []);
     
-    // Debounced smooth scroll
-    const smoothScrollToBottom = useCallback(() => {
-        if (scrollDebounceRef.current) {
-            clearTimeout(scrollDebounceRef.current);
+    // Stabilized scroll with batching and RAF
+    const stableScrollToBottom = useCallback(() => {
+        const state = scrollStateRef.current;
+        
+        // Prevent scroll if already scrolling
+        if (state.isScrolling) {
+            state.pendingScroll = true;
+            return;
         }
         
-        scrollDebounceRef.current = setTimeout(() => {
+        const now = Date.now();
+        if (now - state.lastScrollTime < 200) {
+            // Too soon, defer scroll
+            state.pendingScroll = true;
+            return;
+        }
+        
+        state.isScrolling = true;
+        state.lastScrollTime = now;
+        
+        requestAnimationFrame(() => {
             if (messagesAreaRef.current && !userHasScrolled) {
-                const scrollContainer = messagesAreaRef.current;
-                const targetScroll = scrollContainer.scrollHeight - scrollContainer.clientHeight;
+                const container = messagesAreaRef.current;
+                const targetScroll = container.scrollHeight - container.clientHeight;
                 
-                // Only scroll if we're not already at bottom
-                if (Math.abs(scrollContainer.scrollTop - targetScroll) > 10) {
-                    scrollContainer.scrollTo({
+                // Use instant scroll for large jumps, smooth for small
+                const currentScroll = container.scrollTop;
+                const scrollDistance = Math.abs(targetScroll - currentScroll);
+                
+                if (scrollDistance > 100) {
+                    // Instant jump for large distances
+                    container.scrollTop = targetScroll;
+                    debugLogger.logScrollEvent('force', { 
+                        scrollDistance, 
+                        method: 'instant' 
+                    });
+                } else if (scrollDistance > 10) {
+                    // Smooth scroll for small distances
+                    container.scrollTo({
                         top: targetScroll,
                         behavior: 'smooth'
                     });
                     debugLogger.logScrollEvent('auto', { 
-                        userHasScrolled, 
-                        targetScroll, 
-                        currentScroll: scrollContainer.scrollTop 
+                        scrollDistance, 
+                        method: 'smooth' 
                     });
                 }
             }
-        }, 100); // Debounce for 100ms
+            
+            state.isScrolling = false;
+            
+            // Process pending scroll after delay
+            if (state.pendingScroll) {
+                state.pendingScroll = false;
+                setTimeout(() => stableScrollToBottom(), 100);
+            }
+        });
     }, [userHasScrolled]);
     
-    // Keep old function name for compatibility
-    const smartScrollToBottom = smoothScrollToBottom;
+    // Keep old function names for compatibility
+    const smoothScrollToBottom = stableScrollToBottom;
+    const smartScrollToBottom = stableScrollToBottom;
 
     // Detect user scroll behavior with better tolerance
     const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
@@ -145,28 +183,44 @@ const Chat: React.FC = () => {
         setUserHasScrolled(!isAtBottom);
     }, [userHasScrolled]);
 
-    // Replace ResizeObserver with MutationObserver for better performance
+    // Debounced content observer with better performance
     useEffect(() => {
         if (messagesAreaRef.current) {
-            const observer = new MutationObserver(() => {
-                // Only trigger scroll if content was added (not modified)
-                const currentHeight = messagesAreaRef.current?.scrollHeight || 0;
-                if (currentHeight > contentHeightRef.current) {
-                    smoothScrollToBottom();
-                }
-                contentHeightRef.current = currentHeight;
+            let observerTimeout: NodeJS.Timeout | null = null;
+            
+            const observer = new MutationObserver((mutations) => {
+                // Clear existing timeout
+                if (observerTimeout) clearTimeout(observerTimeout);
+                
+                // Batch mutations
+                observerTimeout = setTimeout(() => {
+                    const hasNewContent = mutations.some(m => 
+                        m.type === 'childList' && m.addedNodes.length > 0
+                    );
+                    
+                    if (hasNewContent) {
+                        const currentHeight = messagesAreaRef.current?.scrollHeight || 0;
+                        if (currentHeight > contentHeightRef.current) {
+                            contentHeightRef.current = currentHeight;
+                            stableScrollToBottom();
+                        }
+                    }
+                }, 50); // 50ms debounce
             });
             
             observer.observe(messagesAreaRef.current, {
                 childList: true,
                 subtree: true,
-                characterData: false, // Don't watch text changes
-                attributes: false     // Don't watch attribute changes
+                characterData: false,
+                attributes: false
             });
             
-            return () => observer.disconnect();
+            return () => {
+                if (observerTimeout) clearTimeout(observerTimeout);
+                observer.disconnect();
+            };
         }
-    }, [smoothScrollToBottom]);
+    }, [stableScrollToBottom]);
 
     // Reset scroll state when new messages arrive
     useEffect(() => {
@@ -239,6 +293,7 @@ const Chat: React.FC = () => {
         logProcessingTimeoutRef.current = setTimeout(() => {
             const fresh = systemLogs.slice(lastLogIndex);
 
+            // Enhanced filtering with regex patterns for Program IDs
             const IGNORE_PREFIXES = [
                 "Preparing your build environment",
                 "Container is up", 
@@ -247,9 +302,21 @@ const Chat: React.FC = () => {
                 "Linking target/deploy",
                 "Collecting project files"
             ];
+            
+            const IGNORE_PATTERNS = [
+                /Program ID: \w+/,
+                /8u9EqQfPNdaCkPFNLpJwTboQQGxwXsb1V7TNeY44qEd/,  // Your specific program ID
+                /[A-Za-z0-9]{32,44}$/,  // Generic base58 program IDs
+                /Generated program keypair/,
+                /\[\.\.\.\] Program ID:/,
+                /IDL metadata.*address/
+            ];
 
-            const visible = fresh.filter(
-                line => !IGNORE_PREFIXES.some(p => line.startsWith(p))
+            const visible = fresh.filter(line => 
+                !IGNORE_PREFIXES.some(p => line.includes(p)) &&
+                !IGNORE_PATTERNS.some(pattern => 
+                    typeof pattern === 'string' ? line.includes(pattern) : pattern.test(line)
+                )
             );
 
             if (visible.length) {
@@ -618,42 +685,58 @@ const Chat: React.FC = () => {
       
       const stageThoughts = {
         'initial-build': [
-          "Scanning project directory structure...",
-          "Located Cargo.toml at /app",
-          "Detecting Solana program architecture...", 
-          "Found 3 instruction handlers in lib.rs",
-          "Analyzing dependencies: anchor-lang v0.30.1",
-          "Preparing containerized build environment...",
-          "Estimating build time: ~2 minutes"
+          "Analyzing project structure...",
+          "Detecting Solana program configuration...",
+          "Validating Anchor.toml settings...",
+          "Checking dependencies versions...",
+          "Planning optimal build strategy...",
+          "Allocating container resources...",
+          "Estimated time: ~2-3 minutes"
         ],
         'environment': [
-          "Initializing Docker container...",
-          "Loading Solana build tools...",
-          "Configuring Rust toolchain...",
-          "Setting up workspace dependencies..."
+          "Spinning up Docker container...",
+          "Installing Solana CLI tools...",
+          "Configuring Rust toolchain 1.75...",
+          "Setting up Anchor framework...",
+          "Mounting project volumes...",
+          "Initializing build cache...",
+          "Container ready for compilation"
         ],
         'codegen': [
-          "Analyzing program structure...",
-          "Generating instruction handlers...",
-          "Creating account definitions...",
-          "Building state management logic...",
-          "Optimizing for Solana runtime..."
+          "Parsing program instructions...",
+          "Generating TypeScript bindings...",
+          "Creating React components...",
+          "Building wallet adapters...",
+          "Structuring frontend hooks...",
+          "Optimizing bundle size...",
+          "Generating documentation..."
         ],
         'build': [
-          "Compiling Rust source files...",
-          "Linking Solana BPF modules...",
-          "Optimizing bytecode...",
-          "Generating deployment artifacts..."
+          "Compiling Rust to BPF bytecode...",
+          "Running cargo build-sbf...",
+          "Optimizing for Solana runtime...",
+          "Generating program keypair...",
+          "Creating IDL definitions...",
+          "Verifying build artifacts...",
+          "Preparing deployment package..."
+        ],
+        'finalization': [
+          "Collecting build artifacts...",
+          "Updating environment variables...",
+          "Syncing IDL with frontend...",
+          "Verifying program integrity...",
+          "Preparing deployment summary..."
         ]
       };
       
       const thoughts = stageThoughts[stage as keyof typeof stageThoughts] || [];
       setThinkingSteps([]);
       
+      // Show thoughts progressively with varying speeds
       for (const [index, thought] of thoughts.entries()) {
-        await new Promise(resolve => setTimeout(resolve, 150));
+        await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 100));
         setThinkingSteps(prev => [...prev, { text: thought, completed: false }]);
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise(resolve => setTimeout(resolve, 150 + Math.random() * 150));
         setThinkingSteps(prev => prev.map((step, i) => 
           i === index ? { ...step, completed: true } : step
         ));

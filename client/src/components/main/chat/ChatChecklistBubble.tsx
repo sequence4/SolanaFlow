@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Check, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 import { Progress } from "../../../components/ui/progress";
@@ -80,10 +80,19 @@ interface StepItemProps {
 
 const StepItem = React.memo(({ step, index, isLastStep }: StepItemProps) => {
   const [expandedFiles, setExpandedFiles] = useState(false);
+  const [showThinking, setShowThinking] = useState(false);
   
   const stepProgress = useMemo(() => {
     return step.pct ?? (step.status === "done" ? 100 : step.status === "active" ? 50 : 0);
   }, [step.pct, step.status]);
+  
+  // Show thinking when transitioning to active
+  useEffect(() => {
+    if (step.status === 'active' && step.pct === 0) {
+      setShowThinking(true);
+      setTimeout(() => setShowThinking(false), 2000);
+    }
+  }, [step.status, step.pct]);
 
   return (
     <div className="relative">
@@ -197,6 +206,37 @@ const StepItem = React.memo(({ step, index, isLastStep }: StepItemProps) => {
               </div>
             )}
           </div>
+        )}
+        
+        {/* Agent thinking indicator between stages */}
+        {showThinking && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mt-2 pl-4 text-xs text-gray-500 italic"
+          >
+            <div className="flex items-center gap-2">
+              <div className="flex gap-1">
+                {[0, 1, 2].map(i => (
+                  <motion.div
+                    key={i}
+                    className="w-1 h-1 bg-gray-400 rounded-full"
+                    animate={{
+                      y: [0, -3, 0],
+                      opacity: [0.3, 1, 0.3]
+                    }}
+                    transition={{
+                      duration: 1,
+                      repeat: Infinity,
+                      delay: i * 0.15
+                    }}
+                  />
+                ))}
+              </div>
+              <span>Analyzing {step.stage} requirements...</span>
+            </div>
+          </motion.div>
         )}
       </motion.div>
     </div>

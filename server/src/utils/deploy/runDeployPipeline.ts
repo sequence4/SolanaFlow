@@ -40,9 +40,10 @@ class ProgressManager {
   
   private progressDistribution = {
     'code-gen': {
-      fileGeneration: 60,    // 0-60% for file generation
-      fileCollection: 35,     // 60-95% for collecting files
-      finalization: 5        // 95-100% for final steps
+      fileGeneration: 40,    // 0-40% for initial file generation
+      fileProcessing: 30,    // 40-70% for processing files
+      fileCollection: 20,    // 70-90% for collecting files
+      finalization: 10       // 90-100% for final steps
     }
   };
   
@@ -155,11 +156,16 @@ class ProgressManager {
     // Track individual file generation for smooth progress
     this.generatedFiles.push({ fileName, content });
     
-    // Calculate progress based on expected files (estimate ~12-15 files)
-    const expectedFiles = 15;
-    const fileProgress = Math.min((this.generatedFiles.length / expectedFiles) * this.progressDistribution['code-gen'].fileGeneration, this.progressDistribution['code-gen'].fileGeneration);
+    // More gradual progress curve with increased expected files
+    const expectedFiles = 20; // Increase for smoother progress
+    const baseProgress = Math.min((this.generatedFiles.length / expectedFiles) * 40, 40);
     
-    this.updateProgress('code-gen', fileProgress, `Generating file ${this.generatedFiles.length}: ${fileName}`);
+    // Add processing phase progress for files
+    const processingProgress = Math.min(30, this.generatedFiles.length * 1.5);
+    
+    const totalProgress = Math.min(70, baseProgress + processingProgress);
+    
+    this.updateProgress('code-gen', totalProgress, `Processing: ${fileName}`);
     
     // Send individual file updates to frontend immediately
     this.sendProgress({
@@ -168,19 +174,22 @@ class ProgressManager {
       fileName,
       fileIndex: this.generatedFiles.length,
       totalFiles: this.generatedFiles.length,
-      pct: fileProgress,
+      pct: totalProgress,
       timestamp: Date.now(),
       sequence: ++this.sequenceNumber
     });
   }
   
-  handleFileCollection(fileName: string, success: boolean) {
+  async handleFileCollection(fileName: string, success: boolean) {
     this.collectedFiles++;
-    const collectionProgress = this.progressDistribution['code-gen'].fileGeneration + 
-      (this.collectedFiles / this.expectedCollectionFiles) * this.progressDistribution['code-gen'].fileCollection;
+    // Start from 70%, go to 90%
+    const collectionProgress = 70 + (this.collectedFiles / this.expectedCollectionFiles) * 20;
     
     this.updateProgress('code-gen', collectionProgress, 
-      success ? `Collected: ${fileName}` : `Waiting for: ${fileName}`);
+      success ? `Verified: ${fileName}` : `Checking: ${fileName}`);
+    
+    // Add small delay between files for smoother perception
+    await new Promise(resolve => setTimeout(resolve, 150));
   }
   
   private getLanguageFromFilename(filename: string): string {
@@ -538,15 +547,15 @@ export async function runDeployPipeline({
         const exists = await checkFileExists(workspace.containerName, file.path);
         if (exists) {
           await readContainerFile(workspace.containerName, file.path, projectId, userId);
-          progressMgr.handleFileCollection(file.name, true);
+          await progressMgr.handleFileCollection(file.name, true);
         } else {
-          progressMgr.handleFileCollection(file.name, false);
+          await progressMgr.handleFileCollection(file.name, false);
         }
         // Small delay to show progress
         await new Promise(resolve => setTimeout(resolve, 100));
       } catch (error) {
         console.log(`[FILE-OPS] Error collecting ${file.name}:`, error);
-        progressMgr.handleFileCollection(file.name, false);
+        await progressMgr.handleFileCollection(file.name, false);
       }
     }
 
