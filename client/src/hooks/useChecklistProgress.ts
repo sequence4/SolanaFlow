@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import eventBus, { ProgressPayload } from "../lib/eventBus";
 
 export interface Step {
@@ -21,19 +21,115 @@ export interface Step {
   }>;
 }
 
+interface StageUpdate {
+  stage: string;
+  status: "active" | "completed" | "error";
+  pct?: number;
+  message?: string;
+  files?: Array<{
+    filename: string;
+    content: string;
+    language: string;
+  }>;
+  codeSnippet?: {
+    language: string;
+    content: string;
+    filename?: string;
+    lineCount?: number;
+  };
+}
+
 const INITIAL: Step[] = [
   { id: 0, stage: "environment", title: "Environment Setup", description: "", status: "pending" },
-  { id: 1, stage: "code-gen"   , title: "Code Generation"   , description: "", status: "pending" },
-  { id: 2, stage: "build"      , title: "Program Build"      , description: "", status: "pending" },
+  { id: 1, stage: "code-gen", title: "Code Generation", description: "", status: "pending" },
+  { id: 2, stage: "build", title: "Program Build", description: "", status: "pending" },
 ];
 
 export function useChecklistProgress() {
   const [steps, setSteps] = useState<Step[]>(INITIAL);
   const [animatingSteps, setAnimatingSteps] = useState<{[stepId: number]: NodeJS.Timeout}>({});
-  const [lastProgressMap, setLastProgressMap] = useState<Map<string, number>>(new Map());
+  const lastProgressMapRef = useRef(new Map<string, number>());
+  
+  // Refs for optimization
+  const updateQueueRef = useRef<StageUpdate[]>([]);
+  const processingRef = useRef(false);
+  const lastUpdateTimeRef = useRef<Map<string, number>>(new Map());
 
-  // Smooth percentage animation function
-  const animatePercentage = (stepId: number, currentPct: number, targetPct: number) => {
+  // Debounced update processing to prevent rapid re-renders
+  const processUpdateQueue = useCallback(() => {
+    if (processingRef.current || updateQueueRef.current.length === 0) return;
+    
+    processingRef.current = true;
+    
+    // Use requestAnimationFrame to batch DOM updates
+    requestAnimationFrame(() => {
+      const updates = [...updateQueueRef.current];
+      updateQueueRef.current = [];
+      
+      if (updates.length === 0) {
+        processingRef.current = false;
+        return;
+      }
+      
+      setSteps(prevSteps => {
+        const newSteps = prevSteps.map(step => {
+          // Find the latest update for this step's stage
+          const relevantUpdates = updates.filter(u => u.stage === step.stage);
+          if (relevantUpdates.length === 0) return step;
+          
+          // Use the most recent update
+          const latestUpdate = relevantUpdates[relevantUpdates.length - 1];
+          
+          const nextStatus =
+            latestUpdate.status === "completed" ? "done" :
+            latestUpdate.status === "error" ? "error" :
+            latestUpdate.status === "active" ? "active" : step.status;
+          
+          const targetPct = latestUpdate.pct ?? (
+            latestUpdate.status === "completed" ? 100 :
+            latestUpdate.status === "active" ? 50 : step.pct || 0
+          );
+          
+          // Prevent progress regression
+          const lastPct = lastProgressMapRef.current.get(latestUpdate.stage) || 0;
+          const currentPct = step.pct || 0;
+          const safePct = Math.max(targetPct, lastPct, currentPct);
+          
+          // Update last progress tracking
+          if (safePct > lastPct) {
+            lastProgressMapRef.current.set(latestUpdate.stage, safePct);
+          }
+          
+          // Only animate if progress is increasing significantly
+          const shouldAnimate = safePct > currentPct + 5;
+          if (shouldAnimate && !animatingSteps[step.id]) {
+            animatePercentage(step.id, currentPct, safePct);
+          }
+          
+          return {
+            ...step,
+            status: nextStatus,
+            description: latestUpdate.message ?? step.description,
+            pct: shouldAnimate ? currentPct : safePct, // Keep current if animating
+            codeSnippet: latestUpdate.codeSnippet ? {
+              language: latestUpdate.codeSnippet.language || 'rust',
+              content: latestUpdate.codeSnippet.content || '',
+              filename: latestUpdate.codeSnippet.filename,
+              lineCount: latestUpdate.codeSnippet.lineCount
+            } : step.codeSnippet,
+            generatedFiles: latestUpdate.files || step.generatedFiles
+          };
+        });
+        
+        return newSteps;
+      });
+      
+      processingRef.current = false;
+    });
+  }, [animatingSteps]);
+
+  // Optimized animation function with cleanup
+  const animatePercentage = useCallback((stepId: number, currentPct: number, targetPct: number) => {
     // Clear any existing animation for this step
     if (animatingSteps[stepId]) {
       clearInterval(animatingSteps[stepId]);
@@ -61,7 +157,37 @@ export function useChecklistProgress() {
     }, 50);
 
     setAnimatingSteps(prev => ({ ...prev, [stepId]: intervalId }));
-  };
+  }, [animatingSteps]);
+
+  // Enhanced message handling with deduplication and throttling
+  const handleProgressMessage = useCallback((payload: any) => {
+    if (!payload.stage) return;
+    
+    const now = Date.now();
+    const lastUpdate = lastUpdateTimeRef.current.get(payload.stage) || 0;
+    
+    // Throttle rapid updates for the same stage (except completion)
+    if (payload.status !== 'completed' && now - lastUpdate < 100) {
+      return;
+    }
+    
+    lastUpdateTimeRef.current.set(payload.stage, now);
+    
+    // Add to update queue with sequence number for deduplication
+    const update: StageUpdate = {
+      stage: payload.stage,
+      status: payload.status,
+      pct: payload.pct,
+      message: payload.message,
+      files: payload.files,
+      codeSnippet: payload.codeSnippet,
+    };
+    
+    updateQueueRef.current.push(update);
+    
+    // Process updates in next tick to allow batching
+    setTimeout(processUpdateQueue, 0);
+  }, [processUpdateQueue]);
 
   // Cleanup intervals on unmount
   useEffect(() => {
@@ -72,70 +198,51 @@ export function useChecklistProgress() {
     };
   }, [animatingSteps]);
 
+  // Event bus subscription with cleanup
   useEffect(() => {
-    const onMsg = (payload: any) => {
-      if (!payload.stage) return;
-      
-      setSteps(prev =>
-        prev.map(s => {
-          if (s.stage === payload.stage) {
-            const nextStatus =
-              payload.status === "completed"
-                ? "done"
-                : payload.status === "error"
-                ? "error"
-                : "active";
-            
-            const targetPct =
-              payload.pct ??                       // backend may send exact %
-              (payload.status === "completed" ? 100 :
-               payload.status === "active"     ? 50  : 0);
-            
-            // Get last known progress for this stage to prevent regression
-            const lastPct = lastProgressMap.get(payload.stage) || 0;
-            const currentPct = s.pct || 0;
-            
-            // Never allow progress to go backwards
-            const safePct = Math.max(targetPct, lastPct, currentPct);
-            
-            // Update last progress map
-            setLastProgressMap(prev => new Map(prev).set(payload.stage, safePct));
-            
-            // Animate percentage smoothly if it's increasing
-            if (safePct > currentPct) {
-              animatePercentage(s.id, currentPct, safePct);
-            }
-            
-            console.log('[PROGRESS] Stage:', payload.stage, 'Target:', targetPct, 'Last:', lastPct, 'Current:', currentPct, 'Safe:', safePct);
-            
-            return {
-              ...s,
-              status: nextStatus,
-              description: payload.message ?? s.description,
-              pct: safePct > currentPct ? currentPct : safePct, // Keep current if animating
-              codeSnippet: payload.codeSnippet ? {
-                language: payload.codeSnippet.language || 'rust',
-                content: payload.codeSnippet.content || '',
-                filename: payload.codeSnippet.filename,
-                lineCount: payload.codeSnippet.lineCount
-              } : s.codeSnippet,
-              generatedFiles: payload.files || s.generatedFiles
-            };
-          } else if (s.status === "active" && payload.stage !== s.stage) {
-            // Clear generated files when moving to a different stage
-            return { 
-              ...s, 
-              status: "done", 
-              generatedFiles: s.stage === "code-gen" ? undefined : s.generatedFiles 
-            };
-          }
-          return s;
-        }),
-      );
+    const eventHandler = handleProgressMessage;
+    eventBus.on("progress", eventHandler);
+    
+    return () => {
+      eventBus.off("progress", eventHandler);
+      // Clear any pending updates
+      updateQueueRef.current = [];
+      processingRef.current = false;
     };
-    eventBus.on("progress", onMsg);
-    return () => eventBus.off("progress", onMsg);
-  }, [lastProgressMap]);
+  }, [handleProgressMessage]);
 
-  return steps;
-} 
+  // Memoize steps to prevent unnecessary re-renders in parent components
+  const memoizedSteps = useMemo(() => steps, [steps]);
+
+  return memoizedSteps;
+}
+
+// Enhanced hook with additional optimization for specific use cases
+export function useChecklistProgressWithOptimization() {
+  const steps = useChecklistProgress();
+  
+  // Memoize derived state to prevent recalculation
+  const derivedState = useMemo(() => {
+    const activeStep = steps.find(step => step.status === 'active');
+    const completedSteps = steps.filter(step => step.status === 'done');
+    const errorSteps = steps.filter(step => step.status === 'error');
+    const overallProgress = Math.round(
+      steps.reduce((sum, step) => {
+        const pct = step.pct ?? (step.status === "done" ? 100 : step.status === "active" ? 50 : 0);
+        return sum + pct;
+      }, 0) / steps.length
+    );
+    
+    return {
+      steps,
+      activeStep,
+      completedSteps,
+      errorSteps,
+      overallProgress,
+      isComplete: completedSteps.length === steps.length,
+      hasErrors: errorSteps.length > 0
+    };
+  }, [steps]);
+  
+  return derivedState;
+}

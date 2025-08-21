@@ -26,17 +26,102 @@ interface ProgressEvent {
   [k: string]: unknown;      
 }
 
-// ─── Progress Manager to prevent overlapping stages ──────
+// ─── Enhanced Progress Manager with atomic stage transitions ──────
 class ProgressManager {
   private currentStage: string = '';
   private stageProgress: Map<string, number> = new Map();
+  private eventBuffer: any[] = [];
+  private batchTimeout: NodeJS.Timeout | null = null;
+  private sequenceNumber = 0;
+  private isTransitioning = false;
   
-  sendProgress(stage: string, pct: number, sendProgress: Function, message: string, extraData: any = {}) {
-    // Only send if this is the active stage or if transitioning
-    if (this.currentStage !== stage) {
-      console.log(`[PROGRESS-MGR] Stage transition: ${this.currentStage} → ${stage}`);
-      this.currentStage = stage;
+  constructor(private deploymentId: string, private sendProgress: Function) {}
+  
+  private scheduleBatchUpdate() {
+    if (this.batchTimeout) return;
+    
+    this.batchTimeout = setTimeout(() => {
+      this.flushEventBuffer();
+    }, 100); // 100ms debounce
+  }
+  
+  private flushEventBuffer() {
+    if (this.eventBuffer.length === 0) return;
+    
+    // Send single batched event with all files
+    if (this.eventBuffer.some(e => e.type === 'code-generation')) {
+      const codeGenEvents = this.eventBuffer.filter(e => e.type === 'code-generation');
+      const allFiles = codeGenEvents.flatMap(e => e.files || []);
+      
+      if (allFiles.length > 0) {
+        const batchedEvent = {
+          type: 'code-generation-batch',
+          deploymentId: this.deploymentId,
+          stage: 'code-gen',
+          files: allFiles,
+          timestamp: Date.now(),
+          sequence: ++this.sequenceNumber
+        };
+        
+        console.log(`[PROGRESS-MGR] Sending batched code generation with ${allFiles.length} files`);
+        this.sendProgress(batchedEvent);
+      }
     }
+    
+    // Send other events
+    this.eventBuffer.filter(e => e.type !== 'code-generation').forEach(event => {
+      this.sendProgress(event);
+    });
+    
+    // Clear buffer and timeout
+    this.eventBuffer = [];
+    this.batchTimeout = null;
+  }
+  
+  async transitionToStage(stage: string, message: string): Promise<void> {
+    if (this.isTransitioning) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      return this.transitionToStage(stage, message);
+    }
+    
+    this.isTransitioning = true;
+    
+    try {
+      // Complete current stage before transitioning
+      if (this.currentStage && this.currentStage !== stage) {
+        console.log(`[PROGRESS-MGR] Completing stage: ${this.currentStage}`);
+        this.stageProgress.set(this.currentStage, 100);
+        this.sendProgress({
+          stage: this.currentStage,
+          status: 'completed',
+          message: `${this.currentStage} complete`,
+          pct: 100,
+          sequence: ++this.sequenceNumber
+        });
+        
+        // Brief pause for UI to process completion
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+      
+      // Start new stage
+      console.log(`[PROGRESS-MGR] Starting stage: ${stage}`);
+      this.currentStage = stage;
+      this.stageProgress.set(stage, 0);
+      
+      this.sendProgress({
+        stage,
+        status: 'active',
+        message,
+        pct: 0,
+        sequence: ++this.sequenceNumber
+      });
+    } finally {
+      this.isTransitioning = false;
+    }
+  }
+  
+  updateProgress(stage: string, pct: number, message: string, extraData: any = {}) {
+    if (this.currentStage !== stage) return;
     
     // Never send lower progress for the same stage
     const lastPct = this.stageProgress.get(stage) || 0;
@@ -45,23 +130,65 @@ class ProgressManager {
     
     console.log(`[PROGRESS-MGR] ${stage}: ${lastPct}% → ${newPct}% (${message})`);
     
-    sendProgress({
+    this.sendProgress({
       stage,
       status: 'active',
       message,
       pct: newPct,
+      sequence: ++this.sequenceNumber,
       ...extraData
     });
   }
   
-  completeStage(stage: string, sendProgress: Function, message: string) {
+  addCodeGenerationEvent(fileName: string, content: string) {
+    // Add to batch buffer instead of sending immediately
+    this.eventBuffer.push({
+      type: 'code-generation',
+      fileName,
+      content,
+      files: [{ filename: fileName, content, language: this.getLanguageFromFilename(fileName) }]
+    });
+    
+    // Schedule batched update
+    this.scheduleBatchUpdate();
+  }
+  
+  private getLanguageFromFilename(filename: string): string {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    const langMap: Record<string, string> = {
+      'rs': 'rust',
+      'ts': 'typescript',
+      'js': 'javascript',
+      'json': 'json',
+      'toml': 'toml',
+      'yml': 'yaml',
+      'yaml': 'yaml'
+    };
+    return langMap[ext || ''] || 'text';
+  }
+  
+  async completeStage(stage: string, message: string) {
+    // Flush any pending events first
+    if (this.batchTimeout) {
+      clearTimeout(this.batchTimeout);
+      this.flushEventBuffer();
+    }
+    
     this.stageProgress.set(stage, 100);
-    sendProgress({
+    this.sendProgress({
       stage,
       status: 'completed',
       message,
-      pct: 100
+      pct: 100,
+      sequence: ++this.sequenceNumber
     });
+  }
+  
+  cleanup() {
+    if (this.batchTimeout) {
+      clearTimeout(this.batchTimeout);
+      this.flushEventBuffer();
+    }
   }
 }
 // ──────────────────────────────────────────────────────────────
@@ -120,7 +247,7 @@ export async function runDeployPipeline({
   resetProgress();
   
   // Create progress manager to coordinate stages
-  const progressMgr = new ProgressManager();
+  const progressMgr = new ProgressManager(projectId, sendProgress);
   
   // Start environment setup with smooth progress
   const environmentPromise = sendEnvironmentProgress(sendProgress);
@@ -152,21 +279,16 @@ export async function runDeployPipeline({
     
     // 2 ─ code generation ─────────────────────────────────────────────────
     console.log('[DEPLOY] Starting code generation phase with managed progress');
-    progressMgr.sendProgress('code-gen', 0, sendProgress, '🦀 Starting Solana program generation...');
+    await progressMgr.transitionToStage('code-gen', '🦀 Starting Solana program generation...');
     
-    // Wrap sendProgress to coordinate with progress manager
+    // Enhanced progress wrapper with batching
     const managedProgressWrapper = (data: any) => {
-      if (data.type === 'code-generation') {
-        // ALWAYS pass through code-generation messages with files
-        console.log('[DEPLOY] Code-generation message detected, passing through:', {
-          type: data.type,
-          filesCount: data.files?.length || 0,
-          pct: data.pct,
-          message: data.message?.substring(0, 50)
-        });
-        sendProgress(data); // Pass the ORIGINAL data, not through progress manager
+      if (data.type === 'code-generation' && data.fileName && data.content) {
+        // Add individual files to batch instead of sending immediately
+        console.log('[DEPLOY] Batching code-generation file:', data.fileName);
+        progressMgr.addCodeGenerationEvent(data.fileName, data.content);
       } else if (data.pct && data.stage) {
-        progressMgr.sendProgress(data.stage, data.pct, sendProgress, data.message, data);
+        progressMgr.updateProgress(data.stage, data.pct, data.message, data);
       } else {
         sendProgress(data);
       }
@@ -191,8 +313,8 @@ export async function runDeployPipeline({
     const secretArr   = JSON.parse(secretJson);
     programKeypair    = Keypair.fromSecretKey(Uint8Array.from(secretArr));
     programIdStr      = programKeypair.publicKey.toBase58();
-    // Notify the frontend of the re‑used Program ID
-    progressMgr.completeStage('code-gen', sendProgress, `Code generation complete — Program ID: ${programIdStr}`);
+    // Complete code generation stage
+    await progressMgr.completeStage('code-gen', `Code generation complete — Program ID: ${programIdStr}`);
 
     /* 3 ─ build program --------------------------------------------------- */
     
@@ -200,9 +322,9 @@ export async function runDeployPipeline({
     // allow up to 3 min for large repos (90 × 2 s)
     await waitForTaskCompletion(sentinelId, 90, 2_000);
     
-    // Start smooth build progress using progress manager
+    // Start build phase with atomic transition
     console.log('[DEPLOY] Starting build phase with managed progress');
-    progressMgr.sendProgress('build', 10, sendProgress, 'Starting Rust compilation...');
+    await progressMgr.transitionToStage('build', 'Starting Rust compilation...');
     const buildPromise = sendBuildProgress(sendProgress);
     const buildTask = await startAnchorBuildTask(projectId, userId);
     
@@ -465,8 +587,10 @@ export async function runDeployPipeline({
     throw err;
   } finally {
     /* ----------------------------------------------------------------
-     * Queue container for later cleanup instead of immediate deletion
+     * Cleanup progress manager and container
      * ---------------------------------------------------------------- */
+    progressMgr.cleanup();
+    
     if (workspace) {
       await markContainerForCleanup(projectId, workspace.containerName);
     }

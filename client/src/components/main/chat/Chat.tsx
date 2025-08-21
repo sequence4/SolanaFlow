@@ -127,8 +127,12 @@ const Chat: React.FC = () => {
     }, [input]);
 
     // ───────────────────────────────────────────────────────────────────────────
-    //  Whenever TaskLogsProvider pushes new lines, append them as AI messages
+    //  Debounced system log processing to prevent UI flickering
     // ───────────────────────────────────────────────────────────────────────────
+    const processedEventsRef = useRef(new Set<string>());
+    const logProcessingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const lastCodeGenSequenceRef = useRef<number>(0);
+
     useEffect(() => {
         if (!systemLogs?.length) return;
         
@@ -138,143 +142,151 @@ const Chat: React.FC = () => {
           return;
         }
 
-        // Grab the slice we have not injected yet
-        const fresh = systemLogs.slice(lastLogIndex);
+        // Clear existing timeout to debounce processing
+        if (logProcessingTimeoutRef.current) {
+            clearTimeout(logProcessingTimeoutRef.current);
+        }
 
-        /* 🔽 skip the environment / progress status lines we don't want in chat */
-        const IGNORE_PREFIXES = [
-          "Preparing your build environment",
-          "Container is up", 
-          "Container URL",
-          "Building program",
-          "Linking target/deploy",
-          "Collecting project files"
-        ];
+        // Schedule batched processing after 150ms debounce
+        logProcessingTimeoutRef.current = setTimeout(() => {
+            const fresh = systemLogs.slice(lastLogIndex);
 
-        const visible = fresh.filter(
-          line => !IGNORE_PREFIXES.some(p => line.startsWith(p))
-        );
+            const IGNORE_PREFIXES = [
+                "Preparing your build environment",
+                "Container is up", 
+                "Container URL",
+                "Building program",
+                "Linking target/deploy",
+                "Collecting project files"
+            ];
 
-        if (visible.length) {
-            console.log('[CHAT] ====== PROCESSING SYSTEM LOGS ======');
-            console.log('[CHAT] Processing', visible.length, 'new lines');
-            console.log('[CHAT] Lines:', visible);
-            
-            const logMessages: AIMessageType[] = [];
-            
-            for (const line of visible) {
-                console.log('[CHAT] Processing line:', line);
+            const visible = fresh.filter(
+                line => !IGNORE_PREFIXES.some(p => line.startsWith(p))
+            );
+
+            if (visible.length) {
+                console.log('[CHAT] ====== PROCESSING BATCHED SYSTEM LOGS ======');
+                console.log('[CHAT] Processing', visible.length, 'new lines');
                 
-                // Detect different build phases and show thinking states
-                if (line.includes("Preparing your build environment")) {
-                    console.log('[CHAT] Detected environment setup phase');
-                    showThinkingForStage('environment');
-                } else if (line.includes("Building program")) {
-                    console.log('[CHAT] Detected build phase');
-                    showThinkingForStage('build');
-                }
+                const newLogMessages: AIMessageType[] = [];
+                let hasCodeGenUpdate = false;
+                let latestCodeGenFiles: any[] = [];
                 
-                // Check if this is a JSON message first
-                try {
-                    if (line.startsWith('{') && line.includes('type')) {
-                        const parsed = JSON.parse(line);
-                        console.log('[CHAT] Parsed JSON message:', parsed);
-                        
-                        // Check for code generation messages with files
-                        if (parsed.type === 'code-generation' && parsed.files && parsed.files.length > 0) {
-                            console.log('[CHAT] ====== CODE GENERATION DETECTED ======');
-                            console.log('[CHAT] Found code-generation message with', parsed.files.length, 'files');
-                            console.log('[CHAT] Files:', parsed.files.map((f: any) => f.filename));
+                for (const line of visible) {
+                    // Create unique key for deduplication
+                    const lineKey = `${line.substring(0, 100)}_${Date.now()}`;
+                    if (processedEventsRef.current.has(lineKey)) continue;
+                    processedEventsRef.current.add(lineKey);
+                    
+                    // Detect build phases
+                    if (line.includes("Preparing your build environment")) {
+                        showThinkingForStage('environment');
+                    } else if (line.includes("Building program")) {
+                        showThinkingForStage('build');
+                    }
+                    
+                    // Handle JSON messages
+                    try {
+                        if (line.startsWith('{') && line.includes('type')) {
+                            const parsed = JSON.parse(line);
                             
-                            // Show thinking state for code generation
-                            console.log('[CHAT] Triggering codegen thinking state...');
-                            showThinkingForStage('codegen');
+                            // Handle batched code generation events
+                            if (parsed.type === 'code-generation-batch' && parsed.files?.length > 0) {
+                                // Deduplicate by sequence number
+                                if (parsed.sequence && parsed.sequence > lastCodeGenSequenceRef.current) {
+                                    console.log('[CHAT] ====== BATCHED CODE GENERATION ======');
+                                    console.log('[CHAT] Files:', parsed.files.length);
+                                    
+                                    hasCodeGenUpdate = true;
+                                    latestCodeGenFiles = parsed.files;
+                                    lastCodeGenSequenceRef.current = parsed.sequence;
+                                    
+                                    showThinkingForStage('codegen');
+                                }
+                                continue;
+                            }
                             
-                            // IMMEDIATELY add to messages, don't wait for batch
-                            setMessages(prev => {
-                                // Remove any existing code-gen messages to avoid duplicates
-                                const filtered = prev.filter(m => !m.codeGenFiles);
-                                console.log('[CHAT] Filtered out previous code-gen messages, remaining:', filtered.length);
-                                
-                                const newMessage = {
-                                    text: '', // Empty text, let SequentialCodeDisplay handle the display
-                                    sender: 'ai' as const,
-                                    timestamp: new Date(),
-                                    status: 'sent' as const,
-                                    codeGenFiles: parsed.files
-                                };
-                                
-                                console.log('[CHAT] Adding code gen message IMMEDIATELY to chat');
-                                console.log('[CHAT] Total messages after immediate update will be:', filtered.length + 1);
-                                return [...filtered, newMessage];
-                            });
+                            // Handle individual code generation (legacy support)
+                            if (parsed.type === 'code-generation' && parsed.files?.length > 0) {
+                                console.log('[CHAT] ====== INDIVIDUAL CODE GENERATION ======');
+                                hasCodeGenUpdate = true;
+                                latestCodeGenFiles = [...latestCodeGenFiles, ...parsed.files];
+                                showThinkingForStage('codegen');
+                                continue;
+                            }
                             
-                            // Reset user scroll state when new messages arrive
-                            setUserHasScrolled(false);
-                            // Smart scroll to bottom
-                            setTimeout(() => smartScrollToBottom(), 100);
-                            
-                            // DON'T add to logMessages - we already added directly
-                            continue; // Skip the rest of the loop
+                            // Skip progress messages to avoid conflicts
+                            if (parsed.type === 'progress' && parsed.pct !== undefined) {
+                                continue;
+                            }
+                        }
+                    } catch (e) {
+                        // Filter out progress lines
+                        if (line.includes('%') && (line.includes('Building') || line.includes('Generating'))) {
+                            continue;
                         }
                         
-                        // Skip progress-only messages during code generation to avoid conflicts
-                        if (parsed.type === 'progress' && parsed.message && parsed.pct !== undefined) {
-                            console.log('[CHAT] Skipping progress message to avoid conflicts:', parsed.message, 'at', parsed.pct + '%');
+                        if (line.includes('Collecting project files') || line.includes('Preparing files')) {
                             continue;
                         }
                     }
-                } catch (e) {
-                    // Not JSON, check if it's a progress percentage line
-                    if (line.includes('%') && (line.includes('Building') || line.includes('Generating'))) {
-                        console.log('[CHAT] Skipping progress line:', line);
-                        continue;
-                    }
                     
-                    // Skip any other lines that might interfere with code generation display
-                    if (line.includes('Collecting project files') || line.includes('Preparing files')) {
-                        console.log('[CHAT] Skipping file preparation line:', line);
-                        continue;
+                    // Add regular log lines (filtered)
+                    if (!taskLogs.isBuilding || line.includes('ERROR') || line.includes('WARN')) {
+                        newLogMessages.push({
+                            text: line,
+                            sender: 'ai',
+                            timestamp: new Date(),
+                            status: 'sent',
+                            isLogLine: true,
+                        });
                     }
+                }
+
+                // Batch update messages
+                if (hasCodeGenUpdate || newLogMessages.length > 0) {
+                    console.log('[CHAT] ====== BATCH UPDATE ======');
+                    
+                    setMessages(prev => {
+                        let updated = [...prev];
+                        
+                        // Add/update code generation message
+                        if (hasCodeGenUpdate && latestCodeGenFiles.length > 0) {
+                            // Remove existing code-gen messages
+                            updated = updated.filter(m => !m.codeGenFiles);
+                            
+                            // Add new consolidated code gen message
+                            updated.push({
+                                text: '',
+                                sender: 'ai' as const,
+                                timestamp: new Date(),
+                                status: 'sent' as const,
+                                codeGenFiles: latestCodeGenFiles
+                            });
+                        }
+                        
+                        // Add regular log messages
+                        if (newLogMessages.length > 0) {
+                            updated.push(...newLogMessages);
+                        }
+                        
+                        return updated;
+                    });
+                    
+                    setUserHasScrolled(false);
+                    setTimeout(() => smartScrollToBottom(), 100);
                 }
                 
-                // Add regular log line (but suppress most during build process)
-                if (!taskLogs.isBuilding || line.includes('ERROR') || line.includes('WARN')) {
-                    console.log('[CHAT] Adding regular log line:', line);
-                    logMessages.push({
-                        text: line,
-                        sender: 'ai',
-                        timestamp: new Date(),
-                        status: 'sent',
-                        isLogLine: true,
-                    });
-                }
+                setLastLogIndex(systemLogs.length);
             }
+        }, 150); // 150ms debounce
 
-            if (logMessages.length > 0) {
-                console.log('[CHAT] ====== ADDING MESSAGES TO CHAT ======');
-                console.log('[CHAT] Adding', logMessages.length, 'new messages to chat');
-                console.log('[CHAT] New messages:', logMessages.map(m => ({
-                    sender: m.sender,
-                    hasCodeGenFiles: !!m.codeGenFiles,
-                    fileCount: m.codeGenFiles?.length || 0,
-                    isChecklist: m.isChecklist,
-                    textPreview: m.text.substring(0, 50)
-                })));
-                setMessages(prev => {
-                    const newMessages = [...prev, ...logMessages];
-                    console.log('[CHAT] Total messages after update:', newMessages.length);
-                    console.log('[CHAT] Messages with codeGenFiles:', newMessages.filter(m => m.codeGenFiles).length);
-                    return newMessages;
-                });
-                // Reset user scroll state when new messages arrive
-                setUserHasScrolled(false);
-                // Smart scroll to bottom
-                setTimeout(() => smartScrollToBottom(), 100);
+        // Cleanup timeout on unmount
+        return () => {
+            if (logProcessingTimeoutRef.current) {
+                clearTimeout(logProcessingTimeoutRef.current);
             }
-            
-            setLastLogIndex(systemLogs.length);
-        }
+        };
     }, [systemLogs, lastLogIndex, taskLogs.isBuilding, messages]);
 
     // Add comprehensive debugging to trace ALL events
