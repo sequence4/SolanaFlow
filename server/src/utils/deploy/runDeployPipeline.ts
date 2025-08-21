@@ -182,14 +182,21 @@ class ProgressManager {
   
   async handleFileCollection(fileName: string, success: boolean) {
     this.collectedFiles++;
-    // Start from 70%, go to 90%
-    const collectionProgress = 70 + (this.collectedFiles / this.expectedCollectionFiles) * 20;
     
-    this.updateProgress('code-gen', collectionProgress, 
-      success ? `Verified: ${fileName}` : `Checking: ${fileName}`);
+    // More gradual progress from 70% to 95%
+    const baseProgress = 70;
+    const maxProgress = 95;
+    const progressRange = maxProgress - baseProgress;
     
-    // Add small delay between files for smoother perception
-    await new Promise(resolve => setTimeout(resolve, 150));
+    // Use logarithmic curve for smoother progression
+    const progressRatio = Math.log(this.collectedFiles + 1) / Math.log(this.expectedCollectionFiles + 1);
+    const collectionProgress = baseProgress + (progressRange * Math.min(1, progressRatio));
+    
+    this.updateProgress('code-gen', Math.round(collectionProgress), 
+      success ? `Verified: ${fileName}` : `Processing: ${fileName}`);
+    
+    // Smaller delay for smoother updates
+    await new Promise(resolve => setTimeout(resolve, 50));
   }
   
   private getLanguageFromFilename(filename: string): string {

@@ -9,6 +9,7 @@ export interface Step {
   description: string;
   status: "pending" | "active" | "done" | "error";
   pct?: number;
+  totalFileCount?: number; // Track total separately from display files
   codeSnippet?: {
     language: string;
     content: string;
@@ -50,6 +51,8 @@ export function useChecklistProgress() {
   const [steps, setSteps] = useState<Step[]>(INITIAL);
   const [animatingSteps, setAnimatingSteps] = useState<{[stepId: number]: NodeJS.Timeout}>({});
   const lastProgressMapRef = useRef(new Map<string, number>());
+  // Add a separate ref to track all generated files
+  const allGeneratedFilesRef = useRef<Map<string, any>>(new Map());
   
   // Refs for optimization and deduplication
   const updateQueueRef = useRef<StageUpdate[]>([]);
@@ -186,38 +189,48 @@ export function useChecklistProgress() {
   const handleProgressMessage = useCallback((payload: any) => {
     if (!payload.stage) return;
     
-    // Handle individual file-generated events separately
+    // Handle file-generated events with proper accumulation
     if (payload.type === 'file-generated') {
-      console.log('[PROGRESS] File generated:', payload.fileName, `(${payload.fileIndex}/${payload.totalFiles})`);
-      debugLogger.logFileGeneration(payload.fileName, payload.fileIndex, payload.totalFiles);
+      const fileName = payload.fileName;
+      
+      // Store in ref to prevent loss
+      if (!allGeneratedFilesRef.current.has(fileName)) {
+        allGeneratedFilesRef.current.set(fileName, {
+          filename: fileName,
+          content: '',
+          language: getLanguageFromFilename(fileName)
+        });
+      }
+      
+      console.log(`[PROGRESS] File generated: ${fileName} (${allGeneratedFilesRef.current.size} total)`);
       
       setSteps(prevSteps => {
         return prevSteps.map(step => {
           if (step.stage === 'code-gen') {
-            const currentFiles = step.generatedFiles || [];
+            // Always use the complete file list from ref
+            const allFiles = Array.from(allGeneratedFilesRef.current.values());
             
-            // Add new file if not already present
-            const fileExists = currentFiles.some(f => f.filename === payload.fileName);
-            if (!fileExists) {
-              const newFile = {
-                filename: payload.fileName,
-                content: '', // Don't store full content to save memory
-                language: getLanguageFromFilename(payload.fileName)
-              };
-              
-              return {
-                ...step,
-                generatedFiles: [...currentFiles, newFile],
-                pct: payload.pct || step.pct,
-                description: `Generated ${payload.totalFiles} files`,
-                status: 'active' as const
-              };
-            }
+            // Limit display to 10 most recent files
+            const displayFiles = allFiles.slice(-10);
+            
+            return {
+              ...step,
+              generatedFiles: displayFiles,
+              totalFileCount: allFiles.length, // Track total separately
+              pct: payload.pct || step.pct,
+              description: `Generated ${allFiles.length} files`,
+              status: 'active' as const
+            };
           }
           return step;
         });
       });
-      return; // Don't process as regular progress event
+      return;
+    }
+    
+    // Reset file tracking when stage changes
+    if (payload.stage !== 'code-gen' && payload.status === 'active') {
+      allGeneratedFilesRef.current.clear();
     }
     
     // Create unique hash for event deduplication

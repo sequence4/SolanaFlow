@@ -431,6 +431,7 @@ export const startGetFileContentTask = async (
   creatorId: string | null 
 ): Promise<string> => {
   const taskId = await createTask('Get File Content', creatorId, projectId);
+  
   setImmediate(async () => {
     try {
       const containerQuery = await pool.query(
@@ -445,13 +446,28 @@ export const startGetFileContentTask = async (
       
       if (containerName) {
         try {
-          console.log(`Reading file ${filePath} from container ${containerName}`);
+          console.log(`[FILE-READ] Starting async read for ${filePath}`);
           const readCmd = `docker exec ${containerName} cat /usr/src/${projectRootPath}/${filePath}`;
-          content = await runCommand(readCmd, '.', taskId);
-          console.log(`Successfully read file from container: ${filePath}`);
+          
+          // Add timeout and non-blocking execution
+          const timeoutPromise = new Promise<string>((_, reject) => 
+            setTimeout(() => reject(new Error('File read timeout')), 5000)
+          );
+          
+          const readPromise = new Promise<string>((resolve, reject) => {
+            // Use exec instead of execSync for non-blocking
+            const { exec } = require('child_process');
+            exec(readCmd, { maxBuffer: 10 * 1024 * 1024 }, (error: any, stdout: any) => {
+              if (error) reject(error);
+              else resolve(stdout);
+            });
+          });
+          
+          content = await Promise.race([readPromise, timeoutPromise]);
+          console.log(`[FILE-READ] Completed async read for ${filePath}`);
         } catch (containerError) {
-          console.error(`Error reading file ${filePath} from container:`, containerError);
-          console.log('Falling back to local file system for file content');
+          console.error(`[FILE-READ] Container read failed for ${filePath}:`, containerError);
+          // Fallback to local file system
           const fullPath = path.join(APP_CONFIG.ROOT_FOLDER, projectRootPath, filePath);
           content = await fs.promises.readFile(fullPath, 'utf-8');
         }
@@ -463,10 +479,11 @@ export const startGetFileContentTask = async (
       
       await updateTaskStatus(taskId, 'succeed', content);
     } catch (error) {
-      console.error('Error reading file:', error);
+      console.error('[FILE-READ] Error:', error);
       await updateTaskStatus(taskId, 'failed', `Failed to read file: ${error instanceof Error ? error.message : String(error)}`);
     }
   });
+  
   return taskId;
 };
 

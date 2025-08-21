@@ -83,6 +83,8 @@ const Chat: React.FC = () => {
         lastScrollTime: 0,
         pendingScroll: false
     });
+    // Add scroll lock to prevent bouncing
+    const scrollLockRef = useRef(false);
 
 
     // Enhanced scroll functions
@@ -100,61 +102,47 @@ const Chat: React.FC = () => {
         }
     }, []);
     
-    // Stabilized scroll with batching and RAF
+    // Stabilized scroll with throttling
     const stableScrollToBottom = useCallback(() => {
+        if (scrollLockRef.current) return;
+        
         const state = scrollStateRef.current;
         
-        // Prevent scroll if already scrolling
         if (state.isScrolling) {
             state.pendingScroll = true;
             return;
         }
         
         const now = Date.now();
-        if (now - state.lastScrollTime < 200) {
-            // Too soon, defer scroll
+        // Increase minimum time between scrolls
+        if (now - state.lastScrollTime < 500) { // Increased from 200ms
             state.pendingScroll = true;
             return;
         }
         
         state.isScrolling = true;
         state.lastScrollTime = now;
+        scrollLockRef.current = true; // Lock scrolling
         
         requestAnimationFrame(() => {
             if (messagesAreaRef.current && !userHasScrolled) {
                 const container = messagesAreaRef.current;
                 const targetScroll = container.scrollHeight - container.clientHeight;
-                
-                // Use instant scroll for large jumps, smooth for small
                 const currentScroll = container.scrollTop;
                 const scrollDistance = Math.abs(targetScroll - currentScroll);
                 
-                if (scrollDistance > 100) {
-                    // Instant jump for large distances
-                    container.scrollTop = targetScroll;
-                    debugLogger.logScrollEvent('force', { 
-                        scrollDistance, 
-                        method: 'instant' 
-                    });
-                } else if (scrollDistance > 10) {
-                    // Smooth scroll for small distances
-                    container.scrollTo({
-                        top: targetScroll,
-                        behavior: 'smooth'
-                    });
-                    debugLogger.logScrollEvent('auto', { 
-                        scrollDistance, 
-                        method: 'smooth' 
-                    });
+                // Only scroll if significant content change
+                if (scrollDistance > 50) { // Increased threshold
+                    container.scrollTop = targetScroll; // Always instant for stability
                 }
             }
             
             state.isScrolling = false;
+            scrollLockRef.current = false; // Unlock
             
-            // Process pending scroll after delay
             if (state.pendingScroll) {
                 state.pendingScroll = false;
-                setTimeout(() => stableScrollToBottom(), 100);
+                setTimeout(() => stableScrollToBottom(), 500); // Longer delay
             }
         });
     }, [userHasScrolled]);
@@ -183,34 +171,31 @@ const Chat: React.FC = () => {
         setUserHasScrolled(!isAtBottom);
     }, [userHasScrolled]);
 
-    // Debounced content observer with better performance
+    // Replace MutationObserver with more controlled approach
     useEffect(() => {
         if (messagesAreaRef.current) {
             let observerTimeout: NodeJS.Timeout | null = null;
+            let lastHeight = 0;
             
             const observer = new MutationObserver((mutations) => {
                 // Clear existing timeout
                 if (observerTimeout) clearTimeout(observerTimeout);
                 
-                // Batch mutations
+                // Heavy debounce - only process after 200ms of no changes
                 observerTimeout = setTimeout(() => {
-                    const hasNewContent = mutations.some(m => 
-                        m.type === 'childList' && m.addedNodes.length > 0
-                    );
+                    const currentHeight = messagesAreaRef.current?.scrollHeight || 0;
                     
-                    if (hasNewContent) {
-                        const currentHeight = messagesAreaRef.current?.scrollHeight || 0;
-                        if (currentHeight > contentHeightRef.current) {
-                            contentHeightRef.current = currentHeight;
-                            stableScrollToBottom();
-                        }
+                    // Only scroll if height actually changed significantly
+                    if (Math.abs(currentHeight - lastHeight) > 100) {
+                        lastHeight = currentHeight;
+                        stableScrollToBottom();
                     }
-                }, 50); // 50ms debounce
+                }, 200); // Increased debounce
             });
             
             observer.observe(messagesAreaRef.current, {
                 childList: true,
-                subtree: true,
+                subtree: false, // Don't watch deep changes
                 characterData: false,
                 attributes: false
             });

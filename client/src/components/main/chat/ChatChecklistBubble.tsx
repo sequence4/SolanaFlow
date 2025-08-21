@@ -81,6 +81,8 @@ interface StepItemProps {
 const StepItem = React.memo(({ step, index, isLastStep }: StepItemProps) => {
   const [expandedFiles, setExpandedFiles] = useState(false);
   const [showThinking, setShowThinking] = useState(false);
+  // Add stable key for code display
+  const [codeDisplayKey] = useState(() => `code-${step.id}-${Date.now()}`);
   
   const stepProgress = useMemo(() => {
     return step.pct ?? (step.status === "done" ? 100 : step.status === "active" ? 50 : 0);
@@ -144,65 +146,67 @@ const StepItem = React.memo(({ step, index, isLastStep }: StepItemProps) => {
           </div>
         )}
 
-        {/* Enhanced file list display for Code Generation */}
+        {/* Enhanced file list with VERTICAL layout */}
         {step.stage === "code-gen" && step.generatedFiles && step.generatedFiles.length > 0 && step.status === "active" && (
           <div className="mt-3 space-y-2">
-            {/* File counter with expand/collapse */}
+            {/* File counter */}
             <div className="flex items-center justify-between text-xs bg-gray-800/30 rounded px-2 py-1">
               <span className="text-cyan-400 font-medium flex items-center gap-1">
                 <span>📁</span>
-                Generated Files ({step.generatedFiles.length})
+                Generated Files ({step.totalFileCount || step.generatedFiles.length})
               </span>
               <button
                 onClick={() => setExpandedFiles(!expandedFiles)}
                 className="text-gray-400 hover:text-cyan-400 transition-colors flex items-center gap-1"
               >
                 {expandedFiles ? (
-                  <><ChevronUp size={12} /> Hide</>
+                  <><ChevronUp size={12} /> Collapse</>
                 ) : (
-                  <><ChevronDown size={12} /> Show all</>
+                  <><ChevronDown size={12} /> Expand</>
                 )}
               </button>
             </div>
             
-            {/* File list grid */}
+            {/* VERTICAL file list */}
             <div className={`transition-all duration-200 overflow-hidden ${
-              !expandedFiles ? 'max-h-16' : 'max-h-48'
+              !expandedFiles ? 'max-h-32' : 'max-h-64'
             }`}>
-              <div className="grid grid-cols-2 gap-1 text-xs">
-                {step.generatedFiles.slice(0, expandedFiles ? step.generatedFiles.length : 4).map((file, idx) => (
+              <div className="flex flex-col gap-1"> {/* Changed to flex-col for vertical */}
+                {step.generatedFiles.slice(0, expandedFiles ? 10 : 5).map((file, idx) => (
                   <motion.div
-                    key={idx}
+                    key={`${file.filename}-${idx}`} // Stable key
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: idx * 0.05 }}
-                    className="flex items-center gap-1 text-gray-400 bg-gray-900/40 rounded px-2 py-1 hover:bg-gray-800/40 transition-colors"
+                    transition={{ delay: idx * 0.02 }} // Faster animation
+                    className="flex items-center gap-2 text-gray-400 bg-gray-900/40 rounded px-2 py-1 hover:bg-gray-800/40 transition-colors"
                   >
                     <span className="text-cyan-500 flex-shrink-0">
                       {getFileIcon(file.filename)}
                     </span>
-                    <span className="truncate text-xs">{file.filename}</span>
+                    <span className="text-xs truncate">{file.filename}</span>
                   </motion.div>
                 ))}
               </div>
               
-              {!expandedFiles && step.generatedFiles.length > 4 && (
-                <div className="text-center mt-1">
+              {step.totalFileCount && step.totalFileCount > 10 && (
+                <div className="text-center mt-2">
                   <span className="text-xs text-gray-500">
-                    +{step.generatedFiles.length - 4} more files...
+                    {step.totalFileCount - 10} more files not shown...
                   </span>
                 </div>
               )}
             </div>
             
-            {/* Code preview - only show latest file in compact form */}
+            {/* Stable code preview - prevent flickering */}
             {step.generatedFiles.length > 0 && (
-              <div className="mt-2">
+              <div className="mt-2" key={codeDisplayKey}> {/* Use stable key */}
                 <div className="text-xs text-gray-500 mb-1">Latest file preview:</div>
-                <SequentialCodeDisplay 
-                  key={`checklist-code-${step.id}-${step.generatedFiles.length}`}
-                  files={[step.generatedFiles[step.generatedFiles.length - 1]]}
-                />
+                <div className="h-48 overflow-hidden"> {/* Fixed height container */}
+                  <SequentialCodeDisplay 
+                    key={codeDisplayKey}
+                    files={[step.generatedFiles[step.generatedFiles.length - 1]]}
+                  />
+                </div>
               </div>
             )}
           </div>
