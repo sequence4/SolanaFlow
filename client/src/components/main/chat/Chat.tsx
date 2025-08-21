@@ -896,6 +896,58 @@ const Chat: React.FC = () => {
                                                             console.log('[RENDER] Component will be mounted with', message.codeGenFiles.length, 'files');
                                                             
                                                             return <SequentialCodeDisplay files={message.codeGenFiles} />;
+                                                        } else if (message.sender === 'ai' && message.text && message.text.length > 100) {
+                                                            // FORCE SHOW for ANY AI message longer than 100 chars - TESTING
+                                                            console.log('[RENDER] ================ FORCE RENDERING SequentialCodeDisplay FOR TESTING ================');
+                                                            const testFiles = [
+                                                                {
+                                                                    filename: 'lib.rs',
+                                                                    content: `use anchor_lang::prelude::*;
+
+#[program]
+pub mod solana_program {
+    use super::*;
+    
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+        msg!("Program initialized successfully!");
+        Ok(())
+    }
+    
+    pub fn process_instruction(ctx: Context<ProcessInstruction>) -> Result<()> {
+        msg!("Processing instruction...");
+        Ok(())
+    }
+}
+
+#[derive(Accounts)]
+pub struct Initialize {}
+
+#[derive(Accounts)]
+pub struct ProcessInstruction {}`,
+                                                                    language: 'rust'
+                                                                },
+                                                                {
+                                                                    filename: 'Anchor.toml',
+                                                                    content: `[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+solana_program = "11111111111111111111111111111112"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "Localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"`,
+                                                                    language: 'toml'
+                                                                }
+                                                            ];
+                                                            return <SequentialCodeDisplay files={testFiles} />;
                                                         } else {
                                                             console.log('[RENDER] Rendering MarkdownRenderer for text message');
                                                             return (
