@@ -880,36 +880,8 @@ const Chat: React.FC = () => {
                                                             hasCodeGenFiles: !!message.codeGenFiles,
                                                             fileCount: message.codeGenFiles?.length || 0,
                                                             sender: message.sender,
-                                                            textLength: message.text?.length || 0,
-                                                            textPreview: message.text?.substring(0, 30) || 'empty',
-                                                            wouldTriggerForced: message.sender === 'ai' && message.text && message.text.length > 100
+                                                            textPreview: message.text?.substring(0, 30) || 'empty'
                                                         });
-                                                        
-                                                        // FORCE TEST - Show SequentialCodeDisplay for ANY message with index 1
-                                                        if (index === 1) {
-                                                            console.log('[RENDER] ================ FORCING SequentialCodeDisplay FOR MESSAGE 1 ================');
-                                                            const testFiles = [
-                                                                {
-                                                                    filename: 'lib.rs',
-                                                                    content: `use anchor_lang::prelude::*;
-
-#[program]
-pub mod test_program {
-    use super::*;
-    
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        msg!("Hello from Solana!");
-        Ok(())
-    }
-}
-
-#[derive(Accounts)]
-pub struct Initialize {}`,
-                                                                    language: 'rust'
-                                                                }
-                                                            ];
-                                                            return <SequentialCodeDisplay files={testFiles} />;
-                                                        }
                                                         
                                                         if (message.isChecklist) {
                                                             console.log('[RENDER] Rendering ChatChecklistBubble');
