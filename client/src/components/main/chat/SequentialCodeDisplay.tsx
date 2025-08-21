@@ -12,10 +12,24 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
   const [isTyping, setIsTyping] = useState(false);
   const [displayedText, setDisplayedText] = useState('');
   const [mounted, setMounted] = useState(false);
+  const [finalFilesToDisplay, setFinalFilesToDisplay] = useState<CodeFile[]>([]);
+  
+  // Add debugging
+  useEffect(() => {
+    console.log('[SequentialCodeDisplay] Component mounted/updated');
+    console.log('[SequentialCodeDisplay] Files received:', files?.length || 0);
+    console.log('[SequentialCodeDisplay] Files data:', files?.map(f => ({
+      filename: f?.filename,
+      hasContent: !!f?.content,
+      contentLength: f?.content?.length || 0,
+      language: f?.language
+    })));
+  }, [files]);
   
   // Fix hydration issues
   useEffect(() => {
     setMounted(true);
+    console.log('[SequentialCodeDisplay] Mounted set to true');
   }, []);
   
   // Validate files array and provide sample content if missing
@@ -94,22 +108,68 @@ export class ${filename.replace(/[^a-zA-Z0-9]/g, '')}Client {
     return content;
   };
   
+  // Process files and create final display array
   useEffect(() => {
-    if (!validFiles.length) return;
+    console.log('[SequentialCodeDisplay] Processing files for display');
+    
+    let processedFiles = validFiles;
+    
+    // Add fallback test files if no valid files
+    if (!validFiles.length) {
+      console.log('[SequentialCodeDisplay] No valid files, creating test files');
+      processedFiles = [
+        {
+          filename: 'lib.rs',
+          content: `use anchor_lang::prelude::*;
+
+#[program]
+pub mod my_program {
+    use super::*;
+    
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+        msg!("Program initialized!");
+        Ok(())
+    }
+}
+
+#[derive(Accounts)]
+pub struct Initialize {}`,
+          language: 'rust'
+        }
+      ];
+    }
+    
+    setFinalFilesToDisplay(processedFiles);
     
     // Reset for new files
+    console.log('[SequentialCodeDisplay] Resetting state for new files');
     setCurrentFileIndex(0);
     setIsTyping(false);
     setDisplayedText('');
-  }, [files]); // Use original files prop for dependency
+  }, [files, validFiles.length]); // Use both files and validFiles.length as dependencies
   
   useEffect(() => {
-    if (!mounted || !validFiles.length || currentFileIndex >= validFiles.length) return;
+    console.log('[SequentialCodeDisplay] Typewriter effect check:', {
+      mounted,
+      finalFilesLength: finalFilesToDisplay.length,
+      currentFileIndex,
+      condition: !mounted || !finalFilesToDisplay.length || currentFileIndex >= finalFilesToDisplay.length
+    });
     
-    const currentFile = validFiles[currentFileIndex];
+    if (!mounted || !finalFilesToDisplay.length || currentFileIndex >= finalFilesToDisplay.length) return;
+    
+    const currentFile = finalFilesToDisplay[currentFileIndex];
+    console.log('[SequentialCodeDisplay] Current file for typewriter:', {
+      filename: currentFile?.filename,
+      hasContent: !!currentFile?.content,
+      contentLength: currentFile?.content?.length || 0
+    });
+    
     if (!currentFile) return; // Extra safety check
     
     const truncatedContent = getTruncatedContent(currentFile.content);
+    console.log('[SequentialCodeDisplay] Starting typewriter with content length:', truncatedContent.length);
+    console.log('[SequentialCodeDisplay] Content preview:', truncatedContent.substring(0, 100));
     
     // Start typewriter effect
     setIsTyping(true);
@@ -121,28 +181,41 @@ export class ${filename.replace(/[^a-zA-Z0-9]/g, '')}Client {
         setDisplayedText(truncatedContent.substring(0, charIndex + 1));
         charIndex++;
       } else {
+        console.log('[SequentialCodeDisplay] Typewriter complete for file:', currentFile.filename);
         clearInterval(timer);
         setIsTyping(false);
         
         // Move to next file after 2 seconds
         setTimeout(() => {
-          if (currentFileIndex < validFiles.length - 1) {
+          if (currentFileIndex < finalFilesToDisplay.length - 1) {
+            console.log('[SequentialCodeDisplay] Moving to next file');
             setCurrentFileIndex(prev => prev + 1);
+          } else {
+            console.log('[SequentialCodeDisplay] All files completed');
           }
         }, 2000);
       }
     }, 15); // Fast typewriter speed
     
     return () => clearInterval(timer);
-  }, [currentFileIndex, validFiles.length, mounted]);
+  }, [currentFileIndex, finalFilesToDisplay.length, mounted]);
   
   // Don't render on server to avoid hydration issues
-  if (!mounted) return null;
+  if (!mounted) {
+    console.log('[SequentialCodeDisplay] Not mounted, returning null');
+    return null;
+  }
   
-  if (!validFiles.length) return null;
+  if (!finalFilesToDisplay.length) {
+    console.log('[SequentialCodeDisplay] No final files to display, returning null');
+    return null;
+  }
   
-  const currentFile = validFiles[currentFileIndex];
-  if (!currentFile) return null; // Safety check
+  const currentFile = finalFilesToDisplay[currentFileIndex];
+  if (!currentFile) {
+    console.log('[SequentialCodeDisplay] No current file, returning null');
+    return null;
+  }
   
   return (
     <div className="mt-2 mb-2">
@@ -162,10 +235,10 @@ export class ${filename.replace(/[^a-zA-Z0-9]/g, '')}Client {
                 {currentFile.filename || 'unknown.rs'}
               </span>
               <span className="text-xs text-gray-500">
-                ({currentFileIndex + 1}/{validFiles.length})
+                ({currentFileIndex + 1}/{finalFilesToDisplay.length})
               </span>
             </div>
-            {!isTyping && currentFileIndex < validFiles.length - 1 && (
+            {!isTyping && currentFileIndex < finalFilesToDisplay.length - 1 && (
               <span className="text-xs text-gray-500">Next in 2s...</span>
             )}
           </div>
@@ -182,7 +255,7 @@ export class ${filename.replace(/[^a-zA-Z0-9]/g, '')}Client {
           
           {/* Progress dots */}
           <div className="flex gap-1 mt-2 justify-center">
-            {validFiles.map((_, idx) => (
+            {finalFilesToDisplay.map((_, idx) => (
               <div
                 key={`dot-${idx}`}
                 className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
