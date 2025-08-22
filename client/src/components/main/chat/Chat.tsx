@@ -29,8 +29,6 @@ import {
   Trash2
 } from "lucide-react";
 import MarkdownRenderer from '@/components/main/code/markdown/MarkdownRenderer';
-import SequentialCodeDisplay from './SequentialCodeDisplay';
-import { ProgressDisplay } from './ProgressDisplay';
 import { TaskProgressDisplay } from './TaskProgressDisplay';
 
 export interface AIMessageType {
@@ -858,7 +856,7 @@ const Chat: React.FC = () => {
         
      //   console.log('[parseCodeGenFiles] Total files found:', files.length);
 
-        return files.length > 0 ? files : null; // Use SequentialCodeDisplay for any files found
+        return files.length > 0 ? files : null;
     };
 
     return (
@@ -965,8 +963,14 @@ const Chat: React.FC = () => {
                                                                 </div>
                                                             );
                                                         } else if (message.isChecklist) {
-                                                            //console.log('[RENDER] Rendering ProgressDisplay');
-                                                            return <ProgressDisplay />;
+                                                            //console.log('[RENDER] Rendering message as markdown instead of ProgressDisplay');
+                                                            return (
+                                                                <div className="w-full max-w-full overflow-hidden">
+                                                                    <MarkdownRenderer 
+                                                                        content={message.text}
+                                                                    />
+                                                                </div>
+                                                            );
                                                         } else {
                                                             //console.log('[RENDER] Rendering MarkdownRenderer for text message');
                                                             return (
