@@ -334,12 +334,23 @@ export async function runDeployPipeline({
       // Handle code-generation events with files array
       if (data.type === 'code-generation' && data.files && Array.isArray(data.files)) {
         console.log('[DEPLOY] Processing code-generation batch with', data.files.length, 'files');
+        console.log('[DEPLOY] CRITICAL: First file in batch:', {
+          filename: data.files[0]?.filename,
+          hasContent: !!data.files[0]?.content,
+          contentLength: data.files[0]?.content?.length || 0,
+          contentSample: data.files[0]?.content?.substring(0, 100) || 'NO CONTENT'
+        });
         
         // Send individual file events for each file in the batch
-        data.files.forEach((file: any) => {
+        data.files.forEach((file: any, index: number) => {
           if (file.filename && file.content) {
-            console.log('[DEPLOY] Processing file from batch:', file.filename, 'content length:', file.content.length);
+            console.log(`[DEPLOY] Processing file ${index + 1}/${data.files.length} from batch:`, file.filename, 'content length:', file.content.length);
             progressMgr.addCodeGenerationEvent(file.filename, file.content);
+          } else {
+            console.log(`[DEPLOY] ⚠️  Skipping file ${index + 1} - missing filename or content:`, { 
+              filename: file.filename, 
+              hasContent: !!file.content 
+            });
           }
         });
         

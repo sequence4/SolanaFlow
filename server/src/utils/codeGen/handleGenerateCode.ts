@@ -174,6 +174,8 @@ const emitFileWritten = (sendProgress: (data: unknown) => void, isRustPhase: boo
       });
       
       console.log(`[FILE-COLLECT] ✅ COLLECTED file ${allGeneratedFiles.length}: ${filename} (${language}), content length: ${content.length}`);
+      console.log(`[FILE-COLLECT] Content preview (first 100 chars):`, content.substring(0, 100));
+      console.log(`[FILE-COLLECT] Display content preview:`, displayContent.substring(0, 100));
       console.log(`[FILE-COLLECT] Total files in collection: ${allGeneratedFiles.length}`);
       
       // Calculate progress (0-95%, estimate ~25 total files)
@@ -902,6 +904,7 @@ EOF'`,
         console.log('[GEN] ====== FORCE SENDING ALL GENERATED FILES ======');
         console.log('[GEN] Total files to send:', allGeneratedFiles.length);
         console.log('[GEN] Files to send:', allGeneratedFiles.map(f => ({ filename: f.filename, contentLength: f.content.length })));
+        console.log('[GEN] CRITICAL: First file content sample:', allGeneratedFiles[0]?.content.substring(0, 200) || 'NO FIRST FILE');
 
         if (allGeneratedFiles.length > 0) {
           const forceSend = {

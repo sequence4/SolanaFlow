@@ -14,8 +14,18 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
   const [mounted, setMounted] = useState(false);
   const [finalFilesToDisplay, setFinalFilesToDisplay] = useState<CodeFile[]>([]);
   
-  // Add debugging
+  // CRITICAL DEBUG CHECK - Add this to see what's received
   useEffect(() => {
+    console.error('[SequentialCodeDisplay] CRITICAL CHECK:', {
+      filesReceived: files?.length || 0,
+      firstFile: files?.[0] ? {
+        filename: files[0].filename,
+        hasContent: !!files[0].content,
+        contentLength: files[0].content?.length || 0,
+        actualContent: files[0].content?.substring(0, 100) || 'NO CONTENT AT ALL'
+      } : 'NO FILES'
+    });
+    
     console.log('[SequentialCodeDisplay] Component mounted/updated');
     console.log('[SequentialCodeDisplay] Files received:', files?.length || 0);
     console.log('[SequentialCodeDisplay] Files data:', files?.map(f => ({

@@ -50,6 +50,8 @@ export async function insertSrcFiles(
     } else if (node.type === 'file') {
       // Log only file path without content
       console.log(`[INSERT] Processing file: ${projectRelativePath}`);
+      console.log(`[INSERT] File has code: ${!!node.code}, code length: ${node.code?.length || 0}`);
+      console.log(`[INSERT] Content preview (first 100 chars):`, (node.code || '').substring(0, 100));
       
       // Special handling for tsconfig.json
       if (projectRelativePath === "web/tsconfig.json") {
@@ -65,6 +67,7 @@ export async function insertSrcFiles(
       );
       if (taskId) {
         console.log(`[INSERT] File task created for: ${projectRelativePath}`);
+        console.log(`[INSERT] About to call onFile with content length: ${(node.code || '').length}`);
         
         // stream the file *now* – don't block the queue
         if (onFile) await onFile(projectRelativePath, node.code || '');
