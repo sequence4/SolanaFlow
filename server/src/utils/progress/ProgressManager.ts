@@ -53,6 +53,8 @@ export class ProgressManager extends EventEmitter {
     
     this.currentProgress.set(id, event);
     this.sendProgress(event);
+    
+    console.log('[PROGRESS-MGR] Started process:', id, 'at stage:', stage, 'pct:', 0);
     return id;
   }
   
@@ -64,15 +66,19 @@ export class ProgressManager extends EventEmitter {
     details?: ProgressEvent['details']
   ) {
     const progress = this.currentProgress.get(id);
-    if (!progress) return;
+    if (!progress) {
+      console.warn('[PROGRESS-MGR] Cannot update unknown process:', id);
+      return;
+    }
     
     const startTime = this.startTimes.get(id) || Date.now();
     const elapsed = (Date.now() - startTime) / 1000;
-    const estimatedTotal = elapsed / (pct / 100);
+    const estimatedTotal = pct > 0 ? elapsed / (pct / 100) : 60;
     const estimatedRemaining = Math.max(0, estimatedTotal - elapsed);
     
     const event: ProgressEvent = {
       ...progress,
+      type: 'progress', // Ensure type is explicitly set
       pct,
       message: message || progress.message,
       estimatedTimeRemaining: estimatedRemaining,
@@ -82,15 +88,21 @@ export class ProgressManager extends EventEmitter {
     
     this.currentProgress.set(id, event);
     this.sendProgress(event);
+    
+    console.log(`[PROGRESS-MGR] ${progress.stage}:${progress.process} → ${pct}% (${message || progress.message})`);
   }
   
   // Complete a process
   completeProcess(id: string, message?: string) {
     const progress = this.currentProgress.get(id);
-    if (!progress) return;
+    if (!progress) {
+      console.warn('[PROGRESS-MGR] Cannot complete unknown process:', id);
+      return;
+    }
     
     const event: ProgressEvent = {
       ...progress,
+      type: 'progress', // Ensure type is explicitly set
       pct: 100,
       message: message || `${progress.process} completed`,
       estimatedTimeRemaining: 0,
@@ -98,8 +110,13 @@ export class ProgressManager extends EventEmitter {
     };
     
     this.sendProgress(event);
-    this.currentProgress.delete(id);
-    this.startTimes.delete(id);
+    console.log(`[PROGRESS-MGR] Completed ${progress.stage}:${progress.process} → 100%`);
+    
+    // Delay before cleanup to allow frontend to show completion
+    setTimeout(() => {
+      this.currentProgress.delete(id);
+      this.startTimes.delete(id);
+    }, 1000);
   }
   
   // Send code generation files

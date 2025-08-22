@@ -2,7 +2,7 @@ import { spawn } from 'child_process';
 
 export function runCommandWithProgress(
   command: string,
-  projectId: string,
+  _projectId: string, // Mark as intentionally unused
   onProgress: (output: string) => void
 ): Promise<void> {
   return new Promise((resolve, reject) => {

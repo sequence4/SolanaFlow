@@ -363,7 +363,9 @@ export const handleGenerateCode = async ({
 
         const containerRootDir = `/usr/src/${workspace.rootPath}`;   // <── NEW
         
-        // DEPENDENCY INSTALLATION
+        // DEPENDENCY INSTALLATION - Wait for UI to complete first
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
         const depsId = progress.startProcess('code-gen', 'install-dependencies', 180);
 
         /* ── One-time Yarn bootstrap inside the running container ── */
@@ -856,8 +858,11 @@ EOF'`,
         progress.updateProcess(codeGenId, 98, '📝 Updating configuration files...');
 
         // Amend config files **first** so IDL changes are in place for the build.
-        const { anchorTaskId } = await amendConfigFiles(projectId, userId);
+        await amendConfigFiles(projectId, userId);
         progress.completeProcess(codeGenId, '✅ Code generation complete');
+
+        // Wait for UI to show completion before starting next phase
+        await new Promise(resolve => setTimeout(resolve, 500));
 
         // BUILD PHASE
         const buildId = progress.startProcess('build', 'anchor-build', 240);
