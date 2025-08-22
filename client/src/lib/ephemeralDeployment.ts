@@ -9,7 +9,7 @@ import {
   TransactionInstruction,
   Connection
 } from '@solana/web3.js';
-import { BPF_UPGRADE_LOADER_ID } from '../utils/helpers/constants';
+import { BPF_UPGRADE_LOADER_ID } from '../utils/helpers/data';
 import type { WalletContextState } from '@solana/wallet-adapter-react';
 import { RATE_LIMIT_MS } from '@/utils/blockchain/connection';
 import { createHash } from 'crypto';

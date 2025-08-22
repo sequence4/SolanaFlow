@@ -638,7 +638,7 @@ export async function runDeployPipeline({
       //console.error('[FILE-OPS] WARNING: .so file not found after retries');
       progressMgr.handleFileCollection(programName + '.so', false);
     } else {
-      console.log('[FILE-OPS] .so file found, proceeding with copy');
+     // console.log('[FILE-OPS] .so file found, proceeding with copy');
       await readContainerFile(
         workspace.containerName,
         soFilePath,
@@ -680,7 +680,7 @@ export async function runDeployPipeline({
         // Small delay to show progress
         await new Promise(resolve => setTimeout(resolve, 100));
       } catch (error) {
-        console.log(`[FILE-OPS] Error collecting ${file.name}:`, error);
+       // console.log(`[FILE-OPS] Error collecting ${file.name}:`, error);
         await progressMgr.handleFileCollection(file.name, false);
       }
     }
@@ -715,10 +715,33 @@ export async function runDeployPipeline({
 
     /* ---- host copy removed: program ID is read in-container below ---- */
     
+    // Pre-filter file tree to reduce processing overhead  
+    const filterFileTree = (nodes: any[]): any[] => {
+      const HEAVY_DIRS = new Set(['.next', 'node_modules', '.yarn', '.git', 'target/debug', 'target/release', '.turbo']);
+      
+      return nodes.map(node => {
+        if (node.type === 'directory') {
+          // Skip heavyweight directories by clearing their children
+          if (HEAVY_DIRS.has(node.name)) {
+            return { ...node, children: [] }; // Keep directory but no children
+          }
+          // Recursively filter children
+          if (node.children) {
+            return { ...node, children: filterFileTree(node.children) };
+          }
+        }
+        return node;
+      }).filter(Boolean);
+    };
+
+    // Filter the tree before attaching contents to dramatically reduce processing
+    const filteredTree = filterFileTree(rawTree);
+    //console.log(`[PERF] Filtered file tree from ${JSON.stringify(rawTree).length} to ${JSON.stringify(filteredTree).length} chars`);
+    
     // Modify attachFileContents to skip logging content but still send real content to frontend
     const skipContentLogging = true; // Don't log file contents to console
-    await attachFileContents(rawTree, absRoot, workspace.containerName, false, skipContentLogging);
-    const fileTree = rawTree;  // now populated with actual content for frontend
+    await attachFileContents(filteredTree, absRoot, workspace.containerName, false, skipContentLogging);
+    const fileTree = filteredTree;  // now populated with actual content for frontend
 
     /* Program ID was determined pre-build */
     const programId = programIdStr!;

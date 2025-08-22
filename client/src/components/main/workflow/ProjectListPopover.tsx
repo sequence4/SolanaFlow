@@ -4,7 +4,9 @@ import { LuSearch } from "react-icons/lu";
 import ProjectContext from '@/context/project/ProjectContext';
 import UxContext from '@/context/ux/UxContext';
 import { shortenText } from '@/utils/helpers/textUtils';
-import { fetchProjects, handleDeleteProject, handleProjectClick } from '@/utils/project/projectUtils';
+import { fetchProjects } from '@/utils/project/fetchProjects';
+import { handleDeleteProject } from '@/utils/project/handleDeleteProject';
+import { handleProjectClick } from '@/utils/project/handleProjectClick';
 import FileContext from '@/context/file/FileContext';
 
 interface ProjectListPopoverProps {

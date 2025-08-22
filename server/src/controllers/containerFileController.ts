@@ -1,11 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../middleware/errorHandler';
-import { 
-    createFileInContainer, 
-    updateFileInContainer, 
-    getFileContentFromContainer, 
-    installDependenciesInContainer 
-} from '../utils/container/containerFileUtils';
+import { createFileInContainer} from '../utils/container/createFileInContainer';
+import { updateFileInContainer} from '../utils/container/updateFileInContainer';
+import { getFileContentFromContainer} from '../utils/container/getFileContentFromContainer';
+import { installDependenciesInContainer} from '../utils/container/installDependenciesInContainer';
 
 export const createFile = async (
   req: Request,

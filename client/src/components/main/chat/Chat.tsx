@@ -185,9 +185,11 @@ const Chat: React.FC = () => {
         smartScrollToBottom();
     }, [isTyping, isThinking, smartScrollToBottom]);
 
+    /*
     useEffect(() => {
         console.log(selectedFile);
     }, []);
+    */
 
     useEffect(() => {
         const savedMessages = sessionStorage.getItem('chatMessages');
@@ -307,8 +309,8 @@ const Chat: React.FC = () => {
             );
 
             if (visible.length) {
-                console.log('[CHAT] ====== PROCESSING BATCHED SYSTEM LOGS ======');
-                console.log('[CHAT] Processing', visible.length, 'new lines');
+                //console.log('[CHAT] ====== PROCESSING BATCHED SYSTEM LOGS ======');
+                //console.log('[CHAT] Processing', visible.length, 'new lines');
                 
                 const newLogMessages: AIMessageType[] = [];
                 let hasCodeGenUpdate = false;
@@ -353,8 +355,8 @@ const Chat: React.FC = () => {
                         if (parsed.type === 'code-generation-batch' && parsed.files?.length > 0) {
                             // Deduplicate by sequence number
                             if (parsed.sequence && parsed.sequence > lastCodeGenSequenceRef.current) {
-                                console.log('[CHAT] ====== BATCHED CODE GENERATION ======');
-                                console.log('[CHAT] Files:', parsed.files.length);
+                                //console.log('[CHAT] ====== BATCHED CODE GENERATION ======');
+                               // console.log('[CHAT] Files:', parsed.files.length);
                                 
                                 hasCodeGenUpdate = true;
                                 latestCodeGenFiles = parsed.files;
@@ -367,7 +369,7 @@ const Chat: React.FC = () => {
                         
                         // Handle individual code generation (legacy support)
                         if (parsed.type === 'code-generation' && parsed.files?.length > 0) {
-                            console.log('[CHAT] ====== INDIVIDUAL CODE GENERATION ======');
+                           // console.log('[CHAT] ====== INDIVIDUAL CODE GENERATION ======');
                             hasCodeGenUpdate = true;
                             latestCodeGenFiles = [...latestCodeGenFiles, ...parsed.files];
                             showThinkingForStage('codegen');
@@ -403,7 +405,7 @@ const Chat: React.FC = () => {
 
                 // Batch update messages
                 if (hasCodeGenUpdate || newLogMessages.length > 0) {
-                    console.log('[CHAT] ====== BATCH UPDATE ======');
+                    //console.log('[CHAT] ====== BATCH UPDATE ======');
                     
                     setMessages(prev => {
                         let updated = [...prev];
@@ -451,11 +453,11 @@ const Chat: React.FC = () => {
     useEffect(() => {
         const logAllEvents = (eventName: string) => {
             return (data: any) => {
-                console.log(`[CHAT-DEBUG] Event "${eventName}":`, data);
+               // console.log(`[CHAT-DEBUG] Event "${eventName}":`, data);
                 if (data.type === 'code-generation') {
-                    console.log('[CHAT-DEBUG] 🎯 CODE-GENERATION EVENT DETECTED!');
-                    console.log('[CHAT-DEBUG] Files count:', data.files?.length || 0);
-                    console.log('[CHAT-DEBUG] Files:', data.files?.map((f: any) => f.filename));
+                //    console.log('[CHAT-DEBUG] 🎯 CODE-GENERATION EVENT DETECTED!');
+                //    console.log('[CHAT-DEBUG] Files count:', data.files?.length || 0);
+               //     console.log('[CHAT-DEBUG] Files:', data.files?.map((f: any) => f.filename));
                 }
             };
         };
@@ -500,8 +502,8 @@ const Chat: React.FC = () => {
     const { publicKey, connected } = useWallet();
 
     useEffect(() => {
-        console.log('Wallet connection status:', connected);
-        console.log('Wallet public key:', publicKey?.toBase58() || 'Not connected');
+        //console.log('Wallet connection status:', connected);
+       // console.log('Wallet public key:', publicKey?.toBase58() || 'Not connected');
     }, [connected, publicKey]);
 
 
@@ -541,7 +543,7 @@ const Chat: React.FC = () => {
                 (file): file is FileTreeItemType => Boolean(file)
             );
 
-            console.log("Files selected for context:", selectedFiles);
+           // console.log("Files selected for context:", selectedFiles);
             
             setMessages([...messages, { 
                 text: input, 
@@ -559,7 +561,7 @@ const Chat: React.FC = () => {
                 const fileTasks = await Promise.all(
                     selectedFiles.map(async (file) => {
                         if (file.path && projectContext.id) {
-                            console.log("Fetching content for file:", file.path);
+                        //    console.log("Fetching content for file:", file.path);
                             const taskResponse = await fileApi.getFileContent(projectContext.id, file.path);
                             return { filePath: file.path, taskId: taskResponse.taskId };
                         }
@@ -580,7 +582,7 @@ const Chat: React.FC = () => {
                     fileTasks.map(async (fileTask) => {
                         if (fileTask) {
                             const content = await fetchContent(fileTask.taskId);
-                            console.log("Fetched content for file:", fileTask.filePath, "Length:", content.length);
+                           // console.log("Fetched content for file:", fileTask.filePath, "Length:", content.length);
                             return {
                                 path: fileTask.filePath,
                                 content: content || 'No content available',
@@ -591,7 +593,7 @@ const Chat: React.FC = () => {
                 );
 
                 const userPublicKeyString = connected && publicKey ? publicKey.toBase58() : '';
-                console.log('Using wallet public key for AI request:', userPublicKeyString || 'No wallet connected');
+               // console.log('Using wallet public key for AI request:', userPublicKeyString || 'No wallet connected');
 
                 setMessages(prevMessages => 
                     prevMessages.map(msg => 
@@ -624,7 +626,7 @@ const Chat: React.FC = () => {
                 ]);
             } catch (error) {
                 setIsTyping(false);
-                console.error('Failed to send message to AI:', error);
+               // console.error('Failed to send message to AI:', error);
                 setMessages(prevMessages => [
                     ...prevMessages,
                     { 
@@ -788,8 +790,8 @@ const Chat: React.FC = () => {
         ];
 
         const isCodeGenMessage = codeGenPatterns.some(pattern => pattern.test(messageText));
-        console.log('[parseCodeGenFiles] Is code generation message:', isCodeGenMessage);
-        console.log('[parseCodeGenFiles] Matched patterns:', codeGenPatterns.filter(pattern => pattern.test(messageText)));
+       // console.log('[parseCodeGenFiles] Is code generation message:', isCodeGenMessage);
+      //  console.log('[parseCodeGenFiles] Matched patterns:', codeGenPatterns.filter(pattern => pattern.test(messageText)));
         
         if (!isCodeGenMessage) return null;
 
@@ -798,8 +800,8 @@ const Chat: React.FC = () => {
         const files = [];
         let match;
 
-        console.log('[parseCodeGenFiles] Searching for code blocks in message');
-        console.log('[parseCodeGenFiles] Message preview:', messageText.substring(0, 200));
+    //    console.log('[parseCodeGenFiles] Searching for code blocks in message');
+     //   console.log('[parseCodeGenFiles] Message preview:', messageText.substring(0, 200));
 
         while ((match = codeBlockRegex.exec(messageText)) !== null) {
             const [fullMatch, language = 'rust', filename, content] = match;
@@ -820,11 +822,11 @@ const Chat: React.FC = () => {
                     language: language || 'rust'
                 });
                 
-                console.log('[parseCodeGenFiles] Added file:', finalFilename);
+          //      console.log('[parseCodeGenFiles] Added file:', finalFilename);
             }
         }
         
-        console.log('[parseCodeGenFiles] Total files found:', files.length);
+     //   console.log('[parseCodeGenFiles] Total files found:', files.length);
 
         return files.length > 0 ? files : null; // Use SequentialCodeDisplay for any files found
     };
@@ -909,7 +911,9 @@ const Chat: React.FC = () => {
                                             <div className="flex items-start gap-3 w-full">
                                                 <div className="leading-relaxed w-full min-w-0 flex-1">
                                                     {/* Render message content */}
+                                                    
                                                     {(() => {
+                                                        /*
                                                         console.log(`[RENDER] Message ${index} render check:`, {
                                                             isChecklist: message.isChecklist,
                                                             hasCodeGenFiles: !!message.codeGenFiles,
@@ -917,26 +921,28 @@ const Chat: React.FC = () => {
                                                             sender: message.sender,
                                                             textPreview: message.text?.substring(0, 30) || 'empty'
                                                         });
-                                                        
+                                                        */
                                                         // Check if we should show task progress at the top level
                                                         if (Object.keys(activeTasks).length > 0 && index === messages.length - 1) {
-                                                            console.log('[RENDER] ================ RENDERING TaskProgressDisplay ================');
+                                                           // console.log('[RENDER] ================ RENDERING TaskProgressDisplay ================');
                                                             return <TaskProgressDisplay tasks={activeTasks} />;
                                                         } else if (message.codeGenFiles && message.codeGenFiles.length > 0) {
-                                                            console.log('[RENDER] ================ RENDERING SequentialCodeDisplay ================');
+                                                            //console.log('[RENDER] ================ RENDERING SequentialCodeDisplay ================');
+                                                            /*
                                                             console.log('[RENDER] Files to display:', message.codeGenFiles.map((f: any) => ({ 
                                                                 filename: f.filename, 
                                                                 contentLength: f.content?.length || 0,
                                                                 language: f.language 
                                                             })));
-                                                            console.log('[RENDER] Component will be mounted with', message.codeGenFiles.length, 'files');
+                                                            */
+                                                            //console.log('[RENDER] Component will be mounted with', message.codeGenFiles.length, 'files');
                                                             
                                                             return <SequentialCodeDisplay files={message.codeGenFiles} />;
                                                         } else if (message.isChecklist) {
-                                                            console.log('[RENDER] Rendering ProgressDisplay');
+                                                            //console.log('[RENDER] Rendering ProgressDisplay');
                                                             return <ProgressDisplay />;
                                                         } else {
-                                                            console.log('[RENDER] Rendering MarkdownRenderer for text message');
+                                                            //console.log('[RENDER] Rendering MarkdownRenderer for text message');
                                                             return (
                                                                 <div className="w-full max-w-full overflow-hidden">
                                                                     <MarkdownRenderer 

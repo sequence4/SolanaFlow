@@ -27,7 +27,7 @@ function sendContainerSetupProgress(taskId: string, taskName: string, message: s
   };
   
   // Emit to SSE for frontend
-  console.log(JSON.stringify(event));
+  //console.log(JSON.stringify(event));
 }
 
 function startContainerTask(taskId: string, taskName: string) {

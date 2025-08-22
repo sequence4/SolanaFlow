@@ -7,7 +7,12 @@ import { v4 as uuidv4 } from 'uuid';
 import { createTask, updateTaskStatus } from '../taskUtils/taskUtils';
 import { runCommand } from '../command-execution/runCommand';
 
-const SKIP_FOLDERS = ['.anchor', '.github', '.git', 'target', 'node_modules'];
+const SKIP_FOLDERS = [
+  '.anchor', '.github', '.git', 'target', 'node_modules',
+  '.next', '.yarn', '.turbo', 'dist', 'build', 'coverage',
+  '__pycache__', '.pytest_cache', '.mypy_cache', '.cache',
+  'target/debug', 'target/release', '.vscode', '.idea'
+];
 const SKIP_FILES = [
   'Cargo.lock',
   'package-lock.json',

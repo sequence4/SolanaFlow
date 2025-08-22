@@ -3,7 +3,7 @@
 import React, { useContext, useState, useRef, useEffect, useCallback } from 'react';
 import '@/styles/toolbox/toolboxStyle.css';
 import { NodeItems } from '@/components/main/toolbox/workflowToolbox/NodeItems';
-import FileExplorer from '@/components/code/FileExplorer';
+import FileExplorer from '@/components/main/code/FileExplorer';
 import ProjectContext from '@/context/project/ProjectContext';
 import FileContext from '@/context/file/FileContext';
 import UxContext from '@/context/ux/UxContext';
@@ -15,7 +15,10 @@ import { Badge } from "@/components/ui/badge";
 import ProjectListPopover from '../workflow/ProjectListPopover';
 import { toast } from "sonner";
 import PulseLoader from "react-spinners/PulseLoader";
-import { handleConfirmNewProject, handleOpenProject, handleSaveClick, handleNewProjectClick } from '@/utils/project/projectUtils';
+import { handleConfirmNewProject } from '@/utils/project/handleConfirmNewProject';
+import { handleOpenProject } from '@/utils/project/handleOpenProject';
+import { handleSaveClick } from '@/utils/project/handleSaveClick';
+import { handleNewProjectClick } from '@/utils/project/handleNewProjectClick';
 import {
   Search,
   X,

@@ -12,7 +12,7 @@ export const promptAI = async (
   const apiKey = process.env.REACT_APP_OPENAI_API_KEY || 'no api key provided';
   const model = 'gpt-4o';
   const body = { messages: [prompt], model, _apiKey: apiKey, _schema: schema };
-  console.log('body:', body);
+  //console.log('body:', body);
   const resp = await api.post('/ai/prompt', body);
   return resp.data?.data;
 };
@@ -20,7 +20,6 @@ export const promptAI = async (
 export const promptAI_v2 = async (
   text: string,
   model: string,
-  apiKey: string,
   schema: any,
   promptType: string,
   maxRetries = 1,
@@ -36,9 +35,9 @@ export const promptAI_v2 = async (
       }
       const apiKey = process.env.OPENAI_API_KEY || '';
 
-      console.log('promptAI called');
-      console.log('model:', model);
-      console.log('apiKey:', apiKey);
+      //console.log('promptAI called');
+      //console.log('model:', model);
+      //console.log('apiKey:', apiKey);
 
       const body = {
         messages: [text],

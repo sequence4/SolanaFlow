@@ -9,7 +9,7 @@ interface CodeFile {
 
 const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
   // IMMEDIATE validation and logging
-  console.log('[SequentialCodeDisplay] RENDER CALLED with files:', files);
+  //console.log('[SequentialCodeDisplay] RENDER CALLED with files:', files);
   
   if (!files || files.length === 0) {
     return (
@@ -23,7 +23,7 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
   const [forceUpdate, setForceUpdate] = useState(0);
   
   useEffect(() => {
-    console.log('[SequentialCodeDisplay] Files changed, forcing update');
+    //console.log('[SequentialCodeDisplay] Files changed, forcing update');
     setForceUpdate(prev => prev + 1);
   }, [files]);
   
@@ -49,42 +49,13 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
     }).filter(Boolean) as CodeFile[];
   }, [files, forceUpdate]);
 
-  console.log('[SequentialCodeDisplay] Validated files:', validatedFiles.length);
+ // console.log('[SequentialCodeDisplay] Validated files:', validatedFiles.length);
 
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [isTyping, setIsTyping] = useState(false);
   const [displayedText, setDisplayedText] = useState('');
   const [mounted, setMounted] = useState(false);
-  const [finalFilesToDisplay, setFinalFilesToDisplay] = useState<CodeFile[]>([]);
-  
-  // CRITICAL DEBUG CHECK - Add this to see what's received
-  useEffect(() => {
-    console.error('[SequentialCodeDisplay] CRITICAL CHECK:', {
-      filesReceived: validatedFiles?.length || 0,
-      firstFile: validatedFiles?.[0] ? {
-        filename: validatedFiles[0].filename,
-        hasContent: !!validatedFiles[0].content,
-        contentLength: validatedFiles[0].content?.length || 0,
-        actualContent: validatedFiles[0].content?.substring(0, 100) || 'NO CONTENT AT ALL'
-      } : 'NO FILES'
-    });
-    
-    console.log('[SequentialCodeDisplay] Component mounted/updated');
-    console.log('[SequentialCodeDisplay] Validated files:', validatedFiles?.length || 0);
-    console.log('[SequentialCodeDisplay] Files data:', validatedFiles?.map(f => ({
-      filename: f?.filename,
-      hasContent: !!f?.content,
-      contentLength: f?.content?.length || 0,
-      contentPreview: f?.content?.substring(0, 50) || 'NO CONTENT',
-      language: f?.language
-    })));
-  }, [validatedFiles]);
-  
-  // Fix hydration issues
-  useEffect(() => {
-    setMounted(true);
-    console.log('[SequentialCodeDisplay] Mounted set to true');
-  }, []);
+  const [finalFilesToDisplay, setFinalFilesToDisplay] = useState<CodeFile[]>([]);  
   
   // Use validatedFiles instead of the old validFiles
   const validFiles = validatedFiles;
@@ -210,17 +181,19 @@ pub struct Initialize {}`,
     if (!mounted || !finalFilesToDisplay.length || currentFileIndex >= finalFilesToDisplay.length) return;
     
     const currentFile = finalFilesToDisplay[currentFileIndex];
+    /*
     console.log('[SequentialCodeDisplay] Current file for typewriter:', {
       filename: currentFile?.filename,
       hasContent: !!currentFile?.content,
       contentLength: currentFile?.content?.length || 0
     });
+    */
     
     if (!currentFile) return; // Extra safety check
     
     const truncatedContent = getTruncatedContent(currentFile.content);
-    console.log('[SequentialCodeDisplay] Starting typewriter with content length:', truncatedContent.length);
-    console.log('[SequentialCodeDisplay] Content preview:', truncatedContent.substring(0, 100));
+    //console.log('[SequentialCodeDisplay] Starting typewriter with content length:', truncatedContent.length);
+    //console.log('[SequentialCodeDisplay] Content preview:', truncatedContent.substring(0, 100));
     
     // Start typewriter effect
     setIsTyping(true);
@@ -239,7 +212,7 @@ pub struct Initialize {}`,
         // Move to next file after 2 seconds
         setTimeout(() => {
           if (currentFileIndex < finalFilesToDisplay.length - 1) {
-            console.log('[SequentialCodeDisplay] Moving to next file');
+            //console.log('[SequentialCodeDisplay] Moving to next file');
             setCurrentFileIndex(prev => prev + 1);
           } else {
             console.log('[SequentialCodeDisplay] All files completed');
@@ -252,10 +225,12 @@ pub struct Initialize {}`,
   }, [currentFileIndex, finalFilesToDisplay.length, mounted]);
   
   // Don't render on server to avoid hydration issues
+  /*
   if (!mounted) {
     console.log('[SequentialCodeDisplay] Not mounted, returning null');
     return null;
   }
+  */
   
   if (!finalFilesToDisplay.length) {
     console.log('[SequentialCodeDisplay] No final files to display, returning null');

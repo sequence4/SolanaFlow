@@ -39,7 +39,7 @@ import { connection } from "@/utils/blockchain/connection";
 import { useWalletSigner } from "@/utils/blockchain/wallet";
 
 import { createEphemeralKey, EphemeralDeployOptions, deployWithEphemeralKey } from "@/api/projectDeploy";
-import { BPF_UPGRADE_LOADER_ID } from "@/utils/helpers/constants";
+import { BPF_UPGRADE_LOADER_ID } from "@/utils/helpers/data";
 import { darkTheme } from '@/styles/theme';
 
 // Toggle verbose client-side logs by setting NEXT_PUBLIC_DEBUG_LOGS=true in your
