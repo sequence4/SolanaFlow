@@ -18,7 +18,9 @@
       "Bash(npx tsc:*)",
       "Bash(grep:*)",
       "Bash(find:*)",
-      "Bash(pnpm run:*)"
+      "Bash(pnpm run:*)",
+      "Bash(sed:*)",
+      "Bash(git revert:*)"
     ],
     "deny": [],
     "ask": [],

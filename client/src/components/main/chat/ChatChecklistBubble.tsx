@@ -198,14 +198,36 @@ const StepItem = React.memo(({ step, index, isLastStep }: StepItemProps) => {
             </div>
             
             {/* Stable code preview - prevent flickering */}
-            {step.generatedFiles.length > 0 && (
-              <div className="mt-2" key={codeDisplayKey}> {/* Use stable key */}
+            {step.generatedFiles && step.generatedFiles.length > 0 && (
+              <div className="mt-2" key={codeDisplayKey}>
                 <div className="text-xs text-gray-500 mb-1">Latest file preview:</div>
-                <div className="h-48 overflow-hidden"> {/* Fixed height container */}
-                  <SequentialCodeDisplay 
-                    key={codeDisplayKey}
-                    files={[step.generatedFiles[step.generatedFiles.length - 1]]}
-                  />
+                <div className="h-48 overflow-hidden">
+                  {/* Only render if we have files with actual content */}
+                  {(() => {
+                    const latestFile = step.generatedFiles[step.generatedFiles.length - 1];
+                    const hasContent = latestFile && latestFile.content && latestFile.content.length > 0;
+                    
+                    console.log('[ChatChecklistBubble] Latest file:', {
+                      filename: latestFile?.filename,
+                      hasContent,
+                      contentLength: latestFile?.content?.length || 0
+                    });
+                    
+                    if (hasContent) {
+                      return (
+                        <SequentialCodeDisplay 
+                          key={codeDisplayKey}
+                          files={[latestFile]}
+                        />
+                      );
+                    } else {
+                      return (
+                        <div className="text-xs text-gray-400 italic p-2">
+                          Waiting for file content...
+                        </div>
+                      );
+                    }
+                  })()}
                 </div>
               </div>
             )}

@@ -22,6 +22,7 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
       filename: f?.filename,
       hasContent: !!f?.content,
       contentLength: f?.content?.length || 0,
+      contentPreview: f?.content?.substring(0, 50) || 'NO CONTENT',
       language: f?.language
     })));
   }, [files]);

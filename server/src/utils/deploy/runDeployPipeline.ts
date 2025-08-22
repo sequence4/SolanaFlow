@@ -172,11 +172,13 @@ class ProgressManager {
       type: 'file-generated',
       stage: 'code-gen',
       fileName,
+      content: content, // Include actual content
       fileIndex: this.generatedFiles.length,
       totalFiles: this.generatedFiles.length,
       pct: totalProgress,
       timestamp: Date.now(),
-      sequence: ++this.sequenceNumber
+      sequence: ++this.sequenceNumber,
+      language: this.getLanguageFromFilename(fileName) // Include language
     });
   }
   
@@ -329,13 +331,38 @@ export async function runDeployPipeline({
     
     // Enhanced progress wrapper with individual file tracking
     const managedProgressWrapper = (data: any) => {
-      if (data.type === 'code-generation' && data.fileName && data.content) {
+      // Handle code-generation events with files array
+      if (data.type === 'code-generation' && data.files && Array.isArray(data.files)) {
+        console.log('[DEPLOY] Processing code-generation batch with', data.files.length, 'files');
+        
+        // Send individual file events for each file in the batch
+        data.files.forEach((file: any) => {
+          if (file.filename && file.content) {
+            console.log('[DEPLOY] Processing file from batch:', file.filename, 'content length:', file.content.length);
+            progressMgr.addCodeGenerationEvent(file.filename, file.content);
+          }
+        });
+        
+        // Also send the overall progress update
+        if (data.pct && data.stage) {
+          progressMgr.updateProgress(data.stage, data.pct, data.message, data);
+        }
+      } 
+      // Handle individual file-generated events
+      else if ((data.type === 'code-generation' || data.type === 'file-generated') && data.fileName) {
         // Send individual file generation events immediately
-        console.log('[DEPLOY] Processing code-generation file:', data.fileName);
-        progressMgr.addCodeGenerationEvent(data.fileName, data.content);
-      } else if (data.pct && data.stage) {
+        console.log('[DEPLOY] Processing individual file generation:', data.fileName, 'has content:', !!data.content);
+        
+        // Ensure content is passed through
+        const fileContent = data.content || data.fileContent || '';
+        progressMgr.addCodeGenerationEvent(data.fileName, fileContent);
+      } 
+      // Handle general progress updates
+      else if (data.pct && data.stage) {
         progressMgr.updateProgress(data.stage, data.pct, data.message, data);
-      } else {
+      } 
+      // Pass through other events
+      else {
         sendProgress(data);
       }
     };

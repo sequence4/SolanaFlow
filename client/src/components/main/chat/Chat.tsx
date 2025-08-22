@@ -883,10 +883,7 @@ const Chat: React.FC = () => {
                                                             textPreview: message.text?.substring(0, 30) || 'empty'
                                                         });
                                                         
-                                                        if (message.isChecklist) {
-                                                            console.log('[RENDER] Rendering ChatChecklistBubble');
-                                                            return <ChatChecklistBubble />;
-                                                        } else if (message.codeGenFiles && message.codeGenFiles.length > 0) {
+                                                        if (message.codeGenFiles && message.codeGenFiles.length > 0) {
                                                             console.log('[RENDER] ================ RENDERING SequentialCodeDisplay ================');
                                                             console.log('[RENDER] Files to display:', message.codeGenFiles.map((f: any) => ({ 
                                                                 filename: f.filename, 
@@ -896,6 +893,9 @@ const Chat: React.FC = () => {
                                                             console.log('[RENDER] Component will be mounted with', message.codeGenFiles.length, 'files');
                                                             
                                                             return <SequentialCodeDisplay files={message.codeGenFiles} />;
+                                                        } else if (message.isChecklist) {
+                                                            console.log('[RENDER] Rendering ChatChecklistBubble');
+                                                            return <ChatChecklistBubble />;
                                                         } else {
                                                             console.log('[RENDER] Rendering MarkdownRenderer for text message');
                                                             return (

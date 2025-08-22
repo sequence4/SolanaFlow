@@ -192,17 +192,19 @@ export function useChecklistProgress() {
     // Handle file-generated events with proper accumulation
     if (payload.type === 'file-generated') {
       const fileName = payload.fileName;
+      const fileContent = payload.content || ''; // Use actual content from payload
+      const fileLanguage = payload.language || getLanguageFromFilename(fileName);
       
       // Store in ref to prevent loss
       if (!allGeneratedFilesRef.current.has(fileName)) {
         allGeneratedFilesRef.current.set(fileName, {
           filename: fileName,
-          content: '',
-          language: getLanguageFromFilename(fileName)
+          content: fileContent, // Use the actual content
+          language: fileLanguage // Use the language from payload or derive it
         });
       }
       
-      console.log(`[PROGRESS] File generated: ${fileName} (${allGeneratedFilesRef.current.size} total)`);
+      console.log(`[PROGRESS] File generated: ${fileName} (${allGeneratedFilesRef.current.size} total, content length: ${fileContent.length})`);
       
       setSteps(prevSteps => {
         return prevSteps.map(step => {
