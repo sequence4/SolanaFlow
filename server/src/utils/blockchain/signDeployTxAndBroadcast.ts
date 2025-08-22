@@ -1,4 +1,4 @@
-import { Keypair, LAMPORTS_PER_SOL, Transaction } from "@solana/web3.js/lib";
+import { Keypair, LAMPORTS_PER_SOL, Transaction } from "@solana/web3.js";
 import { Connection } from "@solana/web3.js";
 import { v4 as uuidv4 } from "uuid";
 import { getContainerName } from "../container/getContainerName";

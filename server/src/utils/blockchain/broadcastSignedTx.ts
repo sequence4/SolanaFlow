@@ -1,4 +1,4 @@
-import { Connection, Transaction } from "@solana/web3.js/lib";
+import { Connection, Transaction } from "@solana/web3.js";
 import { Keypair } from "@solana/web3.js";
 import { getProgramSecret, awsSecretsEnabled } from "../awsSecrets";
 import fs from 'fs';

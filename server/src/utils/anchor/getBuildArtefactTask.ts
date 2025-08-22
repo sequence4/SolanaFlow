@@ -1,4 +1,4 @@
-import { Keypair } from "@solana/web3.js/lib";
+import { Keypair } from "@solana/web3.js";
 import { getContainerName } from "../container/getContainerName";
 import { getProjectRootPath } from "../fileUtils";
 import { runCommand } from "../command-execution/runCommand";
