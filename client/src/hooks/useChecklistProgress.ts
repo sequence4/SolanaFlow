@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
-import eventBus, { ProgressPayload } from "../lib/eventBus";
-import { debugLogger } from "../utils/debugLogger";
+import eventBus from "../lib/eventBus";
+// import { debugLogger } from "../utils/debugLogger"; // Unused for now
 
 export interface Step {
   id: number;
@@ -256,6 +256,32 @@ export function useChecklistProgress() {
     processedEventHashesRef.current.add(eventHash);
     lastEventTimestampRef.current[eventHash] = now;
     
+    // Special handler for code-generation events
+    if (payload.type === 'code-generation' && payload.stage === 'code-gen') {
+      console.log('[PROGRESS] ====== CODE GENERATION EVENT ======');
+      console.log('[PROGRESS] Files received:', payload.files?.length || 0);
+      console.log('[PROGRESS] All file names:', payload.allFileNames?.length || 0);
+      console.log('[PROGRESS] First file content preview:', payload.files?.[0]?.content?.substring(0, 50));
+      
+      setSteps(prevSteps => {
+        return prevSteps.map(step => {
+          if (step.stage === 'code-gen') {
+            return {
+              ...step,
+              generatedFiles: payload.files || [], // Files for display
+              allFileNames: payload.allFileNames || [], // All file names
+              totalFileCount: payload.totalFileCount || 0,
+              pct: payload.pct || step.pct,
+              description: payload.message || step.description,
+              status: 'active' as const
+            };
+          }
+          return step;
+        });
+      });
+      return;
+    }
+
     // For code-gen stage, batch file updates to prevent accumulation
     if (payload.stage === 'code-gen' && payload.files) {
       // Clear any pending updates for code-gen to prevent accumulation

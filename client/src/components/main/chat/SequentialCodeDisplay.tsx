@@ -8,6 +8,30 @@ interface CodeFile {
 }
 
 const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
+  // CRITICAL: Validate and fix files structure
+  const validatedFiles = React.useMemo(() => {
+    if (!files || !Array.isArray(files)) {
+      console.error('[SequentialCodeDisplay] No files provided!');
+      return [];
+    }
+    
+    return files.map(f => {
+      if (!f || typeof f !== 'object') {
+        console.error('[SequentialCodeDisplay] Invalid file object:', f);
+        return null;
+      }
+      
+      // Ensure proper structure
+      return {
+        filename: f.filename || 'unknown.rs',
+        content: f.content || '// No content available',
+        language: f.language || 'rust'
+      };
+    }).filter(Boolean) as CodeFile[];
+  }, [files]);
+
+  console.log('[SequentialCodeDisplay] Validated files:', validatedFiles.length);
+
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [isTyping, setIsTyping] = useState(false);
   const [displayedText, setDisplayedText] = useState('');
@@ -17,25 +41,25 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
   // CRITICAL DEBUG CHECK - Add this to see what's received
   useEffect(() => {
     console.error('[SequentialCodeDisplay] CRITICAL CHECK:', {
-      filesReceived: files?.length || 0,
-      firstFile: files?.[0] ? {
-        filename: files[0].filename,
-        hasContent: !!files[0].content,
-        contentLength: files[0].content?.length || 0,
-        actualContent: files[0].content?.substring(0, 100) || 'NO CONTENT AT ALL'
+      filesReceived: validatedFiles?.length || 0,
+      firstFile: validatedFiles?.[0] ? {
+        filename: validatedFiles[0].filename,
+        hasContent: !!validatedFiles[0].content,
+        contentLength: validatedFiles[0].content?.length || 0,
+        actualContent: validatedFiles[0].content?.substring(0, 100) || 'NO CONTENT AT ALL'
       } : 'NO FILES'
     });
     
     console.log('[SequentialCodeDisplay] Component mounted/updated');
-    console.log('[SequentialCodeDisplay] Files received:', files?.length || 0);
-    console.log('[SequentialCodeDisplay] Files data:', files?.map(f => ({
+    console.log('[SequentialCodeDisplay] Validated files:', validatedFiles?.length || 0);
+    console.log('[SequentialCodeDisplay] Files data:', validatedFiles?.map(f => ({
       filename: f?.filename,
       hasContent: !!f?.content,
       contentLength: f?.content?.length || 0,
       contentPreview: f?.content?.substring(0, 50) || 'NO CONTENT',
       language: f?.language
     })));
-  }, [files]);
+  }, [validatedFiles]);
   
   // Fix hydration issues
   useEffect(() => {
@@ -43,11 +67,8 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
     console.log('[SequentialCodeDisplay] Mounted set to true');
   }, []);
   
-  // Validate files array and provide sample content if missing
-  const validFiles = files?.filter(f => f && f.filename).map(f => ({
-    ...f,
-    content: f.content || getSampleContent(f.filename, f.language)
-  })) || [];
+  // Use validatedFiles instead of the old validFiles
+  const validFiles = validatedFiles;
   
   // Get sample content for files without content
   const getSampleContent = (filename: string, language: string) => {

@@ -817,15 +817,28 @@ EOF'`,
               });
             }
 
-            // Send batch update with LIMITED files for display but ALL file names
-            const displayFiles = allGeneratedFiles.slice(0, 5); // Only first 5 files for animation
+            // Send batch update with correct file structure
+            const displayFiles = allGeneratedFiles.slice(0, 5).map(file => ({
+              filename: file.filename,
+              content: file.content,
+              language: file.language
+            }));
+            
             const allFileNames = allSrcFiles.map(f => f.path); // ALL file paths for complete list
+
+            // Log what we're sending for debugging
+            console.log('[GEN] Sending files to frontend:', {
+              displayFilesCount: displayFiles.length,
+              firstFileContent: displayFiles[0]?.content?.substring(0, 100),
+              allFileNamesCount: allFileNames.length
+            });
+
             sendProgress({
               type: 'code-generation',
               stage: 'code-gen',
               status: 'active',
               message: `🦀 Generated ${allGeneratedFiles.length} Solana program files`,
-              files: displayFiles, // Limited files for typewriter animation
+              files: displayFiles, // Limited files with correct structure
               totalFileCount: allGeneratedFiles.length,
               allFileNames: allFileNames, // ALL file names for complete list
               pct: 50
@@ -861,10 +874,28 @@ EOF'`,
           sendProgress,
         );
 
+        // ADD MISSING PROGRESS UPDATE - after files are written
+        sendProgress({
+          type: 'progress',
+          stage: 'code-gen',
+          status: 'active',
+          message: '✍️ Writing program files to disk...',
+          pct: 94
+        });
+
         // Progress is now managed by file generation events
         console.log('[GEN] Code generation phase completed, moving to dependency management');
         sendProgress({ stage: "ui-complete" });
 
+
+        // ADD MISSING PROGRESS UPDATE - before linting
+        sendProgress({
+          type: 'progress',
+          stage: 'code-gen',
+          status: 'active',
+          message: '🔍 Validating Cargo manifests...',
+          pct: 96
+        });
 
         // ─────────── Run static lint on Cargo manifests before amending ───────────
         console.log('[GEN] Running Cargo.toml linter');
@@ -875,6 +906,15 @@ EOF'`,
           .catch(err =>
             sendProgress({ stage: "lint-failed", message: `Manifest validation failed: ${String(err)}` }),
           );
+
+        // ADD MISSING PROGRESS UPDATE - before amending config files
+        sendProgress({
+          type: 'progress',
+          stage: 'code-gen',
+          status: 'active',
+          message: '📝 Updating configuration files...',
+          pct: 98
+        });
 
         // Amend config files **first** so IDL changes are in place for the build.
         const { anchorTaskId } = await amendConfigFiles(projectId, userId);
@@ -965,13 +1005,12 @@ EOF'`,
           await updateTaskStatus(dumpTaskId, 'succeed', 'Tree dumped and files printed');
         }
         
-        // Send final progress with all files at 100%
+        // Send final progress update at 100%
         sendProgress({
-          type: 'code-generation',
+          type: 'progress',
           stage: 'code-gen', 
-          status: 'completed',
-          message: `✅ Generated ${allGeneratedFiles.length} files successfully`,
-          files: [...allGeneratedFiles],
+          status: 'active',
+          message: `✅ Code generation completed successfully!`,
           pct: 100
         });
 
