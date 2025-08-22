@@ -14,7 +14,7 @@ import { FileTreeItem } from '../../types/FileTreeItem';
 import { runCommand } from "../projectUtils";
 import { randomUUID } from 'crypto';
 import path from "path";
-import { attachFileContents } from "../fileUtils/attachFileContents";
+// import { attachFileContents } from "../fileUtils/attachFileContents"; // Removed - no longer needed
 import fs from 'fs/promises';            // promise-based FS API
 import fsSync from 'fs';                 // for existsSync in helper
 import { APP_CONFIG } from '../../config/appConfig';
@@ -750,34 +750,87 @@ EOF'`,
         });
         console.log('[GEN] STARTED - Global file array cleared, sent initial progress. File collection will start now.');
         
-        function writeFilesAndEmitTree(
+        // Extract all files from the generated tree immediately
+        const extractAllFiles = (node: FileTreeItem, basePath: string = ''): Array<{path: string, content: string}> => {
+          const files: Array<{path: string, content: string}> = [];
+          
+          const currentPath = basePath ? `${basePath}/${node.name}` : node.name;
+          
+          if (node.type === 'file' && node.code) {
+            files.push({ path: currentPath, content: node.code });
+          }
+          
+          if (node.children) {
+            for (const child of node.children) {
+              files.push(...extractAllFiles(child, currentPath));
+            }
+          }
+          
+          return files;
+        };
+
+        const writeFilesAndEmitTree = (
           rootNode: FileTreeItem,
           projectId: string,
           creatorId: string | null,
-          workspace: WorkspaceHandle,
+          _workspace: WorkspaceHandle, // Keep for signature compatibility
           sendProgress: (d: unknown) => void,
-        ): Promise<string> {
+        ): Promise<string> => {
           return (async () => {
+            // IMMEDIATELY extract and send all files to frontend
+            const allSrcFiles = extractAllFiles(rootNode);
+            console.log('[GEN] Extracted', allSrcFiles.length, 'files from generated tree');
+
+            // Send all files to frontend IMMEDIATELY with actual content
+            for (const file of allSrcFiles) {
+              const filename = file.path.split('/').pop() || file.path;
+              const language = filename.endsWith('.rs') ? 'rust' : 
+                               filename.endsWith('.toml') ? 'toml' : 'text';
+              
+              // Truncate content for display but ensure it's real content
+              const displayContent = file.content.length > 400 
+                ? file.content.substring(0, 400) + '\n\n// ... (truncated)'
+                : file.content;
+              
+              // Add to global collection with REAL content
+              allGeneratedFiles.push({
+                filename: file.path,
+                content: displayContent,
+                language
+              });
+            }
+
+            // Send batch update with ALL files immediately
+            sendProgress({
+              type: 'code-generation',
+              stage: 'code-gen',
+              status: 'active',
+              message: `🦀 Generated ${allGeneratedFiles.length} Solana program files`,
+              files: [...allGeneratedFiles],
+              pct: 50
+            });
+            
             const writeTaskIds = await insertSrcFiles(rootNode, projectId, existingFilePaths, creatorId, emitFileWritten(sendProgress, true)); // true = Rust phase
             
-            // 🟢 NEW – wait until every write-file task finishes
+            // Wait until every write-file task finishes
             for (const tId of writeTaskIds) {
               await waitForTaskCompletion(tId, 90, 2_000);
             }
 
-            const rootBase = process.env.ROOT_FOLDER!;
-            const absRoot  = path.join(rootBase, workspace.rootPath);
-            const tinyTree = [rootNode];
-            // Include real content for frontend but skip logging to console
-            const skipContentLogging = true;
-            await attachFileContents(tinyTree, absRoot, workspace.containerName, false, skipContentLogging);
+            // SKIP the attachFileContents call - we already have the content!
+            // This eliminates the 95% lag entirely
+            // const rootBase = process.env.ROOT_FOLDER!;
+            // const absRoot  = path.join(rootBase, workspace.rootPath);
+            // const tinyTree = [rootNode];
+            // const skipContentLogging = true;
+            // await attachFileContents(tinyTree, absRoot, workspace.containerName, false, skipContentLogging);
 
             // now it is safe to raise the sentinel
             const sentinelId = await markWriteDone(projectId);
             console.log('[GEN] Write operations completed, sentinel ID:', sentinelId);
             return sentinelId;
           })();
-        }
+        };
         
         const sentinelId = await writeFilesAndEmitTree(
           srcTree,
@@ -891,46 +944,21 @@ EOF'`,
           await updateTaskStatus(dumpTaskId, 'succeed', 'Tree dumped and files printed');
         }
         
-        // Final progress update - code generation complete at 100%
+        // Send final progress with all files at 100%
         sendProgress({
-          type: 'progress',
-          stage: 'code-gen',
-          status: 'complete',
-          message: '✅ Code generation completed successfully!',
+          type: 'code-generation',
+          stage: 'code-gen', 
+          status: 'completed',
+          message: `✅ Generated ${allGeneratedFiles.length} files successfully`,
+          files: [...allGeneratedFiles],
           pct: 100
         });
 
-        // FORCE send all generated files at end to guarantee delivery
-        console.log('[GEN] ====== FORCE SENDING ALL GENERATED FILES ======');
-        console.log('[GEN] Total files to send:', allGeneratedFiles.length);
-        console.log('[GEN] Files to send:', allGeneratedFiles.map(f => ({ filename: f.filename, contentLength: f.content.length })));
-        console.log('[GEN] CRITICAL: First file content sample:', allGeneratedFiles[0]?.content.substring(0, 200) || 'NO FIRST FILE');
-
+        console.log('[GEN] ====== CODE GENERATION COMPLETED ======');
+        console.log('[GEN] Total files generated:', allGeneratedFiles.length);
+        console.log('[GEN] Files:', allGeneratedFiles.map(f => ({ filename: f.filename, contentLength: f.content.length })));
         if (allGeneratedFiles.length > 0) {
-          const forceSend = {
-            type: 'code-generation',
-            stage: 'code-gen',
-            status: 'active',
-            message: `🦀 Generated ${allGeneratedFiles.length} Solana program files`,
-            files: allGeneratedFiles,
-            pct: 100
-          };
-          
-          console.log('[GEN] FORCE SENDING:', {
-            type: forceSend.type,
-            filesCount: forceSend.files.length,
-            message: forceSend.message,
-            fileNames: forceSend.files.map(f => f.filename)
-          });
-          sendProgress(forceSend);
-          
-          // Send it TWICE to make sure it gets through
-          setTimeout(() => {
-            console.log('[GEN] SENDING AGAIN to ensure delivery');
-            sendProgress(forceSend);
-          }, 1000);
-        } else {
-          console.log('[GEN] ⚠️  No files in allGeneratedFiles to send!');
+          console.log('[GEN] Sample content from first file:', allGeneratedFiles[0]?.content.substring(0, 200));
         }
         
         // ─── end of function ────────────────────────────────
