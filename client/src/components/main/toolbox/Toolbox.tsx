@@ -78,12 +78,12 @@ export const Toolbox = () => {
 
     useEffect(() => {
         setProjectName(projectContext.name || "My Token Project");
-        console.log('[Toolbox useEffect] projectContext programId', projectContext.details?.projectState?.programId);
+        //console.log('[Toolbox useEffect] projectContext programId', projectContext.details?.projectState?.programId);
     }, [projectContext.name, projectContext.details?.projectState?.programId, projectContext.details?.projectState?.deployed]);
     
     // Debug: track programId changes to help diagnose context updates
     useEffect(() => {
-        console.log('[Toolbox useEffect] context programId changed to', projectContext.details?.projectState?.programId);
+       // console.log('[Toolbox useEffect] context programId changed to', projectContext.details?.projectState?.programId);
     }, [projectContext.details?.projectState?.programId]);
 
 
@@ -164,17 +164,17 @@ export const Toolbox = () => {
             // ───────────────────────────────────
             //  DEBUG  –  log every raw message
             // ───────────────────────────────────
-            console.log('[BUILD DEBUG] raw SSE message', msg);
+            //console.log('[BUILD DEBUG] raw SSE message', msg);
 
             // … existing progress / fileTree logic unchanged …
             if (msg.fileTree) {
-              console.log(`[BUILD] Received fileTree update`);
+             // console.log(`[BUILD] Received fileTree update`);
               setFileTree(structuredClone(msg.fileTree));
               setActiveTab('code');
             }
             
             if (msg.containerUrl) {
-              console.log(`[BUILD] Received container URL: ${msg.containerUrl}`);
+             // console.log(`[BUILD] Received container URL: ${msg.containerUrl}`);
               const fullUrl = msg.containerUrl.includes("/dapp/")
                 ? msg.containerUrl
                 : msg.containerUrl.replace(/\/$/, "") + `/dapp/${projectId}`;
@@ -192,7 +192,7 @@ export const Toolbox = () => {
                   const timeoutId = setTimeout(() => controller.abort(), 2000);
                   fetch(containerUrl, { method: 'GET', mode: 'no-cors', signal: controller.signal }).then(() => {
                     clearTimeout(timeoutId);
-                    console.log('[BUILD] dApp interface is now reachable (HTTP 200)');
+                  //  console.log('[BUILD] dApp interface is now reachable (HTTP 200)');
                     setActiveTab('interface');
                   }).catch(() => {
                     clearTimeout(timeoutId);
@@ -221,7 +221,7 @@ export const Toolbox = () => {
               const m = msg.message.match(/Program ID[: ]+([0-9A-Za-z]+)/);
               if (m) {
                 const programId = m[1];
-                console.log('[Toolbox code-gen stage] extracted programId', programId);
+               // console.log('[Toolbox code-gen stage] extracted programId', programId);
                 setProjectContext(prev => ({
                   ...prev,
                   // ⚠️  shallow‑spread is enough; we only need fresh refs
