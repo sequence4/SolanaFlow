@@ -42,6 +42,11 @@ export function deployPipeline(
     
     onmessage(event: EventSourceMessage) {
       try {
+        // Skip empty data (SSE comments/ping messages)
+        if (!event.data || event.data.trim() === '') {
+          return;
+        }
+        
         const msg = JSON.parse(event.data);
       //  console.log(`[SSE] Received message:`, msg);
         
@@ -59,7 +64,7 @@ export function deployPipeline(
           onProgress(msg);
         }
       } catch (error) {
-        console.error(`[SSE] Error parsing message:`, error);
+        console.error(`[SSE] Error parsing message:`, error, 'Raw data:', event.data);
       }
     },
     
