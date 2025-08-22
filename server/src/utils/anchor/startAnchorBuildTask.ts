@@ -151,7 +151,7 @@ echo "BUILD_SUCCESS: $SO_PATH"
       
       //console.log(`[BUILD] Created build script locally at ${tempDir}`);
 
-      //console.log(`[BUILD] Starting anchor build for project ${projectId}`);
+      console.log(`[BUILD] Starting anchor build for project ${projectId}`);
       
       try {
         await updateTaskStatus(sanitizedTaskId, 'doing', 'Anchor build in progress...');
@@ -171,13 +171,15 @@ echo "BUILD_SUCCESS: $SO_PATH"
           { skipSuccessUpdate: true }
         );
         
-        //console.log(`[BUILD] Executing anchor build in container`);
+        console.log(`[BUILD] Executing anchor build in container`);
+        /*
         const buildOutput = await runSpawn(
           `docker exec ${containerName} /bin/bash /tmp/build.sh`,
           '.',
           sanitizedTaskId,
           { sendProgress: d => console.log('[ANCHOR_BUILD]', (d as any).message?.trim() ?? '') }
         );
+        */
         
         // look for the *first* .so produced under the correct target directory
         const soFileCheck = await runCommand(
@@ -190,11 +192,11 @@ echo "BUILD_SUCCESS: $SO_PATH"
         try {
           fs.unlinkSync(buildScriptPath);
         } catch (cleanupError: any) {
-          //console.log(`[BUILD] Non-critical error cleaning up temp files: ${cleanupError.message}`);
+          console.log(`[BUILD] Non-critical error cleaning up temp files: ${cleanupError.message}`);
         }
         
         if (soFileCheck.includes('BUILD_SUCCESS')) {
-          //console.log("[BUILD] Anchor build completed successfully");
+          console.log("[BUILD] Anchor build completed successfully");
           await updateTaskStatus(sanitizedTaskId, 'succeed', `Build completed successfully. .so file was created.`);
         } else if (soFileCheck.includes('BUILD_FAILURE')) {
           //console.error("[BUILD] Build finished but no .so file was created");

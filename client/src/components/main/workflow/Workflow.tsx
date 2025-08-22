@@ -86,7 +86,7 @@ const ReactFlowContent = ({
     const onDrop = useCallback(
         async (event: React.DragEvent<HTMLDivElement>) => {
           if (!setProjectState) {
-            console.log("setProjectState is not defined");
+            //("setProjectState is not defined");
             return;
           }
 
