@@ -1,6 +1,6 @@
 import { Connection, Transaction } from "@solana/web3.js";
 import { Keypair } from "@solana/web3.js";
-import { getProgramSecret, awsSecretsEnabled } from "../awsSecrets";
+import { getProgramSecret, awsSecretsEnabled } from "../aws/awsSecrets";
 import fs from 'fs';
 import path from 'path';
 import { sendAndConfirmRawTransaction, } from '@solana/web3.js';

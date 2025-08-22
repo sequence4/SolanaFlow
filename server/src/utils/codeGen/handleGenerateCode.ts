@@ -21,7 +21,7 @@ import { APP_CONFIG } from '../../config/appConfig';
 import { Keypair } from '@solana/web3.js';
 import pool from '../../config/database';
 import { normalizeProjectName } from '../stringUtils';
-import { saveProgramSecret, awsSecretsEnabled } from '../awsSecrets';
+import { saveProgramSecret, awsSecretsEnabled } from '../aws/awsSecrets';
 import { ProgressManager } from '../progress/ProgressManager';
 import { runCommandWithSmartProgress } from '../commandWithProgress';
 
