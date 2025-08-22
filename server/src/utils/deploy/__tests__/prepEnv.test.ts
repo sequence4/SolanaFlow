@@ -1,4 +1,4 @@
-import { prepEnv } from '../../dapp-gen/prepEnv'
+import { prepEnv } from '../../container/prepEnv'
 import poolMock from '../../../../tests/__mocks__/@db'
 import * as containerUtils from '../../container'
 import * as helpers from '../../container/containerHelpers'

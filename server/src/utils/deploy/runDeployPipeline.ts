@@ -1,5 +1,5 @@
-import { prepEnv } from '../dapp-gen/prepEnv';
-import type { WorkspaceHandle } from '../dapp-gen/prepEnv';
+import { prepEnv } from '../container/prepEnv';
+import type { WorkspaceHandle } from '../container/prepEnv';
 import { handleGenerateCode } from "../codeGen/handleGenerateCode";
 import { markContainerForCleanup } from "../container/cleanupQueue";
 import { getBuildArtifactTask } from "../anchor/getBuildArtefactTask";

@@ -1,6 +1,6 @@
 import { refreshWorkspaceTree } from './refreshWorkspaceTree';
 import { Graph } from '../../types/graph';
-import type { WorkspaceHandle } from '../dapp-gen/prepEnv';
+import type { WorkspaceHandle } from '../container/prepEnv';
 import { amendConfigFiles } from './amendConfigFiles';
 import { pollTaskStatus, createTask, updateTaskStatus, waitForTaskCompletion } from '../taskUtils';
 import { markWriteDone } from '../taskUtils/index';
@@ -14,9 +14,8 @@ import { FileTreeItem } from '../../types/FileTreeItem';
 import { runCommand } from "../command-execution/runCommand";
 import { randomUUID } from 'crypto';
 import path from "path";
-// import { attachFileContents } from "../fileUtils/attachFileContents"; // Removed - no longer needed
-import fs from 'fs/promises';            // promise-based FS API
-import fsSync from 'fs';                 // for existsSync in helper
+import fs from 'fs/promises';           
+import fsSync from 'fs';            
 import { APP_CONFIG } from '../../config/appConfig';
 import { Keypair } from '@solana/web3.js';
 import pool from '../../config/database';
@@ -242,7 +241,7 @@ export const handleGenerateCode = async ({
     
     // Initialize progress manager
     const progress = new ProgressManager(sendProgress);
-    
+     
     // Reset global file collection for this new code generation run
     allGeneratedFiles.length = 0; // Clear the array
     //console.log('[GEN] ✅ Reset allGeneratedFiles array for new code generation run');
@@ -270,7 +269,7 @@ export const handleGenerateCode = async ({
           })
           .filter(Boolean) as string[];
 
-        console.log(`[GEN] Processing ${functionParts.length} code snippets from graph nodes`);
+        //console.log(`[GEN] Processing ${functionParts.length} code snippets from graph nodes`);
 
         if (functionParts.length > 0) {
             const functionCode = functionParts.join('\n\n');

@@ -27,7 +27,7 @@ export async function insertSrcFiles(
     const projectRelativePath = node.path.replace(/^\.?\//, ''); 
 
     if (node.type === 'directory') {
-      console.log(`[INSERT] Processing directory: ${projectRelativePath}`);
+      //console.log(`[INSERT] Processing directory: ${projectRelativePath}`);
       // ── ensure empty dir is materialised ──
       if (!node.children?.length) {
         await updateOrCreateFile(

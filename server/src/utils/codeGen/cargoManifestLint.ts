@@ -1,7 +1,7 @@
 import { startGetFileContentTask } from '../fileUtils';
 import { pollTaskStatus } from '../taskUtils';
 import { runCommand } from '../command-execution/runCommand';
-import type { WorkspaceHandle } from '../dapp-gen/prepEnv';
+import type { WorkspaceHandle } from '../container/prepEnv';
 
 interface LintContext {
   projectId: string;
