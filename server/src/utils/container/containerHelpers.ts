@@ -36,7 +36,7 @@ export async function resolveContainerUrl(name: string): Promise<string> {
     throw new Error(`port 3000/tcp not published for ${name} after ${MAX_WAIT_MS/1000} s`);
   }
 
-  console.log(`[resolveContainerUrl] ${name} → ${mapping.trim()}`);
+  //console.log(`[resolveContainerUrl] ${name} → ${mapping.trim()}`);
 
   // Parse "…:hostPort"
   const m = mapping.match(/:(\d+)\s*$/);

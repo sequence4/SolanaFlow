@@ -264,7 +264,7 @@ export async function startProjectContainer(
       if (detailsObj.programId) {
         if (detailsObj.projectState && detailsObj.projectState.deployed) {
           programIdEnv = ['-e', `PROGRAM_ID=${detailsObj.programId}`, '-e', `NEXT_PUBLIC_PROGRAM_ID=${detailsObj.programId}`];
-          console.log(`[startProjectContainer] Found Program ID ${detailsObj.programId} – adding to container env`);
+          //console.log(`[startProjectContainer] Found Program ID ${detailsObj.programId} – adding to container env`);
         } else {
           console.log(`[startProjectContainer] Project has Program ID but not yet deployed – skipping PROGRAM_ID injection to avoid stale ID`);
         }
@@ -307,7 +307,7 @@ export async function startProjectContainer(
         );
         digest = buf ? buf.toString().trim() : '';
         if (digest) {
-          console.log('[startProjectContainer] pulled digest:', digest);
+          //console.log('[startProjectContainer] pulled digest:', digest);
           execSync(`docker tag ${digest} ${image}`, { stdio: 'inherit' });
           imageRef = image;          // pinned
         }
@@ -416,7 +416,7 @@ export async function startProjectContainer(
       );
     }
 
-    console.log("[startProjectContainer] RUN CMD:\n", runArgs.join(" "));
+    //console.log("[startProjectContainer] RUN CMD:\n", runArgs.join(" "));
     timed(runArgs.join(" "), 'docker-run');
 
     // ─── ensure Yarn 1.x binary is available via Corepack ──────────────────
@@ -431,9 +431,7 @@ export async function startProjectContainer(
 
     const containerUrl = resolveContainerUrl(String(hostPort));
 
-    console.log(
-      `[startProjectContainer] ➜  ${containerUrl}`,
-    );
+    //console.log(`[startProjectContainer] ➜  ${containerUrl}`);
     return {
       containerName: name,
       containerUrl

@@ -28,5 +28,5 @@ export async function debugPrintFiles(
       }
     }
     
-    console.log(`[DEBUG] All key project files checked`);
+    //console.log(`[DEBUG] All key project files checked`);
   }

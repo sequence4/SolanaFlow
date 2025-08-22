@@ -15,7 +15,7 @@ interface RentedContainer {
  */
 function addTraefikLabels(container: string, projectId: string): void {
   try {
-    console.log(`[rentContainerFromPool] Adding Traefik labels to container ${container} for project ${projectId}`);
+    //console.log(`[rentContainerFromPool] Adding Traefik labels to container ${container} for project ${projectId}`);
     
     // Update container with labels without restarting it
     execSync(
