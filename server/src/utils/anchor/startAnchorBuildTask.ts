@@ -7,7 +7,7 @@ import fs from "fs";
 import { runCommand } from "../command-execution/runCommand";
 import { updateTaskStatus } from "../taskUtils";
 import { APP_CONFIG } from "src/config/appConfig";
-import { Keypair } from "@solana/web3.js/lib";
+import { Keypair } from "@solana/web3.js";
 import { runSpawn } from "../command-execution/runSpawn";
 
 export const startAnchorBuildTask = async (
