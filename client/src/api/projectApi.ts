@@ -309,15 +309,15 @@ export const projectApi = {
     packages: string[]
   ): Promise<TaskResponse> => {
     try {
-      console.log(`Installing dependencies for project ${projectId}:`);
-      console.log(`Packages to install: ${JSON.stringify(packages)}`);
+      //console.log(`Installing dependencies for project ${projectId}:`);
+      //console.log(`Packages to install: ${JSON.stringify(packages)}`);
       
       const response = await api.post(
         `/projects/${projectId}/install-node-dependencies`,
         { packages }
       );
       
-      console.log(`Install dependencies API response:`, response.data);
+     // console.log(`Install dependencies API response:`, response.data);
       return response.data;
     } catch (error) {
       console.error('Error installing node dependencies:', error);

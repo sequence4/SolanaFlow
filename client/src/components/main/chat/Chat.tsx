@@ -324,27 +324,27 @@ const Chat: React.FC = () => {
                     if (processedEventsRef.current.has(lineKey)) continue;
                     processedEventsRef.current.add(lineKey);
                     
-                    // Add more thinking triggers based on log content
-                    if (line.includes("Starting Docker container")) {
+                    // Enhanced thinking triggers based on backend log content
+                    if (line.includes("[ENVIRONMENT]") || line.includes("Setting up Docker environment")) {
                         showThinkingForStage('environment');
-                    } else if (line.includes("Generating") && line.includes("files")) {
-                        showThinkingForStage('codegen-files');
-                    } else if (line.includes("Compilation progress")) {
-                        showThinkingForStage('build-progress');
-                    } else if (line.includes("Build completed successfully")) {
-                        showThinkingForStage('deployment-ready');
-                    } else if (line.includes("Preparing your build environment")) {
-                        showThinkingForStage('environment');
-                    } else if (line.includes("Building program")) {
-                        showThinkingForStage('build');
-                    } else if (line.includes("cargo build-sbf")) {
-                        showThinkingForStage('build');
-                    } else if (line.includes("Compiling") && line.includes("Rust")) {
-                        showThinkingForStage('build-progress');
-                    } else if (line.includes("TypeScript bindings")) {
+                    } else if (line.includes("[CODE-GEN]") || line.includes("Starting code generation")) {
                         showThinkingForStage('codegen');
-                    } else if (log.category === 'structured' && log.type === 'container-progress') {
-                        showThinkingForStage('environment');
+                    } else if (line.includes("Generating Rust program files")) {
+                        showThinkingForStage('codegen-files');
+                    } else if (line.includes("[BUILD]") || line.includes("Starting build phase")) {
+                        showThinkingForStage('build');
+                    } else if (line.includes("Anchor build process") || line.includes("cargo build-sbf")) {
+                        showThinkingForStage('build-progress');
+                    } else if (line.includes("Build completed") || line.includes("Pipeline completed successfully")) {
+                        showThinkingForStage('deployment-ready');
+                    } else if (line.includes("Container ready") || line.includes("Environment setup complete")) {
+                        showThinkingForStage('container-setup');
+                    } else if (line.includes("[ARTIFACTS]") || line.includes("Fetching build artifacts")) {
+                        showThinkingForStage('build-progress');
+                    } else if (line.includes("[FILE-TREE]") || line.includes("file tree")) {
+                        showThinkingForStage('file-processing');
+                    } else if (line.includes("Program ID determined") || line.includes("Program ID:")) {
+                        showThinkingForStage('deployment-ready');
                     }
                     
                     // Handle structured logs directly
@@ -477,14 +477,19 @@ const Chat: React.FC = () => {
 
 
     // ———————————————————————————————
-    //  Inject a friendly AI note once the build completes
+    //  Enhanced completion detection and friendly AI response
     // ———————————————————————————————
     useEffect(() => {
         const onComplete = () => {
+            // Clear any active tasks
+            setActiveTasks({});
+            setIsThinking(false);
+            setCurrentThinkingStage(null);
+            
             setMessages(prev => [
                 ...prev,
                 {
-                    text: "Build finished successfully! Let me know what you'd like to do next.",
+                    text: "Your Solana program has been built successfully! The deployment pipeline is complete and your program is ready for deployment to devnet or mainnet. What would you like to do next?",
                     sender: "ai",
                     timestamp: new Date(),
                     status: "sent"
@@ -494,8 +499,22 @@ const Chat: React.FC = () => {
             
             taskLogs.setSuppressToast(false);      // re-enable normal task-log toasts
         };
+        
+        // Listen for pipeline completion via progress events
+        const onProgressUpdate = (data: any) => {
+            if (data.type === 'pipeline-complete' || 
+                (data.stage === 'build' && data.status === 'completed' && data.message?.includes('finished'))) {
+                setTimeout(onComplete, 1000); // Small delay to let final progress updates show
+            }
+        };
+        
         eventBus.on("build-complete", onComplete);
-        return () => eventBus.off("build-complete", onComplete);
+        eventBus.on("progress", onProgressUpdate);
+        
+        return () => {
+            eventBus.off("build-complete", onComplete);
+            eventBus.off("progress", onProgressUpdate);
+        };
     }, [taskLogs]);
 
 
@@ -685,70 +704,81 @@ const Chat: React.FC = () => {
       
       const stageThoughts = {
         'initial-build': [
-          "Analyzing project structure...",
-          "Validating Anchor.toml configuration...",
-          "Checking Rust toolchain compatibility...",
-          "Scanning dependencies and versions...",
-          "Identifying program entry points...",
-          "Planning optimal build strategy...",
-          "Preparing Docker container...",
-          "Estimated time: 2-3 minutes"
+          "Analyzing your workflow graph structure",
+          "Planning optimal Solana program architecture",
+          "Validating instruction dependencies and relationships",
+          "Designing account structures for minimal rent costs",
+          "Calculating compute unit requirements",
+          "Preparing secure Docker development environment",
+          "Estimated completion: 3-4 minutes"
         ],
         'environment': [
-          "Starting Docker container...",
-          "Mounting project volumes...",
-          "Installing Rust 1.75.0...",
-          "Setting up Anchor framework v0.30...",
-          "Configuring Solana CLI tools...",
-          "Loading build dependencies...",
-          "Initializing build cache...",
-          "Container ready for compilation"
+          "Initializing secure Docker container with Solana toolchain",
+          "Installing Rust stable toolchain with BPF target support",
+          "Setting up Anchor framework v0.30 for program development",
+          "Configuring Solana CLI tools for local development",
+          "Preparing build cache and dependency management",
+          "Mounting project workspace with proper permissions",
+          "Environment ready - all development tools configured"
         ],
         'codegen': [
-          "Parsing program instructions...",
-          "Analyzing account structures...",
-          "Generating TypeScript bindings...",
-          "Creating React components...",
-          "Building wallet adapter hooks...",
-          "Generating UI components...",
-          "Creating IDL definitions...",
-          "Optimizing for production..."
+          "Analyzing workflow requirements for optimal instruction design",
+          "Generating secure Rust program with proper validation logic",
+          "Creating custom instruction handlers with error checking",
+          "Building comprehensive TypeScript SDK for frontend integration",
+          "Designing account structures optimized for your use case",
+          "Implementing wallet adapter hooks for seamless user experience",
+          "Generating production-ready React components and utilities",
+          "Creating Interface Definition Language for program interaction"
         ],
         'codegen-files': [
-          "Creating lib.rs with program logic...",
-          "Generating instruction handlers...",
-          "Setting up account validators...",
-          "Building state management...",
-          "Creating wallet integration...",
-          "Generating API endpoints...",
-          "Building data structures..."
+          "Writing main program library with your custom instructions",
+          "Implementing instruction validation and security checks",
+          "Creating account data structures with proper serialization",
+          "Generating comprehensive TypeScript bindings and types",
+          "Building React hooks for program state management",
+          "Setting up wallet connection and transaction handling",
+          "Creating test infrastructure and example usage patterns"
         ],
         'build': [
-          "Starting cargo build-sbf...",
-          "Compiling Rust to BPF bytecode...",
-          "Optimizing for Solana runtime...",
-          "Generating program keypair...",
-          "Creating deployment package...",
-          "Running safety checks...",
-          "Generating IDL metadata...",
-          "Finalizing build artifacts..."
+          "Initiating Anchor build pipeline for Solana deployment",
+          "Compiling Rust source code to Berkeley Packet Filter bytecode",
+          "Running comprehensive program validation and security checks",
+          "Optimizing bytecode size and execution efficiency",
+          "Generating deterministic program keypair for deployment",
+          "Creating deployment artifacts and metadata files",
+          "Validating program fits within Solana account size limits",
+          "Build pipeline complete - program ready for deployment"
         ],
         'build-progress': [
-          "Compilation progress: 25%...",
-          "Linking dependencies...",
-          "Compilation progress: 50%...",
-          "Optimizing bytecode...",
-          "Compilation progress: 75%...",
-          "Finalizing program binary...",
-          "Compilation progress: 95%...",
-          "Build verification complete"
+          "Processing Rust compilation - analyzing dependencies",
+          "Compiling core program logic and instruction handlers",
+          "Linking Solana runtime dependencies and libraries",
+          "Optimizing bytecode for minimal compute unit usage",
+          "Running static analysis and security validation",
+          "Generating Interface Definition Language metadata",
+          "Creating deployment package with all required artifacts",
+          "Final verification complete - build successful"
         ],
         'deployment-ready': [
-          "Build completed successfully!",
-          "Artifacts ready for deployment",
-          "Program ID generated",
-          "Frontend connected to program",
-          "Ready to deploy to Solana!"
+          "Deployment pipeline completed successfully",
+          "All program artifacts generated and validated",
+          "TypeScript SDK ready for frontend integration",
+          "Program ID assigned and configured in environment",
+          "Your Solana program is now ready for deployment to devnet/mainnet"
+        ],
+        'container-setup': [
+          "Allocating dedicated compute resources for your build",
+          "Pulling latest Solana development container images",
+          "Configuring secure container networking and isolation",
+          "Setting up persistent storage for efficient build caching",
+          "Initializing development toolchain and dependencies"
+        ],
+        'file-processing': [
+          "Analyzing project structure and source file organization",
+          "Processing and validating all program dependencies",
+          "Optimizing file layout for efficient compilation pipeline",
+          "Preparing source code repository for container build process"
         ]
       };
       
@@ -927,17 +957,13 @@ const Chat: React.FC = () => {
                                                            // console.log('[RENDER] ================ RENDERING TaskProgressDisplay ================');
                                                             return <TaskProgressDisplay tasks={activeTasks} />;
                                                         } else if (message.codeGenFiles && message.codeGenFiles.length > 0) {
-                                                            //console.log('[RENDER] ================ RENDERING SequentialCodeDisplay ================');
-                                                            /*
-                                                            console.log('[RENDER] Files to display:', message.codeGenFiles.map((f: any) => ({ 
-                                                                filename: f.filename, 
-                                                                contentLength: f.content?.length || 0,
-                                                                language: f.language 
-                                                            })));
-                                                            */
-                                                            //console.log('[RENDER] Component will be mounted with', message.codeGenFiles.length, 'files');
-                                                            
-                                                            return <SequentialCodeDisplay files={message.codeGenFiles} />;
+                                                            // Show progress indicator instead of code files
+                                                            return (
+                                                                <div className="flex items-center gap-2 text-sm text-gray-400 p-2 bg-gray-800/30 rounded">
+                                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                                    <span>Generated {message.codeGenFiles.length} program files successfully</span>
+                                                                </div>
+                                                            );
                                                         } else if (message.isChecklist) {
                                                             //console.log('[RENDER] Rendering ProgressDisplay');
                                                             return <ProgressDisplay />;

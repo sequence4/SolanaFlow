@@ -341,6 +341,11 @@ export async function runDeployPipeline({
   let programKeypair: Keypair | null = null;
   let programIdStr: string | null = null;
   
+  console.log("[PIPELINE] Starting deployment pipeline");
+  console.log(`[PIPELINE] Project: ${projectId}`);
+  console.log(`[PIPELINE] User: ${userId}`);
+  console.log(`[PIPELINE] Development mode: ${devMode}`);
+  
   // Reset progress tracking to prevent wobbling
   resetProgress();
   
@@ -348,6 +353,7 @@ export async function runDeployPipeline({
   const progressMgr = new ProgressManager(projectId, sendProgress);
   
   // Start environment setup with smooth progress
+  console.log("[PIPELINE] Initializing environment setup");
   const environmentPromise = sendEnvironmentProgress(sendProgress);
 
   // declare outside try so `finally` can see it
@@ -356,14 +362,17 @@ export async function runDeployPipeline({
   let keepAliveInterval: NodeJS.Timeout | null = null;
 
   try {
+    console.log("[ENVIRONMENT] Setting up Docker environment");
     // Environment setup with individual tasks
     progressMgr.startTask('env-docker', 'Docker Environment Setup', 'environment');
     workspace = await prepEnv(projectId, userId, devMode);
+    console.log(`[ENVIRONMENT] Container ready: ${workspace.containerName}`);
     progressMgr.completeTask('env-docker', 'Container ready');
 
     // Wait for environment progress animation to complete
     await environmentPromise;
 
+    console.log("[ENVIRONMENT] Environment setup complete");
     sendProgress(<ProgressEvent>{
       stage: "environment",
       status: "completed",
@@ -379,15 +388,18 @@ export async function runDeployPipeline({
  
     
     // 2 ─ code generation ─────────────────────────────────────────────────
-    //console.log('[DEPLOY] Starting code generation phase with managed progress');
-    await progressMgr.transitionToStage('code-gen', '🦀 Starting Solana program generation...');
+    console.log("[CODE-GEN] Starting code generation phase");
+    await progressMgr.transitionToStage('code-gen', 'Starting Solana program generation');
     
     // Code generation with detailed tasks
+    console.log("[CODE-GEN] Analyzing project structure");
     progressMgr.startTask('codegen-analyze', 'Analyzing Project Structure', 'code-gen');
     progressMgr.updateTask('codegen-analyze', 25, 'Parsing graph structure...');
     progressMgr.completeTask('codegen-analyze');
     
+    console.log("[CODE-GEN] Generating Rust program files");
     progressMgr.startTask('codegen-rust', 'Generating Rust Program', 'code-gen');
+    console.log("[CODE-GEN] Generating frontend TypeScript bindings");
     progressMgr.startTask('codegen-frontend', 'Generating Frontend Code', 'code-gen');
     
     // Enhanced progress wrapper with individual file tracking
@@ -443,8 +455,12 @@ export async function runDeployPipeline({
       }
     };
     
+    console.log("[CODE-GEN] Executing code generation");
     const { sentinelId, programName } =
           await handleGenerateCode({ projectId, graph, workspace, sendProgress: managedProgressWrapper, userId });
+
+    console.log(`[CODE-GEN] Code generation completed for program: ${programName}`);
+    console.log(`[CODE-GEN] Sentinel task ID: ${sentinelId}`);
 
     // ✅ Code generation is done – **re‑use** the deterministic key‑pair that
     // was written during code‑gen. Never generate a second one.
@@ -452,6 +468,7 @@ export async function runDeployPipeline({
       workspace.rootPath ??
       (await import("../fileUtils").then(m => m.getProjectRootPath(projectId)));
 
+    console.log("[CODE-GEN] Reading program keypair");
     // Read the existing keypair JSON from the warm‑cache
     const keypairPath = `/usr/src/target/deploy/${programName}-keypair.json`;
     const secretJson  = execSync(
@@ -462,43 +479,55 @@ export async function runDeployPipeline({
     const secretArr   = JSON.parse(secretJson);
     programKeypair    = Keypair.fromSecretKey(Uint8Array.from(secretArr));
     programIdStr      = programKeypair.publicKey.toBase58();
+    console.log(`[CODE-GEN] Program ID determined: ${programIdStr}`);
     
     // Complete individual code generation tasks
     progressMgr.completeTask('codegen-rust');
     progressMgr.completeTask('codegen-frontend');
     
+    console.log("[CODE-GEN] Code generation stage completed");
     // Complete code generation stage
     await progressMgr.completeStage('code-gen', `Code generation complete — Program ID: ${programIdStr}`);
 
     /* 3 ─ build program --------------------------------------------------- */
     
+    console.log("[BUILD] Waiting for all files to be written to disk");
     // wait until all src + UI files are on disk
     // allow up to 3 min for large repos (90 × 2 s)
     await waitForTaskCompletion(sentinelId, 90, 2_000);
     
+    console.log("[BUILD] Starting build phase");
     // Start build phase with atomic transition
-    //console.log('[DEPLOY] Starting build phase with managed progress');
     await progressMgr.transitionToStage('build', 'Starting Rust compilation...');
     
     // Build with individual tasks
+    console.log("[BUILD] Setting up build tasks");
     progressMgr.startTask('build-deps', 'Installing Dependencies', 'build');
     progressMgr.startTask('build-compile', 'Compiling Rust to BPF', 'build');
     progressMgr.startTask('build-artifacts', 'Generating Artifacts', 'build');
     
+    console.log("[BUILD] Starting Anchor build process");
     const buildPromise = sendBuildProgress(sendProgress);
     const buildTask = await startAnchorBuildTask(projectId, userId);
+    console.log(`[BUILD] Build task started: ${buildTask}`);
     
     // Compute retry count based on configured build timeout
     const buildMinutes = MAX_BUILD_MINUTES;
     const buildRetries = Math.ceil(buildMinutes * 60_000 / 2_000);
+    console.log(`[BUILD] Build timeout: ${buildMinutes} minutes (${buildRetries} retries)`);
     
     // Check build status and bail early if not successful
+    console.log("[BUILD] Waiting for build completion");
     const buildStatus = await waitForTaskCompletion(buildTask, buildRetries, 2_000);
+    console.log(`[BUILD] Build completed with status: ${buildStatus}`);
+    
     const OK_STATUSES = ['succeed', 'finished', 'warning']; // Anchor warns but succeeds
     if (!OK_STATUSES.includes(buildStatus)) {
+      console.error(`[BUILD] Build failed with status: ${buildStatus}`);
       throw new Error(`Build task ended with status: ${buildStatus}`);
     }
     
+    console.log("[BUILD] Completing build tasks");
     // Complete individual build tasks
     progressMgr.completeTask('build-deps', 'Dependencies installed');
     progressMgr.completeTask('build-compile', 'Rust compilation completed');
@@ -535,10 +564,13 @@ export async function runDeployPipeline({
     //console.log("🔨 Build task completed successfully");
 
     /* 3b ─ fetch artefact ------------------------------------------------ */
+    console.log("[ARTIFACTS] Fetching build artifacts");
     const { base64So } = await getBuildArtifactTask(projectId);
     if (!base64So) {
+      console.error("[ARTIFACTS] No .so file found after build");
       throw new Error('Anchor built with warnings but produced no .so – check build log');
     }
+    console.log("[ARTIFACTS] Build artifact retrieved successfully");
     
     /* ---------------------------------------------------------------- *
      * 3c ─ build finished → gather file-tree with eager code
@@ -546,6 +578,7 @@ export async function runDeployPipeline({
     // Wait for build progress animation to complete
     await buildPromise;
 
+    console.log("[FILE-TREE] Generating project file tree");
     // (1) build the raw tree via the existing utility
     const rootPath = workspace.rootPath ?? (
       await import("../fileUtils").then(m => m.getProjectRootPath(projectId))
@@ -557,6 +590,7 @@ export async function runDeployPipeline({
     const { result: treeJson } = await import("../taskUtils")
       .then(m => m.getTaskById(rawTreeTask));
     const rawTree: any[] = treeJson ? JSON.parse(treeJson) : [];
+    console.log(`[FILE-TREE] Generated file tree with ${rawTree.length} root items`);
 
     // (2) attach code for the important files
     const rootBase = process.env.ROOT_FOLDER;
@@ -848,6 +882,11 @@ export async function runDeployPipeline({
       }
     }
     
+    console.log("[PIPELINE] Build stage completed successfully");
+    console.log(`[PIPELINE] Final program ID: ${programIdStr}`);
+    console.log(`[PIPELINE] Found ${idls.length} IDL files`);
+    console.log("[PIPELINE] Deployment pipeline completed successfully");
+    
     // Complete the build stage properly
     await progressMgr.completeStage('build', `Build finished successfully - Program ID: ${programIdStr}`);
     
@@ -863,7 +902,21 @@ export async function runDeployPipeline({
       programId: programIdStr,
     });
 
+    // Send pipeline completion event for frontend
+    console.log("[PIPELINE] Sending pipeline completion event");
+    sendProgress({
+      type: 'pipeline-complete',
+      stage: 'build',
+      status: 'completed',
+      message: 'Deployment pipeline completed successfully',
+      programId: programIdStr,
+      timestamp: Date.now()
+    });
+
   } catch (err) {
+    console.error("[PIPELINE] Deployment pipeline failed");
+    console.error("[PIPELINE] Error:", err instanceof Error ? err.message : String(err));
+    
     sendProgress(<ProgressEvent>{
       stage: "error",
       status: "error",
@@ -871,18 +924,23 @@ export async function runDeployPipeline({
     });
     throw err;
   } finally {
+    console.log("[PIPELINE] Starting cleanup");
     /* ----------------------------------------------------------------
      * Cleanup progress manager and container
      * ---------------------------------------------------------------- */
     progressMgr.cleanup();
     
     if (workspace) {
+      console.log(`[PIPELINE] Marking container for cleanup: ${workspace.containerName}`);
       await markContainerForCleanup(projectId, workspace.containerName);
     }
     
     if (keepAliveInterval) {
+      console.log("[PIPELINE] Clearing keep-alive interval");
       clearInterval(keepAliveInterval);
     }
+    
+    console.log("[PIPELINE] Cleanup completed");
   }
 }
 
