@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react"
-import TaskLogsToast from "@/components/logs/TaskLogsToast";
 import useInitializeTaskLogger from "@/data/hooks/useInitializeTaskLogger";
 
 export default function MainLayout({
@@ -14,7 +13,6 @@ export default function MainLayout({
   return (
     <div className="main-layout-wrapper h-screen flex flex-col bg-background text-foreground">
       {children}
-      <TaskLogsToast />
     </div>
   )
 }

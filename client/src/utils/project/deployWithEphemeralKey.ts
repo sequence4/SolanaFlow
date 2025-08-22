@@ -5,7 +5,7 @@ import bs58 from 'bs58';
 import { projectApi } from '../../api/projectApi';
 import { toast } from 'sonner';
 import { createAndRegisterEphemeral } from '@/utils/ephemeral/ephemeralKey';
-import { BPF_UPGRADE_LOADER_ID } from '@/utils/constants';
+import { BPF_UPGRADE_LOADER_ID } from '@/utils/helpers/constants';
 
 /**
  * Handles the deployment of a Solana program using an ephemeral key approach

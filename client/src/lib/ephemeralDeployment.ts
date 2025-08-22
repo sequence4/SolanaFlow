@@ -9,9 +9,9 @@ import {
   TransactionInstruction,
   Connection
 } from '@solana/web3.js';
-import { BPF_UPGRADE_LOADER_ID } from '../utils/constants';
+import { BPF_UPGRADE_LOADER_ID } from '../utils/helpers/constants';
 import type { WalletContextState } from '@solana/wallet-adapter-react';
-import { RATE_LIMIT_MS } from '@/utils/connection';
+import { RATE_LIMIT_MS } from '@/utils/blockchain/connection';
 import { createHash } from 'crypto';
 
 /** Little-endian helpers required by the loader */

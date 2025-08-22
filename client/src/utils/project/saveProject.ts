@@ -1,7 +1,7 @@
 import React from 'react';
 import { ProjectContextType, ProjectStateType, ProjectContextToSave, SaveProjectResponse } from '../../context/project/ProjectContextTypes';
 import { projectApi } from '../../api/projectApi';
-import { useTaskLogMonitoring } from '@/utils/logIntegration';
+import { useTaskLogMonitoring } from '@/utils/helpers/logIntegration';
 
 function pickProjectStateFields<K extends keyof ProjectStateType>(
   projectState: ProjectStateType,

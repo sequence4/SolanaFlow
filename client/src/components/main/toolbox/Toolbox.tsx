@@ -28,7 +28,7 @@ import {
   Edit2,
 } from "lucide-react";
 import { deployPipeline } from '@/api/deployPipeline';
-import { useWalletSigner } from '@/utils/wallet';
+import { useWalletSigner } from '@/utils/blockchain/wallet';
 import { ensureId } from '@/utils/project/ensureId';
 import { ProgramDeployer } from '@/components/ProgramDeployer';
 import { projectApi } from '@/api/projectApi';

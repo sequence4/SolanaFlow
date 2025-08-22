@@ -1,6 +1,6 @@
 import { Connection, PublicKey, Transaction, TransactionMessage, VersionedTransaction, Commitment } from '@solana/web3.js';
 import { Keypair } from '@solana/web3.js';
-import { rpcWithRetry } from "@/utils/rpcRetry";
+import { rpcWithRetry } from "@/utils/blockchain/rpcRetry";
 
 export async function debugAndSendTransaction(
     tx: Transaction,

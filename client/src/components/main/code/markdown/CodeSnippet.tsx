@@ -11,46 +11,11 @@ import { githubLight } from '@uiw/codemirror-theme-github';
 
 interface CodeSnippetProps {
   children?: React.ReactNode;
-  enableTypewriter?: boolean;
   language?: string;
-  onTypewriterComplete?: () => void;
 }
 
-const CodeSnippet: React.FC<CodeSnippetProps> = ({ children, enableTypewriter = false, language = 'javascript', onTypewriterComplete }) => {
-  const [displayedCode, setDisplayedCode] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  
+const CodeSnippet: React.FC<CodeSnippetProps> = ({ children, language = 'javascript' }) => {
   const codeString = typeof children === "string" ? children : String(children);
-  
-  useEffect(() => {
-    if (!enableTypewriter || !codeString) {
-      setDisplayedCode(codeString);
-      return;
-    }
-
-    setIsTyping(true);
-    setDisplayedCode('');
-    
-    // MUCH SLOWER for visibility
-    const STEP = 1;   // Only 1 character at a time
-    const SPEED = 50; // 50ms per character (was 25ms)
-    
-    let pos = 0;
-    const id = setInterval(() => {
-      if (pos < codeString.length) {
-        setDisplayedCode(codeString.slice(0, pos + 1));
-        pos += STEP;
-      } else {
-        clearInterval(id);
-        setIsTyping(false);
-        setTimeout(() => {
-          onTypewriterComplete?.();
-        }, 1000); // Wait 1 second after completion
-      }
-    }, SPEED);
-
-    return () => clearInterval(id);
-  }, [codeString, enableTypewriter, onTypewriterComplete]);
 
   const handleCopy = async () => {
     if (typeof children === "string") {
@@ -91,7 +56,7 @@ const CodeSnippet: React.FC<CodeSnippetProps> = ({ children, enableTypewriter = 
         </Button>
         <div className="max-w-full overflow-x-auto">
           <CodeMirror
-            value={displayedCode + (isTyping ? '|' : '')}
+            value={codeString}
             theme={isDark ? vscodeDark : githubLight}
             extensions={getLanguageExtension()}
             editable={false}

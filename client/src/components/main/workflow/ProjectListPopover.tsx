@@ -3,7 +3,7 @@ import { LuTrash2 } from "react-icons/lu";
 import { LuSearch } from "react-icons/lu";
 import ProjectContext from '@/context/project/ProjectContext';
 import UxContext from '@/context/ux/UxContext';
-import { shortenText } from '@/utils/textUtils';
+import { shortenText } from '@/utils/helpers/textUtils';
 import { fetchProjects, handleDeleteProject, handleProjectClick } from '@/utils/project/projectUtils';
 import FileContext from '@/context/file/FileContext';
 

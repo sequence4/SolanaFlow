@@ -31,6 +31,7 @@ import {
 import MarkdownRenderer from '@/components/main/code/markdown/MarkdownRenderer';
 import SequentialCodeDisplay from './SequentialCodeDisplay';
 import { ProgressDisplay } from './ProgressDisplay';
+import { TaskProgressDisplay } from './TaskProgressDisplay';
 
 export interface AIMessageType {
   text: string;
@@ -67,6 +68,16 @@ const Chat: React.FC = () => {
     const taskLogs = useTaskLogs();  // Complete taskLogs object including systemLogs and setSuppressToast
     const { systemLogs } = taskLogs;
     const [lastLogIndex, setLastLogIndex] = useState(0);  // 🟡 NEW
+    
+    // Add state for active tasks
+    const [activeTasks, setActiveTasks] = useState<Record<string, {
+      name: string;
+      status: 'running' | 'completed' | 'error';
+      pct: number;
+      stage: string;
+      message?: string;
+      thoughts?: string[];
+    }>>({});
   
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const messagesAreaRef = useRef<HTMLDivElement | null>(null);
@@ -222,34 +233,77 @@ const Chat: React.FC = () => {
             clearTimeout(logProcessingTimeoutRef.current);
         }
 
-        // Schedule batched processing after 150ms debounce
+        // Schedule batched processing after 100ms debounce
         logProcessingTimeoutRef.current = setTimeout(() => {
             const fresh = systemLogs.slice(lastLogIndex);
 
-            // Enhanced filtering with regex patterns for Program IDs
-            const IGNORE_PREFIXES = [
-                "Preparing your build environment",
-                "Container is up", 
-                "Container URL",
-                "Building program",
-                "Linking target/deploy",
-                "Collecting project files"
-            ];
-            
-            const IGNORE_PATTERNS = [
-                /Program ID: \w+/,
-                /8u9EqQfPNdaCkPFNLpJwTboQQGxwXsb1V7TNeY44qEd/,  // Your specific program ID
-                /[A-Za-z0-9]{32,44}$/,  // Generic base58 program IDs
-                /Generated program keypair/,
-                /\[\.\.\.\] Program ID:/,
-                /IDL metadata.*address/
-            ];
+            // Categorize logs instead of filtering them out
+            const categorizedLogs = fresh.map(line => {
+              try {
+                if (line.startsWith('{')) {
+                  const parsed = JSON.parse(line);
+                  return { ...parsed, raw: line, category: 'structured' };
+                }
+              } catch (e) {
+                // Categorize text logs
+                if (line.includes('Docker') || line.includes('container')) {
+                  return { raw: line, category: 'docker', type: 'container-log' };
+                } else if (line.includes('cargo') || line.includes('Compiling')) {
+                  return { raw: line, category: 'build', type: 'build-log' };
+                } else if (line.includes('Generating') || line.includes('Creating')) {
+                  return { raw: line, category: 'codegen', type: 'codegen-log' };
+                }
+              }
+              return { raw: line, category: 'general', type: 'system-log' };
+            });
 
-            const visible = fresh.filter(line => 
-                !IGNORE_PREFIXES.some(p => line.includes(p)) &&
-                !IGNORE_PATTERNS.some(pattern => 
-                    typeof pattern === 'string' ? line.includes(pattern) : pattern.test(line)
-                )
+            // Process structured events for task updates
+            categorizedLogs.forEach(log => {
+              if (log.type === 'task-start') {
+                setActiveTasks(prev => ({
+                  ...prev,
+                  [log.taskId]: { name: log.taskName, status: 'running', pct: 0, stage: log.stage }
+                }));
+              } else if (log.type === 'task-update') {
+                setActiveTasks(prev => ({
+                  ...prev,
+                  [log.taskId]: { ...prev[log.taskId], pct: log.pct, message: log.message }
+                }));
+              } else if (log.type === 'task-complete') {
+                setActiveTasks(prev => ({
+                  ...prev,
+                  [log.taskId]: { ...prev[log.taskId], status: 'completed', pct: 100 }
+                }));
+                // Remove completed tasks after delay
+                setTimeout(() => {
+                  setActiveTasks(prev => {
+                    const updated = { ...prev };
+                    delete updated[log.taskId];
+                    return updated;
+                  });
+                }, 2000);
+              } else if (log.type === 'container-setup-progress') {
+                // Handle container setup progress with thoughts
+                setActiveTasks(prev => ({
+                  ...prev,
+                  [log.taskId]: { 
+                    ...prev[log.taskId], 
+                    name: log.taskName,
+                    pct: log.pct, 
+                    message: log.message,
+                    thoughts: log.thoughts,
+                    status: 'running',
+                    stage: log.stage
+                  }
+                }));
+              }
+            });
+
+            // Filter visible logs for display (less aggressive filtering)
+            const visible = categorizedLogs.filter(log => 
+                !(log.category === 'structured' && ['task-start', 'task-update', 'task-complete'].includes(log.type)) &&
+                !log.raw?.includes('Program ID: ') && // Still filter program IDs
+                !log.raw?.includes('[...] Program ID:')
             );
 
             if (visible.length) {
@@ -260,7 +314,9 @@ const Chat: React.FC = () => {
                 let hasCodeGenUpdate = false;
                 let latestCodeGenFiles: any[] = [];
                 
-                for (const line of visible) {
+                for (const log of visible) {
+                    const line = log.raw || log;
+                    
                     // Create unique key for deduplication
                     const lineKey = `${line.substring(0, 100)}_${Date.now()}`;
                     if (processedEventsRef.current.has(lineKey)) continue;
@@ -285,47 +341,45 @@ const Chat: React.FC = () => {
                         showThinkingForStage('build-progress');
                     } else if (line.includes("TypeScript bindings")) {
                         showThinkingForStage('codegen');
-                    } else if (line.includes("Program ID generated")) {
-                        showThinkingForStage('deployment-ready');
+                    } else if (log.category === 'structured' && log.type === 'container-progress') {
+                        showThinkingForStage('environment');
                     }
                     
-                    // Handle JSON messages
-                    try {
-                        if (line.startsWith('{') && line.includes('type')) {
-                            const parsed = JSON.parse(line);
-                            
-                            // Handle batched code generation events
-                            if (parsed.type === 'code-generation-batch' && parsed.files?.length > 0) {
-                                // Deduplicate by sequence number
-                                if (parsed.sequence && parsed.sequence > lastCodeGenSequenceRef.current) {
-                                    console.log('[CHAT] ====== BATCHED CODE GENERATION ======');
-                                    console.log('[CHAT] Files:', parsed.files.length);
-                                    
-                                    hasCodeGenUpdate = true;
-                                    latestCodeGenFiles = parsed.files;
-                                    lastCodeGenSequenceRef.current = parsed.sequence;
-                                    
-                                    showThinkingForStage('codegen');
-                                }
-                                continue;
-                            }
-                            
-                            // Handle individual code generation (legacy support)
-                            if (parsed.type === 'code-generation' && parsed.files?.length > 0) {
-                                console.log('[CHAT] ====== INDIVIDUAL CODE GENERATION ======');
+                    // Handle structured logs directly
+                    if (log.category === 'structured') {
+                        const parsed = log;
+                        
+                        // Handle batched code generation events
+                        if (parsed.type === 'code-generation-batch' && parsed.files?.length > 0) {
+                            // Deduplicate by sequence number
+                            if (parsed.sequence && parsed.sequence > lastCodeGenSequenceRef.current) {
+                                console.log('[CHAT] ====== BATCHED CODE GENERATION ======');
+                                console.log('[CHAT] Files:', parsed.files.length);
+                                
                                 hasCodeGenUpdate = true;
-                                latestCodeGenFiles = [...latestCodeGenFiles, ...parsed.files];
+                                latestCodeGenFiles = parsed.files;
+                                lastCodeGenSequenceRef.current = parsed.sequence;
+                                
                                 showThinkingForStage('codegen');
-                                continue;
                             }
-                            
-                            // Skip progress messages to avoid conflicts
-                            if (parsed.type === 'progress' && parsed.pct !== undefined) {
-                                continue;
-                            }
+                            continue;
                         }
-                    } catch (e) {
-                        // Filter out progress lines
+                        
+                        // Handle individual code generation (legacy support)
+                        if (parsed.type === 'code-generation' && parsed.files?.length > 0) {
+                            console.log('[CHAT] ====== INDIVIDUAL CODE GENERATION ======');
+                            hasCodeGenUpdate = true;
+                            latestCodeGenFiles = [...latestCodeGenFiles, ...parsed.files];
+                            showThinkingForStage('codegen');
+                            continue;
+                        }
+                        
+                        // Skip progress messages to avoid conflicts
+                        if (parsed.type === 'progress' && parsed.pct !== undefined) {
+                            continue;
+                        }
+                    } else {
+                        // Handle text-based logs - Filter out progress lines
                         if (line.includes('%') && (line.includes('Building') || line.includes('Generating'))) {
                             continue;
                         }
@@ -864,7 +918,11 @@ const Chat: React.FC = () => {
                                                             textPreview: message.text?.substring(0, 30) || 'empty'
                                                         });
                                                         
-                                                        if (message.codeGenFiles && message.codeGenFiles.length > 0) {
+                                                        // Check if we should show task progress at the top level
+                                                        if (Object.keys(activeTasks).length > 0 && index === messages.length - 1) {
+                                                            console.log('[RENDER] ================ RENDERING TaskProgressDisplay ================');
+                                                            return <TaskProgressDisplay tasks={activeTasks} />;
+                                                        } else if (message.codeGenFiles && message.codeGenFiles.length > 0) {
                                                             console.log('[RENDER] ================ RENDERING SequentialCodeDisplay ================');
                                                             console.log('[RENDER] Files to display:', message.codeGenFiles.map((f: any) => ({ 
                                                                 filename: f.filename, 
@@ -882,11 +940,7 @@ const Chat: React.FC = () => {
                                                             return (
                                                                 <div className="w-full max-w-full overflow-hidden">
                                                                     <MarkdownRenderer 
-                                                                        content={message.text} 
-                                                                        enableCodeTypewriter={!isUser && !isLog && message.text.includes('```')}
-                                                                        onCodeTypewriterComplete={() => {
-                                                                          console.log('Code typewriter completed for message', index);
-                                                                        }}
+                                                                        content={message.text}
                                                                     />
                                                                 </div>
                                                             );
@@ -911,6 +965,18 @@ const Chat: React.FC = () => {
                             );
                         })}
                     </AnimatePresence>
+
+                    {/* Task Progress Display - shown separately from messages */}
+                    {Object.keys(activeTasks).length > 0 && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="w-full py-4"
+                        >
+                            <TaskProgressDisplay tasks={activeTasks} />
+                        </motion.div>
+                    )}
 
                     {/* Typing/Thinking indicator */}
                     {(isTyping || isThinking) && (

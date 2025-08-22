@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, DM_Sans } from "next/font/google";
 import "@/styles/globals.css";
-import "@/utils/polyfills";
+import "@/utils/helpers/polyfills";
 
 import Providers from "@/components/Providers";
 

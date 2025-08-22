@@ -431,7 +431,7 @@ function inferProgramId(label: string, accounts?: LegacyAccount[]): string {
 
 // Main conversion function
 export function convertLegacyToEnhanced(legacyData: LegacyInstructionNodeData): EnhancedInstructionNodeData {
-  console.log('Converting legacy instruction:', legacyData.label);
+  //console.log('Converting legacy instruction:', legacyData.label);
   
   const category = categorizeInstruction(legacyData.label);
   const programId = inferProgramId(legacyData.label, legacyData.accounts);
@@ -442,7 +442,7 @@ export function convertLegacyToEnhanced(legacyData: LegacyInstructionNodeData): 
   const enhancedEvents = legacyData.events?.map(convertEvent) || [];
   
   const estimatedCost = estimateCost(category, enhancedAccounts.length);
-  
+  /*
   console.log('Enhanced conversion result:', {
     label: legacyData.label,
     category,
@@ -453,6 +453,7 @@ export function convertLegacyToEnhanced(legacyData: LegacyInstructionNodeData): 
     eventCount: enhancedEvents.length,
     estimatedCost
   });
+  */
 
   return {
     label: legacyData.label,

@@ -6,7 +6,7 @@ import { Progress } from "../../../components/ui/progress";
 import { useChecklistProgress, Step } from "../../../hooks/useChecklistProgress";
 import CompactCodeSnippet from "../code/markdown/CompactCodeSnippet";
 import SequentialCodeDisplay from "./SequentialCodeDisplay";
-import { debugLogger } from "../../../utils/debugLogger";
+import { debugLogger } from "../../../utils/debug/debugLogger";
 
 interface ChatChecklistBubbleProps {
   key?: string;
