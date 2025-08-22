@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import { Keypair } from '@solana/web3.js';
-import { catchAsync } from '../utils/catchAsync';
+import { catchAsync } from '../utils/middleware/catchAsync';
 
 const router = express.Router();
 

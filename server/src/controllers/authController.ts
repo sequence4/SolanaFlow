@@ -5,7 +5,7 @@ import pool from '../config/database';
 import { generateToken } from '../utils/jwt';
 import { APP_CONFIG } from '../config/appConfig';
 import { AppError } from '../middleware/errorHandler';
-import { getValidBetaCodes } from '../utils/betaCodes';
+import { getValidBetaCodes } from '../utils/DEPRECIATED/betaCodes';
 
 export const register: RequestHandler = async (req, res) => {
   const { username, password, organisation, description, code, openAiApiKey } = req.body;

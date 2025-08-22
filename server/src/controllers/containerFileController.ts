@@ -5,7 +5,7 @@ import {
     updateFileInContainer, 
     getFileContentFromContainer, 
     installDependenciesInContainer 
-} from '../utils/containerFileUtils';
+} from '../utils/container/containerFileUtils';
 
 export const createFile = async (
   req: Request,

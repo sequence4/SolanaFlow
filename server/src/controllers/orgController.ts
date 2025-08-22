@@ -7,7 +7,7 @@ export const listOrganizationProjects = async (
   res: Response,
   next: NextFunction
 ) => {
-  const userId = req.user?.id ?? 'mock-user';
+//  const userId = req.user?.id ?? 'mock-user';
   // org_id checks temporarily disabled until auth lands
 
   const {

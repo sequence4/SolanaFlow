@@ -149,7 +149,7 @@ async function loadProgramKeypair(projectId: string): Promise<Keypair | null> {
 
 import { waitForTaskCompletion, updateTaskStatus } from '../utils/taskUtils';
 import { createProject as createProjectDb } from '../utils/project/createProject';
-import { catchAsync } from '../utils/catchAsync';
+import { catchAsync } from '../utils/middleware/catchAsync';
 import { ensureNonceAccount } from '../utils/nonceUtils';
 /* -------------------------------------------------------------------------- */
 /*                              Nonce endpoint                                */

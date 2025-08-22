@@ -1,7 +1,7 @@
-import { createTask, updateTaskStatus, ensureDirectoryExists } from './taskUtils';
-import { runCommand } from './command-execution/runCommand';
-import { getProjectRootPath } from './fileUtils';
-import pool from '../config/database';
+import { createTask, updateTaskStatus, ensureDirectoryExists } from '../taskUtils';
+import { runCommand } from '../command-execution/runCommand';
+import { getProjectRootPath } from '../fileUtils';
+import pool from '../../config/database';
 
 async function getContainerName(projectId: string): Promise<string | null> {
   const result = await pool.query(

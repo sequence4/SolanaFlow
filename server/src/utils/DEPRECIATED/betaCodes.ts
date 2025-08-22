@@ -1,4 +1,4 @@
-import { APP_CONFIG } from '../config/appConfig';
+import { APP_CONFIG } from '../../config/appConfig';
 
 export const getValidBetaCodes = (): Set<string> => {
   if (!APP_CONFIG.BETA_CODE) throw new Error('BETA_CODE is not set in appConfig.ts');

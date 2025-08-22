@@ -1,6 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { signDeployTxAndBroadcast } from '../utils/blockchain/signDeployTxAndBroadcast';
-import { catchAsync } from '../utils/catchAsync';
+import { catchAsync } from '../utils/middleware/catchAsync';
 import { deployPipeline } from '../controllers/deployController';
 
 const router = express.Router();
