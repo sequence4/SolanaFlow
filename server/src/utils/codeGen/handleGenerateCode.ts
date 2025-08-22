@@ -6,7 +6,7 @@ import { pollTaskStatus, createTask, updateTaskStatus, waitForTaskCompletion } f
 import { markWriteDone } from '../taskUtils/index';
 import { genSrcFiles } from './genSrcFiles';
 import { insertSrcFiles } from './insertSrcFiles';
-import { debugDumpContainerTree, debugPrintFiles } from '../containerUtils';
+import { debugDumpContainerTree, debugPrintFiles } from '../container';
 import { ensureAnchorTomlProgram, ensureRootWorkspaceMembers } from './ensureConfigHelpers';
 import { parseNodeDetails } from './parseNodeDetails';
 import { lintWorkspaceManifests } from './cargoManifestLint';
@@ -23,7 +23,7 @@ import pool from '../../config/database';
 import { normalizeProjectName } from '../helpers/stringUtils';
 import { saveProgramSecret, awsSecretsEnabled } from '../aws/awsSecrets';
 import { ProgressManager } from '../progress/ProgressManager';
-import { runCommandWithSmartProgress } from '../commandWithProgress';
+import { runCommandWithSmartProgress } from '../command-execution/commandWithProgress';
 
 // Global file collector for ALL generated files (frontend + Rust)
 const allGeneratedFiles: Array<{filename: string, content: string, language: string}> = [];

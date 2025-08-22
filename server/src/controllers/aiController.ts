@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../middleware/errorHandler';
 import { openai } from '../utils/ai/openaiClient';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat';
-import { getWalletBalanceSol, functionDefs } from '../utils/getWalletBalanceSol';
+import { getWalletBalanceSol, functionDefs } from '../utils/blockchain/getWalletBalanceSol';
 
 export const generateAIResponse = async (
   req: Request,

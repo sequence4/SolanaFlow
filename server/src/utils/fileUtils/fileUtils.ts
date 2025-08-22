@@ -1,11 +1,11 @@
 import fs, { Dirent } from 'fs';
 import path from 'path';
-import { APP_CONFIG } from '../config/appConfig';
-import { AppError } from '../middleware/errorHandler';
-import pool from '../config/database';
+import { APP_CONFIG } from '../../config/appConfig';
+import { AppError } from '../../middleware/errorHandler';
+import pool from '../../config/database';
 import { v4 as uuidv4 } from 'uuid';
-import { createTask, updateTaskStatus } from './taskUtils';
-import { runCommand } from './command-execution/runCommand';
+import { createTask, updateTaskStatus } from '../taskUtils/taskUtils';
+import { runCommand } from '../command-execution/runCommand';
 
 const SKIP_FOLDERS = ['.anchor', '.github', '.git', 'target', 'node_modules'];
 const SKIP_FILES = [

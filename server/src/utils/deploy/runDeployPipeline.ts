@@ -12,7 +12,7 @@ import { Keypair } from "@solana/web3.js";
 import { attachFileContents } from "../fileUtils/attachFileContents";
 import { readContainerFile } from "../fileUtils/attachFileContents";
 import { v4 as uuidv4 } from "uuid";
-import { sendEnvironmentProgress, sendBuildProgress, resetProgress } from "../progressUtils";
+import { sendEnvironmentProgress, sendBuildProgress, resetProgress } from "../progress/progressUtils";
 
 // Types
 import { Graph } from '../../types/graph';

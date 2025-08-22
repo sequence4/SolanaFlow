@@ -20,7 +20,9 @@
       "Bash(find:*)",
       "Bash(pnpm run:*)",
       "Bash(sed:*)",
-      "Bash(git revert:*)"
+      "Bash(git revert:*)",
+      "Bash(timeout 5s npm run dev)",
+      "Bash(timeout 10s npm run dev)"
     ],
     "deny": [],
     "ask": [],
