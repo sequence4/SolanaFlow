@@ -2,7 +2,7 @@ import { RequestHandler } from 'express';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/database';
-import { generateToken } from '../utils/jwt';
+import { generateToken } from '../utils/auth/jwt';
 import { APP_CONFIG } from '../config/appConfig';
 import { AppError } from '../middleware/errorHandler';
 import { getValidBetaCodes } from '../utils/DEPRECIATED/betaCodes';
