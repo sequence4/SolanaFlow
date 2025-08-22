@@ -1,5 +1,5 @@
-import { prepEnv } from './prepEnv';
-import type { WorkspaceHandle } from './prepEnv';
+import { prepEnv } from '../dapp-gen/prepEnv';
+import type { WorkspaceHandle } from '../dapp-gen/prepEnv';
 import { Graph } from '../../types/graph';
 import { handleGenerateCode } from "../codeGen/handleGenerateCode";
 import { markContainerForCleanup } from "../container/cleanupQueue";

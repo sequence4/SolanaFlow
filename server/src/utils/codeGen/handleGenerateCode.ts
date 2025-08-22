@@ -1,6 +1,6 @@
 import { refreshWorkspaceTree } from './refreshWorkspaceTree';
 import { Graph } from '../../types/graph';
-import type { WorkspaceHandle } from '../deploy/prepEnv';
+import type { WorkspaceHandle } from '../dapp-gen/prepEnv';
 import { amendConfigFiles } from './amendConfigFiles';
 import { pollTaskStatus, createTask, updateTaskStatus, waitForTaskCompletion } from '../taskUtils';
 import { markWriteDone } from '../taskUtils/index';

@@ -1,5 +1,5 @@
 import { runDeployPipeline } from '../runDeployPipeline'
-import * as env from '../prepEnv'
+import * as env from '../../dapp-gen/prepEnv'
 
 jest.mock('../prepEnv', () => ({
   prepEnv: jest.fn()
