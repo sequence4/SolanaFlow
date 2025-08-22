@@ -36,7 +36,9 @@ export async function deployPipeline(
   res.writeHead(200, {
     'Content-Type': 'text/event-stream', // official MIME type for SSE
     'Cache-Control': 'no-cache',
-    Connection: 'keep-alive',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Cache-Control',
   });
 
   // Generic helper keeps TypeScript happy for every event payload
@@ -46,6 +48,12 @@ export async function deployPipeline(
    * short placeholder so the console stays readable.
    */
   const send = <T = unknown>(data: T): void => {
+    // Handle keep-alive ping messages as SSE comments instead of data
+    if (typeof data === 'object' && data !== null && (data as any).type === 'ping') {
+      res.write(': ping\n\n');
+      return;
+    }
+    
     // Clean up the data for logging
     let safeForLog: unknown;
     

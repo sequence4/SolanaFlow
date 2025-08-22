@@ -381,10 +381,10 @@ export async function runDeployPipeline({
       containerUrl: workspace.containerUrl
     });
     
-    // Keep SSE connection alive
+    // Keep SSE connection alive with periodic ping every 30 seconds
     keepAliveInterval = setInterval(() => {
-      sendProgress({ stage: "ping" });
-    }, 15000);
+      sendProgress({ type: "ping", stage: "keepalive", message: "Connection maintained" });
+    }, 30000);
  
     
     // 2 ─ code generation ─────────────────────────────────────────────────
