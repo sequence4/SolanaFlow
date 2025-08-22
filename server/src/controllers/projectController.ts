@@ -4,23 +4,20 @@ import pool from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 import { getProjectRootPath } from '../utils/fileUtils';
 import { startProjectContainer } from '../utils/container';
-import { normalizeProjectName } from '../utils/stringUtils';
-import {
-  startAnchorBuildTask,
-  startAnchorDeployTask,
-  startAnchorInitTask,
-  startAnchorTestTask,
-  startCustomCommandTask,
-  startInstallPackagesTask,
-  getBuildArtifactTask,
-  startSetClusterTask,
-  runCommand,
-  startInstallNodeDependenciesTask,
-  compileTs,
-  broadcastSignedTx,
-  signDeployTxAndBroadcast,
-  getContainerName,
-} from '../utils/projectUtils';
+import { runCommand } from '../utils/command-execution/runCommand';
+import { startAnchorBuildTask } from '../utils/anchor/startAnchorBuildTask';
+import { startAnchorDeployTask } from '../utils/anchor/startAnchorDeployTask';
+import { startAnchorInitTask } from '../utils/anchor/startAnchorInitTask';
+import { startAnchorTestTask } from '../utils/anchor/startAnchorTestTask';
+import { startCustomCommandTask } from '../utils/tasks/startCustomCommandTask';
+import { startInstallPackagesTask } from '../utils/project/startInstallPackagesTask';
+import { getBuildArtifactTask } from '../utils/anchor/getBuildArtefactTask';
+import { startSetClusterTask } from '../utils/anchor/startSetClusterTask';
+import { startInstallNodeDependenciesTask } from '../utils/project/startInstallNodeDependenciesTask';
+import { compileTs } from '../utils/compilation/compileTs';
+import { signDeployTxAndBroadcast } from '../utils/blockchain/signDeployTxAndBroadcast';
+import { getContainerName } from '../utils/container/getContainerName';
+
 import path from 'path';
 import { APP_CONFIG } from '../config/appConfig';
 import { Buffer } from 'buffer';

@@ -1,6 +1,21 @@
 import { spawn } from "child_process";
 import { updateTaskStatus } from "../taskUtils";
-import { hasWarning } from "../projectUtils";
+
+function hasWarning(output: string): boolean {
+  const lowercasedOutput = output.toLowerCase();
+  
+  if (lowercasedOutput.includes('no lockfile found') ||
+      lowercasedOutput.includes('info no lockfile found')) {
+    return false;
+  }
+  
+  if (lowercasedOutput.includes('npm deprecated') && 
+      lowercasedOutput.includes('this is not a bug in npm')) {
+    return false;
+  }
+  
+  return lowercasedOutput.includes('warning');
+}
 
 export async function runSpawn(
   command: string,
