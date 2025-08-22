@@ -10,6 +10,7 @@ export interface Step {
   status: "pending" | "active" | "done" | "error";
   pct?: number;
   totalFileCount?: number; // Track total separately from display files
+  allFileNames?: string[]; // ALL file names for complete list display
   codeSnippet?: {
     language: string;
     content: string;
@@ -28,6 +29,8 @@ interface StageUpdate {
   status: "active" | "completed" | "error";
   pct?: number;
   message?: string;
+  totalFileCount?: number;
+  allFileNames?: string[];
   files?: Array<{
     filename: string;
     content: string;
@@ -117,6 +120,8 @@ export function useChecklistProgress() {
             status: nextStatus,
             description: latestUpdate.message ?? step.description,
             pct: shouldAnimate ? currentPct : safePct, // Keep current if animating
+            totalFileCount: latestUpdate.totalFileCount ?? step.totalFileCount,
+            allFileNames: latestUpdate.allFileNames ?? step.allFileNames,
             codeSnippet: latestUpdate.codeSnippet ? {
               language: latestUpdate.codeSnippet.language || 'rust',
               content: latestUpdate.codeSnippet.content || '',
@@ -273,6 +278,8 @@ export function useChecklistProgress() {
       status: payload.status,
       pct: payload.pct,
       message: payload.message,
+      totalFileCount: payload.totalFileCount,
+      allFileNames: payload.allFileNames,
       files: payload.files,
       codeSnippet: payload.codeSnippet,
     };

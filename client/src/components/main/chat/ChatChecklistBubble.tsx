@@ -146,14 +146,14 @@ const StepItem = React.memo(({ step, index, isLastStep }: StepItemProps) => {
           </div>
         )}
 
-        {/* Enhanced file list with VERTICAL layout */}
-        {step.stage === "code-gen" && step.generatedFiles && step.generatedFiles.length > 0 && step.status === "active" && (
+        {/* Enhanced file list with ALL files but limited code display */}
+        {step.stage === "code-gen" && step.allFileNames && step.allFileNames.length > 0 && step.status === "active" && (
           <div className="mt-3 space-y-2">
-            {/* File counter */}
+            {/* File counter - show TOTAL count */}
             <div className="flex items-center justify-between text-xs bg-gray-800/30 rounded px-2 py-1">
               <span className="text-cyan-400 font-medium flex items-center gap-1">
                 <span>📁</span>
-                Generated Files ({step.totalFileCount || step.generatedFiles.length})
+                Generated Files ({step.allFileNames.length})
               </span>
               <button
                 onClick={() => setExpandedFiles(!expandedFiles)}
@@ -167,67 +167,47 @@ const StepItem = React.memo(({ step, index, isLastStep }: StepItemProps) => {
               </button>
             </div>
             
-            {/* VERTICAL file list */}
+            {/* Show ALL file names in list */}
             <div className={`transition-all duration-200 overflow-hidden ${
               !expandedFiles ? 'max-h-32' : 'max-h-64'
             }`}>
-              <div className="flex flex-col gap-1"> {/* Changed to flex-col for vertical */}
-                {step.generatedFiles.slice(0, expandedFiles ? 10 : 5).map((file, idx) => (
+              <div className="flex flex-col gap-1">
+                {step.allFileNames.slice(0, expandedFiles ? undefined : 10).map((filename: string, idx: number) => (
                   <motion.div
-                    key={`${file.filename}-${idx}`} // Stable key
+                    key={`${filename}-${idx}`}
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: idx * 0.02 }} // Faster animation
+                    transition={{ delay: idx * 0.02 }}
                     className="flex items-center gap-2 text-gray-400 bg-gray-900/40 rounded px-2 py-1 hover:bg-gray-800/40 transition-colors"
                   >
                     <span className="text-cyan-500 flex-shrink-0">
-                      {getFileIcon(file.filename)}
+                      {getFileIcon(filename)}
                     </span>
-                    <span className="text-xs truncate">{file.filename}</span>
+                    <span className="text-xs truncate">{filename}</span>
                   </motion.div>
                 ))}
               </div>
               
-              {step.totalFileCount && step.totalFileCount > 10 && (
+              {step.allFileNames.length > 10 && !expandedFiles && (
                 <div className="text-center mt-2">
                   <span className="text-xs text-gray-500">
-                    {step.totalFileCount - 10} more files not shown...
+                    {step.allFileNames.length - 10} more files...
                   </span>
                 </div>
               )}
             </div>
             
-            {/* Stable code preview - prevent flickering */}
+            {/* Code preview - only show LIMITED snippets */}
             {step.generatedFiles && step.generatedFiles.length > 0 && (
               <div className="mt-2" key={codeDisplayKey}>
-                <div className="text-xs text-gray-500 mb-1">Latest file preview:</div>
+                <div className="text-xs text-gray-500 mb-1">
+                  Code preview (showing {step.generatedFiles.length} of {step.allFileNames?.length || step.generatedFiles.length} files):
+                </div>
                 <div className="h-48 overflow-hidden">
-                  {/* Only render if we have files with actual content */}
-                  {(() => {
-                    const latestFile = step.generatedFiles[step.generatedFiles.length - 1];
-                    const hasContent = latestFile && latestFile.content && latestFile.content.length > 0;
-                    
-                    console.log('[ChatChecklistBubble] Latest file:', {
-                      filename: latestFile?.filename,
-                      hasContent,
-                      contentLength: latestFile?.content?.length || 0
-                    });
-                    
-                    if (hasContent) {
-                      return (
-                        <SequentialCodeDisplay 
-                          key={codeDisplayKey}
-                          files={[latestFile]}
-                        />
-                      );
-                    } else {
-                      return (
-                        <div className="text-xs text-gray-400 italic p-2">
-                          Waiting for file content...
-                        </div>
-                      );
-                    }
-                  })()}
+                  <SequentialCodeDisplay 
+                    key={codeDisplayKey}
+                    files={step.generatedFiles} // Use ALL limited files for display
+                  />
                 </div>
               </div>
             )}

@@ -371,19 +371,18 @@ export const handleGenerateCode = async ({
             type: 'progress',
             stage: 'code-gen',
             status: 'active',
-            message: '📦 Generating package lockfile...',
-            pct: 60
+            message: '📦 Creating package lockfile...',
+            pct: 72
           });
 
           await runCommand(lockfileCmd, '.', projectId);
 
-          // Before dependency installation
           sendProgress({
             type: 'progress',
             stage: 'code-gen',
             status: 'active',
-            message: '📦 Installing dependencies...',
-            pct: 70
+            message: '📦 Resolving dependencies...',
+            pct: 75
           });
 
           sendProgress({ stage: 'deps', message: 'yarn.lock updated; installing deps…' });
@@ -398,6 +397,15 @@ export const handleGenerateCode = async ({
             'bash -lc "mkdir -p \\$YARN_CACHE_FOLDER && ' +
               'yarn --cwd web install --prefer-offline --network-timeout 600000"'
           ].join(' ');
+
+          // Send progress updates during yarn install
+          sendProgress({
+            type: 'progress',
+            stage: 'code-gen',
+            status: 'active',
+            message: '📦 Installing dependencies (this may take 1-2 minutes)...',
+            pct: 78
+          });
 
           await runCommand(installCmd, '.', projectId);
 
@@ -444,8 +452,11 @@ export const handleGenerateCode = async ({
         /* ────────────────── 3️⃣  Build *only* in standalone mode ──────────── */
         if (!isDevServer) {
           sendProgress({
-            stage: 'next-build',
-            message: 'Running Next.js build to process Tailwind CSS…'
+            type: 'progress',
+            stage: 'code-gen',
+            status: 'active',
+            message: '🔨 Building Next.js application...',
+            pct: 88
           });
           try {
             // Force-write the tsconfig.json file to ensure it has the correct configuration
@@ -490,14 +501,20 @@ EOF'`,
               projectId
             );
             sendProgress({
-              stage: 'next-build-done',
-              message: 'Next.js build completed'
+              type: 'progress',
+              stage: 'code-gen',
+              status: 'active',
+              message: '✅ Next.js build completed',
+              pct: 92
             });
           } catch (error) {
             console.error('Error during Next.js build:', error);
             sendProgress({
-              stage: 'next-build-failed',
-              message: 'Next.js build failed'
+              type: 'progress',
+              stage: 'code-gen',
+              status: 'active',
+              message: '⚠️ Next.js build failed (non-critical)',
+              pct: 92
             });
           }
         } // ← closes "if (!isDevServer)"
@@ -800,13 +817,17 @@ EOF'`,
               });
             }
 
-            // Send batch update with ALL files immediately
+            // Send batch update with LIMITED files for display but ALL file names
+            const displayFiles = allGeneratedFiles.slice(0, 5); // Only first 5 files for animation
+            const allFileNames = allSrcFiles.map(f => f.path); // ALL file paths for complete list
             sendProgress({
               type: 'code-generation',
               stage: 'code-gen',
               status: 'active',
               message: `🦀 Generated ${allGeneratedFiles.length} Solana program files`,
-              files: [...allGeneratedFiles],
+              files: displayFiles, // Limited files for typewriter animation
+              totalFileCount: allGeneratedFiles.length,
+              allFileNames: allFileNames, // ALL file names for complete list
               pct: 50
             });
             
