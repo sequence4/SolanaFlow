@@ -2,11 +2,9 @@ import { prepEnv } from '../dapp-gen/prepEnv';
 import type { WorkspaceHandle } from '../dapp-gen/prepEnv';
 import { handleGenerateCode } from "../codeGen/handleGenerateCode";
 import { markContainerForCleanup } from "../container/cleanupQueue";
-import {
-  startAnchorBuildTask,
-  getBuildArtifactTask,
-  runCommand,
-} from "../projectUtils";
+import { getBuildArtifactTask } from "../anchor/getBuildArtefactTask";
+import { startAnchorBuildTask } from "../anchor/startAnchorBuildTask";
+import { runCommand } from "../command-execution/runCommand";
 import { waitForTaskCompletion } from "../taskUtils";
 import path from "path";
 import { execSync } from "child_process"; 
