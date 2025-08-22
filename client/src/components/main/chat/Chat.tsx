@@ -451,11 +451,11 @@ const Chat: React.FC = () => {
     useEffect(() => {
         const logAllEvents = (eventName: string) => {
             return (data: any) => {
-               // console.log(`[CHAT-DEBUG] Event "${eventName}":`, data);
+                console.log(`[CHAT-DEBUG] Event "${eventName}":`, data);
                 if (data.type === 'code-generation') {
-                //    console.log('[CHAT-DEBUG] 🎯 CODE-GENERATION EVENT DETECTED!');
-                //    console.log('[CHAT-DEBUG] Files count:', data.files?.length || 0);
-               //     console.log('[CHAT-DEBUG] Files:', data.files?.map((f: any) => f.filename));
+                    console.log('[CHAT-DEBUG] 🎯 CODE-GENERATION EVENT DETECTED!');
+                    console.log('[CHAT-DEBUG] Files count:', data.files?.length || 0);
+                    console.log('[CHAT-DEBUG] Files:', data.files?.map((f: any) => f.filename));
                 }
             };
         };
@@ -537,19 +537,19 @@ const Chat: React.FC = () => {
           ]);
           setInput('');
           
-          // Immediately show build starting message with spinner
+          // Immediately show build starting message
           setMessages(prev => [
             ...prev,
             { 
               text: "Starting build process...", 
               sender: 'ai', 
-              isChecklist: true, 
               timestamp: new Date(), 
               status: 'sent' 
             }
           ]);
 
           // Forward build command
+          console.log('[CHAT-DEBUG] Emitting chat-build-command');
           eventBus.emit('chat-build-command');
           
           return;
