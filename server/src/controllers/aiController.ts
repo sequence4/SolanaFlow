@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../middleware/errorHandler';
-import { openai } from '../utils/openaiClient';
+import { openai } from '../utils/ai/openaiClient';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat';
 import { getWalletBalanceSol, functionDefs } from '../utils/getWalletBalanceSol';
 

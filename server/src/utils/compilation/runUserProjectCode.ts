@@ -1,6 +1,6 @@
 import { getContainerName } from "../container/getContainerName";
 import pool from "../../config/database";
-import { normalizeProjectName } from "../stringUtils";
+import { normalizeProjectName } from "../helpers/stringUtils";
 import { runCommand } from "../command-execution/runCommand";
 import path from 'path';
 

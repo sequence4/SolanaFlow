@@ -2,7 +2,7 @@ import { createTask } from "../taskUtils";
 import { getContainerName } from "../container/getContainerName";
 import { updateTaskStatus } from "../taskUtils";
 import pool from "../../config/database";
-import { normalizeProjectName } from "../stringUtils";
+import { normalizeProjectName } from "../helpers/stringUtils";
 import { runCommand } from "../command-execution/runCommand";
 
 export const startInstallNodeDependenciesTask = async (

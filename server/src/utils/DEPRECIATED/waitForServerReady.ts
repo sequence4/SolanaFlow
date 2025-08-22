@@ -1,6 +1,6 @@
 import { exec } from "child_process";
 import pool from "../../config/database";
-import { normalizeProjectName } from "../stringUtils";
+import { normalizeProjectName } from "../helpers/stringUtils";
 
 export async function waitForServerReady(containerName: string, maxAttempts = 30, delayMs = 1000): Promise<boolean> {
     //console.log(`Waiting for CRA server to be ready in container ${containerName}...`);
