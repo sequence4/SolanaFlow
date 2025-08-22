@@ -1,6 +1,5 @@
 import { prepEnv } from '../dapp-gen/prepEnv';
 import type { WorkspaceHandle } from '../dapp-gen/prepEnv';
-import { Graph } from '../../types/graph';
 import { handleGenerateCode } from "../codeGen/handleGenerateCode";
 import { markContainerForCleanup } from "../container/cleanupQueue";
 import {
@@ -16,6 +15,9 @@ import { attachFileContents } from "../fileUtils/attachFileContents";
 import { readContainerFile } from "../fileUtils/attachFileContents";
 import { v4 as uuidv4 } from "uuid";
 import { sendEnvironmentProgress, sendBuildProgress, resetProgress } from "../progressUtils";
+
+// Types
+import { Graph } from '../../types/graph';
 
 // ─── unified progress payload ────────────────────────────
 interface ProgressEvent {

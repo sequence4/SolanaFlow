@@ -135,7 +135,7 @@ const emitFileWritten = (sendProgress: (data: unknown) => void, isRustPhase: boo
   return async (path, content) => {
     const filename = path.split('/').pop() || '';
     
-    console.log(`[FILE-EMIT] Processing file: ${path} (${filename}) - Phase: ${isRustPhase ? 'Rust' : 'Frontend'}, Length: ${content.length}`);
+    //console.log(`[FILE-EMIT] Processing file: ${path} (${filename}) - Phase: ${isRustPhase ? 'Rust' : 'Frontend'}, Length: ${content.length}`);
     
     // Include content for frontend but avoid logging it to console
     sendProgress({
@@ -175,10 +175,10 @@ const emitFileWritten = (sendProgress: (data: unknown) => void, isRustPhase: boo
         language
       });
       
-      console.log(`[FILE-COLLECT] ✅ COLLECTED file ${allGeneratedFiles.length}: ${filename} (${language}), content length: ${content.length}`);
-      console.log(`[FILE-COLLECT] Content preview (first 100 chars):`, content.substring(0, 100));
-      console.log(`[FILE-COLLECT] Display content preview:`, displayContent.substring(0, 100));
-      console.log(`[FILE-COLLECT] Total files in collection: ${allGeneratedFiles.length}`);
+      //console.log(`[FILE-COLLECT] ✅ COLLECTED file ${allGeneratedFiles.length}: ${filename} (${language}), content length: ${content.length}`);
+      //console.log(`[FILE-COLLECT] Content preview (first 100 chars):`, content.substring(0, 100));
+      //console.log(`[FILE-COLLECT] Display content preview:`, displayContent.substring(0, 100));
+      //console.log(`[FILE-COLLECT] Total files in collection: ${allGeneratedFiles.length}`);
       
       // Calculate progress (0-95%, estimate ~25 total files)
       const progressPct = Math.min(
@@ -198,6 +198,7 @@ const emitFileWritten = (sendProgress: (data: unknown) => void, isRustPhase: boo
         files: [...allGeneratedFiles]  // Send all files collected so far
       });
       
+      /*
       console.log(`[PROGRESS-SEND] 📤 SENT JSON progress message: ${allGeneratedFiles.length} files at ${progressPct}%`);
       console.log(`[PROGRESS-SEND] Message type: code-generation, files array length: ${allGeneratedFiles.length}`);
       console.log(`[PROGRESS-SEND] Files being sent:`, allGeneratedFiles.map(f => ({ filename: f.filename, contentLength: f.content.length })));
@@ -211,6 +212,7 @@ const emitFileWritten = (sendProgress: (data: unknown) => void, isRustPhase: boo
         pct: progressPct,
         files: allGeneratedFiles.map(f => ({ filename: f.filename, language: f.language, contentPreview: f.content.substring(0, 50) + '...' }))
       }, null, 2));
+      */
     }
     
     // Small delay between files for visibility
@@ -236,14 +238,14 @@ export const handleGenerateCode = async ({
     /* Dev-mode flag set by dev.sh or CI: container already runs `next dev` */
     const isDevServer = process.env.SF_DEV_SERVER === '1';
 
-    console.log('[GEN] Starting code generation for project:', projectId);
+    //console.log('[GEN] Starting code generation for project:', projectId);
     
     // Initialize progress manager
     const progress = new ProgressManager(sendProgress);
     
     // Reset global file collection for this new code generation run
     allGeneratedFiles.length = 0; // Clear the array
-    console.log('[GEN] ✅ Reset allGeneratedFiles array for new code generation run');
+    //console.log('[GEN] ✅ Reset allGeneratedFiles array for new code generation run');
     
     try {
         // --------------------------------------------------------------------
@@ -272,7 +274,7 @@ export const handleGenerateCode = async ({
 
         if (functionParts.length > 0) {
             const functionCode = functionParts.join('\n\n');
-            console.log('[GEN] Combined function code length:', functionCode.length);
+            //console.log('[GEN] Combined function code length:', functionCode.length);
         } else {
             console.log('[GEN] No valid function code found in nodes');
         }
@@ -284,12 +286,12 @@ export const handleGenerateCode = async ({
         
         progress.updateProcess(envId, 30, 'Refreshing file tree...');
         const fileTreeTaskIds = await refreshWorkspaceTree(projectId, userId);
-        console.log('[GEN] File tree refresh initiated');
+        //console.log('[GEN] File tree refresh initiated');
         
         progress.updateProcess(envId, 50, 'Waiting for file tree...');
         const { succeeded, failed } = await waitForAll(fileTreeTaskIds);
 
-        console.log(`[GEN] File tree tasks completed: ${succeeded.length} succeeded, ${failed.length} failed`);
+        //console.log(`[GEN] File tree tasks completed: ${succeeded.length} succeeded, ${failed.length} failed`);
         
         if (failed.length) {
           progress.errorProcess(envId, `File-tree task(s) failed: ${failed.join(', ')}`);
@@ -632,7 +634,7 @@ EOF'`,
         if (derivedPubkey !== programId) {
           throw new Error('Keypair self-verification failed');
         }
-        console.log('[GEN] Generated program ID:', programId);
+        //console.log('[GEN] Generated program ID:', programId);
 
         /* ──────────────────────────────────────────────────────────────
          * Persist programId inside solanaproject.details.projectState
@@ -666,7 +668,7 @@ EOF'`,
             [JSON.stringify({ lastProgramId: programId }), projectId],
           );
  
-          console.log('[GEN] Program ID saved to database');
+          //console.log('[GEN] Program ID saved to database');
           
           // Notify frontend that the programId is now available
           sendProgress({ stage: 'programIdPersisted', programId });
@@ -753,11 +755,11 @@ EOF'`,
          * write the src tree into the workspace
          * --------------------------------------------------------------- */
         progress.updateProcess(codeGenId, 65, 'Extracting generated files...');
-        console.log('[GEN] Code generation will collect files through emitFileWritten callback');
+        //console.log('[GEN] Code generation will collect files through emitFileWritten callback');
 
         // Clear the global file collector and send initial progress
         allGeneratedFiles.length = 0;
-        console.log('[GEN] STARTED - Global file array cleared. File collection will start now.');
+        //console.log('[GEN] STARTED - Global file array cleared. File collection will start now.');
         
         // Extract all files from the generated tree immediately
         const extractAllFiles = (node: FileTreeItem, basePath: string = ''): Array<{path: string, content: string}> => {
@@ -788,7 +790,7 @@ EOF'`,
           return (async () => {
             // Extract files FIRST but DON'T send them yet
             const allSrcFiles = extractAllFiles(rootNode);
-            console.log('[GEN] Extracted', allSrcFiles.length, 'files from generated tree');
+            //console.log('[GEN] Extracted', allSrcFiles.length, 'files from generated tree');
 
             // Extract files and track progress
             progress.updateProcess(codeGenId, 70, `Writing ${allSrcFiles.length} program files...`);
@@ -818,11 +820,13 @@ EOF'`,
               language: file.path.endsWith('.rs') ? 'rust' : 'toml'
             }));
 
-            console.log('[GEN] SENDING FILES NOW - After writing complete');
+            //console.log('[GEN] SENDING FILES NOW - After writing complete');
+            /*
             console.log('[GEN] Display files:', displayFiles.map(f => ({
               name: f.filename,
               contentLength: f.content.length
             })));
+            */
 
             // Send files AFTER writing is done using progress manager
             progress.sendCodeFiles(displayFiles);
@@ -830,7 +834,7 @@ EOF'`,
 
             // now it is safe to raise the sentinel
             const sentinelId = await markWriteDone(projectId);
-            console.log('[GEN] Write operations completed, sentinel ID:', sentinelId);
+            //console.log('[GEN] Write operations completed, sentinel ID:', sentinelId);
             return sentinelId;
           })();
         };
@@ -846,7 +850,7 @@ EOF'`,
         progress.updateProcess(codeGenId, 95, 'Validating Cargo manifests...');
 
         // ─────────── Run static lint on Cargo manifests before amending ───────────
-        console.log('[GEN] Running Cargo.toml linter');
+        //console.log('[GEN] Running Cargo.toml linter');
         lintWorkspaceManifests({ projectId, userId, workspace })
           .then(() =>
             progress.updateProcess(codeGenId, 97, "Cargo manifests validated")
@@ -960,12 +964,14 @@ EOF'`,
           await updateTaskStatus(dumpTaskId, 'succeed', 'Tree dumped and files printed');
         }
         
-        console.log('[GEN] ====== CODE GENERATION COMPLETED ======');
-        console.log('[GEN] Total files generated:', allGeneratedFiles.length);
-        console.log('[GEN] Files:', allGeneratedFiles.map(f => ({ filename: f.filename, contentLength: f.content.length })));
+        //console.log('[GEN] ====== CODE GENERATION COMPLETED ======');
+        //console.log('[GEN] Total files generated:', allGeneratedFiles.length);
+        //console.log('[GEN] Files:', allGeneratedFiles.map(f => ({ filename: f.filename, contentLength: f.content.length })));
+        /*
         if (allGeneratedFiles.length > 0) {
           console.log('[GEN] Sample content from first file:', allGeneratedFiles[0]?.content.substring(0, 200));
         }
+        */
         
         // ─── end of function ────────────────────────────────
         return { sentinelId, programName };
