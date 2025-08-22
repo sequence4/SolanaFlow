@@ -11,7 +11,11 @@ type BusEvents = {
   'typing-start': void;        // Event emitted when file content typing starts
   'typing-done': void;         // Event emitted when file content typing completes
   'file-written': { event: 'file-written'; path: string; content: string; }; // Server sent file data
-  'code-generation': { type: 'code-generation'; files: Array<{ filename: string; content: string; language: string; }>; }; // Code generation event
+  'code-generation': { 
+    type: 'code-generation'; 
+    files: Array<{ filename: string; content: string; language: string; }>; 
+    timestamp?: number; 
+  }; // Code generation event
 };
 
 const eventBus = mitt<BusEvents>();

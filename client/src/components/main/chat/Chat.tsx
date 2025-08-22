@@ -33,6 +33,7 @@ import {
 import MarkdownRenderer from '@/components/main/code/markdown/MarkdownRenderer';
 import ChatChecklistBubble from './ChatChecklistBubble';
 import SequentialCodeDisplay from './SequentialCodeDisplay';
+import { ProgressDisplay } from './ProgressDisplay';
 import { debugLogger } from '@/utils/debugLogger';
 
 export interface AIMessageType {
@@ -894,8 +895,8 @@ const Chat: React.FC = () => {
                                                             
                                                             return <SequentialCodeDisplay files={message.codeGenFiles} />;
                                                         } else if (message.isChecklist) {
-                                                            console.log('[RENDER] Rendering ChatChecklistBubble');
-                                                            return <ChatChecklistBubble />;
+                                                            console.log('[RENDER] Rendering ProgressDisplay');
+                                                            return <ProgressDisplay />;
                                                         } else {
                                                             console.log('[RENDER] Rendering MarkdownRenderer for text message');
                                                             return (

@@ -22,6 +22,8 @@ import { Keypair } from '@solana/web3.js';
 import pool from '../../config/database';
 import { normalizeProjectName } from '../stringUtils';
 import { saveProgramSecret, awsSecretsEnabled } from '../awsSecrets';
+import { ProgressManager } from '../progress/ProgressManager';
+import { runCommandWithSmartProgress } from '../commandWithProgress';
 
 // Global file collector for ALL generated files (frontend + Rust)
 const allGeneratedFiles: Array<{filename: string, content: string, language: string}> = [];
@@ -236,6 +238,9 @@ export const handleGenerateCode = async ({
 
     console.log('[GEN] Starting code generation for project:', projectId);
     
+    // Initialize progress manager
+    const progress = new ProgressManager(sendProgress);
+    
     // Reset global file collection for this new code generation run
     allGeneratedFiles.length = 0; // Clear the array
     console.log('[GEN] ✅ Reset allGeneratedFiles array for new code generation run');
@@ -272,24 +277,31 @@ export const handleGenerateCode = async ({
             console.log('[GEN] No valid function code found in nodes');
         }
         
-        sendProgress({ stage: 'file-tree', message: 'Refreshing file tree…' });
+        // ENVIRONMENT SETUP PHASE
+        const envId = progress.startProcess('environment', 'container-setup', 30);
+        
+        progress.updateProcess(envId, 10, '🐳 Starting Docker container...');
+        
+        progress.updateProcess(envId, 30, '📁 Refreshing file tree...');
         const fileTreeTaskIds = await refreshWorkspaceTree(projectId, userId);
         console.log('[GEN] File tree refresh initiated');
-        sendProgress({ stage: 'file-tree', message: 'Waiting for file-tree refresh…' });
-
+        
+        progress.updateProcess(envId, 50, '⏳ Waiting for file tree...');
         const { succeeded, failed } = await waitForAll(fileTreeTaskIds);
 
         console.log(`[GEN] File tree tasks completed: ${succeeded.length} succeeded, ${failed.length} failed`);
-        sendProgress({
-          stage: failed.length ? 'file-tree-failed' : 'file-tree-done',
-          message: failed.length
-            ? `File-tree refresh: ${failed.length} task(s) failed`
-            : 'File-tree refresh complete'
-        });
-
+        
         if (failed.length) {
+          progress.errorProcess(envId, `File-tree task(s) failed: ${failed.join(', ')}`);
           throw new Error(`File-tree task(s) failed: ${failed.join(', ')}`);
         }
+        
+        progress.updateProcess(envId, 70, '📂 Processing existing files...');
+        progress.updateProcess(envId, 90, '✅ Environment ready');
+        progress.completeProcess(envId, '✅ Environment setup complete');
+        
+        // CODE GENERATION PHASE
+        const codeGenId = progress.startProcess('code-gen', 'generating-files', 120);
 
         // Get the file tree result to check for existing program directory
         const treeTaskId = fileTreeTaskIds[0];
@@ -314,14 +326,13 @@ export const handleGenerateCode = async ({
         }
 
         /* ─────────────────────  A)  stream *existing* web/ directory  ───────────────────── */
-        sendProgress({ stage: 'ui-gen', message: 'Streaming existing web/ files…' });
+        progress.updateProcess(codeGenId, 10, '🎨 Streaming existing web/ files...');
 
         const webRootDir = findWebDir();
         const creatorId   = userId;
         const uiTree      = await dirToFileTree(webRootDir, webRootDir);     // dynamic tree
 
-        // Tell FE we're starting incremental UI push
-        sendProgress({ stage: 'ui-stream', message: 'Streaming UI files…' });
+        progress.updateProcess(codeGenId, 15, '📤 Processing UI files...');
 
         // ─── write UI files and WAIT until every task finishes ────────────────
         const uiWriteTaskIds = await insertSrcFiles(
@@ -332,16 +343,28 @@ export const handleGenerateCode = async ({
           emitFileWritten(sendProgress, false)  // false = frontend phase
         );
 
+        progress.updateProcess(codeGenId, 20, `💾 Writing ${uiWriteTaskIds.length} UI files...`);
+        
         // block until every UI-write task is complete
-        for (const id of uiWriteTaskIds) {
-          await waitForTaskCompletion(id, 90, 2_000);
+        for (let i = 0; i < uiWriteTaskIds.length; i++) {
+          await waitForTaskCompletion(uiWriteTaskIds[i], 90, 2_000);
+          const pct = 20 + Math.round((i / uiWriteTaskIds.length) * 10);
+          progress.updateProcess(
+            codeGenId,
+            pct,
+            `Saved UI file ${i + 1}/${uiWriteTaskIds.length}`,
+            { current: i + 1, total: uiWriteTaskIds.length }
+          );
         }
 
-        sendProgress({ event: 'ui-complete', message: 'UI streaming finished' });
+        progress.updateProcess(codeGenId, 30, '✅ UI files processed');
 
         /* ──────────────────────  Install JS deps inside the container  ────────────────────── */
 
         const containerRootDir = `/usr/src/${workspace.rootPath}`;   // <── NEW
+        
+        // DEPENDENCY INSTALLATION
+        const depsId = progress.startProcess('code-gen', 'install-dependencies', 180);
 
         /* ── One-time Yarn bootstrap inside the running container ── */
         await runCommand(
@@ -354,7 +377,7 @@ export const handleGenerateCode = async ({
 
         {
           // STEP 0  ➜ regenerate yarn.lock so the upcoming frozen install never bails
-          sendProgress({ stage: 'deps', message: 'Creating/refreshing yarn.lock in container…' });
+          progress.updateProcess(depsId, 10, '📦 Generating yarn.lock...');
 
           const lockfileCmd = [
             'docker exec',
@@ -366,28 +389,14 @@ export const handleGenerateCode = async ({
               'yarn --cwd web install --lockfile-only --network-timeout 600000"' // ⬅ --cwd web
           ].join(' ');
 
-          // Before lockfile generation
-          sendProgress({
-            type: 'progress',
-            stage: 'code-gen',
-            status: 'active',
-            message: '📦 Creating package lockfile...',
-            pct: 72
-          });
-
+          const lockfileStartTime = Date.now();
           await runCommand(lockfileCmd, '.', projectId);
+          const lockfileTime = (Date.now() - lockfileStartTime) / 1000;
+          progress.updateProcess(depsId, 30, `✅ Lockfile created (${lockfileTime.toFixed(1)}s)`);
 
-          sendProgress({
-            type: 'progress',
-            stage: 'code-gen',
-            status: 'active',
-            message: '📦 Resolving dependencies...',
-            pct: 75
-          });
-
-          sendProgress({ stage: 'deps', message: 'yarn.lock updated; installing deps…' });
-
-          // second pass – real install but tolerant to the fresh lock-file
+          // Dependencies installation with real-time updates
+          progress.updateProcess(depsId, 40, '📦 Installing dependencies...');
+          
           const installCmd = [
             'docker exec',
             // isolate Yarn's cache so every dApp build starts clean
@@ -398,25 +407,26 @@ export const handleGenerateCode = async ({
               'yarn --cwd web install --prefer-offline --network-timeout 600000"'
           ].join(' ');
 
-          // Send progress updates during yarn install
-          sendProgress({
-            type: 'progress',
-            stage: 'code-gen',
-            status: 'active',
-            message: '📦 Installing dependencies (this may take 1-2 minutes)...',
-            pct: 78
-          });
-
-          await runCommand(installCmd, '.', projectId);
-
-          // After dependency installation
-          sendProgress({
-            type: 'progress',
-            stage: 'code-gen',
-            status: 'active',
-            message: '✅ Dependencies installed successfully',
-            pct: 85
-          });
+          // Use streaming command execution for real-time updates
+          await runCommandWithSmartProgress(
+            installCmd,
+            projectId,
+            (output: string, parsed?: { current?: number, total?: number, step?: string }) => {
+              if (parsed?.current && parsed?.total) {
+                const pct = 40 + Math.round((parsed.current / parsed.total) * 40);
+                progress.updateProcess(
+                  depsId,
+                  pct,
+                  `Installing package ${parsed.current}/${parsed.total}...`,
+                  { current: parsed.current, total: parsed.total }
+                );
+              } else if (parsed?.step) {
+                progress.updateProcess(depsId, 60, parsed.step);
+              }
+            }
+          );
+          
+          progress.updateProcess(depsId, 85, '✅ Dependencies installed');
 
           /* shadcn-ui CLI init REMOVED
              Reason: `npx shadcn-ui init` overwrites tailwind.config.js and
@@ -425,11 +435,17 @@ export const handleGenerateCode = async ({
              (see GitHub issues #878, #2030, #1086). The preset is already
              provided via package.json, so nothing else is required. */
 
-          sendProgress({ stage: 'deps', message: 'JS dependencies installed' });
+          // Next.js build
+          if (!isDevServer) {
+            progress.updateProcess(depsId, 90, '🔨 Building Next.js application...');
+            // Build logic will be handled below
+          }
+          
+          progress.completeProcess(depsId, '✅ All dependencies ready');
         }
 
         // ─── Restart Next.js dev server so it picks up next-themes, toast, etc.
-        sendProgress({ stage: 'deps', message: 'Restarting Next.js server…' });
+        progress.updateProcess(codeGenId, 35, 'Restarting Next.js server...');
 
         /* 1️⃣  Kill ONLY the stand-alone server; keep `next dev` alive.      */
         await runCommand(
@@ -438,26 +454,16 @@ export const handleGenerateCode = async ({
           projectId,
         );
 
-        /* 2️⃣  If we are *not* in dev mode, container CMD will start server.js
-                once the build finishes.  When in dev mode no restart needed. */
-        sendProgress({
-          stage: 'deps',
-          message: isDevServer
-            ? 'Dev server detected – no restart needed'
-            : 'Dev server will start via CMD'
-        });
+        progress.updateProcess(codeGenId, 40, isDevServer 
+          ? 'Dev server detected – no restart needed' 
+          : 'Dev server will start via CMD'
+        );
 
         /* ──────────────────────────────────────────────────────────────────────── */
 
         /* ────────────────── 3️⃣  Build *only* in standalone mode ──────────── */
         if (!isDevServer) {
-          sendProgress({
-            type: 'progress',
-            stage: 'code-gen',
-            status: 'active',
-            message: '🔨 Building Next.js application...',
-            pct: 88
-          });
+          progress.updateProcess(codeGenId, 45, '🔨 Building Next.js application...');
           try {
             // Force-write the tsconfig.json file to ensure it has the correct configuration
             await runCommand(
@@ -500,22 +506,10 @@ EOF'`,
               '.',
               projectId
             );
-            sendProgress({
-              type: 'progress',
-              stage: 'code-gen',
-              status: 'active',
-              message: '✅ Next.js build completed',
-              pct: 92
-            });
+            progress.updateProcess(codeGenId, 50, '✅ Next.js build completed');
           } catch (error) {
             console.error('Error during Next.js build:', error);
-            sendProgress({
-              type: 'progress',
-              stage: 'code-gen',
-              status: 'active',
-              message: '⚠️ Next.js build failed (non-critical)',
-              pct: 92
-            });
+            progress.updateProcess(codeGenId, 50, '⚠️ Next.js build failed (non-critical)');
           }
         } // ← closes "if (!isDevServer)"
         /* ── dev-mode skip: build/restart not required ── */
@@ -523,6 +517,8 @@ EOF'`,
         /* runtime server already started by docker run → nothing to do */
 
         // ───────────────────────── write graph-derived Rust sources ──────────────
+        progress.updateProcess(codeGenId, 55, '🔨 Building source tree...');
+        
         // Derive program name from project context (fallback to 'my_program' if not found)
         /* -----------------------------------------------------------
          * Derive the **crate name** from the workspace's root folder:
@@ -546,6 +542,8 @@ EOF'`,
         } catch (e) {
           console.warn('Could not fetch project name, using default:', e);
         }
+        
+        progress.updateProcess(codeGenId, 60, '🔑 Generating program keypair...');
         // Generate a fresh, random keypair so every dApp has a unique program ID
         const programKeypair = Keypair.generate();
         const programId = programKeypair.publicKey.toBase58();
@@ -752,20 +750,12 @@ EOF'`,
         /* --------------------------------------------------------------- *
          * write the src tree into the workspace
          * --------------------------------------------------------------- */
+        progress.updateProcess(codeGenId, 65, '📝 Extracting generated files...');
         console.log('[GEN] Code generation will collect files through emitFileWritten callback');
 
         // Clear the global file collector and send initial progress
         allGeneratedFiles.length = 0;
-        
-        // Send initial 0% progress - no separate progress timeline  
-        sendProgress({
-          type: 'progress',
-          stage: 'code-gen',
-          status: 'active',
-          message: '🦀 Starting Solana program generation...',
-          pct: 0
-        });
-        console.log('[GEN] STARTED - Global file array cleared, sent initial progress. File collection will start now.');
+        console.log('[GEN] STARTED - Global file array cleared. File collection will start now.');
         
         // Extract all files from the generated tree immediately
         const extractAllFiles = (node: FileTreeItem, basePath: string = ''): Array<{path: string, content: string}> => {
@@ -798,38 +788,25 @@ EOF'`,
             const allSrcFiles = extractAllFiles(rootNode);
             console.log('[GEN] Extracted', allSrcFiles.length, 'files from generated tree');
 
-            // DON'T SEND FILES YET - just update progress
-            sendProgress({
-              type: 'progress',
-              stage: 'code-gen',
-              status: 'active',
-              message: `📝 Writing ${allSrcFiles.length} program files...`,
-              pct: 55
-            });
+            // Extract files and track progress
+            progress.updateProcess(codeGenId, 70, `💾 Writing ${allSrcFiles.length} program files...`);
             
             // Write files to disk
             const writeTaskIds = await insertSrcFiles(rootNode, projectId, existingFilePaths, creatorId, emitFileWritten(sendProgress, true));
             
             // Update progress while waiting
-            sendProgress({
-              type: 'progress',
-              stage: 'code-gen',
-              status: 'active',
-              message: '💾 Saving files to container...',
-              pct: 70
-            });
+            progress.updateProcess(codeGenId, 75, '💾 Saving files to container...');
             
             // Wait for writes with progress updates
             for (let i = 0; i < writeTaskIds.length; i++) {
               await waitForTaskCompletion(writeTaskIds[i], 90, 2_000);
-              const progress = 70 + Math.round((i / writeTaskIds.length) * 20);
-              sendProgress({
-                type: 'progress',
-                stage: 'code-gen',
-                status: 'active',
-                message: `💾 Saved ${i + 1}/${writeTaskIds.length} files...`,
-                pct: Math.min(progress, 90)
-              });
+              const progressPct = 75 + Math.round((i / writeTaskIds.length) * 15);
+              progress.updateProcess(
+                codeGenId,
+                progressPct,
+                `💾 Saved ${i + 1}/${writeTaskIds.length} files...`,
+                { current: i + 1, total: writeTaskIds.length }
+              );
             }
 
             // NOW send the files with content AFTER they're written
@@ -845,17 +822,9 @@ EOF'`,
               contentLength: f.content.length
             })));
 
-            // Send files AFTER writing is done
-            sendProgress({
-              type: 'code-generation',
-              stage: 'code-gen',
-              status: 'active',
-              message: `✅ Generated ${allSrcFiles.length} Solana program files`,
-              files: displayFiles,
-              totalFileCount: allSrcFiles.length,
-              allFileNames: allSrcFiles.map(f => f.path),
-              pct: 95
-            });
+            // Send files AFTER writing is done using progress manager
+            progress.sendCodeFiles(displayFiles);
+            progress.updateProcess(codeGenId, 90, `✅ Generated ${allSrcFiles.length} Solana program files`);
 
             // now it is safe to raise the sentinel
             const sentinelId = await markWriteDone(projectId);
@@ -872,66 +841,29 @@ EOF'`,
           sendProgress,
         );
 
-        // ADD MISSING PROGRESS UPDATE - after files are written
-        sendProgress({
-          type: 'progress',
-          stage: 'code-gen',
-          status: 'active',
-          message: '✍️ Writing program files to disk...',
-          pct: 94
-        });
-
-        // Progress is now managed by file generation events
-        console.log('[GEN] Code generation phase completed, moving to dependency management');
-        sendProgress({ stage: "ui-complete" });
-
-
-        // ADD MISSING PROGRESS UPDATE - before linting
-        sendProgress({
-          type: 'progress',
-          stage: 'code-gen',
-          status: 'active',
-          message: '🔍 Validating Cargo manifests...',
-          pct: 96
-        });
+        progress.updateProcess(codeGenId, 95, '🔍 Validating Cargo manifests...');
 
         // ─────────── Run static lint on Cargo manifests before amending ───────────
         console.log('[GEN] Running Cargo.toml linter');
         lintWorkspaceManifests({ projectId, userId, workspace })
           .then(() =>
-            sendProgress({ stage: "lint-done", message: "Cargo manifests validated" }),
+            progress.updateProcess(codeGenId, 97, "Cargo manifests validated")
           )
           .catch(err =>
-            sendProgress({ stage: "lint-failed", message: `Manifest validation failed: ${String(err)}` }),
+            progress.updateProcess(codeGenId, 97, `Manifest validation failed: ${String(err)}`)
           );
 
-        // ADD MISSING PROGRESS UPDATE - before amending config files
-        sendProgress({
-          type: 'progress',
-          stage: 'code-gen',
-          status: 'active',
-          message: '📝 Updating configuration files...',
-          pct: 98
-        });
+        progress.updateProcess(codeGenId, 98, '📝 Updating configuration files...');
 
         // Amend config files **first** so IDL changes are in place for the build.
         const { anchorTaskId } = await amendConfigFiles(projectId, userId);
-        sendProgress({
-          stage: "amend-done",
-          anchorTaskId,
-          message: "[handleGenerateCode] Amend done",
-        });
+        progress.completeProcess(codeGenId, '✅ Code generation complete');
 
-        /* --------------------------------------------------------------
-         * ensureAnchorTomlProgram / amendConfigFiles may have just
-         * touched Anchor.toml – run a second keys sync so
-         * Anchor.toml, declare_id!(), and the JSON keypair stay equal
-         * -------------------------------------------------------------- */
-        /* --------------------------------------------------------------
-         * Re‑sync keys, purge old artefacts, then force a *clean* build.
-         * `cargo-build-sbf` (called by `anchor build`) does **not**
-         * understand "--force" → use `anchor clean` instead.
-         * -------------------------------------------------------------- */
+        // BUILD PHASE
+        const buildId = progress.startProcess('build', 'anchor-build', 240);
+        
+        progress.updateProcess(buildId, 10, '🧹 Cleaning previous builds...');
+        
         /* --------------------------------------------------------------
          * Final, deterministic rebuild sequence:
          *   1. anchor clean            – remove all artefacts **and** keypairs
@@ -959,12 +891,28 @@ EOF'`,
           `anchor build -p ${programName}`
         ].join(' && ');
 
-        await runCommand(
+        progress.updateProcess(buildId, 20, '🔑 Syncing program keys...');
+        progress.updateProcess(buildId, 30, '🦀 Compiling Rust program...');
+        
+        // Use smart progress for anchor build
+        await runCommandWithSmartProgress(
           `docker exec ${workspace.containerName} bash -lc "${script}"`,
-          '.',
-          randomUUID(),
-          { skipSuccessUpdate: true }
+          projectId,
+          (output: string, parsed?: { current?: number, total?: number, step?: string }) => {
+            if (output.includes('Compiling')) {
+              const match = output.match(/Compiling (\S+)/);
+              if (match) {
+                progress.updateProcess(buildId, 40, `Compiling ${match[1]}...`);
+              }
+            } else if (output.includes('Building')) {
+              progress.updateProcess(buildId, 60, 'Building program...');
+            } else if (output.includes('Finished')) {
+              progress.updateProcess(buildId, 90, '✅ Compilation complete');
+            }
+          }
         );
+        
+        progress.completeProcess(buildId, '✅ Program built successfully');
 
         // ─────────── Debug: dump container tree ───────────
         const dumpTaskId = await createTask(
@@ -1003,15 +951,6 @@ EOF'`,
           await updateTaskStatus(dumpTaskId, 'succeed', 'Tree dumped and files printed');
         }
         
-        // Send final progress update at 100%
-        sendProgress({
-          type: 'progress',
-          stage: 'code-gen', 
-          status: 'active',
-          message: `✅ Code generation completed successfully!`,
-          pct: 100
-        });
-
         console.log('[GEN] ====== CODE GENERATION COMPLETED ======');
         console.log('[GEN] Total files generated:', allGeneratedFiles.length);
         console.log('[GEN] Files:', allGeneratedFiles.map(f => ({ filename: f.filename, contentLength: f.content.length })));
@@ -1023,6 +962,10 @@ EOF'`,
         return { sentinelId, programName };
     } catch (err) {
         console.error('Error in handleGenerateCode:', err);
+        // Send error to all active processes
+        progress.getActiveProcesses().forEach((activeProcess) => {
+          progress.errorProcess(activeProcess.id, `${err instanceof Error ? err.message : String(err)}`);
+        });
         throw err;
     }
 };
