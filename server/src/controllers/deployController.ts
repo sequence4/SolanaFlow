@@ -2,8 +2,6 @@ import { NextFunction, Request, Response } from 'express';
 import { AppError } from '../middleware/errorHandler';
 import { runDeployPipeline } from '../utils/deploy/runDeployPipeline';
 import { Graph } from '../types/graph'; 
-import { deriveProgramId } from "../utils/deriveProgramId";
-import { markContainerForCleanup } from "../utils/container/cleanupQueue";
 
 /**
  * POST /api/deploy/:id/deploy-pipeline
@@ -20,7 +18,7 @@ export async function deployPipeline(
   const userId = (req.user as { id?: string } | undefined)?.id; // keep optional-chaining safe
   const walletSigned = requestWalletSigned === true;
 
-  console.log(`🚀 Deploy pipeline starting: ${id}${walletSigned ? ' (wallet-signed)' : ''}`);
+  //console.log(`🚀 Deploy pipeline starting: ${id}${walletSigned ? ' (wallet-signed)' : ''}`);
 
   /* ------------------------------------------------------------------ *
    * Guards – bail out fast on bad input
@@ -87,7 +85,7 @@ export async function deployPipeline(
     if (typeof data === 'object' && data !== null) {
       const eventObj = data as any;
       if (eventObj.stage === 'completed' || eventObj.stage === 'error') {
-        console.log(`📡 ${eventObj.stage}: ${eventObj.message}`);
+       // console.log(`📡 ${eventObj.stage}: ${eventObj.message}`);
       }
     }
     

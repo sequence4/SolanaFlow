@@ -59,6 +59,7 @@ const ephemeralKeys = new Map<string, Keypair>();
  * `BpfLoader.load()` call.  On Devnet/Testnet we transparently airdrop;
  * on Mainnet we throw with a clear message so the operator can fund the key.
  */
+/*
 async function ensureFeePayerBalance(
   connection: Connection,
   feePayer: Keypair,
@@ -90,6 +91,7 @@ async function ensureFeePayerBalance(
       `to fee‑payer ${feePayer.publicKey.toBase58()} (tx: ${sig})`,
   );
 }
+  */
 
 // fee‑payer will be the buffer‑authority keypair (funded by the wallet)
 
@@ -567,7 +569,7 @@ export const anchorInitProject = async (
     }
 
     if ((details as any).isLite === true) {
-      console.log('Skipping Anchor initialization for lite project');
+      //console.log('Skipping Anchor initialization for lite project');
       res.status(200).json({ 
         message: 'Operation skipped for lite project',
         isLite: true
@@ -660,7 +662,7 @@ export const buildProject = async (
     }
 
     if ((details as any).isLite === true) {
-      console.log('Skipping build process for lite project');
+      //console.log('Skipping build process for lite project');
       res.status(200).json({ 
         message: 'Build operation skipped for lite project',
         isLite: true
@@ -711,9 +713,9 @@ export const createEphemeralKeypair = async (req: Request, res: Response, next: 
     
     // Store the keypair in memory only
     ephemeralKeys.set(pubkey, ephem);
-    console.log(`[EPHEMERAL] Generated new ephemeral keypair: ${pubkey}`);
-    console.log(`[EPHEMERAL] Total ephemeral keys now stored: ${ephemeralKeys.size}`);
-    console.log(`[EPHEMERAL] All stored keys: ${Array.from(ephemeralKeys.keys()).join(', ')}`);
+    //console.log(`[EPHEMERAL] Generated new ephemeral keypair: ${pubkey}`);
+    //console.log(`[EPHEMERAL] Total ephemeral keys now stored: ${ephemeralKeys.size}`);
+   // console.log(`[EPHEMERAL] All stored keys: ${Array.from(ephemeralKeys.keys()).join(', ')}`);
     
     // Return only the public key to the client
     res.status(200).json({
@@ -736,7 +738,7 @@ export const deployProject = async (
     const { id: projectId } = req.params;
     const { walletPubkey, bufferAuthority }  = req.body;
     
-    console.log(`[DEPLOY] Starting deployment for project ${projectId} with wallet ${walletPubkey}`);
+   // console.log(`[DEPLOY] Starting deployment for project ${projectId} with wallet ${walletPubkey}`);
     
     // Get the buffer authority keypair from memory
     const bufferAuthorityKp = ephemeralKeys.get(bufferAuthority);
@@ -745,12 +747,12 @@ export const deployProject = async (
     }
 
     /* ① fetch artefact (base‑64) and secret key */
-    console.log(`[DEPLOY] Fetching build artifact for project ${projectId}`);
+   // console.log(`[DEPLOY] Fetching build artifact for project ${projectId}`);
     const { base64So } = await getBuildArtifactTask(projectId);           // 259 kB string
-    console.log(`[DEPLOY] Retrieved build artifact, size: ${base64So.length} characters`);
+   // console.log(`[DEPLOY] Retrieved build artifact, size: ${base64So.length} characters`);
     
     const soBytes = Uint8Array.from(atob(base64So), c => c.charCodeAt(0)).buffer;
-    console.log(`[DEPLOY] Converted base64 to binary, size: ${soBytes.byteLength} bytes`);
+   // console.log(`[DEPLOY] Converted base64 to binary, size: ${soBytes.byteLength} bytes`);
 
     /* ② pull existing program context (if any) -------------------------- */
     const detailsRes = await pool.query(
@@ -771,12 +773,12 @@ export const deployProject = async (
 
     /* ③ run deployWithEphemeralKey on the server ------------------------ */
     const endpoint = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
-    console.log(`[DEPLOY] Using RPC endpoint: ${endpoint}`);
+   // console.log(`[DEPLOY] Using RPC endpoint: ${endpoint}`);
     
     const connection = new Connection(endpoint, 'confirmed');
     // Use buffer-authority as fee-payer (wallet already funded it)
     const feePayer = bufferAuthorityKp;
-    console.log(`[DEPLOY] Using buffer‑authority as fee‑payer: ${feePayer.publicKey.toBase58()}`);
+    //console.log(`[DEPLOY] Using buffer‑authority as fee‑payer: ${feePayer.publicKey.toBase58()}`);
 
     /* ----------------------------------------------------------------- */
     /* REAL DEPLOY 🥳 – uses the upgradeable loader (same path as CLI)   */
@@ -831,7 +833,7 @@ export const deployProject = async (
         `${programId}.json`,
       );
       fs.writeFileSync(kpPath, JSON.stringify(Array.from(finalProgramKp.secretKey)));
-      console.log(`[DEPLOY] Saved program keypair → ${kpPath}`);
+      //console.log(`[DEPLOY] Saved program keypair → ${kpPath}`);
     }
 
     // store real programId in project.details
@@ -843,8 +845,8 @@ export const deployProject = async (
       [JSON.stringify({ programId }), projectId]
     );
 
-    console.log(`[DEPLOY] Deployment completed successfully for project ${projectId}`);
-    console.log(`[DEPLOY] Program ID: ${programId}`);
+    //console.log(`[DEPLOY] Deployment completed successfully for project ${projectId}`);
+   // console.log(`[DEPLOY] Program ID: ${programId}`);
     
     res.json({
       success: true,
@@ -869,16 +871,16 @@ export const deployProjectEphemeral = async (
   const userId = req.user?.id ?? 'mock-user';
   const { ephemeralPubkey } = req.body;
 
-  console.log(`[DEPLOY_EPHEMERAL] Received request to deploy project ${id} with ephemeral key ${ephemeralPubkey}`);
+  //console.log(`[DEPLOY_EPHEMERAL] Received request to deploy project ${id} with ephemeral key ${ephemeralPubkey}`);
 
   if (!ephemeralPubkey) {
-    console.log(`[DEPLOY_EPHEMERAL] No ephemeral public key provided in request`);
+   // console.log(`[DEPLOY_EPHEMERAL] No ephemeral public key provided in request`);
     return next(new AppError('Ephemeral public key is required', 400));
   }
 
   // If using Phantom (signed transaction path), skip container deploy and await relay
   if (ephemeralPubkey === 'SIGNED') {
-    console.log(`[DEPLOY_EPHEMERAL] 'SIGNED' flag received – expecting front-end to handle deployment`);
+  //  console.log(`[DEPLOY_EPHEMERAL] 'SIGNED' flag received – expecting front-end to handle deployment`);
     // Generate a new program keypair for this deploy
     const program = Keypair.generate();
     const pubkey = program.publicKey.toBase58();
@@ -896,20 +898,20 @@ export const deployProjectEphemeral = async (
   
   // Validate the ephemeral key format for provided pubkey
   try {
-    console.log(`[DEPLOY_EPHEMERAL] Validating ephemeral key format`);
+   // console.log(`[DEPLOY_EPHEMERAL] Validating ephemeral key format`);
     // Check if the key is in the expected format
     if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(ephemeralPubkey)) {
-      console.log(`[DEPLOY_EPHEMERAL] Invalid ephemeral key format: ${ephemeralPubkey}`);
+   //   console.log(`[DEPLOY_EPHEMERAL] Invalid ephemeral key format: ${ephemeralPubkey}`);
       return next(new AppError('Invalid ephemeral public key format', 400));
     }
 
     // Check if the key file exists
     const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${ephemeralPubkey}.json`);
     if (!fs.existsSync(walletPath)) {
-      console.log(`[DEPLOY_EPHEMERAL] Ephemeral key file not found at ${walletPath}`);
+     // console.log(`[DEPLOY_EPHEMERAL] Ephemeral key file not found at ${walletPath}`);
       return next(new AppError(`Ephemeral key file not found. Please create it first.`, 404));
     }
-    console.log(`[DEPLOY_EPHEMERAL] Ephemeral key file exists at ${walletPath}`);
+   // console.log(`[DEPLOY_EPHEMERAL] Ephemeral key file exists at ${walletPath}`);
   } catch (validationError: any) {
     console.error(`[DEPLOY_EPHEMERAL] Error validating ephemeral key:`, validationError);
     return next(new AppError(`Error validating ephemeral key: ${validationError.message}`, 400));
@@ -922,7 +924,7 @@ export const deployProjectEphemeral = async (
     );
 
     if (projectCheck.rows.length === 0) {
-      console.log(`[DEPLOY_EPHEMERAL] Project not found (id=${id})`);
+     // console.log(`[DEPLOY_EPHEMERAL] Project not found (id=${id})`);
       return next(
         new AppError(
           'Project not found or you do not have permission to deploy it',
@@ -944,14 +946,14 @@ export const deployProjectEphemeral = async (
       return next(new AppError('Error parsing project details', 500));
     }
 
-    console.log(`[DEPLOY_EPHEMERAL] Starting anchor deploy task with ephemeral key ${ephemeralPubkey}`);
+   // console.log(`[DEPLOY_EPHEMERAL] Starting anchor deploy task with ephemeral key ${ephemeralPubkey}`);
     const taskId = await startAnchorDeployTask(id, userId, ephemeralPubkey);
-    console.log(`[DEPLOY_EPHEMERAL] Deploy task started: ${taskId}`);
+   // console.log(`[DEPLOY_EPHEMERAL] Deploy task started: ${taskId}`);
 
     // Wait for the task to complete (up to 120s)
-      console.log(`[DEPLOY_EPHEMERAL] Waiting for task ${taskId} to complete...`);
+    //  console.log(`[DEPLOY_EPHEMERAL] Waiting for task ${taskId} to complete...`);
     const status = await waitForTaskCompletion(taskId, 120000);
-      console.log(`[DEPLOY_EPHEMERAL] Task ${taskId} completed with status: ${status}`);
+   //   console.log(`[DEPLOY_EPHEMERAL] Task ${taskId} completed with status: ${status}`);
       
       if (status === 'succeed' || status === 'finished') {
       // Retrieve the programId from the task result
@@ -975,14 +977,14 @@ export const deployProjectEphemeral = async (
                  WHERE id = $3`,
               [JSON.stringify({ programId }), new Date(), id]
             );
-            console.log(`[DEPLOY_EPHEMERAL] Program ID ${programId} stored in DB.`);
+           // console.log(`[DEPLOY_EPHEMERAL] Program ID ${programId} stored in DB.`);
             }
           }
         } finally {
           client.release();
         }
       if (programId) {
-        console.log(`[DEPLOY_EPHEMERAL] Deployment succeeded with Program ID: ${programId}`);
+       // console.log(`[DEPLOY_EPHEMERAL] Deployment succeeded with Program ID: ${programId}`);
         res.status(200).json({ success: true, programId, signatures: [] });
         return;
       } else {
@@ -1094,7 +1096,7 @@ export const testProject = async (
     }
 
     if ((details as any).isLite === true) {
-      console.log('Skipping test process for lite project');
+    //  console.log('Skipping test process for lite project');
       res.status(200).json({ 
         message: 'Test operation skipped for lite project',
         isLite: true
@@ -1145,8 +1147,8 @@ export const runProjectCommand = async (
     }
 
     if (functionName) {
-      console.log(`Executing function ${functionName} with parameters:`, parameters);
-      console.log(`UMI required: ${requiresUmi}`);
+     // console.log(`Executing function ${functionName} with parameters:`, parameters);
+     // console.log(`UMI required: ${requiresUmi}`);
       
       const taskId = await startCustomCommandTask(id, userId, 'runFunction', functionName, parameters, ephemeralPubkey);
       
@@ -1367,7 +1369,7 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
     const currentSigs = transaction.signatures.filter(s => s.signature).length;
     
     
-    console.log(`[RELAY_SIGNED_TX] Checking if this is a deployment transaction...`);
+   // console.log(`[RELAY_SIGNED_TX] Checking if this is a deployment transaction...`);
     // Check if this is a BPF upgrade loader transaction - look for Write (1), Deploy (2), or Upgrade (3) instructions
     // The deployment transaction may have multiple instructions (nonce advance, create account, write, deploy)
     let isBPFLoaderTransaction = false;
@@ -1375,24 +1377,24 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
       const instruction = transaction.instructions[i];
       if (instruction && instruction.data.length >= 4) {
         const instructionType = Array.from(instruction.data.slice(0, 4));
-        console.log(`[RELAY_SIGNED_TX] Instruction ${i} data prefix: [${instructionType.join(',')}]`);
+      //  console.log(`[RELAY_SIGNED_TX] Instruction ${i} data prefix: [${instructionType.join(',')}]`);
         
         // Check for Write (1) OR Deploy (2) OR Upgrade (3) instructions
         if ((instructionType[0] === 1 || instructionType[0] === 2 || instructionType[0] === 3) 
             && instructionType[1] === 0 && instructionType[2] === 0 && instructionType[3] === 0) {
-          console.log(`[RELAY_SIGNED_TX] Found BPF loader instruction (type ${instructionType[0]}) at index ${i}`);
+       //   console.log(`[RELAY_SIGNED_TX] Found BPF loader instruction (type ${instructionType[0]}) at index ${i}`);
           isBPFLoaderTransaction = true;
           
           // For Write instructions, sign with ephemeral key
           if (instructionType[0] === 1) {
-            console.log(`[RELAY_SIGNED_TX] This is a Write instruction - needs ephemeral signing`);
+        //    console.log(`[RELAY_SIGNED_TX] This is a Write instruction - needs ephemeral signing`);
           }
         }
       }
     }
     
     if (isBPFLoaderTransaction) {
-      console.log(`[RELAY_SIGNED_TX] This is a BPF loader transaction`);
+   //   console.log(`[RELAY_SIGNED_TX] This is a BPF loader transaction`);
     } else {
       console.log(`[RELAY_SIGNED_TX] This is not a BPF loader transaction`);
     }
@@ -1403,7 +1405,7 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
     // because Write transactions need ephemeral key signatures
     if (currentSigs === requiredSigs && !isBPFLoaderTransaction) {
       // Transaction is fully signed and not a BPF loader transaction, broadcast directly
-      console.log(`[RELAY_SIGNED_TX] Transaction is fully signed, broadcasting directly`);
+  //    console.log(`[RELAY_SIGNED_TX] Transaction is fully signed, broadcasting directly`);
       const endpoint = process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com';
       const connection = new Connection(endpoint, 'confirmed');
       
@@ -1412,11 +1414,11 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
         { skipPreflight: true }
       );
       
-      console.log(`[RELAY_SIGNED_TX] Direct broadcast successful: ${txSignature}`);
+   //   console.log(`[RELAY_SIGNED_TX] Direct broadcast successful: ${txSignature}`);
     } else {
       // Transaction needs additional server signing (or is a BPF loader transaction)
       if (isBPFLoaderTransaction) {
-        console.log(`[RELAY_SIGNED_TX] BPF loader transaction detected, forcing server signature processing`);
+ //       console.log(`[RELAY_SIGNED_TX] BPF loader transaction detected, forcing server signature processing`);
       } else {
         console.log(`[RELAY_SIGNED_TX] Transaction needs server signatures, processing...`);
       }
@@ -1446,7 +1448,7 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
       client.release();
     }
     
-    console.log(`[RELAY_SIGNED_TX] Program ${programId} deployed successfully for project ${id}`);
+  //  console.log(`[RELAY_SIGNED_TX] Program ${programId} deployed successfully for project ${id}`);
     
     // Restart container so Next.js picks up the new Program ID
     const { rows: [proj] } = await pool.query(
@@ -1456,7 +1458,7 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
     if (proj && proj.container_name) {
       try {
         await runCommand(`docker restart ${proj.container_name}`, '.', uuidv4());
-        console.log(`[RELAY_SIGNED_TX] Restarted container ${proj.container_name} to load new Program ID`);
+    //    console.log(`[RELAY_SIGNED_TX] Restarted container ${proj.container_name} to load new Program ID`);
       } catch (err) {
         console.error(`[RELAY_SIGNED_TX] Failed to restart container ${proj.container_name}:`, err);
       }
@@ -1479,7 +1481,7 @@ export const relayTx = async (req: Request, res: Response, next: NextFunction) =
   }
   
   try {
-    console.log(`[RELAY_TX] Starting relay for programId: ${programId}`);
+  //  console.log(`[RELAY_TX] Starting relay for programId: ${programId}`);
     
     const endpoint = process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com';
     const connection = new Connection(endpoint, 'confirmed');
@@ -1494,7 +1496,7 @@ export const relayTx = async (req: Request, res: Response, next: NextFunction) =
       return next(new AppError('Transaction must have a fee payer', 400));
     }
     
-    console.log(`[RELAY_TX] Fee payer: ${transaction.feePayer.toBase58()}`);
+   // console.log(`[RELAY_TX] Fee payer: ${transaction.feePayer.toBase58()}`);
     
     // CRITICAL: If fee payer is ephemeral, verify it has funds
     if (ephemeralKeys.has(transaction.feePayer.toBase58())) {
@@ -1511,17 +1513,17 @@ export const relayTx = async (req: Request, res: Response, next: NextFunction) =
         ));
       }
       
-      console.log(`[RELAY_TX] Ephemeral fee payer balance: ${balance} lamports`);
+    //  console.log(`[RELAY_TX] Ephemeral fee payer balance: ${balance} lamports`);
     }
     
     // Get all required signers
     const msg = transaction.compileMessage();
     const requiredSigners = msg.accountKeys.slice(0, msg.header.numRequiredSignatures);
-    console.log(`[RELAY_TX] Required signers: ${requiredSigners.map(k => k.toBase58()).join(', ')}`);
+   // console.log(`[RELAY_TX] Required signers: ${requiredSigners.map(k => k.toBase58()).join(', ')}`);
     
     // Check which signatures we already have
     const existingSigs = transaction.signatures.filter(s => s.signature).length;
-    console.log(`[RELAY_TX] Existing signatures: ${existingSigs}`);
+  //  console.log(`[RELAY_TX] Existing signatures: ${existingSigs}`);
     
     // Find ephemeral keys that need to sign
     const signers: Keypair[] = [];
@@ -1531,7 +1533,7 @@ export const relayTx = async (req: Request, res: Response, next: NextFunction) =
         const sigIndex = msg.accountKeys.findIndex(k => k.equals(keypair.publicKey));
         if (sigIndex >= 0 && sigIndex < transaction.signatures.length) {
           if (!transaction.signatures[sigIndex].signature) {
-            console.log(`[RELAY_TX] Found ephemeral key to sign: ${pubkeyStr}`);
+     //       console.log(`[RELAY_TX] Found ephemeral key to sign: ${pubkeyStr}`);
             signers.push(keypair);
           } else {
             console.log(`[RELAY_TX] Ephemeral key ${pubkeyStr} already signed`);
@@ -1550,12 +1552,12 @@ export const relayTx = async (req: Request, res: Response, next: NextFunction) =
     // Sign with ephemeral keys
     for (const signer of signers) {
       transaction.partialSign(signer);
-      console.log(`[RELAY_TX] Signed with ephemeral key: ${signer.publicKey.toBase58()}`);
+  //    console.log(`[RELAY_TX] Signed with ephemeral key: ${signer.publicKey.toBase58()}`);
     }
     
     // Verify all required signatures are present
     const finalSigs = transaction.signatures.filter(s => s.signature).length;
-    console.log(`[RELAY_TX] Final signatures: ${finalSigs}/${msg.header.numRequiredSignatures}`);
+ //   console.log(`[RELAY_TX] Final signatures: ${finalSigs}/${msg.header.numRequiredSignatures}`);
     
     if (finalSigs < msg.header.numRequiredSignatures) {
       const missing = [];
@@ -1569,18 +1571,18 @@ export const relayTx = async (req: Request, res: Response, next: NextFunction) =
     }
     
     // Send the fully signed transaction
-    console.log(`[RELAY_TX] Sending fully signed transaction...`);
+ //   console.log(`[RELAY_TX] Sending fully signed transaction...`);
     const signature = await connection.sendRawTransaction(
       transaction.serialize(),
       { skipPreflight: false }
     );
     
-    console.log(`[RELAY_TX] Transaction sent successfully: ${signature}`);
+ //   console.log(`[RELAY_TX] Transaction sent successfully: ${signature}`);
     
     // Wait for confirmation
     try {
       await connection.confirmTransaction(signature, 'confirmed');
-      console.log(`[RELAY_TX] Transaction confirmed: ${signature}`);
+ //     console.log(`[RELAY_TX] Transaction confirmed: ${signature}`);
     } catch (confirmError) {
       console.warn(`[RELAY_TX] Confirmation timeout (continuing): ${confirmError}`);
     }

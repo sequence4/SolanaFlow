@@ -1,6 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
 import pool from '../config/database';
-import { AppError } from '../middleware/errorHandler';
 import { PaginatedResponse } from '../types';
 
 export const listOrganizationProjects = async (
