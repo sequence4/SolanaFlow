@@ -15,7 +15,6 @@ import { fileApi } from '@/api/fileApi';
 import { taskApi } from '@/api/taskApi';
 
 // UI Components
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useTaskLogs } from "@/context/logs/useTaskLogs";
 import eventBus from '@/lib/eventBus';
@@ -31,10 +30,8 @@ import {
   Trash2
 } from "lucide-react";
 import MarkdownRenderer from '@/components/main/code/markdown/MarkdownRenderer';
-import ChatChecklistBubble from './ChatChecklistBubble';
 import SequentialCodeDisplay from './SequentialCodeDisplay';
 import { ProgressDisplay } from './ProgressDisplay';
-import { debugLogger } from '@/utils/debugLogger';
 
 export interface AIMessageType {
   text: string;
@@ -71,13 +68,10 @@ const Chat: React.FC = () => {
     const taskLogs = useTaskLogs();  // Complete taskLogs object including systemLogs and setSuppressToast
     const { systemLogs } = taskLogs;
     const [lastLogIndex, setLastLogIndex] = useState(0);  // 🟡 NEW
-    const [userHasScrolled, setUserHasScrolled] = useState(false); // Track if user manually scrolled
   
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const messagesAreaRef = useRef<HTMLDivElement | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-    const contentHeightRef = useRef(0);
-    const isAutoScrollingRef = useRef(false);
     const scrollStateRef = useRef({
         userHasScrolledUp: false,  // Track if user has manually scrolled up
         lastUserMessageCount: 0,   // Track user messages to trigger scroll resets
@@ -101,8 +95,6 @@ const Chat: React.FC = () => {
     
     // Keep compatibility with existing calls
     const smartScrollToBottom = scrollToBottom;
-    const forceScrollToBottom = useCallback(() => scrollToBottom(true), [scrollToBottom]);
-    const smoothScrollToBottom = scrollToBottom;
     const stableScrollToBottom = scrollToBottom;
 
     // Simple scroll detection - just track if user has scrolled up
@@ -118,7 +110,6 @@ const Chat: React.FC = () => {
         // Update user scroll state
         const hasScrolledUp = !isNearBottom;
         scrollStateRef.current.userHasScrolledUp = hasScrolledUp;
-        setUserHasScrolled(hasScrolledUp);
     }, []);
 
     // Replace MutationObserver with more controlled approach
@@ -127,7 +118,7 @@ const Chat: React.FC = () => {
             let observerTimeout: NodeJS.Timeout | null = null;
             let lastHeight = 0;
             
-            const observer = new MutationObserver((mutations) => {
+            const observer = new MutationObserver(() => {
                 // Clear existing timeout
                 if (observerTimeout) clearTimeout(observerTimeout);
                 
@@ -168,7 +159,7 @@ const Chat: React.FC = () => {
         if (lastMessage.sender === 'user') {
             scrollStateRef.current.userHasScrolledUp = false;
             scrollStateRef.current.lastUserMessageCount = currentUserMessageCount;
-            setUserHasScrolled(false);
+            
             
             // Force scroll to bottom for user messages
             setTimeout(() => scrollToBottom(true), 100);
@@ -387,7 +378,7 @@ const Chat: React.FC = () => {
                         return updated;
                     });
                     
-                    setUserHasScrolled(false);
+                    
                     setTimeout(() => smartScrollToBottom(), 100);
                 }
                 
@@ -445,7 +436,7 @@ const Chat: React.FC = () => {
                 }
             ]);
             // Reset scroll state for new message
-            setUserHasScrolled(false);
+            
             taskLogs.setSuppressToast(false);      // re-enable normal task-log toasts
         };
         eventBus.on("build-complete", onComplete);
@@ -474,7 +465,7 @@ const Chat: React.FC = () => {
             { text: input, sender: 'user', timestamp: new Date(), status: 'sent' }
           ]);
           setInput('');
-          setUserHasScrolled(false);
+          
 
           // 3) Wait a moment before showing AI is thinking (more natural)
           await new Promise(resolve => setTimeout(resolve, 800));
@@ -512,7 +503,7 @@ const Chat: React.FC = () => {
                 status: 'sending'
             }]);
             setInput('');
-            setUserHasScrolled(false); // Reset scroll state for new message
+             // Reset scroll state for new message
 
             setIsTyping(true);
 

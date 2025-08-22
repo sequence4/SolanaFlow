@@ -899,18 +899,22 @@ EOF'`,
         progress.updateProcess(buildId, 20, '🔑 Syncing program keys...');
         progress.updateProcess(buildId, 30, '🦀 Compiling Rust program...');
         
-        // Use smart progress for anchor build
+        // Use enhanced smart progress for anchor build
         await runCommandWithSmartProgress(
           `docker exec ${workspace.containerName} bash -lc "${script}"`,
           projectId,
           (output: string, parsed?: { current?: number, total?: number, step?: string }) => {
-            if (output.includes('Compiling')) {
+            if (parsed?.current && parsed.current > 30) {
+              // Use the smart progress percentage directly
+              progress.updateProcess(buildId, parsed.current, parsed.step || 'Building...');
+            } else if (output.includes('Compiling')) {
               const match = output.match(/Compiling (\S+)/);
               if (match) {
-                progress.updateProcess(buildId, 40, `Compiling ${match[1]}...`);
+                // Let smart progress handle the percentage, just update message
+                progress.updateProcess(buildId, 45, `Compiling ${match[1]}...`);
               }
-            } else if (output.includes('Building')) {
-              progress.updateProcess(buildId, 60, 'Building program...');
+            } else if (output.includes('cargo-build-sbf')) {
+              progress.updateProcess(buildId, 75, 'Building BPF bytecode...');
             } else if (output.includes('Finished')) {
               progress.updateProcess(buildId, 90, '✅ Compilation complete');
             }
