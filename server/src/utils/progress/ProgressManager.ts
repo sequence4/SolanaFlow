@@ -1,5 +1,14 @@
 import { EventEmitter } from 'events';
 
+// Helper function to clean messages (remove emojis and extra formatting)
+function cleanMessage(msg: string): string {
+  return msg
+    .replace(/[^\x00-\x7F]/g, '') // Remove all non-ASCII characters (emojis)
+    .replace(/:\s*/g, '') // Remove colons
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim();
+}
+
 export interface ProgressEvent {
   id: string;
   type: 'progress' | 'code-generation' | 'log' | 'status';
@@ -45,7 +54,7 @@ export class ProgressManager extends EventEmitter {
       type: 'progress',
       stage,
       process,
-      message: `Starting ${process}...`,
+      message: cleanMessage(`Starting ${process}...`),
       pct: 0,
       estimatedTimeRemaining: estimatedDuration,
       timestamp: startTime
@@ -80,7 +89,7 @@ export class ProgressManager extends EventEmitter {
       ...progress,
       type: 'progress', // Ensure type is explicitly set
       pct,
-      message: message || progress.message,
+      message: cleanMessage(message || progress.message),
       estimatedTimeRemaining: estimatedRemaining,
       details,
       timestamp: Date.now()
@@ -104,7 +113,7 @@ export class ProgressManager extends EventEmitter {
       ...progress,
       type: 'progress', // Ensure type is explicitly set
       pct: 100,
-      message: message || `${progress.process} completed`,
+      message: cleanMessage(message || `${progress.process} completed`),
       estimatedTimeRemaining: 0,
       timestamp: Date.now()
     };
@@ -126,7 +135,7 @@ export class ProgressManager extends EventEmitter {
       type: 'code-generation',
       stage: 'code-gen',
       process: 'file-generation',
-      message: `Generated ${files.length} files`,
+      message: cleanMessage(`Generated ${files.length} files`),
       pct: 100,
       details: { files },
       timestamp: Date.now()
@@ -154,7 +163,7 @@ export class ProgressManager extends EventEmitter {
     const event: ProgressEvent = {
       ...progress,
       pct: 0,
-      message: `❌ Error: ${error}`,
+      message: cleanMessage(`Error: ${error}`),
       timestamp: Date.now()
     };
     

@@ -22,7 +22,6 @@ import eventBus from '@/lib/eventBus';
 // Icons
 import { 
   Send, 
-  Bot, 
   Loader2, 
   X, 
   Maximize2, 
@@ -429,7 +428,7 @@ const Chat: React.FC = () => {
             setMessages(prev => [
                 ...prev,
                 {
-                    text: "✅ Build finished successfully! Let me know what you'd like to do next.",
+                    text: "Build finished successfully! Let me know what you'd like to do next.",
                     sender: "ai",
                     timestamp: new Date(),
                     status: "sent"
@@ -456,36 +455,31 @@ const Chat: React.FC = () => {
     const sendMessage = async () => {
         const trimmed = input.trim().toLowerCase();
         if (trimmed === 'build') {
-          // 1) prevent toast
           taskLogs.setSuppressToast(true);
 
-          // 2) Add user message first
+          // Add user message
           setMessages(prev => [
             ...prev,
             { text: input, sender: 'user', timestamp: new Date(), status: 'sent' }
           ]);
           setInput('');
           
-
-          // 3) Wait a moment before showing AI is thinking (more natural)
-          await new Promise(resolve => setTimeout(resolve, 800));
-
-          // 4) Show AI thinking state with structured thoughts
-          await showThinkingForStage('initial-build');
-          
-          // 5) Brief pause before showing checklist
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-          // 7) Add checklist bubble and forward build command
+          // Immediately show build starting message with spinner
           setMessages(prev => [
             ...prev,
-            { text: "", sender: 'ai', isChecklist: true, timestamp: new Date(), status: 'sent' }
+            { 
+              text: "Starting build process...", 
+              sender: 'ai', 
+              isChecklist: true, 
+              timestamp: new Date(), 
+              status: 'sent' 
+            }
           ]);
 
-          // 8) Forward build command globally after the delay
+          // Forward build command
           eventBus.emit('chat-build-command');
           
-          return; // stop normal AI flow
+          return;
         }
         
         if (input.trim()) {
@@ -635,70 +629,70 @@ const Chat: React.FC = () => {
       
       const stageThoughts = {
         'initial-build': [
-          "🔍 Analyzing project structure...",
-          "📋 Validating Anchor.toml configuration...",
-          "🔧 Checking Rust toolchain compatibility...",
-          "📦 Scanning dependencies and versions...",
-          "🎯 Identifying program entry points...",
-          "⚡ Planning optimal build strategy...",
-          "🐳 Preparing Docker container...",
-          "⏱️ Estimated time: 2-3 minutes"
+          "Analyzing project structure...",
+          "Validating Anchor.toml configuration...",
+          "Checking Rust toolchain compatibility...",
+          "Scanning dependencies and versions...",
+          "Identifying program entry points...",
+          "Planning optimal build strategy...",
+          "Preparing Docker container...",
+          "Estimated time: 2-3 minutes"
         ],
         'environment': [
-          "🐳 Starting Docker container...",
-          "🔄 Mounting project volumes...",
-          "🦀 Installing Rust 1.75.0...",
-          "⚓ Setting up Anchor framework v0.30...",
-          "🔗 Configuring Solana CLI tools...",
-          "📚 Loading build dependencies...",
-          "💾 Initializing build cache...",
-          "✅ Container ready for compilation"
+          "Starting Docker container...",
+          "Mounting project volumes...",
+          "Installing Rust 1.75.0...",
+          "Setting up Anchor framework v0.30...",
+          "Configuring Solana CLI tools...",
+          "Loading build dependencies...",
+          "Initializing build cache...",
+          "Container ready for compilation"
         ],
         'codegen': [
-          "📝 Parsing program instructions...",
-          "🔍 Analyzing account structures...",
-          "🏗️ Generating TypeScript bindings...",
-          "⚛️ Creating React components...",
-          "🔌 Building wallet adapter hooks...",
-          "🎨 Generating UI components...",
-          "📄 Creating IDL definitions...",
-          "🚀 Optimizing for production..."
+          "Parsing program instructions...",
+          "Analyzing account structures...",
+          "Generating TypeScript bindings...",
+          "Creating React components...",
+          "Building wallet adapter hooks...",
+          "Generating UI components...",
+          "Creating IDL definitions...",
+          "Optimizing for production..."
         ],
         'codegen-files': [
-          "📄 Creating lib.rs with program logic...",
-          "📄 Generating instruction handlers...",
-          "🔐 Setting up account validators...",
-          "🎯 Building state management...",
-          "💼 Creating wallet integration...",
-          "🌐 Generating API endpoints...",
-          "📊 Building data structures..."
+          "Creating lib.rs with program logic...",
+          "Generating instruction handlers...",
+          "Setting up account validators...",
+          "Building state management...",
+          "Creating wallet integration...",
+          "Generating API endpoints...",
+          "Building data structures..."
         ],
         'build': [
-          "🔨 Starting cargo build-sbf...",
-          "🦀 Compiling Rust to BPF bytecode...",
-          "⚡ Optimizing for Solana runtime...",
-          "🔑 Generating program keypair...",
-          "📦 Creating deployment package...",
-          "🔍 Running safety checks...",
-          "📋 Generating IDL metadata...",
-          "✨ Finalizing build artifacts..."
+          "Starting cargo build-sbf...",
+          "Compiling Rust to BPF bytecode...",
+          "Optimizing for Solana runtime...",
+          "Generating program keypair...",
+          "Creating deployment package...",
+          "Running safety checks...",
+          "Generating IDL metadata...",
+          "Finalizing build artifacts..."
         ],
         'build-progress': [
-          "📊 Compilation progress: 25%...",
-          "⚙️ Linking dependencies...",
-          "📊 Compilation progress: 50%...",
-          "🔧 Optimizing bytecode...",
-          "📊 Compilation progress: 75%...",
-          "🎯 Finalizing program binary...",
-          "📊 Compilation progress: 95%...",
-          "✅ Build verification complete"
+          "Compilation progress: 25%...",
+          "Linking dependencies...",
+          "Compilation progress: 50%...",
+          "Optimizing bytecode...",
+          "Compilation progress: 75%...",
+          "Finalizing program binary...",
+          "Compilation progress: 95%...",
+          "Build verification complete"
         ],
         'deployment-ready': [
-          "🎉 Build completed successfully!",
-          "📦 Artifacts ready for deployment",
-          "🔑 Program ID generated",
-          "🌐 Frontend connected to program",
-          "✨ Ready to deploy to Solana!"
+          "Build completed successfully!",
+          "Artifacts ready for deployment",
+          "Program ID generated",
+          "Frontend connected to program",
+          "Ready to deploy to Solana!"
         ]
       };
       
@@ -859,11 +853,6 @@ const Chat: React.FC = () => {
                                     >
                                         <div className={`${isUser ? "" : ""} w-full`}>
                                             <div className="flex items-start gap-3 w-full">
-                                                {!isUser && !isLog && (
-                                                    <div className="ai-avatar mt-1 flex-shrink-0">
-                                                        <Bot size={16} className="text-gray-400" />
-                                                    </div>
-                                                )}
                                                 <div className="leading-relaxed w-full min-w-0 flex-1">
                                                     {/* Render message content */}
                                                     {(() => {
@@ -929,12 +918,9 @@ const Chat: React.FC = () => {
                             initial={{ opacity: 0, y: 10 }} 
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -10 }}
-                            className="w-full border-l-2 border-gray-600/50 pl-4 py-4"
+                            className="w-full py-4"
                         >
                             <div className="flex items-start gap-3">
-                                <div className="ai-avatar mt-1">
-                                    <Bot size={16} className="text-gray-400" />
-                                </div>
                                 <div className="flex-1">
                                     {isThinking && thinkingSteps.length > 0 ? (
                                         <div className="thinking-steps space-y-2">
@@ -946,33 +932,20 @@ const Chat: React.FC = () => {
                                                     transition={{ delay: index * 0.1 }}
                                                     className="flex items-center gap-2 text-gray-500 text-sm"
                                                 >
+                                                    <Loader2 
+                                                        size={12} 
+                                                        className={step.completed ? "" : "animate-spin"}
+                                                    />
                                                     <span className="text-sm">
-                                                        {step.completed ? '●' : '○'}
+                                                        {step.text.replace(/[^\x00-\x7F]/g, '').trim()}
                                                     </span>
-                                                    <span className="text-sm">{step.text}</span>
                                                 </motion.div>
                                             ))}
                                         </div>
                                     ) : (
                                         <div className="flex items-center gap-3">
-                                            <span className="text-sm text-gray-500 italic">Thinking...</span>
-                                            <div className="flex space-x-1">
-                                                {[0, 1, 2].map(i => (
-                                                    <motion.div
-                                                        key={i}
-                                                        className="w-2 h-2 bg-gray-400 rounded-full"
-                                                        animate={{
-                                                            scale: [1, 1.2, 1],
-                                                            opacity: [0.3, 1, 0.3]
-                                                        }}
-                                                        transition={{
-                                                            duration: 1.5,
-                                                            repeat: Infinity,
-                                                            delay: i * 0.2
-                                                        }}
-                                                    />
-                                                ))}
-                                            </div>
+                                            <Loader2 size={16} className="animate-spin text-cyan-500" />
+                                            <span className="text-sm text-gray-500 italic">Processing...</span>
                                         </div>
                                     )}
                                 </div>

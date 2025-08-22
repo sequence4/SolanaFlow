@@ -1,8 +1,8 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Progress } from '@/components/ui/progress';
 import { useProgressTracking } from '@/hooks/useProgressTracking';
 import SequentialCodeDisplay from './SequentialCodeDisplay';
+import { Loader2 } from 'lucide-react';
 
 export const ProgressDisplay: React.FC = () => {
   const { processes, codeFiles } = useProgressTracking();
@@ -10,87 +10,41 @@ export const ProgressDisplay: React.FC = () => {
   // FILTER OUT environment stage - we don't want to show it to users
   const visibleProcesses = processes.filter(p => p.stage !== 'environment');
   
-  // Calculate overall progress from visible processes only
-  const visibleOverallProgress = React.useMemo(() => {
-    if (visibleProcesses.length === 0) return 0;
-    const totalProgress = visibleProcesses.reduce((sum, p) => sum + p.pct, 0);
-    return Math.round(totalProgress / visibleProcesses.length);
-  }, [visibleProcesses]);
-  
-  const formatTime = (seconds?: number) => {
-    if (!seconds || seconds <= 0) return '';
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-  
-  const getStageIcon = (stage: string) => {
-    switch(stage) {
-      case 'environment': return '🐳';
-      case 'code-gen': return '⚙️';
-      case 'build': return '🔨';
-      case 'deploy': return '🚀';
-      default: return '📋';
-    }
-  };
+  // Get the current active process (highest priority)
+  const activeProcess = visibleProcesses.find(p => p.pct < 100) || visibleProcesses[0];
   
   return (
     <div className="w-full space-y-4">
-      {/* Overall Progress - only show if we have visible processes */}
-      {visibleProcesses.length > 0 && (
-        <div className="bg-gray-900/50 rounded-lg p-4">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="text-sm font-medium text-gray-300">
-              Deployment Progress
-            </h3>
-            <span className="text-xs font-mono text-gray-500">
-              {visibleOverallProgress}%
-            </span>
-          </div>
-          <Progress value={visibleOverallProgress} className="h-2" />
-        </div>
-      )}
-      
-      {/* Active Processes - use filtered list */}
-      <AnimatePresence>
-        {visibleProcesses.map(process => (
+      {/* Simple spinner with status message */}
+      <AnimatePresence mode="wait">
+        {activeProcess && (
           <motion.div
-            key={process.id}
+            key={activeProcess.id}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="bg-gray-900/30 rounded-lg p-3 border-l-4 border-cyan-500/50"
+            transition={{ duration: 0.3 }}
+            className="flex items-center space-x-3 text-gray-300"
           >
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <span>{getStageIcon(process.stage)}</span>
-                <span className="text-xs font-medium text-gray-300">
-                  {process.process.replace(/-/g, ' ').replace(/^\w/, c => c.toUpperCase())}
-                </span>
-                <span className="text-xs text-gray-500 ml-2">
-                  ({process.stage})
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-gray-500">
-                {process.estimatedTimeRemaining && (
-                  <span>~{formatTime(process.estimatedTimeRemaining)} left</span>
-                )}
-                <span className="font-mono">{process.pct}%</span>
-              </div>
-            </div>
+            {/* Spinner */}
+            <Loader2 className="h-4 w-4 animate-spin text-cyan-500" />
             
-            <Progress value={process.pct} className="h-1 mb-2" />
-            
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-400">{process.message}</span>
-              {process.details && (
-                <span className="text-xs font-mono text-gray-500">
-                  {process.details.current}/{process.details.total}
-                </span>
+            {/* Status message without emojis */}
+            <div className="flex-1">
+              <p className="text-sm">
+                {activeProcess.message
+                  .replace(/[^\x00-\x7F]/g, '') // Remove all non-ASCII (emojis)
+                  .replace(/:\s*/g, '') // Remove colons
+                  .trim()}
+              </p>
+              {activeProcess.details && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Processing {activeProcess.details.current} of {activeProcess.details.total}
+                </p>
               )}
             </div>
           </motion.div>
-        ))}
+        )}
       </AnimatePresence>
       
       {/* Code Files Display */}
