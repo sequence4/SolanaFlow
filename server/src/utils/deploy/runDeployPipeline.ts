@@ -37,6 +37,7 @@ class ProgressManager {
   private generatedFiles: any[] = [];
   private collectedFiles = 0;
   private expectedCollectionFiles = 10;
+  private currentTasks: Map<string, {name: string, status: 'running' | 'completed' | 'error', pct: number}> = new Map();
   
   private progressDistribution = {
     'code-gen': {
@@ -232,6 +233,55 @@ class ProgressManager {
     });
   }
   
+  // Add new method for individual task tracking
+  startTask(taskId: string, taskName: string, stage: string) {
+    this.currentTasks.set(taskId, {name: taskName, status: 'running', pct: 0});
+    this.sendProgress({
+      type: 'task-start',
+      taskId,
+      taskName,
+      stage,
+      status: 'running',
+      timestamp: Date.now(),
+      sequence: ++this.sequenceNumber
+    });
+  }
+  
+  updateTask(taskId: string, pct: number, message?: string) {
+    const task = this.currentTasks.get(taskId);
+    if (task) {
+      task.pct = pct;
+      this.sendProgress({
+        type: 'task-update',
+        taskId,
+        taskName: task.name,
+        pct,
+        message,
+        status: 'running',
+        timestamp: Date.now(),
+        sequence: ++this.sequenceNumber
+      });
+    }
+  }
+  
+  completeTask(taskId: string, message?: string) {
+    const task = this.currentTasks.get(taskId);
+    if (task) {
+      task.status = 'completed';
+      task.pct = 100;
+      this.sendProgress({
+        type: 'task-complete',
+        taskId,
+        taskName: task.name,
+        pct: 100,
+        message: message || `${task.name} completed`,
+        status: 'completed',
+        timestamp: Date.now(),
+        sequence: ++this.sequenceNumber
+      });
+    }
+  }
+
   cleanup() {
     if (this.batchTimeout) {
       clearTimeout(this.batchTimeout);
@@ -306,7 +356,10 @@ export async function runDeployPipeline({
   let keepAliveInterval: NodeJS.Timeout | null = null;
 
   try {
+    // Environment setup with individual tasks
+    progressMgr.startTask('env-docker', 'Docker Environment Setup', 'environment');
     workspace = await prepEnv(projectId, userId, devMode);
+    progressMgr.completeTask('env-docker', 'Container ready');
 
     // Wait for environment progress animation to complete
     await environmentPromise;
@@ -329,6 +382,14 @@ export async function runDeployPipeline({
     //console.log('[DEPLOY] Starting code generation phase with managed progress');
     await progressMgr.transitionToStage('code-gen', '🦀 Starting Solana program generation...');
     
+    // Code generation with detailed tasks
+    progressMgr.startTask('codegen-analyze', 'Analyzing Project Structure', 'code-gen');
+    progressMgr.updateTask('codegen-analyze', 25, 'Parsing graph structure...');
+    progressMgr.completeTask('codegen-analyze');
+    
+    progressMgr.startTask('codegen-rust', 'Generating Rust Program', 'code-gen');
+    progressMgr.startTask('codegen-frontend', 'Generating Frontend Code', 'code-gen');
+    
     // Enhanced progress wrapper with individual file tracking
     const managedProgressWrapper = (data: any) => {
       // Handle code-generation events with files array
@@ -344,10 +405,17 @@ export async function runDeployPipeline({
         */
         
         // Send individual file events for each file in the batch
-        data.files.forEach((file: any, index: number) => {
+        data.files.forEach((file: any) => {
           if (file.filename && file.content) {
-            //console.log(`[DEPLOY] Processing file ${index + 1}/${data.files.length} from batch:`, file.filename, 'content length:', file.content.length);
+            //console.log(`[DEPLOY] Processing file from batch:`, file.filename, 'content length:', file.content.length);
             progressMgr.addCodeGenerationEvent(file.filename, file.content);
+            
+            // Update specific task progress based on file type
+            if (file.filename.endsWith('.rs')) {
+              progressMgr.updateTask('codegen-rust', Math.min(90, (data.files.filter((f: any) => f.filename.endsWith('.rs')).length / data.files.length) * 100));
+            } else if (file.filename.endsWith('.tsx') || file.filename.endsWith('.ts')) {
+              progressMgr.updateTask('codegen-frontend', Math.min(90, (data.files.filter((f: any) => f.filename.endsWith('.tsx') || f.filename.endsWith('.ts')).length / data.files.length) * 100));
+            }
           } 
         });
         
@@ -394,6 +462,11 @@ export async function runDeployPipeline({
     const secretArr   = JSON.parse(secretJson);
     programKeypair    = Keypair.fromSecretKey(Uint8Array.from(secretArr));
     programIdStr      = programKeypair.publicKey.toBase58();
+    
+    // Complete individual code generation tasks
+    progressMgr.completeTask('codegen-rust');
+    progressMgr.completeTask('codegen-frontend');
+    
     // Complete code generation stage
     await progressMgr.completeStage('code-gen', `Code generation complete — Program ID: ${programIdStr}`);
 
@@ -406,6 +479,12 @@ export async function runDeployPipeline({
     // Start build phase with atomic transition
     //console.log('[DEPLOY] Starting build phase with managed progress');
     await progressMgr.transitionToStage('build', 'Starting Rust compilation...');
+    
+    // Build with individual tasks
+    progressMgr.startTask('build-deps', 'Installing Dependencies', 'build');
+    progressMgr.startTask('build-compile', 'Compiling Rust to BPF', 'build');
+    progressMgr.startTask('build-artifacts', 'Generating Artifacts', 'build');
+    
     const buildPromise = sendBuildProgress(sendProgress);
     const buildTask = await startAnchorBuildTask(projectId, userId);
     
@@ -419,6 +498,11 @@ export async function runDeployPipeline({
     if (!OK_STATUSES.includes(buildStatus)) {
       throw new Error(`Build task ended with status: ${buildStatus}`);
     }
+    
+    // Complete individual build tasks
+    progressMgr.completeTask('build-deps', 'Dependencies installed');
+    progressMgr.completeTask('build-compile', 'Rust compilation completed');
+    progressMgr.completeTask('build-artifacts', 'Build artifacts generated');
     
     /* ------------------------------------------------------------------ *
      * 3a ─ make ./target/deploy point at the warmed cache

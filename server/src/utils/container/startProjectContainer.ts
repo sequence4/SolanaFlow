@@ -9,6 +9,55 @@ import os from 'os';
 import fs from 'fs';
 import path from 'path';
 import { getProjectRootPath } from 'src/utils/fileUtils';
+import eventBus from '../../lib/eventBus';
+
+// Progress tracking function for container setup operations
+function sendContainerSetupProgress(taskId: string, taskName: string, message: string, pct: number, thoughts: string[] = []) {
+  eventBus.emit('task-update', { taskId, pct, message });
+  
+  const event = {
+    type: 'container-setup-progress',
+    taskId,
+    taskName,
+    stage: 'environment',
+    message,
+    pct,
+    thoughts,
+    timestamp: Date.now()
+  };
+  
+  // Emit to SSE for frontend
+  console.log(JSON.stringify(event));
+}
+
+function startContainerTask(taskId: string, taskName: string) {
+  eventBus.emit('task-start', { taskId, taskName, stage: 'environment' });
+  
+  const event = {
+    type: 'task-start',
+    taskId,
+    taskName,
+    stage: 'environment',
+    status: 'running',
+    timestamp: Date.now()
+  };
+  
+  console.log(JSON.stringify(event));
+}
+
+function completeContainerTask(taskId: string, message: string = 'Task completed') {
+  eventBus.emit('task-complete', { taskId, message });
+  
+  const event = {
+    type: 'task-complete',
+    taskId,
+    message,
+    status: 'completed',
+    timestamp: Date.now()
+  };
+  
+  console.log(JSON.stringify(event));
+}
 
 /* ───────── timing helper ────────
  * If you only need to *see* the output, use inherit=true.
@@ -295,7 +344,22 @@ export async function startProjectContainer(
   try {
     process.env.DOCKER_CLI_DEBUG = process.env.DOCKER_CLI_DEBUG ?? '1'; // show HTTP calls
     
+    // Start container setup tracking
+    startContainerTask('env-docker-init', 'Docker Environment Initialization');
+    sendContainerSetupProgress('env-docker-init', 'Docker Environment Initialization', 'Checking Docker configuration...', 5, [
+      'Analyzing Docker daemon configuration',
+      'Validating platform compatibility (linux/amd64 vs linux/arm64)',
+      'Setting up CLI debug mode for better visibility',
+      'This ensures we can troubleshoot any Docker issues quickly'
+    ]);
+    
     // ── pin to immutable digest and then re-tag it so `docker run` will work
+    sendContainerSetupProgress('env-docker-init', 'Docker Environment Initialization', 'Resolving container image digest...', 10, [
+      'Inspecting container image for immutable digest reference',
+      'This prevents version drift and ensures reproducible builds',
+      'Using digest-based references for maximum stability'
+    ]);
+    
     let imageRef = image;
     try {
       let digest = '';
@@ -307,37 +371,101 @@ export async function startProjectContainer(
         );
         digest = buf ? buf.toString().trim() : '';
         if (digest) {
-          //console.log('[startProjectContainer] pulled digest:', digest);
+          sendContainerSetupProgress('env-docker-init', 'Docker Environment Initialization', 'Pinning image to digest...', 15, [
+            `Found immutable digest: ${digest.substring(0, 20)}...`,
+            'Tagging digest with friendly name for Docker run compatibility',
+            'This guarantees we use exactly the same image layers every time'
+          ]);
           execSync(`docker tag ${digest} ${image}`, { stdio: 'inherit' });
           imageRef = image;          // pinned
         }
       } catch (e) {
         console.warn('[startProjectContainer] no digest found – using tag only');
+        sendContainerSetupProgress('env-docker-init', 'Docker Environment Initialization', 'Using tag reference (no digest)...', 15, [
+          'No digest found, falling back to tag-based reference',
+          'This is still safe but slightly less reproducible',
+          'Modern registries usually provide digests automatically'
+        ]);
         imageRef = image;            // safe fallback
       }
     } catch (e) {
       console.warn("[startProjectContainer] digest tagging failed; using tag:", e);
+      sendContainerSetupProgress('env-docker-init', 'Docker Environment Initialization', 'Using image tag as fallback...', 15, [
+        'Digest pinning failed, using tag reference instead',
+        'This is a safe fallback but less deterministic',
+        'Container will still work normally'
+      ]);
       imageRef = image;
     }
 
     /* 1b ─ ensure the traefik network exists on the remote host */
+    sendContainerSetupProgress('env-docker-init', 'Docker Environment Initialization', 'Setting up Docker networking...', 20, [
+      'Checking for Traefik reverse proxy network',
+      'This network enables automatic HTTPS and routing',
+      'Essential for web app accessibility from external hosts'
+    ]);
+    
     try {
       execSync('docker network inspect traefik', { stdio: 'ignore' });
+      sendContainerSetupProgress('env-docker-init', 'Docker Environment Initialization', 'Traefik network found', 25, [
+        'Existing Traefik network is ready',
+        'No need to create additional networking infrastructure',
+        'Container will automatically join this network'
+      ]);
     } catch {
       console.warn('[startProjectContainer] creating missing "traefik" network');
+      sendContainerSetupProgress('env-docker-init', 'Docker Environment Initialization', 'Creating Traefik network...', 25, [
+        'No Traefik network found, creating new bridge network',
+        'This network will handle reverse proxy routing',
+        'Enables automatic SSL termination and subdomain routing'
+      ]);
       timed('docker network create traefik --driver bridge', 'net-create');
     }
+    
+    completeContainerTask('env-docker-init', 'Docker environment initialized');
 
     /* 2 ─ run container with explicit platform, project label & random host-port */
+    startContainerTask('env-disk-check', 'Storage Space Verification');
+    sendContainerSetupProgress('env-disk-check', 'Storage Space Verification', 'Checking available disk space...', 30, [
+      'Ensuring minimum 3GB free space for container operations',
+      'Large Rust projects can consume significant disk space',
+      'Will trigger cleanup if space is insufficient'
+    ]);
+    
     // NEW: make sure the host has enough free space (≥ 3 GiB)
     ensureDockerSpace();
+    completeContainerTask('env-disk-check', 'Sufficient disk space verified');
     
     /* ------------------------------------------------------------------
      * Pull the image for the platform selected above.  This guarantees
      * that    SF_DOCKER_PLATFORM=linux/amd64    on WSL/Intel laptops
      * actually fetches x86-64 layers and never falls back to QEMU. 
      * ------------------------------------------------------------------ */
+    startContainerTask('env-image-pull', 'Container Image Download');
+    sendContainerSetupProgress('env-image-pull', 'Container Image Download', `Pulling ${targetPlatform} image...`, 35, [
+      `Target platform: ${targetPlatform}`,
+      'Downloading pre-built Solana development environment',
+      'This image contains Rust, Anchor framework, and Solana CLI',
+      'May take a few minutes on first run'
+    ]);
+    
     timed(`docker pull --platform ${targetPlatform} ${image}`, 'pull');
+    
+    sendContainerSetupProgress('env-image-pull', 'Container Image Download', 'Image download completed', 95, [
+      'All container layers downloaded successfully',
+      'Image contains pre-cached dependencies to speed up builds',
+      'Ready to start container with development environment'
+    ]);
+    
+    completeContainerTask('env-image-pull', 'Container image ready');
+
+    // Container configuration and startup
+    startContainerTask('env-container-config', 'Container Configuration');
+    sendContainerSetupProgress('env-container-config', 'Container Configuration', 'Configuring container networking...', 40, [
+      'Selecting available port for web application',
+      'Checking port availability to avoid conflicts',
+      'Setting up reverse proxy routing configuration'
+    ]);
 
     // choose the public port deterministically so the UI link is stable
     const hostPort = process.env.SF_HOST_PORT
@@ -347,6 +475,12 @@ export async function startProjectContainer(
     if (portInUse(String(hostPort))) {
       throw new Error(`[startProjectContainer] requested hostPort ${hostPort} already in use`);
     }
+    
+    sendContainerSetupProgress('env-container-config', 'Container Configuration', `Port ${hostPort} allocated successfully`, 45, [
+      `Container will be accessible on port ${hostPort}`,
+      'Port mapping ensures external connectivity',
+      'Reverse proxy will handle SSL termination automatically'
+    ]);
     
     const runArgs: string[] = [
       'docker', 'run',
@@ -391,8 +525,20 @@ export async function startProjectContainer(
       imageRef,
     ];
 
+    sendContainerSetupProgress('env-container-config', 'Container Configuration', 'Preparing container startup command...', 60, [
+      `Mode: ${useDevServer ? 'Development (hot-reload)' : 'Production (standalone)'}`,
+      'Configuring Next.js web server startup',
+      'Setting up graceful shutdown handlers',
+      'Will copy base template if project is new'
+    ]);
+
     // Add the appropriate command based on dev vs production mode
     if (useDevServer) {
+      sendContainerSetupProgress('env-container-config', 'Container Configuration', 'Configuring development mode...', 65, [
+        'Development server with hot-reload enabled',
+        'React Fast Refresh will update code instantly',
+        'Perfect for iterative development workflow'
+      ]);
       runArgs.push(
         'bash', '-lc',
         // Copy base Next.js app if needed, then start dev server with hot-reload
@@ -404,6 +550,11 @@ export async function startProjectContainer(
         `pid=$!; trap 'kill $pid' TERM INT; wait $pid"`
       );
     } else {
+      sendContainerSetupProgress('env-container-config', 'Container Configuration', 'Configuring production mode...', 65, [
+        'Production server with optimized build',
+        'Lower resource usage, better performance',
+        'Standalone server ready for deployment'
+      ]);
       runArgs.push(
         'bash', '-lc',
         // Copy base Next.js app if needed, then run standalone server
@@ -416,18 +567,50 @@ export async function startProjectContainer(
       );
     }
 
+    sendContainerSetupProgress('env-container-config', 'Container Configuration', 'Starting container...', 70, [
+      'Executing docker run command',
+      'Container will start in detached mode',
+      'All volumes and environment variables configured'
+    ]);
+
     //console.log("[startProjectContainer] RUN CMD:\n", runArgs.join(" "));
     timed(runArgs.join(" "), 'docker-run');
+    
+    sendContainerSetupProgress('env-container-config', 'Container Configuration', 'Container started, setting up tools...', 80, [
+      'Container is now running successfully',
+      'Setting up Yarn package manager via Corepack',
+      'Preparing development environment'
+    ]);
 
     // ─── ensure Yarn 1.x binary is available via Corepack ──────────────────
+    startContainerTask('env-tools-setup', 'Development Tools Setup');
+    sendContainerSetupProgress('env-tools-setup', 'Development Tools Setup', 'Installing Yarn package manager...', 85, [
+      'Activating Corepack for package manager selection',
+      'Installing Yarn 1.22.22 for JavaScript dependencies',
+      'This enables fast package installation and caching'
+    ]);
+    
     try {
       timed(
         `docker exec ${name} bash -lc "corepack enable && corepack prepare yarn@1.22.22 --activate"`,
         'corepack-prepare'
       );
+      sendContainerSetupProgress('env-tools-setup', 'Development Tools Setup', 'Yarn installed successfully', 95, [
+        'Yarn package manager is ready',
+        'Frontend dependencies can now be installed quickly',
+        'Development environment fully configured'
+      ]);
     } catch (e) {
       console.warn('[startProjectContainer] corepack prepare failed:', e);
+      sendContainerSetupProgress('env-tools-setup', 'Development Tools Setup', 'Yarn setup failed (non-critical)', 95, [
+        'Yarn installation encountered an issue',
+        'Container is still functional for Rust development',
+        'JavaScript features may have limited functionality'
+      ]);
     }
+    
+    completeContainerTask('env-tools-setup', 'Development tools ready');
+    completeContainerTask('env-container-config', 'Container fully configured');
 
     const containerUrl = resolveContainerUrl(String(hostPort));
 

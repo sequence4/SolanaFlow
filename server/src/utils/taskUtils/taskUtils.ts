@@ -40,6 +40,15 @@ export async function updateTaskStatus(
 ): Promise<void> {
   const client = await pool.connect();
   const sanitizedTaskId = taskId.trim().replace(/,$/, '');
+  
+  // Validate UUID format before attempting database update
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(sanitizedTaskId)) {
+    console.warn(`[TASK-UPDATE] Skipping invalid task ID: ${sanitizedTaskId}`);
+    client.release();
+    return;
+  }
+  
   try {
     await client.query(
       'UPDATE task SET status = $1, result = $2 WHERE id = $3',

@@ -514,13 +514,29 @@ export const startCreateFileTask = async (
             await runCommand(mkdirCmd, '.', taskId);
           }
           
-          const writeCmd = `
-            docker exec -i ${containerName} bash -c "cat > /usr/src/${projectRootPath}/${filePath}" << 'EOF'
-${content}
-EOF`;
-          await runCommand(writeCmd, '.', taskId);
-          //console.log(`Successfully created file in container: ${filePath}`);
-          await updateTaskStatus(taskId, 'succeed', 'File created successfully in container');
+          // Write to temporary file first to avoid E2BIG error with large content
+          const tempFile = `/tmp/solanaflow-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          await fs.promises.writeFile(tempFile, content, 'utf-8');
+          
+          try {
+            // Copy temp file to container
+            const copyCmd = `docker cp "${tempFile}" "${containerName}:/usr/src/${projectRootPath}/${filePath}"`;
+            await runCommand(copyCmd, '.', taskId);
+            
+            // Set proper permissions
+            const chownCmd = `docker exec ${containerName} chown 1000:1000 "/usr/src/${projectRootPath}/${filePath}"`;
+            await runCommand(chownCmd, '.', taskId, { skipSuccessUpdate: true, silent: true });
+            
+            //console.log(`Successfully created file in container: ${filePath}`);
+            await updateTaskStatus(taskId, 'succeed', 'File created successfully in container');
+          } finally {
+            // Clean up temp file
+            try {
+              await fs.promises.unlink(tempFile);
+            } catch (e) {
+              // Ignore cleanup errors
+            }
+          }
         } catch (containerError) {
           console.error(`Error creating file ${filePath} in container:`, containerError);
           //console.log('Falling back to local file system for file creation');
