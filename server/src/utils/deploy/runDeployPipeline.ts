@@ -75,7 +75,7 @@ class ProgressManager {
           sequence: ++this.sequenceNumber
         };
         
-        console.log(`[PROGRESS-MGR] Sending batched code generation with ${allFiles.length} files`);
+        //console.log(`[PROGRESS-MGR] Sending batched code generation with ${allFiles.length} files`);
         this.sendProgress(batchedEvent);
       }
     }
@@ -101,7 +101,7 @@ class ProgressManager {
     try {
       // Complete current stage before transitioning
       if (this.currentStage && this.currentStage !== stage) {
-        console.log(`[PROGRESS-MGR] Completing stage: ${this.currentStage}`);
+        //console.log(`[PROGRESS-MGR] Completing stage: ${this.currentStage}`);
         this.stageProgress.set(this.currentStage, 100);
         this.sendProgress({
           stage: this.currentStage,
@@ -116,7 +116,7 @@ class ProgressManager {
       }
       
       // Start new stage
-      console.log(`[PROGRESS-MGR] Starting stage: ${stage}`);
+      //console.log(`[PROGRESS-MGR] Starting stage: ${stage}`);
       this.currentStage = stage;
       this.stageProgress.set(stage, 0);
       
@@ -140,7 +140,7 @@ class ProgressManager {
     const newPct = Math.max(pct, lastPct);
     this.stageProgress.set(stage, newPct);
     
-    console.log(`[PROGRESS-MGR] ${stage}: ${lastPct}% → ${newPct}% (${message})`);
+    //console.log(`[PROGRESS-MGR] ${stage}: ${lastPct}% → ${newPct}% (${message})`);
     
     this.sendProgress({
       stage,
@@ -326,32 +326,29 @@ export async function runDeployPipeline({
  
     
     // 2 ─ code generation ─────────────────────────────────────────────────
-    console.log('[DEPLOY] Starting code generation phase with managed progress');
+    //console.log('[DEPLOY] Starting code generation phase with managed progress');
     await progressMgr.transitionToStage('code-gen', '🦀 Starting Solana program generation...');
     
     // Enhanced progress wrapper with individual file tracking
     const managedProgressWrapper = (data: any) => {
       // Handle code-generation events with files array
       if (data.type === 'code-generation' && data.files && Array.isArray(data.files)) {
-        console.log('[DEPLOY] Processing code-generation batch with', data.files.length, 'files');
+        //console.log('[DEPLOY] Processing code-generation batch with', data.files.length, 'files');
+        /*
         console.log('[DEPLOY] CRITICAL: First file in batch:', {
           filename: data.files[0]?.filename,
           hasContent: !!data.files[0]?.content,
           contentLength: data.files[0]?.content?.length || 0,
           contentSample: data.files[0]?.content?.substring(0, 100) || 'NO CONTENT'
         });
+        */
         
         // Send individual file events for each file in the batch
         data.files.forEach((file: any, index: number) => {
           if (file.filename && file.content) {
-            console.log(`[DEPLOY] Processing file ${index + 1}/${data.files.length} from batch:`, file.filename, 'content length:', file.content.length);
+            //console.log(`[DEPLOY] Processing file ${index + 1}/${data.files.length} from batch:`, file.filename, 'content length:', file.content.length);
             progressMgr.addCodeGenerationEvent(file.filename, file.content);
-          } else {
-            console.log(`[DEPLOY] ⚠️  Skipping file ${index + 1} - missing filename or content:`, { 
-              filename: file.filename, 
-              hasContent: !!file.content 
-            });
-          }
+          } 
         });
         
         // Also send the overall progress update
@@ -362,7 +359,7 @@ export async function runDeployPipeline({
       // Handle individual file-generated events
       else if ((data.type === 'code-generation' || data.type === 'file-generated') && data.fileName) {
         // Send individual file generation events immediately
-        console.log('[DEPLOY] Processing individual file generation:', data.fileName, 'has content:', !!data.content);
+        //console.log('[DEPLOY] Processing individual file generation:', data.fileName, 'has content:', !!data.content);
         
         // Ensure content is passed through
         const fileContent = data.content || data.fileContent || '';
@@ -407,7 +404,7 @@ export async function runDeployPipeline({
     await waitForTaskCompletion(sentinelId, 90, 2_000);
     
     // Start build phase with atomic transition
-    console.log('[DEPLOY] Starting build phase with managed progress');
+    //console.log('[DEPLOY] Starting build phase with managed progress');
     await progressMgr.transitionToStage('build', 'Starting Rust compilation...');
     const buildPromise = sendBuildProgress(sendProgress);
     const buildTask = await startAnchorBuildTask(projectId, userId);
@@ -451,7 +448,7 @@ export async function runDeployPipeline({
                        ".", symlinkTaskId, { skipSuccessUpdate: true });
     }
     
-    console.log("🔨 Build task completed successfully");
+    //console.log("🔨 Build task completed successfully");
 
     /* 3b ─ fetch artefact ------------------------------------------------ */
     const { base64So } = await getBuildArtifactTask(projectId);
@@ -503,9 +500,9 @@ export async function runDeployPipeline({
      * NEVER copy `${programName}-keypair.json`; it contains the 64‑byte secret
      * key and must stay inside the container.
      * ----------------------------------------------------------------------*/
-    console.log('[FILE-OPS] Starting file collection phase');
-    console.log('[FILE-OPS] Project folder:', projectFolder);
-    console.log('[FILE-OPS] Deploy directory:', deployDir);
+    //console.log('[FILE-OPS] Starting file collection phase');
+    //console.log('[FILE-OPS] Project folder:', projectFolder);
+    //console.log('[FILE-OPS] Deploy directory:', deployDir);
     
     // Helper functions for file operations
     const checkFileExists = async (containerName: string, filePath: string): Promise<boolean> => {
@@ -527,7 +524,7 @@ export async function runDeployPipeline({
           `docker exec ${containerName} ls -la "${dirPath}" 2>/dev/null || echo "Directory not found"`,
           { encoding: 'utf8' }
         );
-        console.log(`[DIR-LISTING] Contents of ${dirPath}:\n${files}`);
+        //console.log(`[DIR-LISTING] Contents of ${dirPath}:\n${files}`);
         return files;
       } catch (error) {
         console.error(`[DIR-LISTING] Error listing ${dirPath}:`, error);
@@ -546,7 +543,7 @@ export async function runDeployPipeline({
     while (!soFileExists && retryCount < 5) {
       soFileExists = await checkFileExists(workspace.containerName, soFilePath);
       if (!soFileExists) {
-        console.log(`[FILE-OPS] .so file not found yet, retry ${retryCount + 1}/5`);
+        //console.log(`[FILE-OPS] .so file not found yet, retry ${retryCount + 1}/5`);
         progressMgr.updateProgress('build', 92 + retryCount, `Waiting for build artifacts (${retryCount + 1}/5)...`);
         await new Promise(resolve => setTimeout(resolve, 2000));
         retryCount++;
@@ -554,7 +551,7 @@ export async function runDeployPipeline({
     }
     
     if (!soFileExists) {
-      console.error('[FILE-OPS] WARNING: .so file not found after retries');
+      //console.error('[FILE-OPS] WARNING: .so file not found after retries');
       progressMgr.handleFileCollection(programName + '.so', false);
     } else {
       console.log('[FILE-OPS] .so file found, proceeding with copy');
@@ -571,7 +568,7 @@ export async function runDeployPipeline({
     const tomlExists = await checkFileExists(workspace.containerName, tomlFile);
     if (tomlExists) {
       await readContainerFile(workspace.containerName, tomlFile, projectId, userId);
-      console.log('[FILE-OPS] Anchor.toml collected');
+      //console.log('[FILE-OPS] Anchor.toml collected');
       progressMgr.handleFileCollection('Anchor.toml', true);
     } else {
       console.warn('[FILE-OPS] Anchor.toml not found at expected location');
@@ -609,7 +606,7 @@ export async function runDeployPipeline({
        ---------------------------------------------------------------- */
     for (const d of idlDirs) {
       try {
-        console.log(`[IDL-COPY] Checking directory: ${d}`);
+        //console.log(`[IDL-COPY] Checking directory: ${d}`);
         await listDirectory(workspace.containerName, d);
         
         const result = await runCommand(
@@ -618,7 +615,7 @@ export async function runDeployPipeline({
           `copy-idl-${Date.now()}`,
           { skipSuccessUpdate: true },
         );
-        console.log(`[IDL-COPY] Result from ${d}:`, result);
+       // console.log(`[IDL-COPY] Result from ${d}:`, result);
       } catch (err) {
         console.log(`[IDL-COPY] Directory ${d} not accessible:`, err);
       }
@@ -698,7 +695,7 @@ export async function runDeployPipeline({
     };
     
     findIdls(fileTree);
-    console.log(`📋 Found ${idls.length} IDL file(s)`);
+    //console.log(`📋 Found ${idls.length} IDL file(s)`);
     
     /* ──────────────────────────────────────────────────────────────
      * Patch   idl.metadata.address  →  compiled program public key
@@ -714,12 +711,12 @@ export async function runDeployPipeline({
           ...(idlContent.metadata ?? {}),
           address: programId,
         };
-        console.log(`🔑 Updated IDL metadata with program ID: ${programId}`);
+        //console.log(`🔑 Updated IDL metadata with program ID: ${programId}`);
 
         /* ---------- ensure the front-end sees the Program ID ---------- */
         try {
           await writeProgramIdEnv(programId, absRoot);
-          console.log(`📄 Program ID written to .env file`);
+          //console.log(`📄 Program ID written to .env file`);
 
           /* ----------------------------------------------------------
            * The file change happens *after* the Next.js dev server
