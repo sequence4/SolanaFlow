@@ -794,70 +794,68 @@ EOF'`,
           sendProgress: (d: unknown) => void,
         ): Promise<string> => {
           return (async () => {
-            // IMMEDIATELY extract and send all files to frontend
+            // Extract files FIRST but DON'T send them yet
             const allSrcFiles = extractAllFiles(rootNode);
             console.log('[GEN] Extracted', allSrcFiles.length, 'files from generated tree');
 
-            // Send all files to frontend IMMEDIATELY with actual content
-            for (const file of allSrcFiles) {
-              const filename = file.path.split('/').pop() || file.path;
-              const language = filename.endsWith('.rs') ? 'rust' : 
-                               filename.endsWith('.toml') ? 'toml' : 'text';
-              
-              // Truncate content for display but ensure it's real content
-              const displayContent = file.content.length > 400 
-                ? file.content.substring(0, 400) + '\n\n// ... (truncated)'
-                : file.content;
-              
-              // Add to global collection with REAL content
-              allGeneratedFiles.push({
-                filename: file.path,
-                content: displayContent,
-                language
+            // DON'T SEND FILES YET - just update progress
+            sendProgress({
+              type: 'progress',
+              stage: 'code-gen',
+              status: 'active',
+              message: `📝 Writing ${allSrcFiles.length} program files...`,
+              pct: 55
+            });
+            
+            // Write files to disk
+            const writeTaskIds = await insertSrcFiles(rootNode, projectId, existingFilePaths, creatorId, emitFileWritten(sendProgress, true));
+            
+            // Update progress while waiting
+            sendProgress({
+              type: 'progress',
+              stage: 'code-gen',
+              status: 'active',
+              message: '💾 Saving files to container...',
+              pct: 70
+            });
+            
+            // Wait for writes with progress updates
+            for (let i = 0; i < writeTaskIds.length; i++) {
+              await waitForTaskCompletion(writeTaskIds[i], 90, 2_000);
+              const progress = 70 + Math.round((i / writeTaskIds.length) * 20);
+              sendProgress({
+                type: 'progress',
+                stage: 'code-gen',
+                status: 'active',
+                message: `💾 Saved ${i + 1}/${writeTaskIds.length} files...`,
+                pct: Math.min(progress, 90)
               });
             }
 
-            // Send batch update with correct file structure
-            const displayFiles = allGeneratedFiles.slice(0, 5).map(file => ({
-              filename: file.filename,
-              content: file.content,
-              language: file.language
+            // NOW send the files with content AFTER they're written
+            const displayFiles = allSrcFiles.slice(0, 5).map(file => ({
+              filename: file.path,
+              content: file.content.substring(0, 500),
+              language: file.path.endsWith('.rs') ? 'rust' : 'toml'
             }));
-            
-            const allFileNames = allSrcFiles.map(f => f.path); // ALL file paths for complete list
 
-            // Log what we're sending for debugging
-            console.log('[GEN] Sending files to frontend:', {
-              displayFilesCount: displayFiles.length,
-              firstFileContent: displayFiles[0]?.content?.substring(0, 100),
-              allFileNamesCount: allFileNames.length
-            });
+            console.log('[GEN] SENDING FILES NOW - After writing complete');
+            console.log('[GEN] Display files:', displayFiles.map(f => ({
+              name: f.filename,
+              contentLength: f.content.length
+            })));
 
+            // Send files AFTER writing is done
             sendProgress({
               type: 'code-generation',
               stage: 'code-gen',
               status: 'active',
-              message: `🦀 Generated ${allGeneratedFiles.length} Solana program files`,
-              files: displayFiles, // Limited files with correct structure
-              totalFileCount: allGeneratedFiles.length,
-              allFileNames: allFileNames, // ALL file names for complete list
-              pct: 50
+              message: `✅ Generated ${allSrcFiles.length} Solana program files`,
+              files: displayFiles,
+              totalFileCount: allSrcFiles.length,
+              allFileNames: allSrcFiles.map(f => f.path),
+              pct: 95
             });
-            
-            const writeTaskIds = await insertSrcFiles(rootNode, projectId, existingFilePaths, creatorId, emitFileWritten(sendProgress, true)); // true = Rust phase
-            
-            // Wait until every write-file task finishes
-            for (const tId of writeTaskIds) {
-              await waitForTaskCompletion(tId, 90, 2_000);
-            }
-
-            // SKIP the attachFileContents call - we already have the content!
-            // This eliminates the 95% lag entirely
-            // const rootBase = process.env.ROOT_FOLDER!;
-            // const absRoot  = path.join(rootBase, workspace.rootPath);
-            // const tinyTree = [rootNode];
-            // const skipContentLogging = true;
-            // await attachFileContents(tinyTree, absRoot, workspace.containerName, false, skipContentLogging);
 
             // now it is safe to raise the sentinel
             const sentinelId = await markWriteDone(projectId);

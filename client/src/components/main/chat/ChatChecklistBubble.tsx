@@ -81,8 +81,7 @@ interface StepItemProps {
 const StepItem = React.memo(({ step, index, isLastStep }: StepItemProps) => {
   const [expandedFiles, setExpandedFiles] = useState(false);
   const [showThinking, setShowThinking] = useState(false);
-  // Add stable key for code display
-  const [codeDisplayKey] = useState(() => `code-${step.id}-${Date.now()}`);
+  // Removed unused codeDisplayKey
   
   const stepProgress = useMemo(() => {
     return step.pct ?? (step.status === "done" ? 100 : step.status === "active" ? 50 : 0);
@@ -197,16 +196,15 @@ const StepItem = React.memo(({ step, index, isLastStep }: StepItemProps) => {
               )}
             </div>
             
-            {/* Code preview - only show LIMITED snippets */}
+            {/* Code preview - ALWAYS show if we have files */}
             {step.generatedFiles && step.generatedFiles.length > 0 && (
-              <div className="mt-2" key={codeDisplayKey}>
+              <div className="mt-2" key={`code-display-${step.id}`}>
                 <div className="text-xs text-gray-500 mb-1">
-                  Code preview (showing {step.generatedFiles.length} of {step.allFileNames?.length || step.generatedFiles.length} files):
+                  Code preview (showing {step.generatedFiles.length} files):
                 </div>
-                <div className="h-48 overflow-hidden">
+                <div className="min-h-[200px] bg-gray-900/50 rounded p-2">
                   <SequentialCodeDisplay 
-                    key={codeDisplayKey}
-                    files={step.generatedFiles} // Use ALL limited files for display
+                    files={step.generatedFiles}
                   />
                 </div>
               </div>

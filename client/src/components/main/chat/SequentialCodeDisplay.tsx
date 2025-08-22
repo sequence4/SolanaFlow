@@ -8,6 +8,25 @@ interface CodeFile {
 }
 
 const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
+  // IMMEDIATE validation and logging
+  console.log('[SequentialCodeDisplay] RENDER CALLED with files:', files);
+  
+  if (!files || files.length === 0) {
+    return (
+      <div className="text-gray-400 italic p-4">
+        Waiting for code generation...
+      </div>
+    );
+  }
+  
+  // Force re-render with valid files
+  const [forceUpdate, setForceUpdate] = useState(0);
+  
+  useEffect(() => {
+    console.log('[SequentialCodeDisplay] Files changed, forcing update');
+    setForceUpdate(prev => prev + 1);
+  }, [files]);
+  
   // CRITICAL: Validate and fix files structure
   const validatedFiles = React.useMemo(() => {
     if (!files || !Array.isArray(files)) {
@@ -28,7 +47,7 @@ const SequentialCodeDisplay: React.FC<{ files: CodeFile[] }> = ({ files }) => {
         language: f.language || 'rust'
       };
     }).filter(Boolean) as CodeFile[];
-  }, [files]);
+  }, [files, forceUpdate]);
 
   console.log('[SequentialCodeDisplay] Validated files:', validatedFiles.length);
 

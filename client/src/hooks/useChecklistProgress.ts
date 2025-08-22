@@ -54,15 +54,9 @@ export function useChecklistProgress() {
   const [steps, setSteps] = useState<Step[]>(INITIAL);
   const [animatingSteps, setAnimatingSteps] = useState<{[stepId: number]: NodeJS.Timeout}>({});
   const lastProgressMapRef = useRef(new Map<string, number>());
-  // Add a separate ref to track all generated files
-  const allGeneratedFilesRef = useRef<Map<string, any>>(new Map());
-  
-  // Refs for optimization and deduplication
+  // Refs for optimization
   const updateQueueRef = useRef<StageUpdate[]>([]);
   const processingRef = useRef(false);
-  const lastUpdateTimeRef = useRef<Map<string, number>>(new Map());
-  const processedEventHashesRef = useRef(new Set<string>());
-  const lastEventTimestampRef = useRef<{[key: string]: number}>({});
 
   // Debounced update processing to prevent rapid re-renders
   const processUpdateQueue = useCallback(() => {
@@ -170,152 +164,66 @@ export function useChecklistProgress() {
     setAnimatingSteps(prev => ({ ...prev, [stepId]: intervalId }));
   }, [animatingSteps]);
 
-  // Helper function to get language from filename
-  const getLanguageFromFilename = useCallback((filename: string): string => {
-    const ext = filename.split('.').pop()?.toLowerCase();
-    const langMap: Record<string, string> = {
-      'rs': 'rust',
-      'ts': 'typescript',
-      'tsx': 'typescript',
-      'js': 'javascript',
-      'jsx': 'javascript',
-      'json': 'json',
-      'toml': 'toml',
-      'yml': 'yaml',
-      'yaml': 'yaml',
-      'css': 'css',
-      'html': 'html',
-      'md': 'markdown'
-    };
-    return langMap[ext || ''] || 'text';
-  }, []);
+  // Helper function to get language from filename (kept for future use)
+  // const getLanguageFromFilename = useCallback((filename: string): string => {
+  //   const ext = filename.split('.').pop()?.toLowerCase();
+  //   const langMap: Record<string, string> = {
+  //     'rs': 'rust',
+  //     'ts': 'typescript',
+  //     'tsx': 'typescript',
+  //     'js': 'javascript',
+  //     'jsx': 'javascript',
+  //     'json': 'json',
+  //     'toml': 'toml',
+  //     'yml': 'yaml',
+  //     'yaml': 'yaml',
+  //     'css': 'css',
+  //     'html': 'html',
+  //     'md': 'markdown'
+  //   };
+  //   return langMap[ext || ''] || 'text';
+  // }, []);
 
-  // Enhanced message handling with individual file events
+  // CORRECTED message handling with priority for code-generation events
   const handleProgressMessage = useCallback((payload: any) => {
+    console.log('[PROGRESS] Received event:', payload.type, payload.stage, payload.pct);
+    
     if (!payload.stage) return;
     
-    // Handle file-generated events with proper accumulation
-    if (payload.type === 'file-generated') {
-      const fileName = payload.fileName;
-      const fileContent = payload.content || ''; // Use actual content from payload
-      const fileLanguage = payload.language || getLanguageFromFilename(fileName);
+    // PRIORITY: Handle code-generation events FIRST
+    if (payload.type === 'code-generation') {
+      console.log('[PROGRESS] CODE GENERATION EVENT - Files:', payload.files?.length);
       
-      // Store in ref to prevent loss
-      if (!allGeneratedFilesRef.current.has(fileName)) {
-        allGeneratedFilesRef.current.set(fileName, {
-          filename: fileName,
-          content: fileContent, // Use the actual content
-          language: fileLanguage // Use the language from payload or derive it
-        });
-      }
+      setSteps(prevSteps => prevSteps.map(step => {
+        if (step.stage === 'code-gen') {
+          return {
+            ...step,
+            generatedFiles: payload.files || [],
+            allFileNames: payload.allFileNames || [],
+            totalFileCount: payload.totalFileCount || 0,
+            pct: payload.pct || step.pct,
+            description: payload.message || step.description,
+            status: 'active' as const
+          };
+        }
+        return step;
+      }));
+      return; // EXIT EARLY - don't process further
+    }
+    
+    // Handle regular progress updates
+    if (payload.type === 'progress' || payload.status) {
+      const update: StageUpdate = {
+        stage: payload.stage,
+        status: payload.status || 'active',
+        pct: payload.pct,
+        message: payload.message,
+      };
       
-      console.log(`[PROGRESS] File generated: ${fileName} (${allGeneratedFilesRef.current.size} total, content length: ${fileContent.length})`);
-      
-      setSteps(prevSteps => {
-        return prevSteps.map(step => {
-          if (step.stage === 'code-gen') {
-            // Always use the complete file list from ref
-            const allFiles = Array.from(allGeneratedFilesRef.current.values());
-            
-            // Limit display to 10 most recent files
-            const displayFiles = allFiles.slice(-10);
-            
-            return {
-              ...step,
-              generatedFiles: displayFiles,
-              totalFileCount: allFiles.length, // Track total separately
-              pct: payload.pct || step.pct,
-              description: `Generated ${allFiles.length} files`,
-              status: 'active' as const
-            };
-          }
-          return step;
-        });
-      });
-      return;
+      updateQueueRef.current = [update]; // Replace queue instead of adding
+      processUpdateQueue();
     }
-    
-    // Reset file tracking when stage changes
-    if (payload.stage !== 'code-gen' && payload.status === 'active') {
-      allGeneratedFilesRef.current.clear();
-    }
-    
-    // Create unique hash for event deduplication
-    const eventHash = `${payload.stage}-${payload.status}-${payload.pct || 0}-${payload.files?.length || 0}`;
-    const now = Date.now();
-    
-    // Skip duplicate events within 500ms window
-    if (processedEventHashesRef.current.has(eventHash)) {
-      const lastTime = lastEventTimestampRef.current[eventHash] || 0;
-      if (now - lastTime < 500) {
-        console.log('[PROGRESS] Skipping duplicate event:', eventHash);
-        return;
-      }
-    }
-    
-    processedEventHashesRef.current.add(eventHash);
-    lastEventTimestampRef.current[eventHash] = now;
-    
-    // Special handler for code-generation events
-    if (payload.type === 'code-generation' && payload.stage === 'code-gen') {
-      console.log('[PROGRESS] ====== CODE GENERATION EVENT ======');
-      console.log('[PROGRESS] Files received:', payload.files?.length || 0);
-      console.log('[PROGRESS] All file names:', payload.allFileNames?.length || 0);
-      console.log('[PROGRESS] First file content preview:', payload.files?.[0]?.content?.substring(0, 50));
-      
-      setSteps(prevSteps => {
-        return prevSteps.map(step => {
-          if (step.stage === 'code-gen') {
-            return {
-              ...step,
-              generatedFiles: payload.files || [], // Files for display
-              allFileNames: payload.allFileNames || [], // All file names
-              totalFileCount: payload.totalFileCount || 0,
-              pct: payload.pct || step.pct,
-              description: payload.message || step.description,
-              status: 'active' as const
-            };
-          }
-          return step;
-        });
-      });
-      return;
-    }
-
-    // For code-gen stage, batch file updates to prevent accumulation
-    if (payload.stage === 'code-gen' && payload.files) {
-      // Clear any pending updates for code-gen to prevent accumulation
-      updateQueueRef.current = updateQueueRef.current.filter(u => u.stage !== 'code-gen');
-      console.log('[PROGRESS] Batching code-gen files:', payload.files.length);
-    }
-    
-    const lastUpdate = lastUpdateTimeRef.current.get(payload.stage) || 0;
-    
-    // Throttle rapid updates for the same stage (except completion)
-    if (payload.status !== 'completed' && now - lastUpdate < 100) {
-      return;
-    }
-    
-    lastUpdateTimeRef.current.set(payload.stage, now);
-    
-    // Add to update queue
-    const update: StageUpdate = {
-      stage: payload.stage,
-      status: payload.status,
-      pct: payload.pct,
-      message: payload.message,
-      totalFileCount: payload.totalFileCount,
-      allFileNames: payload.allFileNames,
-      files: payload.files,
-      codeSnippet: payload.codeSnippet,
-    };
-    
-    updateQueueRef.current.push(update);
-    
-    // Debounce processing for code-gen events to allow batching
-    const delay = payload.stage === 'code-gen' ? 300 : 0;
-    setTimeout(processUpdateQueue, delay);
-  }, [processUpdateQueue, getLanguageFromFilename]);
+  }, [processUpdateQueue]);
 
   // Cleanup intervals on unmount
   useEffect(() => {
@@ -326,22 +234,7 @@ export function useChecklistProgress() {
     };
   }, [animatingSteps]);
 
-  // Clear old hashes periodically to prevent memory leaks
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = Date.now();
-      // Clear hashes older than 5 minutes
-      Object.keys(lastEventTimestampRef.current).forEach(hash => {
-        if (now - lastEventTimestampRef.current[hash] > 300000) {
-          processedEventHashesRef.current.delete(hash);
-          delete lastEventTimestampRef.current[hash];
-        }
-      });
-      console.log('[PROGRESS] Cleaned up old event hashes');
-    }, 60000); // Clean every minute
-    
-    return () => clearInterval(interval);
-  }, []);
+  // Cleanup removed - no longer needed with simplified handler
 
   // Event bus subscription with cleanup
   useEffect(() => {
@@ -353,9 +246,6 @@ export function useChecklistProgress() {
       // Clear any pending updates
       updateQueueRef.current = [];
       processingRef.current = false;
-      // Clear deduplication data
-      processedEventHashesRef.current.clear();
-      lastEventTimestampRef.current = {};
     };
   }, [handleProgressMessage]);
 
