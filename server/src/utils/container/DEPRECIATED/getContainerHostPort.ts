@@ -1,4 +1,4 @@
-import { runCommand } from "../../projectUtils";
+import { runCommand } from "../../command-execution/runCommand";
 
 export async function getContainerHostPort(containerName: string, containerPort = 3000, taskId: string): Promise<string> {
   try {

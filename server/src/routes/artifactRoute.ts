@@ -1,6 +1,5 @@
 import express from "express";
-import { authMiddleware } from "@/middleware/authMiddleware";  // switch back once DEV_AUTH is removed
-import { getBuildArtifactTask } from "@/utils/projectUtils";
+import { getBuildArtifactTask } from "@/utils/anchor/getBuildArtefactTask";
 import { AppError } from "@/middleware/errorHandler";
 
 const router = express.Router();
@@ -38,7 +37,7 @@ router.get("/:id/artifact", guard, async (req, res, next) => {
       return next(new AppError("Invalid program artifact - corrupted ELF file", 400));
     }
     
-    console.log(`[ARTIFACT] Valid ELF header verified for project ${id} (${binary.length} bytes)`);
+    //console.log(`[ARTIFACT] Valid ELF header verified for project ${id} (${binary.length} bytes)`);
     
     res.setHeader("Content-Type", "application/octet-stream");
     res.setHeader(

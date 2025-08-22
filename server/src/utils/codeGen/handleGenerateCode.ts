@@ -11,7 +11,7 @@ import { ensureAnchorTomlProgram, ensureRootWorkspaceMembers } from './ensureCon
 import { parseNodeDetails } from './parseNodeDetails';
 import { lintWorkspaceManifests } from './cargoManifestLint';
 import { FileTreeItem } from '../../types/FileTreeItem';
-import { runCommand } from "../projectUtils";
+import { runCommand } from "../command-execution/runCommand";
 import { randomUUID } from 'crypto';
 import path from "path";
 // import { attachFileContents } from "../fileUtils/attachFileContents"; // Removed - no longer needed

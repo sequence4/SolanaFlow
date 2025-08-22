@@ -1,8 +1,6 @@
 import pool from 'src/config/database';
 import { v4 as uuidv4 } from 'uuid';
-import {
-  runCommand,
-} from '../projectUtils';
+import { runCommand } from '../command-execution/runCommand';
 import {
   rentContainerFromPool,
   releaseContainerToPool,

@@ -1,5 +1,5 @@
 import { createTask, updateTaskStatus, ensureDirectoryExists } from './taskUtils';
-import { runCommand } from './projectUtils';
+import { runCommand } from './command-execution/runCommand';
 import { getProjectRootPath } from './fileUtils';
 import pool from '../config/database';
 
@@ -36,7 +36,7 @@ export async function createFileInContainer(
       const dirPath = relativePath.split('/').slice(0, -1).join('/');
       if (dirPath) {
         const fullDirPath = `/usr/src/${rootPath}/${dirPath}`;
-        console.log(`[DEBUG_FILE] Ensuring directory exists: ${fullDirPath}`);
+        //console.log(`[DEBUG_FILE] Ensuring directory exists: ${fullDirPath}`);
         await ensureDirectoryExists(fullDirPath, containerName);
       }
 
@@ -76,7 +76,7 @@ export async function updateFileInContainer(
       const dirPath = relativePath.split('/').slice(0, -1).join('/');
       if (dirPath) {
         const fullDirPath = `/usr/src/${rootPath}/${dirPath}`;
-        console.log(`[DEBUG_FILE] Ensuring directory exists before update: ${fullDirPath}`);
+        //console.log(`[DEBUG_FILE] Ensuring directory exists before update: ${fullDirPath}`);
         await ensureDirectoryExists(fullDirPath, containerName);
       }
       
@@ -143,7 +143,7 @@ export async function installDependenciesInContainer(
       const rootPath = await getProjectRootPath(projectId);
 
       const targetPath = `/usr/src/${rootPath}/${targetDir}`;
-      console.log(`[DEBUG_FILE] Ensuring target directory exists for dependencies: ${targetPath}`);
+      //console.log(`[DEBUG_FILE] Ensuring target directory exists for dependencies: ${targetPath}`);
       await ensureDirectoryExists(targetPath, containerName);
       
       const packageList = packages.join(' ');

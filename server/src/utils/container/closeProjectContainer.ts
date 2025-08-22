@@ -1,4 +1,4 @@
-import { runCommand } from "../projectUtils";
+import { runCommand } from "../command-execution/runCommand";
 import { createTask } from "../taskUtils";
 import { getContainerName } from "./getContainerName";
 import { updateTaskStatus } from "../taskUtils";

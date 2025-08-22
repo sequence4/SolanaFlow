@@ -1,5 +1,5 @@
 /* eslint-disable no-useless-escape */
-import { runCommand } from './projectUtils';
+import { runCommand } from './command-execution/runCommand';
 import { updateTaskStatus } from './taskUtils';
 
 /**
@@ -35,7 +35,7 @@ NF==1 { print; next }\
 '\'' \
       "
   `;
-  console.log('[DEBUG] Running directory tree dump command');
+  //console.log('[DEBUG] Running directory tree dump command');
 
   let treeDump = '';
   try {
@@ -47,7 +47,7 @@ NF==1 { print; next }\
     throw err;
   }
 
-  console.log('[DEBUG] Directory tree structure generated');
+  //console.log('[DEBUG] Directory tree structure generated');
 }
 
 /**
@@ -61,7 +61,7 @@ export async function debugPrintFiles(
   taskId: string,
 ): Promise<void> {
   if (process.env.DEBUG !== 'true') return;
-  console.log(`[DEBUG] Checking ${paths.length} key project files`);
+  //console.log(`[DEBUG] Checking ${paths.length} key project files`);
   
   for (const rel of paths) {
     const full = `/usr/src/${rootPath}/${rel.replace(/^\.?\/?/, "")}`;

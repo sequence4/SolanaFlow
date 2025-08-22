@@ -5,7 +5,7 @@ import { AppError } from '../middleware/errorHandler';
 import pool from '../config/database';
 import { v4 as uuidv4 } from 'uuid';
 import { createTask, updateTaskStatus } from './taskUtils';
-import { runCommand } from './projectUtils';
+import { runCommand } from './command-execution/runCommand';
 
 const SKIP_FOLDERS = ['.anchor', '.github', '.git', 'target', 'node_modules'];
 const SKIP_FILES = [
@@ -155,7 +155,7 @@ async function generateFileTreeInContainer(
     
     const command = `docker exec ${containerName} bash -c "find /usr/src/${rootPath} \\( ${excludePaths} \\) -o -printf '%y %p\\n'"`;
     
-    console.log(`Executing Docker find command: ${command}`);
+    //console.log(`Executing Docker find command: ${command}`);
     
     try {
       let output = await runCommand(command, '.', tempTaskId);
@@ -167,12 +167,12 @@ async function generateFileTreeInContainer(
       }
       
       const lines = output.split('\n').filter(Boolean);
-      console.log(`Docker find command returned ${lines.length} lines (after potential truncation)`);
+      //console.log(`Docker find command returned ${lines.length} lines (after potential truncation)`);
       
-      console.log(`[DEBUG_FILES] Raw Docker find output (first 20 lines):`, lines.slice(0, 20));
+      //console.log(`[DEBUG_FILES] Raw Docker find output (first 20 lines):`, lines.slice(0, 20));
       
       const instructionFiles = lines.filter(line => line.includes('/instructions/') && line.endsWith('.rs'));
-      console.log(`[DEBUG_FILES] Found ${instructionFiles.length} instruction files:`, instructionFiles);
+      //console.log(`[DEBUG_FILES] Found ${instructionFiles.length} instruction files:`, instructionFiles);
       
       const allItems: Array<{type: 'file' | 'directory', path: string, name: string}> = [];
       
@@ -293,7 +293,7 @@ async function generateFileTreeInContainer(
     } catch (execError) {
       console.error('Error executing Docker find command:', execError);
       
-      console.log('Attempting simplified Docker directory listing...');
+      //console.log('Attempting simplified Docker directory listing...');
       
       const simplifiedCommand = `docker exec ${containerName} bash -c "find /usr/src/${rootPath} -maxdepth 2 -type d | grep -v 'node_modules\\|.git\\|target'"`; 
       
@@ -392,16 +392,16 @@ export const startGenerateFileTreeTask = async (
         
         if (containerName) {
           try {
-            console.log(`Generating file tree in container ${containerName} for project ${projectId}`);
+            //console.log(`Generating file tree in container ${containerName} for project ${projectId}`);
             fileTree = await generateFileTreeInContainer(containerName, rootPath, projectId, creatorId);
           } catch (containerError) {
             console.error('Error generating file tree in container:', containerError);
-            console.log('Falling back to local file system for file tree generation');
+           // console.log('Falling back to local file system for file tree generation');
             const projectPath = path.join(APP_CONFIG.ROOT_FOLDER, rootPath);
             fileTree = await generateFileTree(projectPath);
           }
         } else {
-          console.log('No container found, using local file system for file tree generation');
+          //console.log('No container found, using local file system for file tree generation');
           const projectPath = path.join(APP_CONFIG.ROOT_FOLDER, rootPath);
           fileTree = await generateFileTree(projectPath);
         }
@@ -446,7 +446,7 @@ export const startGetFileContentTask = async (
       
       if (containerName) {
         try {
-          console.log(`[FILE-READ] Starting async read for ${filePath}`);
+          //console.log(`[FILE-READ] Starting async read for ${filePath}`);
           const readCmd = `docker exec ${containerName} cat /usr/src/${projectRootPath}/${filePath}`;
           
           // Add timeout and non-blocking execution
@@ -464,7 +464,7 @@ export const startGetFileContentTask = async (
           });
           
           content = await Promise.race([readPromise, timeoutPromise]);
-          console.log(`[FILE-READ] Completed async read for ${filePath}`);
+          //console.log(`[FILE-READ] Completed async read for ${filePath}`);
         } catch (containerError) {
           console.error(`[FILE-READ] Container read failed for ${filePath}:`, containerError);
           // Fallback to local file system
@@ -472,7 +472,7 @@ export const startGetFileContentTask = async (
           content = await fs.promises.readFile(fullPath, 'utf-8');
         }
       } else {
-        console.log('No container found, using local file system for file content');
+        //console.log('No container found, using local file system for file content');
         const fullPath = path.join(APP_CONFIG.ROOT_FOLDER, projectRootPath, filePath);
         content = await fs.promises.readFile(fullPath, 'utf-8');
       }
@@ -507,7 +507,7 @@ export const startCreateFileTask = async (
       
       if (containerName) {
         try {
-          console.log(`Creating file ${filePath} in container ${containerName}`);
+          //console.log(`Creating file ${filePath} in container ${containerName}`);
           const dirPath = path.dirname(filePath);
           if (dirPath && dirPath !== '.') {
             const mkdirCmd = `docker exec ${containerName} mkdir -p /usr/src/${projectRootPath}/${dirPath}`;
@@ -519,18 +519,18 @@ export const startCreateFileTask = async (
 ${content}
 EOF`;
           await runCommand(writeCmd, '.', taskId);
-          console.log(`Successfully created file in container: ${filePath}`);
+          //console.log(`Successfully created file in container: ${filePath}`);
           await updateTaskStatus(taskId, 'succeed', 'File created successfully in container');
         } catch (containerError) {
           console.error(`Error creating file ${filePath} in container:`, containerError);
-          console.log('Falling back to local file system for file creation');
+          //console.log('Falling back to local file system for file creation');
           const fullPath = path.join(APP_CONFIG.ROOT_FOLDER, projectRootPath, filePath);
           await fs.promises.mkdir(path.dirname(fullPath), { recursive: true });
           await fs.promises.writeFile(fullPath, content, 'utf-8');
           await updateTaskStatus(taskId, 'succeed', 'File created successfully (local fallback)');
         }
       } else {
-        console.log('No container found, using local file system for file creation');
+        //console.log('No container found, using local file system for file creation');
         const fullPath = path.join(APP_CONFIG.ROOT_FOLDER, projectRootPath, filePath);
         await fs.promises.mkdir(path.dirname(fullPath), { recursive: true });
         await fs.promises.writeFile(fullPath, content, 'utf-8');
@@ -569,24 +569,24 @@ export const startUpdateFileTask = async (
       
       if (containerName) {
         try {
-          console.log(`Updating file ${filePath} in container ${containerName}`);
+          //console.log(`Updating file ${filePath} in container ${containerName}`);
           
           const writeCmd = `
             docker exec -i ${containerName} bash -c "cat > /usr/src/${projectRootPath}/${filePath}" << 'EOF'
 ${content}
 EOF`;
           await runCommand(writeCmd, '.', taskId);
-          console.log(`Successfully updated file in container: ${filePath}`);
+          //console.log(`Successfully updated file in container: ${filePath}`);
           await updateTaskStatus(taskId, 'succeed', 'File updated successfully in container');
         } catch (containerError) {
           console.error(`Error updating file ${filePath} in container:`, containerError);
-          console.log('Falling back to local file system for file update');
+          //console.log('Falling back to local file system for file update');
           const fullPath = path.join(APP_CONFIG.ROOT_FOLDER, projectRootPath, filePath);
           await fs.promises.writeFile(fullPath, content, 'utf-8');
           await updateTaskStatus(taskId, 'succeed', 'File updated successfully (local fallback)');
         }
       } else {
-        console.log('No container found, using local file system for file update');
+       // console.log('No container found, using local file system for file update');
         const fullPath = path.join(APP_CONFIG.ROOT_FOLDER, projectRootPath, filePath);
         await fs.promises.writeFile(fullPath, content, 'utf-8');
         await updateTaskStatus(taskId, 'succeed', 'File updated successfully');
@@ -623,21 +623,21 @@ export const startDeleteFileTask = async (
       
       if (containerName) {
         try {
-          console.log(`Deleting file ${filePath} from container ${containerName}`);
+          //console.log(`Deleting file ${filePath} from container ${containerName}`);
           
           const deleteCmd = `docker exec ${containerName} rm /usr/src/${projectRootPath}/${filePath}`;
           await runCommand(deleteCmd, '.', taskId);
-          console.log(`Successfully deleted file from container: ${filePath}`);
+          //console.log(`Successfully deleted file from container: ${filePath}`);
           await updateTaskStatus(taskId, 'succeed', 'File deleted successfully from container');
         } catch (containerError) {
           console.error(`Error deleting file ${filePath} from container:`, containerError);
-          console.log('Falling back to local file system for file deletion');
+          //console.log('Falling back to local file system for file deletion');
           const fullPath = path.join(APP_CONFIG.ROOT_FOLDER, projectRootPath, filePath);
           await fs.promises.unlink(fullPath);
           await updateTaskStatus(taskId, 'succeed', 'File deleted successfully (local fallback)');
         }
       } else {
-        console.log('No container found, using local file system for file deletion');
+       // console.log('No container found, using local file system for file deletion');
         const fullPath = path.join(APP_CONFIG.ROOT_FOLDER, projectRootPath, filePath);
         await fs.promises.unlink(fullPath);
         await updateTaskStatus(taskId, 'succeed', 'File deleted successfully');
