@@ -33,13 +33,13 @@ export async function attachFileContents(
     }
 
     // Skip content attachment in logs only, but still keep it for the frontend
+    /*
     if (skipContent && skipLogging) {
       // Just for logging purposes, don't actually skip the content
-      if (!skipLogging) {
-        console.log(`[attachFileContents] Skipping content logging for ${node.path}`);
-      }
+      //if (!skipLogging) console.log(`[attachFileContents] Skipping content logging for ${node.path}`);
       // We continue with the normal flow to attach the actual content
     }
+    */
 
     // Skip if binary-looking or already too large
     if (BIN_PATTERN.test(node.name)) continue;
@@ -57,9 +57,7 @@ export async function attachFileContents(
         node.content = text;
         
         // Log file path but not content
-        if (!skipLogging) {
-          console.log(`[attachFileContents] Attached content for ${node.path} (${Buffer.byteLength(text)} bytes)`);
-        }
+       // if (!skipLogging) console.log(`[attachFileContents] Attached content for ${node.path} (${Buffer.byteLength(text)} bytes)`);
       }
     } catch (err: any) {
       // Host path not present ➜ pull it straight from the workspace container
@@ -79,9 +77,7 @@ export async function attachFileContents(
       node.content = await readFileFromContainer(containerName, dockerPath);
       
       // Log file path but not content
-      if (!skipLogging) {
-        console.log(`[attachFileContents] Attached content for ${node.path} from container (${Buffer.byteLength(node.content)} bytes)`);
-      }
+      //if (!skipLogging) console.log(`[attachFileContents] Attached content for ${node.path} from container (${Buffer.byteLength(node.content)} bytes)`);
     }
   }
 }

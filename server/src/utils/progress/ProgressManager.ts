@@ -63,7 +63,7 @@ export class ProgressManager extends EventEmitter {
     this.currentProgress.set(id, event);
     this.sendProgress(event);
     
-    console.log('[PROGRESS-MGR] Started process:', id, 'at stage:', stage, 'pct:', 0);
+    //console.log('[PROGRESS-MGR] Started process:', id, 'at stage:', stage, 'pct:', 0);
     return id;
   }
   
@@ -98,7 +98,7 @@ export class ProgressManager extends EventEmitter {
     this.currentProgress.set(id, event);
     this.sendProgress(event);
     
-    console.log(`[PROGRESS-MGR] ${progress.stage}:${progress.process} → ${pct}% (${message || progress.message})`);
+    //console.log(`[PROGRESS-MGR] ${progress.stage}:${progress.process} → ${pct}% (${message || progress.message})`);
   }
   
   // Complete a process
@@ -119,7 +119,7 @@ export class ProgressManager extends EventEmitter {
     };
     
     this.sendProgress(event);
-    console.log(`[PROGRESS-MGR] Completed ${progress.stage}:${progress.process} → 100%`);
+    //console.log(`[PROGRESS-MGR] Completed ${progress.stage}:${progress.process} → 100%`);
     
     // Delay before cleanup to allow frontend to show completion
     setTimeout(() => {

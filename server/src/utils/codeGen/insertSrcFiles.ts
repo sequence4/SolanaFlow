@@ -18,7 +18,7 @@ export async function insertSrcFiles(
     { node: rootNode },
   ];
 
-  console.log(`[INSERT] Starting file insertion for project ${projectId}`);
+  //console.log(`[INSERT] Starting file insertion for project ${projectId}`);
 
   while (queue.length > 0) {
     const { node } = queue.shift()!;
@@ -49,13 +49,13 @@ export async function insertSrcFiles(
       }
     } else if (node.type === 'file') {
       // Log only file path without content
-      console.log(`[INSERT] Processing file: ${projectRelativePath}`);
-      console.log(`[INSERT] File has code: ${!!node.code}, code length: ${node.code?.length || 0}`);
-      console.log(`[INSERT] Content preview (first 100 chars):`, (node.code || '').substring(0, 100));
+      //console.log(`[INSERT] Processing file: ${projectRelativePath}`);
+      //console.log(`[INSERT] File has code: ${!!node.code}, code length: ${node.code?.length || 0}`);
+      //console.log(`[INSERT] Content preview (first 100 chars):`, (node.code || '').substring(0, 100));
       
       // Special handling for tsconfig.json
       if (projectRelativePath === "web/tsconfig.json") {
-        console.log("[INSERT] Processing tsconfig.json file");
+        //console.log("[INSERT] Processing tsconfig.json file");
       }
 
       const taskId = await updateOrCreateFile(
@@ -66,8 +66,8 @@ export async function insertSrcFiles(
         creatorId
       );
       if (taskId) {
-        console.log(`[INSERT] File task created for: ${projectRelativePath}`);
-        console.log(`[INSERT] About to call onFile with content length: ${(node.code || '').length}`);
+       // console.log(`[INSERT] File task created for: ${projectRelativePath}`);
+        //console.log(`[INSERT] About to call onFile with content length: ${(node.code || '').length}`);
         
         // stream the file *now* – don't block the queue
         if (onFile) await onFile(projectRelativePath, node.code || '');
@@ -77,6 +77,6 @@ export async function insertSrcFiles(
     }
   }
 
-  console.log(`[INSERT] Completed file insertion with ${fileTaskIds.length} tasks`);
+  //console.log(`[INSERT] Completed file insertion with ${fileTaskIds.length} tasks`);
   return fileTaskIds;
 }
