@@ -242,10 +242,15 @@ export default function SolMintApp() {
           
           // Try to fetch IDL
           try {
-            const idl = await anchor.Program.fetchIdl(pubkey, { connection })
-            setProgramStatus(prev => ({ ...prev, hasIdl: !!idl }))
+            const fetchedIdl = await anchor.Program.fetchIdl(pubkey, { connection })
+            setProgramStatus(prev => ({ ...prev, hasIdl: !!fetchedIdl }))
+            if (fetchedIdl) {
+              setIdl(fetchedIdl)
+            }
           } catch {
             console.log('[VERIFY] No on-chain IDL found, will use bundled fallback')
+            // Use fallback IDL if available
+            setIdl(null)
           }
         } else {
           setProgramStatus(prev => ({
@@ -265,6 +270,26 @@ export default function SolMintApp() {
     const interval = setInterval(verifyProgram, 10000)
     return () => clearInterval(interval)
   }, [programId, connection])
+  
+  // Fetch wallet balance
+  useEffect(() => {
+    if (!publicKey || !connection) return
+    
+    const fetchBalance = async () => {
+      try {
+        const balance = await connection.getBalance(publicKey)
+        setWalletBalance(balance / anchor.web3.LAMPORTS_PER_SOL)
+      } catch (error) {
+        console.error('[BALANCE] Failed to fetch balance:', error)
+        setWalletBalance(null)
+      }
+    }
+    
+    fetchBalance()
+    // Refresh balance every 5 seconds
+    const interval = setInterval(fetchBalance, 5000)
+    return () => clearInterval(interval)
+  }, [publicKey, connection])
 
   /* ───────── wallet info coming from the parent window ───────── */
   const [parentWallet, setParentWallet] =
@@ -329,6 +354,8 @@ export default function SolMintApp() {
   // State to store the created mint's public key for later use
   const [mintPubKey, setMintPubKey] = useState<PublicKey | null>(null)
   const [airdropLoading, setAirdropLoading] = useState(false)
+  const [walletBalance, setWalletBalance] = useState<number | null>(null)
+  const [idl, setIdl] = useState<any>(null)
   
   // Program verification state
   const [programStatus, setProgramStatus] = useState<{
@@ -451,36 +478,121 @@ export default function SolMintApp() {
   }
 
   const handleInitializeMint = async () => {
+    console.log("=== INIT MINT DEBUG START ===");
+    console.log("1. Wallet connected:", connected);
+    console.log("2. Public key:", publicKey?.toString());
+    console.log("3. Parent wallet:", parentWallet);
+    console.log("4. Wallet ready:", walletReady);
+    console.log("5. Wallet pubkey:", walletPubKey);
+    console.log("6. Program ID:", programId);
+    console.log("7. Is in iframe:", window.parent !== window);
+    console.log("8. signTransaction available:", !!signTransaction);
+    console.log("9. Program status:", programStatus);
+    
     setLoading((prev) => ({ ...prev, initMint: true }))
     setErrors((prev) => ({ ...prev, initMint: "", metadata: "" }))
     setSuccessTx((prev) => ({ ...prev, metadata: "" }))
 
     try {
-      if (!publicKey || !connected) {
-        dbg("InitializeMint abort – wallet not connected")
-        throw new Error("Wallet not connected")
+      // Check if we have wallet connection (either direct or through parent)
+      if (!walletReady) {
+        console.error("WALLET NOT READY - connected:", connected, "parentWallet:", parentWallet);
+        
+        // If in iframe and no wallet, request connection from parent
+        if (window.parent !== window && !parentWallet.connected) {
+          console.log("Requesting wallet connection from parent...");
+          window.parent.postMessage({ type: "wallet_connect_request" }, "*");
+          throw new Error("Please connect your wallet in the main window");
+        }
+        throw new Error("Wallet not connected");
       }
-      if (!programId) {
+      
+      // Use parent wallet public key if in iframe and not directly connected
+      const activePublicKey = publicKey || (parentWallet.publicKey ? new PublicKey(parentWallet.publicKey) : null);
+      console.log("Active public key:", activePublicKey?.toString());
+      
+      if (!activePublicKey) {
+        console.error("NO PUBLIC KEY AVAILABLE");
+        console.log("publicKey:", publicKey);
+        console.log("parentWallet.publicKey:", parentWallet.publicKey);
+        throw new Error("No wallet public key available");
+      }
+      
+      if (!programId || programId === "") {
+        console.error("PROGRAM ID MISSING:", programId);
+        console.log("INITIAL_PROGRAM_ID:", INITIAL_PROGRAM_ID);
         toast({
           title: "Program ID missing",
-          description: "Cannot initialise mint without a program.",
+          description: "Cannot initialize mint without a program. Please deploy first.",
           variant: "destructive",
         })
-        return
+        throw new Error("Program ID is missing - please deploy the program first");
       }
       // ─────── RUNTIME ENV CHECK ───────
       console.log("[DEBUG] Program ID from .env =", programId)
 
       const programIdKey = new PublicKey(programId)
-      dbg("ProgramIdKey", programIdKey.toBase58())
-      // Set up Anchor provider and program
-      const anchorWallet = {
-        publicKey: publicKey,
-        signTransaction: signTransaction!,
-        signAllTransactions: signAllTransactions!,
+      console.log("Program ID key created:", programIdKey.toBase58())
+      
+      // Check if program exists on chain
+      console.log("Checking if program exists on chain...");
+      const programAccount = await connection.getAccountInfo(programIdKey);
+      if (!programAccount) {
+        console.error("PROGRAM NOT FOUND ON CHAIN");
+        throw new Error("Program not deployed. Please deploy the program first.");
       }
+      console.log("Program found on chain, executable:", programAccount.executable);
+      
+      // Check wallet balance
+      const balance = await connection.getBalance(activePublicKey);
+      console.log("Wallet balance:", balance / anchor.web3.LAMPORTS_PER_SOL, "SOL");
+      if (balance < 0.01 * anchor.web3.LAMPORTS_PER_SOL) {
+        console.error("INSUFFICIENT BALANCE");
+        throw new Error("Insufficient SOL balance. Click 'Get Devnet SOL' first.");
+      }
+      
+      // Set up Anchor provider and program
+      console.log("Setting up Anchor provider...");
+      
+      // Check if we're in iframe and need special handling
+      const isInIframe = window.parent !== window;
+      console.log("Is in iframe:", isInIframe);
+      console.log("Connected directly:", connected);
+      console.log("Parent wallet connected:", parentWallet.connected);
+      
+      let anchorWallet;
+      if (isInIframe && !connected && parentWallet.connected) {
+        console.log("Using iframe wallet adapter for parent wallet");
+        // We're in iframe and using parent wallet
+        // The IframeWalletAdapter should handle this
+        anchorWallet = {
+          publicKey: activePublicKey!,
+          signTransaction: async (tx: Transaction) => {
+            console.log("Iframe: Sending transaction to parent for signing");
+            throw new Error("Iframe signing not yet implemented - please connect wallet directly");
+          },
+          signAllTransactions: async (txs: Transaction[]) => {
+            throw new Error("Iframe signing not yet implemented");
+          }
+        };
+      } else if (connected && signTransaction) {
+        console.log("Using direct wallet connection");
+        anchorWallet = {
+          publicKey: publicKey!,
+          signTransaction: signTransaction!,
+          signAllTransactions: signAllTransactions!,
+        }
+      } else {
+        console.error("No valid wallet configuration found");
+        console.log("connected:", connected);
+        console.log("signTransaction:", !!signTransaction);
+        console.log("parentWallet:", parentWallet);
+        throw new Error("Wallet not properly connected");
+      }
+      
       const provider = new anchor.AnchorProvider(connection, anchorWallet as anchor.Wallet, anchor.AnchorProvider.defaultOptions())
       anchor.setProvider(provider)
+      console.log("Provider set up successfully");
       
       const program = await getProgram(provider, programIdKey)
       console.log("[DEBUG] program.programId =", program.programId.toBase58())
@@ -555,7 +667,7 @@ export default function SolMintApp() {
         initMintForm.uri.trim()
       ) {
         try {
-          const { txId, metadataAccount } = await createMetadataAccount(
+          const { txId } = await createMetadataAccount(
             connection,
             mintAccount.publicKey,
             mintAuthorityPubkey,
@@ -783,6 +895,132 @@ export default function SolMintApp() {
               <AlertDescription>Please connect your wallet to start minting tokens.</AlertDescription>
             </Alert>
           )}
+
+          {/* Diagnostic Panel - Shows debugging information */}
+          <Card className="mb-8 backdrop-blur-sm bg-yellow-50/80 border-yellow-200 shadow-lg rounded-3xl">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg font-semibold text-yellow-800 flex items-center gap-2">
+                <Info className="w-5 h-5" />
+                Debug Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm font-mono">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="text-gray-600">Environment:</span>
+                  <Badge variant="outline" className="ml-2">
+                    {typeof window !== 'undefined' && window.self !== window.top ? 'Iframe' : 'Direct'}
+                  </Badge>
+                </div>
+                <div>
+                  <span className="text-gray-600">Wallet Connected:</span>
+                  <Badge variant={connected ? "default" : "destructive"} className="ml-2">
+                    {connected ? 'Yes' : 'No'}
+                  </Badge>
+                </div>
+                <div>
+                  <span className="text-gray-600">Public Key:</span>
+                  <Badge variant="outline" className="ml-2 font-mono text-xs">
+                    {publicKey ? shortenAddress(publicKey.toString()) : 'None'}
+                  </Badge>
+                </div>
+                <div>
+                  <span className="text-gray-600">Parent Wallet:</span>
+                  <Badge variant={parentWallet ? "default" : "secondary"} className="ml-2">
+                    {parentWallet ? 'Connected' : 'Not Connected'}
+                  </Badge>
+                </div>
+                <div>
+                  <span className="text-gray-600">Program ID:</span>
+                  <Badge variant={programId ? "default" : "destructive"} className="ml-2 font-mono text-xs">
+                    {programId ? shortenAddress(programId) : 'Missing'}
+                  </Badge>
+                </div>
+                <div>
+                  <span className="text-gray-600">Program Status:</span>
+                  <Badge 
+                    variant={programStatus.deployed && programStatus.executable ? "default" : "destructive"} 
+                    className="ml-2"
+                  >
+                    {programStatus.checking ? 'Checking...' : 
+                     programStatus.deployed ? (programStatus.executable ? 'Deployed' : 'Not Executable') : 'Not Found'}
+                  </Badge>
+                </div>
+                <div>
+                  <span className="text-gray-600">RPC Endpoint:</span>
+                  <Badge variant="outline" className="ml-2 text-xs">
+                    {connection.rpcEndpoint.includes('devnet') ? 'Devnet' : 'Custom'}
+                  </Badge>
+                </div>
+                <div>
+                  <span className="text-gray-600">Balance:</span>
+                  <Badge variant="outline" className="ml-2">
+                    {walletBalance !== null ? `${walletBalance.toFixed(4)} SOL` : 'Unknown'}
+                  </Badge>
+                </div>
+              </div>
+              
+              <div className="mt-4 pt-4 border-t border-yellow-200">
+                <Button
+                  onClick={async () => {
+                    console.log("=== DIAGNOSTIC CHECK ===");
+                    console.log("1. Window context:", {
+                      isIframe: window.self !== window.top,
+                      location: window.location.href,
+                      parentOrigin: window.parent.location.origin
+                    });
+                    console.log("2. Wallet state:", {
+                      connected,
+                      publicKey: publicKey?.toString(),
+                      parentWallet,
+                      walletReady
+                    });
+                    console.log("3. Program info:", {
+                      programId,
+                      programStatus,
+                      idl: !!idl
+                    });
+                    console.log("4. Connection:", {
+                      endpoint: connection.rpcEndpoint,
+                      commitment: connection.commitment
+                    });
+                    
+                    // Test message passing
+                    if (window.self !== window.top) {
+                      console.log("5. Testing parent communication...");
+                      window.parent.postMessage({ type: "wallet_state_request" }, "*");
+                    }
+                    
+                    // Check program on chain
+                    if (programId) {
+                      try {
+                        const programPubkey = new PublicKey(programId);
+                        const info = await connection.getAccountInfo(programPubkey);
+                        console.log("6. Program account info:", {
+                          exists: !!info,
+                          executable: info?.executable,
+                          owner: info?.owner.toString(),
+                          lamports: info?.lamports
+                        });
+                      } catch (e) {
+                        console.error("6. Failed to fetch program info:", e);
+                      }
+                    }
+                    
+                    toast({
+                      title: "Diagnostics",
+                      description: "Check browser console for detailed output"
+                    });
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                >
+                  Run Full Diagnostics (Check Console)
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
           <div className="grid gap-8 md:grid-cols-2">
             {/* Initialize Mint Card */}
