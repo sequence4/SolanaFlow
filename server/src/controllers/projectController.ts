@@ -878,6 +878,15 @@ export const deployProject = async (
         } else {
           console.warn(`[DEPLOY] No IDL file found for upload`);
         }
+        
+        // Restart container to pick up new NEXT_PUBLIC_PROGRAM_ID
+        try {
+          console.log(`[DEPLOY] Restarting container to update environment variables`);
+          await runCommand(`docker restart ${containerName}`, '.', projectId, { skipSuccessUpdate: true });
+          console.log(`[DEPLOY] Container restarted successfully`);
+        } catch (restartError) {
+          console.warn(`[DEPLOY] Container restart failed (non-critical):`, restartError);
+        }
       }
     } catch (idlUploadError) {
       console.warn(`[DEPLOY] IDL upload process failed (non-critical):`, idlUploadError);
@@ -890,6 +899,69 @@ export const deployProject = async (
   } catch (err: any) {
     console.error('[deployProject] failed:', err);
     next(new AppError(err.message ?? 'deploy failed', 500));
+  }
+};
+
+export const getProgramStatus = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const { id } = req.params;
+  
+  try {
+    const result = await pool.query(
+      'SELECT details FROM solanaproject WHERE id = $1',
+      [id]
+    );
+    
+    if (!result.rows.length) {
+      return res.json({ 
+        deployed: false, 
+        message: 'Project not found' 
+      });
+    }
+    
+    const details = result.rows[0]?.details;
+    const programId = details?.projectState?.programId || details?.programId;
+    const idl = details?.projectState?.idl;
+    
+    if (!programId) {
+      return res.json({ 
+        deployed: false,
+        message: 'No program ID found',
+        hasIdl: false
+      });
+    }
+    
+    try {
+      const rpcUrl = process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com';
+      const connection = new Connection(rpcUrl, 'confirmed');
+      const programPubkey = new PublicKey(programId);
+      const account = await connection.getAccountInfo(programPubkey);
+      
+      res.json({
+        deployed: !!account,
+        executable: account?.executable || false,
+        owner: account?.owner?.toBase58() || null,
+        programId,
+        hasIdl: !!idl,
+        idl: idl || null,
+        rpcUrl
+      });
+    } catch (connectionError) {
+      console.error('[getProgramStatus] RPC connection error:', connectionError);
+      res.json({
+        deployed: false,
+        programId,
+        hasIdl: !!idl,
+        idl: idl || null,
+        error: 'Failed to connect to Solana RPC'
+      });
+    }
+  } catch (error) {
+    console.error('[getProgramStatus] Database error:', error);
+    next(new AppError('Failed to get program status', 500));
   }
 };
 

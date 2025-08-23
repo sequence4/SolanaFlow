@@ -138,27 +138,57 @@ const Interface = () => {
                 console.log("[Interface] Received transaction signing request from iframe");
                 try {
                     if (!connected || !signTransaction) {
-                        throw new Error("Wallet not connected");
+                        throw new Error("Wallet not connected or doesn't support signing");
                     }
                     
                     // Deserialize the transaction
                     const txBytes = new Uint8Array(event.data.transaction);
                     const tx = Transaction.from(txBytes);
                     
+                    // Log transaction details for debugging
+                    console.log("[Interface] Transaction to sign:", {
+                        instructions: tx.instructions.length,
+                        feePayer: tx.feePayer?.toBase58(),
+                        signatures: tx.signatures.length,
+                        recentBlockhash: tx.recentBlockhash
+                    });
+                    
                     // Sign the transaction
                     const signedTx = await signTransaction(tx);
+                    
+                    // Verify signature was added
+                    const hasSignature = signedTx.signatures.some(sig => 
+                        sig.publicKey.equals(publicKey!) && sig.signature !== null
+                    );
+                    
+                    if (!hasSignature) {
+                        throw new Error("Transaction was not properly signed");
+                    }
                     
                     // Serialize and return the signed transaction
                     const serializedTx = signedTx.serialize();
                     iframeRef.current?.contentWindow?.postMessage({
                         type: "sign_transaction_response",
-                        signedTransaction: Array.from(serializedTx)
+                        signedTransaction: Array.from(serializedTx),
+                        success: true
                     }, "*");
+                    
+                    console.log("[Interface] Transaction signed and sent back successfully");
                 } catch (error: any) {
-                    console.error("Error signing transaction:", error);
+                    console.error("[Interface] Transaction signing failed:", error);
+                    
+                    // Provide helpful error messages
+                    let errorMessage = error?.message || String(error);
+                    if (errorMessage.includes("User rejected")) {
+                        errorMessage = "Transaction was rejected by user";
+                    } else if (errorMessage.includes("not connected")) {
+                        errorMessage = "Wallet is not connected. Please connect your wallet first";
+                    }
+                    
                     iframeRef.current?.contentWindow?.postMessage({
                         type: "sign_transaction_response",
-                        error: error?.message || String(error)
+                        error: errorMessage,
+                        success: false
                     }, "*");
                 }
             }

@@ -471,6 +471,56 @@ EOF'`,
         );
         
         sendProgress({ message: 'Program built successfully' });
+        
+        // Extract and save IDL after successful build
+        try {
+          sendProgress({ message: 'Extracting IDL...' });
+          
+          const idlPath = `${WORKDIR}/target/idl/${programName}.json`;
+          const extractIdlCmd = `docker exec ${workspace.containerName} bash -lc 'cat ${idlPath}'`;
+          
+          const idlContent = await runCommand(extractIdlCmd, '.', projectId, { skipSuccessUpdate: true, silent: true });
+          
+          if (idlContent && idlContent.trim()) {
+            const idl = JSON.parse(idlContent);
+            
+            // Ensure IDL has the program address
+            if (!idl.metadata?.address) {
+              idl.metadata = { 
+                ...idl.metadata, 
+                address: programId 
+              };
+            }
+            
+            // Save IDL to project details
+            await pool.query(
+              `UPDATE solanaproject 
+               SET details = jsonb_set(
+                 jsonb_set(
+                   COALESCE(details, '{}'::jsonb),
+                   '{projectState,idl}',
+                   $1::jsonb,
+                   true
+                 ),
+                 '{projectState,idls}',
+                 COALESCE(details->'projectState'->'idls', '[]'::jsonb) || $1::jsonb,
+                 true
+               )
+               WHERE id = $2`,
+              [JSON.stringify(idl), projectId]
+            );
+            
+            sendProgress({ 
+              message: 'IDL extracted and saved',
+              idl: idl 
+            });
+            
+            console.log(`[BUILD] IDL extracted successfully for program ${programId}`);
+          }
+        } catch (idlError) {
+          console.warn('[BUILD] IDL extraction failed (non-critical):', idlError);
+          sendProgress({ message: 'Warning: IDL extraction failed (program will still work)' });
+        }
 
         const dumpTaskId = await createTask(
             'Dump Container Tree', null, projectId);
