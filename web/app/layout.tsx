@@ -3,7 +3,7 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 
 import ThemeProvider from "@/components/theme-provider"
-import { WalletContextProvider } from "@/components/wallet-context-provider"
+import ClientWalletProvider from "@/components/WalletProvider"
 import { Toaster } from "@/components/ui/toaster"
 
 const inter = Inter({ subsets: ["latin"] })
@@ -18,10 +18,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
-          <WalletContextProvider>
+          <ClientWalletProvider>
             {children}
             <Toaster />
-          </WalletContextProvider>
+          </ClientWalletProvider>
         </ThemeProvider>
       </body>
     </html>

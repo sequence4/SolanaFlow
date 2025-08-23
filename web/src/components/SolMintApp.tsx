@@ -970,7 +970,7 @@ export default function SolMintApp() {
                 </div>
               </div>
               
-              <div className="mt-4 pt-4 border-t border-yellow-200">
+              <div className="mt-4 pt-4 border-t border-yellow-200 space-y-2">
                 <Button
                   onClick={async () => {
                     console.log("=== DIAGNOSTIC CHECK ===");
@@ -1027,6 +1027,61 @@ export default function SolMintApp() {
                   className="w-full"
                 >
                   Run Full Diagnostics (Check Console)
+                </Button>
+                
+                <Button
+                  onClick={async () => {
+                    console.log("=== TESTING DIRECT PHANTOM CONNECTION ===");
+                    
+                    // Check if we're in an iframe
+                    const isIframe = window.self !== window.top;
+                    console.log("Running in iframe:", isIframe);
+                    
+                    // Check for Phantom in window
+                    if ((window as any).solana && (window as any).solana.isPhantom) {
+                      console.log("Phantom detected in window!");
+                      try {
+                        const resp = await (window as any).solana.connect();
+                        console.log("✅ Connected to Phantom directly:", resp.publicKey.toString());
+                        toast({
+                          title: "Success!",
+                          description: `Connected to Phantom: ${resp.publicKey.toString().slice(0, 8)}...`,
+                        });
+                      } catch (err) {
+                        console.error("❌ Failed to connect to Phantom:", err);
+                        toast({
+                          title: "Connection Failed",
+                          description: "Failed to connect to Phantom wallet",
+                          variant: "destructive"
+                        });
+                      }
+                    } else {
+                      console.error("❌ Phantom wallet not found in window!");
+                      console.log("Window.solana:", (window as any).solana);
+                      
+                      // If in iframe, try to request parent connection
+                      if (isIframe) {
+                        console.log("Requesting parent window to connect wallet...");
+                        window.parent.postMessage({ type: "wallet_connect_request" }, "*");
+                        toast({
+                          title: "Iframe Mode",
+                          description: "Requesting parent window to connect wallet",
+                        });
+                      } else {
+                        toast({
+                          title: "Phantom Not Found",
+                          description: "Please install Phantom wallet extension",
+                          variant: "destructive"
+                        });
+                        window.open("https://phantom.app/", "_blank");
+                      }
+                    }
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                >
+                  Test Direct Phantom Connection
                 </Button>
               </div>
             </CardContent>
