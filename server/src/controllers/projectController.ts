@@ -906,7 +906,7 @@ export const getProgramStatus = async (
   req: Request,
   res: Response,
   next: NextFunction
-) => {
+): Promise<void> => {
   const { id } = req.params;
   
   try {
@@ -916,10 +916,11 @@ export const getProgramStatus = async (
     );
     
     if (!result.rows.length) {
-      return res.json({ 
+      res.json({ 
         deployed: false, 
         message: 'Project not found' 
       });
+      return;
     }
     
     const details = result.rows[0]?.details;
@@ -927,11 +928,12 @@ export const getProgramStatus = async (
     const idl = details?.projectState?.idl;
     
     if (!programId) {
-      return res.json({ 
+      res.json({ 
         deployed: false,
         message: 'No program ID found',
         hasIdl: false
       });
+      return;
     }
     
     try {

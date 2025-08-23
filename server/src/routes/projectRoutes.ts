@@ -25,7 +25,6 @@ import {
 } from '../controllers/projectController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { buildProject, testProject, getBuildArtifact } from '../controllers/projectController';
-import { v4 as uuidv4 } from 'uuid';
 
 const router = express.Router();
 
