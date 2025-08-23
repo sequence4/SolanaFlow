@@ -121,20 +121,6 @@ export const handleGenerateCode = async ({
         );
 
         {
-          sendProgress({ message: 'Generating yarn.lock...' });
-
-          const lockfileCmd = [
-            'docker exec',
-            '-e', 'YARN_CACHE_FOLDER=/tmp/yarn-cache',
-            '-w', containerRootDir,
-            workspace.containerName,
-            'bash -lc "rm -rf \\$YARN_CACHE_FOLDER && mkdir -p \\$YARN_CACHE_FOLDER && ' +
-              'yarn --cwd web install --lockfile-only --network-timeout 600000"'
-          ].join(' ');
-
-          await runCommand(lockfileCmd, '.', projectId);
-          sendProgress({ message: 'Lockfile created' });
-
           sendProgress({ message: 'Installing dependencies...' });
           
           const installCmd = [
