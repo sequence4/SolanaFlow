@@ -86,12 +86,9 @@ const ReactFlowContent = ({
     const onDrop = useCallback(
         async (event: React.DragEvent<HTMLDivElement>) => {
           if (!setProjectState) {
-            //("setProjectState is not defined");
             return;
           }
-
           const pubkeyString = publicKey?.toBase58() || undefined;
-          console.log("Handling drop in Workflow with projectId:", projectId);
 
           try {
             await handleDrop(
@@ -104,7 +101,6 @@ const ReactFlowContent = ({
               setProjectContext,
               reactFlow
             );
-            console.log("Node drop completed with code injection");
           } catch (error) {
             console.error("Error during node drop:", error);
           }
@@ -113,9 +109,7 @@ const ReactFlowContent = ({
     );
 
     const onNodeClick = useCallback((_event: any, node: any) => {
-        if (node.type === 'instructionGroupNode') {
-            // setActiveInstructionId((prevId) => (prevId === node.id ? null : node.id));
-        }
+        if (node.type === 'instructionGroupNode') {        }
     }, []);
 
     function handleClearCanvas() {
@@ -213,10 +207,6 @@ const Workflow = () => {
     const { publicKey } = useWallet();
     const nodeTypes = useMemo(() => workflowNodeTypes, []);
 
-    useEffect(() => {
-        console.log("Project Context in Workflow:", projectContext);
-        console.log("Project ID in Workflow:", projectId);
-    }, [projectContext, projectId]);
 
     return (
         <div className="relative w-full h-full border-none">
