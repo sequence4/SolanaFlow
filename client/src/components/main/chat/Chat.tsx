@@ -721,7 +721,7 @@ const Chat: React.FC = () => {
                                             </div>
                                         )}
                                         {displayTime && (
-                                            <div className={`text-xs mt-2 ${isUser ? "text-gray-500" : "text-gray-500"}`}>
+                                            <div className={`text-xs mt-2 ${isUser ? "flex justify-end text-gray-500" : "text-gray-500"}`}>
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-mono">{displayTime}</span>
                                                     {isUser && (
