@@ -11,7 +11,6 @@ import { downloadArtifact } from "@/api/projectArtifact";
 import { projectApi } from "@/api/projectApi";
 import { Button } from "@/components/ui/button";
 import { Rocket, AlertTriangle } from "lucide-react";
-// No longer using client-side deployment
 import {
   PublicKey,
   Keypair,
@@ -42,16 +41,6 @@ import { createEphemeralKey, EphemeralDeployOptions, deployWithEphemeralKey } fr
 import { BPF_UPGRADE_LOADER_ID } from "@/utils/helpers/data";
 import { darkTheme } from '@/styles/theme';
 
-// Toggle verbose client-side logs by setting NEXT_PUBLIC_DEBUG_LOGS=true in your
-// environment.  This reduces noisy console output in production.
-// Temporarily enabled by default to debug deployment issues
-
-/* ────────────────────────────────────────────
-   TEMP instrumentation helpers
-   They wrap Buffer.writeXXLE so we can see which
-   value/offset causes "index out of range".
-──────────────────────────────────────────── */
-// Global trap so ANY uncaught error prints a stack (esp. "index out of range")
 if (typeof window !== 'undefined') {
   window.onerror = (msg, src, line, col, err) => {
     console.error('[window.onerror]', msg, 'at', src, line + ':' + col, err);

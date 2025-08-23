@@ -3,8 +3,6 @@ import { api } from "./apiHelper";
 import { streamTaskStatus } from "./taskStream";
 import { TaskEvent } from "./taskStream";
 
-/* 1 – wrapper: create an ephemeral key (already exists via projectApi) */
-// Request an ephemeral authority key and return its base‑58 string
 export const createEphemeralKey = (projectId: string): Promise<string> =>
   api
     .post<{ ephemeralPubkey: string; pubkey?: string }>(`/projects/${projectId}/ephemeral`)
@@ -14,9 +12,6 @@ export const createEphemeralKey = (projectId: string): Promise<string> =>
       return key;
     });
 
-
-
-/* 3 – wrapper: REST fallback polling */
 export const getTaskStatus = (taskId: string) =>
   api.get<{ task: TaskEvent }>(`/tasks/${taskId}`).then(r => r.data.task);
 

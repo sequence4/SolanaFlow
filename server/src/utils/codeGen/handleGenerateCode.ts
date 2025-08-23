@@ -21,7 +21,6 @@ import { Keypair } from '@solana/web3.js';
 import pool from '../../config/database';
 import { normalizeProjectName } from '../helpers/stringUtils';
 import { saveProgramSecret, awsSecretsEnabled } from '../aws/awsSecrets';
-import { ProgressManager } from '../progress/ProgressManager';
 import { 
   Args,
   allGeneratedFiles
@@ -112,7 +111,7 @@ export const handleGenerateCode = async ({
         
         await new Promise(resolve => setTimeout(resolve, 200));
         
-        sendProgress({ message: 'Installing dependencies...' });
+        sendProgress({ message: 'Setting up dependencies...' });
 
         await runCommand(
           `docker exec ${workspace.containerName} bash -lc 'rm -f ${containerRootDir}/web/.yarnrc'`,
@@ -120,21 +119,44 @@ export const handleGenerateCode = async ({
           projectId,
         );
 
-        {
-          sendProgress({ message: 'Installing dependencies...' });
+        try {
+          sendProgress({ message: 'Linking pre-installed dependencies...' });
           
-          const installCmd = [
-            'docker exec',
-            '-e', 'YARN_CACHE_FOLDER=/tmp/yarn-cache',
-            '-w', containerRootDir,
-            workspace.containerName,
-            'bash -lc "mkdir -p \\$YARN_CACHE_FOLDER && ' +
-              'yarn --cwd web install --prefer-offline --network-timeout 600000"'
-          ].join(' ');
+          const symlinkCmd = `docker exec ${workspace.containerName} bash -c "
+            rm -rf ${containerRootDir}/web/node_modules && 
+            ln -s /usr/share/solanaflow/web/node_modules ${containerRootDir}/web/node_modules &&
+            cd ${containerRootDir}/web && npx next --version > /dev/null 2>&1"`;
+          
+          await runCommand(symlinkCmd, '.', projectId, { skipSuccessUpdate: true });
+          
+          sendProgress({ message: 'Dependencies linked successfully!' });
+        } catch (symlinkError) {
+          console.warn('[GEN] Symlink failed, falling back to copy:', symlinkError);
+          sendProgress({ message: 'Installing dependencies (fallback mode)...' });
+          
+          try {
+            await runCommand(
+              `docker exec ${workspace.containerName} bash -c "cp -r /usr/share/solanaflow/web/node_modules ${containerRootDir}/web/"`,
+              '.', 
+              projectId
+            );
+            sendProgress({ message: 'Dependencies copied successfully!' });
+          } catch (copyError) {
+            console.error('[GEN] Copy failed, falling back to fresh install:', copyError);
+            sendProgress({ message: 'Installing dependencies (fresh install)...' });
+            
+            const installCmd = [
+              'docker exec',
+              '-e', 'YARN_CACHE_FOLDER=/tmp/yarn-cache',
+              '-w', containerRootDir,
+              workspace.containerName,
+              'bash -lc "mkdir -p \\$YARN_CACHE_FOLDER && ' +
+                'yarn --cwd web install --prefer-offline --network-timeout 600000"'
+            ].join(' ');
 
-          await runCommand(installCmd, '.', projectId);
-          
-          sendProgress({ message: 'Dependencies installed' });
+            await runCommand(installCmd, '.', projectId);
+            sendProgress({ message: 'Dependencies installed' });
+          }
         }
 
         sendProgress({ message: 'Restarting Next.js server...' });

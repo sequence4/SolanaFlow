@@ -1567,7 +1567,6 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
     if (proj && proj.container_name) {
       try {
         await runCommand(`docker restart ${proj.container_name}`, '.', uuidv4());
-    //    console.log(`[RELAY_SIGNED_TX] Restarted container ${proj.container_name} to load new Program ID`);
       } catch (err) {
         console.error(`[RELAY_SIGNED_TX] Failed to restart container ${proj.container_name}:`, err);
       }
@@ -1590,24 +1589,18 @@ export const relayTx = async (req: Request, res: Response, next: NextFunction) =
   }
   
   try {
-  //  console.log(`[RELAY_TX] Starting relay for programId: ${programId}`);
     
     const endpoint = process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com';
     const connection = new Connection(endpoint, 'confirmed');
     
-    // Decode the transaction
     const raw = Buffer.from(encodedTx, 'base64');
     const transaction = Transaction.from(raw);
     
-    // Check fee payer
     if (!transaction.feePayer) {
       console.error('[RELAY_TX] ERROR: No fee payer set');
       return next(new AppError('Transaction must have a fee payer', 400));
     }
-    
-   // console.log(`[RELAY_TX] Fee payer: ${transaction.feePayer.toBase58()}`);
-    
-    // CRITICAL: If fee payer is ephemeral, verify it has funds
+        
     if (ephemeralKeys.has(transaction.feePayer.toBase58())) {
       const balance = await connection.getBalance(transaction.feePayer, 'confirmed');
       const MIN_BALANCE = 15000; // Minimum for one transaction
@@ -1622,27 +1615,19 @@ export const relayTx = async (req: Request, res: Response, next: NextFunction) =
         ));
       }
       
-    //  console.log(`[RELAY_TX] Ephemeral fee payer balance: ${balance} lamports`);
     }
     
-    // Get all required signers
     const msg = transaction.compileMessage();
     const requiredSigners = msg.accountKeys.slice(0, msg.header.numRequiredSignatures);
-   // console.log(`[RELAY_TX] Required signers: ${requiredSigners.map(k => k.toBase58()).join(', ')}`);
     
-    // Check which signatures we already have
     const existingSigs = transaction.signatures.filter(s => s.signature).length;
-  //  console.log(`[RELAY_TX] Existing signatures: ${existingSigs}`);
     
-    // Find ephemeral keys that need to sign
     const signers: Keypair[] = [];
     for (const [pubkeyStr, keypair] of ephemeralKeys) {
       if (requiredSigners.some(k => k.equals(keypair.publicKey))) {
-        // Check if this key hasn't already signed
         const sigIndex = msg.accountKeys.findIndex(k => k.equals(keypair.publicKey));
         if (sigIndex >= 0 && sigIndex < transaction.signatures.length) {
           if (!transaction.signatures[sigIndex].signature) {
-     //       console.log(`[RELAY_TX] Found ephemeral key to sign: ${pubkeyStr}`);
             signers.push(keypair);
           } else {
             console.log(`[RELAY_TX] Ephemeral key ${pubkeyStr} already signed`);
