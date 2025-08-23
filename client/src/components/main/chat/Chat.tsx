@@ -664,7 +664,7 @@ const Chat: React.FC = () => {
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="w-full">
+                                            <div className="w-full ai-message-container">
                                                 {/* Thinking process for this specific AI message */}
                                                 {isThinking && thinkingSteps.length > 0 && index === messages.length - 1 && (
                                                     <motion.div 

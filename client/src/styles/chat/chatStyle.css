@@ -3,8 +3,8 @@
     --chat-bg-light: #fafafa;
     --chat-bg-dark: #0d1117;
 
-    --message-ai-bg-light: #ebebeb;
-    --message-ai-bg-dark: oklch(0.245 0 0);
+    --message-ai-bg-light: transparent;
+    --message-ai-bg-dark: transparent;
     --message-ai-text-light: #2d2d2d;
     --message-ai-text-dark: #b8becd;
 
@@ -88,7 +88,7 @@
     margin-right: auto;
     padding: 10px;
     border-radius: 10px;
-    background-color: var(--bubbleColor);
+    background-color: transparent !important;
 }
 .ai-message::after {
     content: "";
@@ -133,7 +133,7 @@
 }
 
 .message-bubble.ai {
-    background-color: var(--message-ai-bg-dark);
+    background-color: transparent !important;
     color: var(--message-ai-text-dark);
 }
 

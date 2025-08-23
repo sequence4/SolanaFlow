@@ -9,7 +9,7 @@ const TransparentCode = ({ children, className }: any) => {
   if (isBlock) {
     return (
       <pre style={{
-        backgroundColor: 'rgba(0, 0, 0, 0.05)',
+        backgroundColor: 'transparent',
         padding: '0.75rem',
         borderRadius: '0.375rem',
         overflow: 'auto',
@@ -26,7 +26,7 @@ const TransparentCode = ({ children, className }: any) => {
   
   return (
     <code style={{
-      backgroundColor: 'rgba(0, 0, 0, 0.05)',
+      backgroundColor: 'transparent',
       padding: '0.125rem 0.25rem',
       borderRadius: '0.25rem',
       fontSize: '0.875rem',
@@ -52,7 +52,7 @@ const markdownOptions = {
       component: (props: any) => (
         <pre
           style={{
-            backgroundColor: 'rgba(0, 0, 0, 0.05)',
+            backgroundColor: 'transparent',
             padding: '0.75rem',
             borderRadius: '0.375rem',
             overflow: 'auto',
