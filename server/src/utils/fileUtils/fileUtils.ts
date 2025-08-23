@@ -6,30 +6,7 @@ import pool from '../../config/database';
 import { v4 as uuidv4 } from 'uuid';
 import { createTask, updateTaskStatus } from '../taskUtils/taskUtils';
 import { runCommand } from '../command-execution/runCommand';
-
-const SKIP_FOLDERS = [
-  '.anchor', '.github', '.git', 'target', 'node_modules',
-  '.next', '.yarn', '.turbo', 'dist', 'build', 'coverage',
-  '__pycache__', '.pytest_cache', '.mypy_cache', '.cache',
-  'target/debug', 'target/release', '.vscode', '.idea'
-];
-const SKIP_FILES = [
-  'Cargo.lock',
-  'package-lock.json',
-  'yarn.lock',
-  '.DS_Store',
-  '.gitignore',
-  '.prettierignore',
-];
-
-export interface FileNode {
-  name: string;
-  type: 'file' | 'directory';
-  ext?: string;
-  path: string;
-  children?: FileNode[];
-  content?: string;
-}
+import { FileNode, SKIP_FILES, SKIP_FOLDERS } from './data';
 
 export async function findFileRecursive(dir: string, fileName: string): Promise<string | null> {
   const files: Dirent[] = fs.readdirSync(dir, { withFileTypes: true }) as Dirent[];

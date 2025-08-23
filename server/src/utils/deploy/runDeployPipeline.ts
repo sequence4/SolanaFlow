@@ -13,9 +13,8 @@ import { attachFileContents } from "../fileUtils/attachFileContents";
 import { readContainerFile } from "../fileUtils/attachFileContents";
 import { v4 as uuidv4 } from "uuid";
 import { sendEnvironmentProgress, sendBuildProgress, resetProgress } from "../progress/progressUtils";
+import { MAX_BUILD_MINUTES, PipelineArgs } from './data';
 
-// Types
-import { Graph } from '../../types/graph';
 
 // ─── unified progress payload ────────────────────────────
 interface ProgressEvent {
@@ -38,15 +37,6 @@ class ProgressManager {
   private collectedFiles = 0;
   private expectedCollectionFiles = 10;
   private currentTasks: Map<string, {name: string, status: 'running' | 'completed' | 'error', pct: number}> = new Map();
-  
-  private progressDistribution = {
-    'code-gen': {
-      fileGeneration: 40,    // 0-40% for initial file generation
-      fileProcessing: 30,    // 40-70% for processing files
-      fileCollection: 20,    // 70-90% for collecting files
-      finalization: 10       // 90-100% for final steps
-    }
-  };
   
   constructor(private deploymentId: string, private sendProgress: Function) {}
   
@@ -289,20 +279,6 @@ class ProgressManager {
     }
   }
 }
-// ──────────────────────────────────────────────────────────────
-
-// TODO: chunk really large fileTree payloads (> ~16 MB) – Chrome drops giant SSE frames.
-
-const MAX_BUILD_MINUTES = Number(process.env.MAX_BUILD_MINUTES) || 15;
-
-interface PipelineArgs {
-  projectId: string;
-  userId: string;
-  graph: Graph; 
-  sendProgress: (data: unknown) => void;
-  walletSigned?: boolean;
-  devMode?: boolean;
-}
 
 /* Helper: ensure web/.env (or .env.local) contains the compiled PID */
 async function writeProgramIdEnv(programId: string, absRoot: string) {
@@ -335,7 +311,6 @@ export async function runDeployPipeline({
   userId,
   graph,
   sendProgress,
-  walletSigned = false,
   devMode = false,
 }: PipelineArgs): Promise<void> {
   let programKeypair: Keypair | null = null;
@@ -346,32 +321,20 @@ export async function runDeployPipeline({
   console.log(`[PIPELINE] User: ${userId}`);
   console.log(`[PIPELINE] Development mode: ${devMode}`);
   
-  // Reset progress tracking to prevent wobbling
   resetProgress();
-  
-  // Create progress manager to coordinate stages
   const progressMgr = new ProgressManager(projectId, sendProgress);
-  
-  // Start environment setup with smooth progress
   console.log("[PIPELINE] Initializing environment setup");
   const environmentPromise = sendEnvironmentProgress(sendProgress);
-
-  // declare outside try so `finally` can see it
   let workspace: WorkspaceHandle | null = null;
-  // Keep-alive interval for SSE connection
   let keepAliveInterval: NodeJS.Timeout | null = null;
 
   try {
     console.log("[ENVIRONMENT] Setting up Docker environment");
-    // Environment setup with individual tasks
     progressMgr.startTask('env-docker', 'Docker Environment Setup', 'environment');
     workspace = await prepEnv(projectId, userId, devMode);
     console.log(`[ENVIRONMENT] Container ready: ${workspace.containerName}`);
     progressMgr.completeTask('env-docker', 'Container ready');
-
-    // Wait for environment progress animation to complete
     await environmentPromise;
-
     console.log("[ENVIRONMENT] Environment setup complete");
     sendProgress(<ProgressEvent>{
       stage: "environment",
@@ -381,17 +344,14 @@ export async function runDeployPipeline({
       containerUrl: workspace.containerUrl
     });
     
-    // Keep SSE connection alive with periodic ping every 30 seconds
     keepAliveInterval = setInterval(() => {
       sendProgress({ type: "ping", stage: "keepalive", message: "Connection maintained" });
     }, 30000);
  
     
-    // 2 ─ code generation ─────────────────────────────────────────────────
     console.log("[CODE-GEN] Starting code generation phase");
     await progressMgr.transitionToStage('code-gen', 'Starting Solana program generation');
     
-    // Code generation with detailed tasks
     console.log("[CODE-GEN] Analyzing project structure");
     progressMgr.startTask('codegen-analyze', 'Analyzing Project Structure', 'code-gen');
     progressMgr.updateTask('codegen-analyze', 25, 'Parsing graph structure...');
@@ -661,36 +621,24 @@ export async function runDeployPipeline({
     while (!soFileExists && retryCount < 5) {
       soFileExists = await checkFileExists(workspace.containerName, soFilePath);
       if (!soFileExists) {
-        //console.log(`[FILE-OPS] .so file not found yet, retry ${retryCount + 1}/5`);
-        progressMgr.updateProgress('build', 92 + retryCount, `Waiting for build artifacts (${retryCount + 1}/5)...`);
         await new Promise(resolve => setTimeout(resolve, 2000));
         retryCount++;
       }
     }
     
-    if (!soFileExists) {
-      //console.error('[FILE-OPS] WARNING: .so file not found after retries');
-      progressMgr.handleFileCollection(programName + '.so', false);
-    } else {
-     // console.log('[FILE-OPS] .so file found, proceeding with copy');
+    if (soFileExists) {
       await readContainerFile(
         workspace.containerName,
         soFilePath,
         projectId,
         userId
       );
-      progressMgr.handleFileCollection(programName + '.so', true);
     }
     
     // Check for Anchor.toml with fallback
     const tomlExists = await checkFileExists(workspace.containerName, tomlFile);
     if (tomlExists) {
       await readContainerFile(workspace.containerName, tomlFile, projectId, userId);
-      //console.log('[FILE-OPS] Anchor.toml collected');
-      progressMgr.handleFileCollection('Anchor.toml', true);
-    } else {
-      console.warn('[FILE-OPS] Anchor.toml not found at expected location');
-      progressMgr.handleFileCollection('Anchor.toml', false);
     }
     
     // Collect additional project files for file tree
@@ -707,15 +655,10 @@ export async function runDeployPipeline({
         const exists = await checkFileExists(workspace.containerName, file.path);
         if (exists) {
           await readContainerFile(workspace.containerName, file.path, projectId, userId);
-          await progressMgr.handleFileCollection(file.name, true);
-        } else {
-          await progressMgr.handleFileCollection(file.name, false);
         }
-        // Small delay to show progress
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 50));
       } catch (error) {
-       // console.log(`[FILE-OPS] Error collecting ${file.name}:`, error);
-        await progressMgr.handleFileCollection(file.name, false);
+        // Skip failed files
       }
     }
 
@@ -727,13 +670,12 @@ export async function runDeployPipeline({
         //console.log(`[IDL-COPY] Checking directory: ${d}`);
         await listDirectory(workspace.containerName, d);
         
-        const result = await runCommand(
+        await runCommand(
           `docker exec ${workspace.containerName} bash -c 'shopt -s nullglob && for f in "${d}"/*.json; do echo "Found: $f" && cat "$f" 2>/dev/null || echo "Failed to read: $f"; done'`,
           ".",
           `copy-idl-${Date.now()}`,
           { skipSuccessUpdate: true },
         );
-       // console.log(`[IDL-COPY] Result from ${d}:`, result);
       } catch (err) {
         console.log(`[IDL-COPY] Directory ${d} not accessible:`, err);
       }

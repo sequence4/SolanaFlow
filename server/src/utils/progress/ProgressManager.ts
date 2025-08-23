@@ -15,11 +15,7 @@ export interface ProgressEvent {
   stage: 'environment' | 'code-gen' | 'build' | 'deploy';
   process: string; // Specific process name
   message: string;
-  pct: number;
-  estimatedTimeRemaining?: number; // in seconds
   details?: {
-    current?: number;
-    total?: number;
     files?: Array<{
       filename: string;
       content: string;
@@ -30,102 +26,67 @@ export interface ProgressEvent {
 }
 
 export class ProgressManager extends EventEmitter {
-  private currentProgress: Map<string, ProgressEvent> = new Map();
   private sendProgress: (data: any) => void;
-  private startTimes: Map<string, number> = new Map();
   
   constructor(sendProgress: (data: any) => void) {
     super();
     this.sendProgress = sendProgress;
   }
   
-  // Track a new process with estimated duration
+  // Track a new process
   startProcess(
     stage: ProgressEvent['stage'], 
-    process: string, 
-    estimatedDuration: number = 60
+    process: string
   ): string {
     const id = `${stage}-${process}-${Date.now()}`;
-    const startTime = Date.now();
-    this.startTimes.set(id, startTime);
     
     const event: ProgressEvent = {
       id,
       type: 'progress',
       stage,
       process,
-      message: cleanMessage(`Starting ${process}...`),
-      pct: 0,
-      estimatedTimeRemaining: estimatedDuration,
-      timestamp: startTime
+      message: cleanMessage(`Starting ${process}`),
+      timestamp: Date.now()
     };
     
-    this.currentProgress.set(id, event);
     this.sendProgress(event);
-    
-    //console.log('[PROGRESS-MGR] Started process:', id, 'at stage:', stage, 'pct:', 0);
     return id;
   }
   
   // Update process progress
   updateProcess(
     id: string, 
-    pct: number, 
+    _pct: number,  // Keep parameter for backward compatibility but ignore it
     message?: string,
     details?: ProgressEvent['details']
   ) {
-    const progress = this.currentProgress.get(id);
-    if (!progress) {
-      console.warn('[PROGRESS-MGR] Cannot update unknown process:', id);
-      return;
-    }
-    
-    const startTime = this.startTimes.get(id) || Date.now();
-    const elapsed = (Date.now() - startTime) / 1000;
-    const estimatedTotal = pct > 0 ? elapsed / (pct / 100) : 60;
-    const estimatedRemaining = Math.max(0, estimatedTotal - elapsed);
+    if (!message) return; // Skip updates without meaningful messages
     
     const event: ProgressEvent = {
-      ...progress,
-      type: 'progress', // Ensure type is explicitly set
-      pct,
-      message: cleanMessage(message || progress.message),
-      estimatedTimeRemaining: estimatedRemaining,
+      id,
+      type: 'progress',
+      stage: 'build', // Default stage
+      process: 'update',
+      message: cleanMessage(message),
       details,
       timestamp: Date.now()
     };
     
-    this.currentProgress.set(id, event);
     this.sendProgress(event);
-    
-    //console.log(`[PROGRESS-MGR] ${progress.stage}:${progress.process} → ${pct}% (${message || progress.message})`);
   }
   
   // Complete a process
   completeProcess(id: string, message?: string) {
-    const progress = this.currentProgress.get(id);
-    if (!progress) {
-      console.warn('[PROGRESS-MGR] Cannot complete unknown process:', id);
-      return;
-    }
-    
     const event: ProgressEvent = {
-      ...progress,
-      type: 'progress', // Ensure type is explicitly set
-      pct: 100,
-      message: cleanMessage(message || `${progress.process} completed`),
-      estimatedTimeRemaining: 0,
+      id,
+      type: 'progress',
+      stage: 'build', // Default stage
+      process: 'complete',
+      message: cleanMessage(message || 'Process completed'),
       timestamp: Date.now()
     };
     
     this.sendProgress(event);
-    //console.log(`[PROGRESS-MGR] Completed ${progress.stage}:${progress.process} → 100%`);
-    
-    // Delay before cleanup to allow frontend to show completion
-    setTimeout(() => {
-      this.currentProgress.delete(id);
-      this.startTimes.delete(id);
-    }, 1000);
   }
   
   // Send code generation files
@@ -135,8 +96,7 @@ export class ProgressManager extends EventEmitter {
       type: 'code-generation',
       stage: 'code-gen',
       process: 'file-generation',
-      message: cleanMessage(`Generated ${files.length} files`),
-      pct: 100,
+      message: cleanMessage(`Generated ${files.length} program files`),
       details: { files },
       timestamp: Date.now()
     };
@@ -144,25 +104,13 @@ export class ProgressManager extends EventEmitter {
     this.sendProgress(event);
   }
   
-  // Get all active processes
-  getActiveProcesses(): ProgressEvent[] {
-    return Array.from(this.currentProgress.values());
-  }
-  
-  // Clear all processes (cleanup)
-  clearAll() {
-    this.currentProgress.clear();
-    this.startTimes.clear();
-  }
-  
   // Error handling
   errorProcess(id: string, error: string) {
-    const progress = this.currentProgress.get(id);
-    if (!progress) return;
-    
     const event: ProgressEvent = {
-      ...progress,
-      pct: 0,
+      id,
+      type: 'progress',
+      stage: 'build',
+      process: 'error',
       message: cleanMessage(`Error: ${error}`),
       timestamp: Date.now()
     };
