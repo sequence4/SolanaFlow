@@ -78,6 +78,95 @@ async function getProgram(
 // Build-time value injected by the pipeline; no silent fall-back.
 const INITIAL_PROGRAM_ID = process.env.NEXT_PUBLIC_PROGRAM_ID ?? "";
 
+// Helper function needs to be defined before components that use it
+const shortenAddress = (address: string) =>
+  address && address.length > 8
+    ? `${address.slice(0, 4)}...${address.slice(-4)}`
+    : address;
+
+// Debug Panel Component
+const DebugPanel = ({ 
+  programId, 
+  programStatus, 
+  walletPubKey, 
+  mintPubKey,
+  connection 
+}: {
+  programId: string
+  programStatus: any
+  walletPubKey: string | null
+  mintPubKey: PublicKey | null
+  connection: anchor.web3.Connection
+}) => {
+  const [expanded, setExpanded] = useState(false)
+  const [balance, setBalance] = useState<number | null>(null)
+  
+  useEffect(() => {
+    if (walletPubKey && expanded) {
+      const checkBalance = async () => {
+        try {
+          const pubkey = new PublicKey(walletPubKey)
+          const bal = await connection.getBalance(pubkey)
+          setBalance(bal / anchor.web3.LAMPORTS_PER_SOL)
+        } catch (error) {
+          console.error('Failed to get balance:', error)
+        }
+      }
+      checkBalance()
+    }
+  }, [walletPubKey, expanded, connection])
+  
+  return (
+    <Card className="fixed bottom-4 right-4 z-50 max-w-md shadow-lg">
+      <CardHeader 
+        className="cursor-pointer pb-2"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <CardTitle className="text-sm flex items-center justify-between">
+          Debug Info
+          <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+            {expanded ? "−" : "+"}
+          </Button>
+        </CardTitle>
+      </CardHeader>
+      {expanded && (
+        <CardContent className="text-xs font-mono space-y-2">
+          <div className="space-y-1">
+            <div>Program ID: {programId || "Not set"}</div>
+            <div>Wallet: {walletPubKey ? shortenAddress(walletPubKey) : "Not connected"}</div>
+            {balance !== null && <div>Balance: {balance.toFixed(4)} SOL</div>}
+            <div>RPC: {connection.rpcEndpoint}</div>
+            <div>Mint: {mintPubKey?.toBase58() ? shortenAddress(mintPubKey.toBase58()) : "Not created"}</div>
+          </div>
+          {programStatus.deployed && (
+            <div className="border-t pt-2 space-y-1">
+              <div className="flex items-center gap-2">
+                <span>Deployed:</span>
+                <span className="text-green-600">✓</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span>Executable:</span>
+                <span className={programStatus.executable ? "text-green-600" : "text-red-600"}>
+                  {programStatus.executable ? "✓" : "✗"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span>Has IDL:</span>
+                <span className={programStatus.hasIdl ? "text-green-600" : "text-yellow-600"}>
+                  {programStatus.hasIdl ? "✓" : "Using fallback"}
+                </span>
+              </div>
+              {programStatus.owner && (
+                <div>Owner: {shortenAddress(programStatus.owner)}</div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      )}
+    </Card>
+  )
+}
+
 export default function SolMintApp() {
   const { publicKey, connected, signTransaction, signAllTransactions } = useWallet()
   const { theme, setTheme } = useTheme()
@@ -128,6 +217,54 @@ export default function SolMintApp() {
   /* ---------- runtime helpers ---------- */
   const isBrowser    = typeof window !== "undefined";
   const isStandalone = isBrowser && window.parent === window;   // running top‑level, *not* inside iframe
+  
+  // Verify program deployment status
+  useEffect(() => {
+    if (!programId || programId.length < 32) return
+    
+    const verifyProgram = async () => {
+      setProgramStatus(prev => ({ ...prev, checking: true }))
+      
+      try {
+        const pubkey = new PublicKey(programId)
+        
+        // Check if program account exists
+        const accountInfo = await connection.getAccountInfo(pubkey)
+        
+        if (accountInfo) {
+          setProgramStatus(prev => ({
+            ...prev,
+            deployed: true,
+            executable: accountInfo.executable,
+            owner: accountInfo.owner.toBase58(),
+            checking: false
+          }))
+          
+          // Try to fetch IDL
+          try {
+            const idl = await anchor.Program.fetchIdl(pubkey, { connection })
+            setProgramStatus(prev => ({ ...prev, hasIdl: !!idl }))
+          } catch {
+            console.log('[VERIFY] No on-chain IDL found, will use bundled fallback')
+          }
+        } else {
+          setProgramStatus(prev => ({
+            ...prev,
+            deployed: false,
+            checking: false
+          }))
+        }
+      } catch (error) {
+        console.error('[VERIFY] Program verification failed:', error)
+        setProgramStatus(prev => ({ ...prev, checking: false }))
+      }
+    }
+    
+    verifyProgram()
+    // Re-verify every 10 seconds
+    const interval = setInterval(verifyProgram, 10000)
+    return () => clearInterval(interval)
+  }, [programId, connection])
 
   /* ───────── wallet info coming from the parent window ───────── */
   const [parentWallet, setParentWallet] =
@@ -191,11 +328,23 @@ export default function SolMintApp() {
 
   // State to store the created mint's public key for later use
   const [mintPubKey, setMintPubKey] = useState<PublicKey | null>(null)
+  const [airdropLoading, setAirdropLoading] = useState(false)
+  
+  // Program verification state
+  const [programStatus, setProgramStatus] = useState<{
+    deployed: boolean
+    hasIdl: boolean
+    executable: boolean
+    owner: string | null
+    checking: boolean
+  }>({
+    deployed: false,
+    hasIdl: false,
+    executable: false,
+    owner: null,
+    checking: false
+  })
 
-  const shortenAddress = (address: string) =>
-    address && address.length > 8
-      ? `${address.slice(0, 4)}...${address.slice(-4)}`
-      : address;
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
@@ -203,6 +352,42 @@ export default function SolMintApp() {
       title: "Copied!",
       description: "Address copied to clipboard",
     })
+  }
+
+  const requestAirdrop = async () => {
+    if (!publicKey) {
+      toast({
+        title: "Connect wallet first",
+        description: "Please connect your wallet to request an airdrop",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setAirdropLoading(true)
+    try {
+      const signature = await connection.requestAirdrop(
+        publicKey,
+        2 * anchor.web3.LAMPORTS_PER_SOL // 2 SOL
+      )
+      
+      await connection.confirmTransaction(signature, 'confirmed')
+      
+      const balance = await connection.getBalance(publicKey)
+      toast({
+        title: "Airdrop successful!",
+        description: `Your balance is now ${(balance / anchor.web3.LAMPORTS_PER_SOL).toFixed(2)} SOL`,
+      })
+    } catch (error) {
+      console.error('Airdrop failed:', error)
+      toast({
+        title: "Airdrop failed",
+        description: "Please try again in a few seconds. You might have requested too many airdrops.",
+        variant: "destructive",
+      })
+    } finally {
+      setAirdropLoading(false)
+    }
   }
 
   const createMetadataAccount = async (
@@ -505,6 +690,15 @@ export default function SolMintApp() {
       <div className="min-h-screen overflow-y-auto bg-gradient-to-br from-white via-blue-50/30 to-purple-50/30">
         {/* Optional whimsical blob background */}
         <div className="fixed top-0 right-0 w-96 h-96 bg-gradient-to-br from-blue-200/10 to-purple-200/10 rounded-full blur-3xl -z-10" />
+        
+        {/* Debug Panel */}
+        <DebugPanel
+          programId={programId}
+          programStatus={programStatus}
+          walletPubKey={walletPubKey}
+          mintPubKey={mintPubKey}
+          connection={connection}
+        />
 
         <div className="container mx-auto px-4 py-8 max-w-4xl">
           {/* Header */}
@@ -523,6 +717,20 @@ export default function SolMintApp() {
                   {shortenAddress(programId)}
                   <Copy className="w-3 h-3 ml-1" />
                 </Badge>
+                {programStatus.checking ? (
+                  <Badge variant="secondary" className="gap-1">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Checking...
+                  </Badge>
+                ) : programStatus.deployed ? (
+                  <Badge variant={programStatus.executable ? "default" : "destructive"} className="gap-1">
+                    {programStatus.executable ? "✓ Deployed" : "Not Executable"}
+                  </Badge>
+                ) : (
+                  <Badge variant="destructive" className="gap-1">
+                    Not Deployed
+                  </Badge>
+                )}
               </div>
             </div>
 
@@ -544,9 +752,27 @@ export default function SolMintApp() {
               </div>
 
               {walletReady && walletPubKey && (
-                <Badge variant="secondary" className="font-mono">
-                  {shortenAddress(walletPubKey)}
-                </Badge>
+                <>
+                  <Badge variant="secondary" className="font-mono">
+                    {shortenAddress(walletPubKey)}
+                  </Badge>
+                  <Button
+                    onClick={requestAirdrop}
+                    disabled={airdropLoading}
+                    variant="outline"
+                    size="sm"
+                    className="rounded-full"
+                  >
+                    {airdropLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Requesting...
+                      </>
+                    ) : (
+                      "Get Devnet SOL"
+                    )}
+                  </Button>
+                </>
               )}
             </div>
           </div>

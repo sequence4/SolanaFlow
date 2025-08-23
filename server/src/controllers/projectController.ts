@@ -848,6 +848,41 @@ export const deployProject = async (
     //console.log(`[DEPLOY] Deployment completed successfully for project ${projectId}`);
    // console.log(`[DEPLOY] Program ID: ${programId}`);
     
+    // Upload IDL to chain after deployment
+    try {
+      const containerName = await getContainerName(projectId);
+      if (containerName) {
+        console.log(`[DEPLOY] Attempting to upload IDL for program ${programId}`);
+        
+        // Find the IDL file in the container
+        const findIdlCmd = `docker exec ${containerName} bash -c "find /usr/src -name '*.json' -path '*/target/idl/*' | head -1"`;
+        const idlPathOutput = await runCommand(findIdlCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+        const idlPath = idlPathOutput?.trim();
+        
+        if (idlPath) {
+          console.log(`[DEPLOY] Found IDL at: ${idlPath}`);
+          
+          // Upload the IDL to the chain
+          const uploadIdlCmd = `docker exec ${containerName} bash -lc "
+            cd /usr/src && 
+            anchor idl init -f ${idlPath} ${programId} --provider.cluster devnet || 
+            anchor idl upgrade -f ${idlPath} ${programId} --provider.cluster devnet
+          "`;
+          
+          try {
+            await runCommand(uploadIdlCmd, '.', projectId, { skipSuccessUpdate: true });
+            console.log(`[DEPLOY] IDL uploaded successfully for program ${programId}`);
+          } catch (idlError) {
+            console.warn(`[DEPLOY] IDL upload failed (non-critical):`, idlError);
+          }
+        } else {
+          console.warn(`[DEPLOY] No IDL file found for upload`);
+        }
+      }
+    } catch (idlUploadError) {
+      console.warn(`[DEPLOY] IDL upload process failed (non-critical):`, idlUploadError);
+    }
+    
     res.json({
       success: true,
       programId
