@@ -2022,3 +2022,464 @@ export const getLocalValidatorStatus = async (
     });
   }
 };
+
+/**
+ * POST /projects/:id/local-validator/deploy
+ * Deploy program to local test validator (instant, no SOL required)
+ */
+export const deployToLocalValidator = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { id: projectId } = req.params;
+    const { forceRebuild = false, walletPubkey } = req.body;
+    
+    console.log(`[LOCAL_DEPLOY] Starting local deployment for project ${projectId}`);
+    console.log(`[LOCAL_DEPLOY] Force rebuild: ${forceRebuild}, Wallet: ${walletPubkey || 'none'}`);
+    
+    const containerName = await getContainerName(projectId);
+    if (!containerName) {
+      return next(new AppError('Container not found', 404));
+    }
+    
+    // Step 1: Ensure validator is running
+    console.log('[LOCAL_DEPLOY] Checking validator status...');
+    const validatorCheck = `docker exec ${containerName} /usr/local/bin/start-validator.sh status`;
+    const validatorStatus = await runCommand(validatorCheck, '.', uuidv4(), { skipSuccessUpdate: true })
+      .catch(() => 'not-running');
+    
+    if (!validatorStatus.includes('running')) {
+      console.log('[LOCAL_DEPLOY] Validator not running, starting it...');
+      // Start validator
+      const startCmd = walletPubkey 
+        ? `docker exec -e WALLET_PUBKEY=${walletPubkey} ${containerName} /usr/local/bin/start-validator.sh`
+        : `docker exec ${containerName} /usr/local/bin/start-validator.sh`;
+      
+      await runCommand(startCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+      
+      // Wait for validator to be ready
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+    
+    // Step 2: Check if program needs building
+    const rootPath = await getProjectRootPath(projectId);
+    const programPath = `/usr/src/${rootPath}`;
+    
+    // Find the program name from Anchor.toml
+    const getProgramNameCmd = `docker exec ${containerName} bash -c "cd ${programPath} && grep '^\\[programs.localnet\\]' -A 1 Anchor.toml | grep -oP '^\\w+' | tail -1"`;
+    const programName = (await runCommand(getProgramNameCmd, '.', uuidv4(), { skipSuccessUpdate: true }))
+      .trim() || 'solanaflow';
+    
+    console.log(`[LOCAL_DEPLOY] Program name: ${programName}`);
+    
+    const soFile = `/usr/src/target/deploy/${programName}.so`;
+    const keypairFile = `/usr/src/target/deploy/${programName}-keypair.json`;
+    
+    // Check if .so file exists or if rebuild is forced
+    const soExistsCmd = `docker exec ${containerName} test -f ${soFile} && echo "exists" || echo "missing"`;
+    const soExists = await runCommand(soExistsCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    
+    if (soExists.trim() === 'missing' || forceRebuild) {
+      console.log('[LOCAL_DEPLOY] Building program...');
+      
+      // Build the program
+      const buildCmd = `docker exec ${containerName} bash -lc "cd ${programPath} && anchor build"`;
+      const buildOutput = await runCommand(buildCmd, '.', projectId);
+      
+      if (!buildOutput.includes('Finished') && !buildOutput.includes('success')) {
+        throw new Error(`Build failed: ${buildOutput.substring(0, 500)}`);
+      }
+      
+      console.log('[LOCAL_DEPLOY] Build completed successfully');
+    } else {
+      console.log('[LOCAL_DEPLOY] Using existing build artifact');
+    }
+    
+    // Step 3: Get or generate program keypair
+    let programId: string;
+    
+    const keypairExistsCmd = `docker exec ${containerName} test -f ${keypairFile} && echo "exists" || echo "missing"`;
+    const keypairExists = await runCommand(keypairExistsCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    
+    if (keypairExists.trim() === 'exists') {
+      // Get existing program ID
+      const getProgramIdCmd = `docker exec ${containerName} solana-keygen pubkey ${keypairFile}`;
+      programId = (await runCommand(getProgramIdCmd, '.', uuidv4(), { skipSuccessUpdate: true })).trim();
+      console.log(`[LOCAL_DEPLOY] Using existing program ID: ${programId}`);
+    } else {
+      // Generate new keypair
+      console.log('[LOCAL_DEPLOY] Generating new program keypair...');
+      const genKeypairCmd = `docker exec ${containerName} solana-keygen new --outfile ${keypairFile} --no-bip39-passphrase --force`;
+      await runCommand(genKeypairCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+      
+      const getProgramIdCmd = `docker exec ${containerName} solana-keygen pubkey ${keypairFile}`;
+      programId = (await runCommand(getProgramIdCmd, '.', uuidv4(), { skipSuccessUpdate: true })).trim();
+      console.log(`[LOCAL_DEPLOY] Generated new program ID: ${programId}`);
+    }
+    
+    // Step 4: Configure Solana CLI for local validator
+    console.log('[LOCAL_DEPLOY] Configuring Solana CLI for local validator...');
+    const configCmd = `docker exec ${containerName} bash -c "
+      solana config set --url http://localhost:8899 &&
+      solana config set --commitment confirmed
+    "`;
+    await runCommand(configCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    
+    // Step 5: Check if program is already deployed
+    const checkDeployedCmd = `docker exec ${containerName} bash -c "
+      solana program show ${programId} --url http://localhost:8899 2>&1 || echo 'not-found'
+    "`;
+    const deployedCheck = await runCommand(checkDeployedCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    
+    let deploymentType: 'new' | 'upgrade' = 'new';
+    if (!deployedCheck.includes('not-found') && !deployedCheck.includes('AccountNotFound')) {
+      deploymentType = 'upgrade';
+      console.log('[LOCAL_DEPLOY] Program already deployed, will upgrade');
+    } else {
+      console.log('[LOCAL_DEPLOY] Program not deployed, will do initial deployment');
+    }
+    
+    // Step 6: Deploy or upgrade the program
+    console.log(`[LOCAL_DEPLOY] Starting ${deploymentType} deployment...`);
+    
+    let deployOutput: string;
+    
+    if (deploymentType === 'new') {
+      // Initial deployment using anchor deploy
+      const deployCmd = `docker exec ${containerName} bash -lc "
+        cd ${programPath} &&
+        anchor deploy --provider.cluster localnet --program-keypair ${keypairFile}
+      "`;
+      
+      deployOutput = await runCommand(deployCmd, '.', projectId);
+    } else {
+      // Upgrade using solana program deploy
+      const upgradeCmd = `docker exec ${containerName} bash -c "
+        solana program deploy ${soFile} \\
+          --program-id ${keypairFile} \\
+          --url http://localhost:8899 \\
+          --commitment confirmed
+      "`;
+      
+      deployOutput = await runCommand(upgradeCmd, '.', projectId);
+    }
+    
+    // Step 7: Verify deployment
+    const verifyCmd = `docker exec ${containerName} bash -c "
+      solana program show ${programId} --url http://localhost:8899 | head -5
+    "`;
+    const verifyOutput = await runCommand(verifyCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    
+    if (!verifyOutput.includes(programId)) {
+      throw new Error('Deployment verification failed');
+    }
+    
+    // Step 8: Update IDL (if it exists)
+    const idlPath = `/usr/src/target/idl/${programName}.json`;
+    const idlExistsCmd = `docker exec ${containerName} test -f ${idlPath} && echo "exists" || echo "missing"`;
+    const idlExists = await runCommand(idlExistsCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    
+    let idlContent = null;
+    if (idlExists.trim() === 'exists') {
+      console.log('[LOCAL_DEPLOY] Uploading IDL...');
+      
+      try {
+        // Initialize or upgrade IDL
+        const idlCmd = `docker exec ${containerName} bash -lc "
+          cd ${programPath} &&
+          (anchor idl init -f ${idlPath} ${programId} --provider.cluster localnet ||
+           anchor idl upgrade -f ${idlPath} ${programId} --provider.cluster localnet)
+        "`;
+        
+        await runCommand(idlCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+        
+        // Read IDL content
+        const readIdlCmd = `docker exec ${containerName} cat ${idlPath}`;
+        idlContent = await runCommand(readIdlCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+      } catch (idlError) {
+        console.warn('[LOCAL_DEPLOY] IDL upload failed (non-critical):', idlError);
+      }
+    }
+    
+    // Step 9: Update project details with local deployment info
+    await pool.query(
+      `UPDATE solanaproject 
+       SET details = jsonb_set(
+         jsonb_set(
+           COALESCE(details, '{}'::jsonb),
+           '{localDeployment}',
+           $1::jsonb
+         ),
+         '{localProgramId}',
+         to_jsonb($2::text)
+       )
+       WHERE id = $3`,
+      [
+        JSON.stringify({
+          deployedAt: new Date().toISOString(),
+          programName,
+          deploymentType,
+          validatorUrl: 'http://localhost:8899'
+        }),
+        programId,
+        projectId
+      ]
+    );
+    
+    // Step 10: Write program ID to .env for frontend
+    const envCmd = `docker exec ${containerName} bash -c "
+      echo 'NEXT_PUBLIC_PROGRAM_ID=${programId}' > ${programPath}/web/.env.local &&
+      echo 'NEXT_PUBLIC_CLUSTER=custom' >> ${programPath}/web/.env.local &&
+      echo 'NEXT_PUBLIC_RPC_URL=http://localhost:8899' >> ${programPath}/web/.env.local
+    "`;
+    await runCommand(envCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    
+    // Restart Next.js to pick up new env vars
+    const restartNextCmd = `docker exec ${containerName} bash -c "
+      pkill -f 'next dev' || true &&
+      cd ${programPath}/web &&
+      nohup npm run dev > /tmp/next.log 2>&1 &
+    "`;
+    await runCommand(restartNextCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    
+    console.log(`[LOCAL_DEPLOY] Deployment successful! Program ID: ${programId}`);
+    
+    res.json({
+      message: `Program ${deploymentType === 'new' ? 'deployed' : 'upgraded'} successfully to local validator`,
+      programId,
+      programName,
+      deploymentType,
+      rpcUrl: 'http://localhost:8899',
+      websocketUrl: 'ws://localhost:8900',
+      faucetUrl: 'http://localhost:9900',
+      idl: idlContent ? JSON.parse(idlContent) : null,
+      deployOutput: deployOutput.substring(0, 1000) // First 1000 chars for debugging
+    });
+    
+  } catch (error) {
+    console.error('[LOCAL_DEPLOY] Deployment error:', error);
+    next(new AppError(`Local deployment failed: ${(error as Error).message}`, 500));
+  }
+};
+
+/**
+ * POST /projects/:id/local-validator/quick-deploy
+ * One-click local deployment with automatic setup
+ */
+export const quickDeployLocal = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { id: projectId } = req.params;
+    const { walletPubkey, resetValidator = false } = req.body;
+    
+    console.log(`[QUICK_DEPLOY] Starting quick local deployment for project ${projectId}`);
+    
+    // Step 1: Start or reset validator
+    const startValidatorReq = {
+      params: { id: projectId },
+      body: { reset: resetValidator, walletPubkey },
+      user: req.user
+    } as Request;
+    
+    await new Promise((resolve, reject) => {
+      startLocalValidator(startValidatorReq, {
+        json: resolve,
+        status: () => ({ json: resolve })
+      } as any, reject);
+    });
+    
+    // Wait for validator to be fully ready
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Step 2: Deploy to local validator
+    const deployReq = {
+      params: { id: projectId },
+      body: { walletPubkey, forceRebuild: false },
+      user: req.user
+    } as Request;
+    
+    const deployResult = await new Promise<any>((resolve, reject) => {
+      deployToLocalValidator(deployReq, {
+        json: resolve,
+        status: () => ({ json: resolve })
+      } as any, reject);
+    });
+    
+    res.json({
+      message: 'Quick local deployment completed',
+      ...deployResult,
+      validatorReset: resetValidator
+    });
+    
+  } catch (error) {
+    console.error('[QUICK_DEPLOY] Error:', error);
+    next(new AppError(`Quick deployment failed: ${(error as Error).message}`, 500));
+  }
+};
+
+/**
+ * GET /projects/:id/cluster-info
+ * Get current cluster configuration for the project
+ */
+export const getProjectClusterInfo = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { id: projectId } = req.params;
+    const { preferLocal } = req.query;
+    
+    // Import the cluster detection utilities
+    const { getProjectCluster, testClusterConnection } = 
+      await import('../utils/environment/clusterDetection');
+    
+    // Get project details to check for local deployment
+    const projectResult = await pool.query(
+      'SELECT details FROM solanaproject WHERE id = $1',
+      [projectId]
+    );
+    
+    if (projectResult.rows.length === 0) {
+      return next(new AppError('Project not found', 404));
+    }
+    
+    const details = projectResult.rows[0].details || {};
+    const hasLocalDeployment = !!details.localProgramId;
+    const hasDevnetDeployment = !!details.programId;
+    
+    // Get cluster config
+    const cluster = await getProjectCluster(
+      projectId, 
+      preferLocal === 'true' || hasLocalDeployment
+    );
+    
+    // Test the connection
+    const connectionTest = await testClusterConnection(cluster.url);
+    
+    // Get program IDs for each environment
+    const programIds = {
+      local: details.localProgramId || null,
+      devnet: details.programId || details.projectState?.programId || null
+    };
+    
+    res.json({
+      cluster,
+      connectionTest,
+      programIds,
+      hasLocalDeployment,
+      hasDevnetDeployment,
+      recommendedCluster: hasLocalDeployment ? 'local' : 'devnet'
+    });
+    
+  } catch (error) {
+    console.error('[CLUSTER_INFO] Error:', error);
+    next(new AppError('Failed to get cluster info', 500));
+  }
+};
+
+/**
+ * POST /projects/:id/switch-cluster
+ * Switch between local and remote clusters
+ */
+export const switchProjectCluster = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { id: projectId } = req.params;
+    const { cluster, customUrl } = req.body;
+    
+    console.log(`[SWITCH_CLUSTER] Switching project ${projectId} to ${cluster}`);
+    
+    const containerName = await getContainerName(projectId);
+    if (!containerName) {
+      return next(new AppError('Container not found', 404));
+    }
+    
+    // Import cluster utilities
+    const { ClusterType, getClusterConfig } = 
+      await import('../utils/environment/clusterDetection');
+    
+    // Get cluster configuration
+    const clusterConfig = getClusterConfig(
+      cluster as ClusterType,
+      customUrl
+    );
+    
+    // Update Solana CLI config in container
+    const configCmd = `docker exec ${containerName} bash -c "
+      solana config set --url ${clusterConfig.url} &&
+      solana config set --commitment confirmed
+    "`;
+    await runCommand(configCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    
+    // Update Anchor.toml
+    const rootPath = await getProjectRootPath(projectId);
+    const anchorTomlPath = `/usr/src/${rootPath}/Anchor.toml`;
+    
+    const updateAnchorCmd = `docker exec ${containerName} bash -c "
+      sed -i 's|cluster = .*|cluster = \\"${cluster === 'local' ? 'localnet' : cluster}\\"|g' ${anchorTomlPath}
+    "`;
+    await runCommand(updateAnchorCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    
+    // Update web/.env.local
+    const programId = cluster === 'local' 
+      ? (await pool.query('SELECT details->\'localProgramId\' as pid FROM solanaproject WHERE id = $1', [projectId])).rows[0]?.pid
+      : (await pool.query('SELECT details->\'programId\' as pid FROM solanaproject WHERE id = $1', [projectId])).rows[0]?.pid;
+    
+    const updateEnvCmd = `docker exec ${containerName} bash -c "
+      cat > /usr/src/${rootPath}/web/.env.local << EOF
+NEXT_PUBLIC_CLUSTER=${cluster}
+NEXT_PUBLIC_RPC_URL=${clusterConfig.url}
+NEXT_PUBLIC_WEBSOCKET_URL=${clusterConfig.websocketUrl}
+NEXT_PUBLIC_PROGRAM_ID=${programId || ''}
+EOF
+    "`;
+    await runCommand(updateEnvCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    
+    // Update project details
+    await pool.query(
+      `UPDATE solanaproject 
+       SET details = jsonb_set(
+         COALESCE(details, '{}'::jsonb),
+         '{currentCluster}',
+         $1::jsonb
+       )
+       WHERE id = $2`,
+      [JSON.stringify(clusterConfig), projectId]
+    );
+    
+    // If switching to local, ensure validator is running
+    if (cluster === 'local') {
+      const validatorStatus = await runCommand(
+        `docker exec ${containerName} /usr/local/bin/start-validator.sh status`,
+        '.', uuidv4(), { skipSuccessUpdate: true }
+      ).catch(() => 'not-running');
+      
+      if (!validatorStatus.includes('running')) {
+        console.log('[SWITCH_CLUSTER] Starting local validator...');
+        await runCommand(
+          `docker exec ${containerName} /usr/local/bin/start-validator.sh`,
+          '.', uuidv4(), { skipSuccessUpdate: true }
+        );
+      }
+    }
+    
+    res.json({
+      message: `Switched to ${clusterConfig.name}`,
+      cluster: clusterConfig,
+      programId
+    });
+    
+  } catch (error) {
+    console.error('[SWITCH_CLUSTER] Error:', error);
+    next(new AppError(`Failed to switch cluster: ${(error as Error).message}`, 500));
+  }
+};

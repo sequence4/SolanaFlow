@@ -26,6 +26,10 @@ import {
   stopLocalValidator,
   getLocalValidatorStatus,
   getLocalValidatorHealth,
+  deployToLocalValidator,
+  quickDeployLocal,
+  getProjectClusterInfo,
+  switchProjectCluster,
 } from '../controllers/projectController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { buildProject, testProject, getBuildArtifact } from '../controllers/projectController';
@@ -71,6 +75,14 @@ router.post('/:id/local-validator/start', guard, startLocalValidator);
 router.post('/:id/local-validator/stop', guard, stopLocalValidator);
 router.get('/:id/local-validator/status', guard, getLocalValidatorStatus);
 router.get('/:id/local-validator/health', guard, getLocalValidatorHealth);
+
+// Local deployment endpoints
+router.post('/:id/local-validator/deploy', guard, deployToLocalValidator);
+router.post('/:id/local-validator/quick-deploy', guard, quickDeployLocal);
+
+// Cluster management endpoints
+router.get('/:id/cluster-info', guard, getProjectClusterInfo);
+router.post('/:id/switch-cluster', guard, switchProjectCluster);
 
 router.get('/:id/local-port', authMiddleware, async (req, res) => {
   try {

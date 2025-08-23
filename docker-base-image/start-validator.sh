@@ -84,33 +84,61 @@ fi
 echo -e "${GREEN}Scanning for programs to pre-load...${NC}"
 PROGRAM_ARGS=""
 PROGRAM_COUNT=0
+PROGRAM_LIST=""
 
-if [ -d "$PROGRAM_DIR" ]; then
-    for program_so in $PROGRAM_DIR/*.so; do
-        if [ -f "$program_so" ]; then
-            # Extract base name without .so extension
-            base_name=$(basename "$program_so" .so)
-            keypair_file="$PROGRAM_DIR/${base_name}-keypair.json"
-            
-            if [ -f "$keypair_file" ]; then
-                # Get public key from keypair
-                PROGRAM_ID=$(solana-keygen pubkey "$keypair_file" 2>/dev/null)
-                if [ -n "$PROGRAM_ID" ]; then
-                    PROGRAM_ARGS="$PROGRAM_ARGS --bpf-program $PROGRAM_ID $program_so"
-                    echo -e "  ${GREEN}✓${NC} Pre-loading program: $PROGRAM_ID (${base_name}.so)"
-                    ((PROGRAM_COUNT++))
+# Also check in project-specific directories
+ADDITIONAL_DIRS="/usr/src/*/target/deploy"
+
+for CHECK_DIR in $PROGRAM_DIR $ADDITIONAL_DIRS; do
+    if [ -d "$CHECK_DIR" ]; then
+        echo "  Checking directory: $CHECK_DIR"
+        for program_so in $CHECK_DIR/*.so; do
+            if [ -f "$program_so" ]; then
+                # Skip template programs
+                if [[ "$program_so" == *"anchor_template"* ]] || [[ "$program_so" == *"anchor-template"* ]]; then
+                    continue
                 fi
-            else
-                echo -e "  ${YELLOW}⚠${NC} Skipping $base_name.so (no keypair found)"
+                
+                # Extract base name without .so extension
+                base_name=$(basename "$program_so" .so)
+                keypair_file="${program_so%.so}-keypair.json"
+                
+                if [ -f "$keypair_file" ]; then
+                    # Get public key from keypair
+                    PROGRAM_ID=$(solana-keygen pubkey "$keypair_file" 2>/dev/null)
+                    if [ -n "$PROGRAM_ID" ]; then
+                        # Check if we haven't already added this program
+                        if [[ ! "$PROGRAM_LIST" == *"$PROGRAM_ID"* ]]; then
+                            PROGRAM_ARGS="$PROGRAM_ARGS --bpf-program $PROGRAM_ID $program_so"
+                            PROGRAM_LIST="$PROGRAM_LIST $PROGRAM_ID"
+                            echo -e "  ${GREEN}✓${NC} Pre-loading: ${base_name} (${PROGRAM_ID:0:16}...)"
+                            ((PROGRAM_COUNT++))
+                        fi
+                    fi
+                else
+                    echo -e "  ${YELLOW}⚠${NC} No keypair for ${base_name}.so"
+                fi
             fi
-        fi
-    done
-fi
+        done
+    fi
+done
 
 if [ $PROGRAM_COUNT -eq 0 ]; then
     echo -e "${YELLOW}No programs found to pre-load${NC}"
 else
-    echo -e "${GREEN}Found $PROGRAM_COUNT program(s) to pre-load${NC}"
+    echo -e "${GREEN}Pre-loading $PROGRAM_COUNT program(s)${NC}"
+fi
+
+# Add test accounts with SOL for testing
+TEST_ACCOUNTS=""
+if [ -n "$WALLET_PUBKEY" ]; then
+    # Create a few test accounts with balance
+    for i in {1..3}; do
+        TEST_KEYPAIR="/tmp/test-account-$i.json"
+        solana-keygen new --outfile "$TEST_KEYPAIR" --no-bip39-passphrase --force --silent 2>/dev/null
+        TEST_PUBKEY=$(solana-keygen pubkey "$TEST_KEYPAIR")
+        echo -e "  ${GREEN}✓${NC} Test account $i: ${TEST_PUBKEY:0:16}..."
+    done
 fi
 
 # Start validator
