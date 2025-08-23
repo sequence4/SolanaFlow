@@ -652,13 +652,15 @@ const Chat: React.FC = () => {
                                 >
                                     <div className="w-full">
                                         {isUser ? (
-                                            <div className="user-message bg-gray-900/20 rounded-lg px-4 py-3 max-w-[80%] shadow-sm overflow-hidden" style={{
-                                                whiteSpace: 'pre-wrap',
-                                                wordWrap: 'break-word', 
-                                                overflowWrap: 'break-word'
-                                            }}>
-                                                <div className="leading-relaxed font-inter text-[15px] text-slate-100 font-normal">
-                                                    <MarkdownRenderer content={message.text} />
+                                            <div className="flex justify-end w-full">
+                                                <div className="user-message bg-gray-900/20 rounded-lg px-4 py-3 max-w-[80%] shadow-sm overflow-hidden" style={{
+                                                    whiteSpace: 'pre-wrap',
+                                                    wordWrap: 'break-word', 
+                                                    overflowWrap: 'break-word'
+                                                }}>
+                                                    <div className="leading-relaxed font-inter text-[15px] text-slate-100 font-normal">
+                                                        <MarkdownRenderer content={message.text} />
+                                                    </div>
                                                 </div>
                                             </div>
                                         ) : (
@@ -671,7 +673,7 @@ const Chat: React.FC = () => {
                                                         exit={{ opacity: 0, y: -10 }}
                                                         className="w-full mb-3"
                                                     >
-                                                        <div className="thinking-container bg-blue-50/80 dark:bg-blue-900/20 border-l-3 border-blue-500 rounded-lg px-4 py-3 space-y-2">
+                                                        <div className="thinking-container px-2 py-1 space-y-2">
                                                             {thinkingSteps.map((step, stepIndex) => (
                                                                 <motion.div
                                                                     key={stepIndex}
@@ -682,13 +684,13 @@ const Chat: React.FC = () => {
                                                                         step.completed ? 'opacity-100' : 'opacity-70'
                                                                     }`}
                                                                 >
-                                                                    <div className="thinking-indicator flex items-center justify-center w-5 h-5">
-                                                                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                                                    <div className="thinking-indicator flex items-center justify-center w-4 h-4">
+                                                                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full opacity-60"></div>
                                                                     </div>
-                                                                    <span className={`text-sm font-mono leading-relaxed ${
+                                                                    <span className={`text-xs font-mono leading-relaxed opacity-70 ${
                                                                         step.completed 
-                                                                            ? "text-gray-600 dark:text-gray-400" 
-                                                                            : "text-gray-700 dark:text-gray-300"
+                                                                            ? "text-gray-500 dark:text-gray-500" 
+                                                                            : "text-gray-600 dark:text-gray-400"
                                                                     }`}>
                                                                         {step.text}
                                                                     </span>
@@ -700,7 +702,7 @@ const Chat: React.FC = () => {
                                                 
                                                 {/* AI message content */}
                                                 {message.logs && message.logs.length > 0 ? (
-                                                    <div className="space-y-1 font-mono text-xs text-gray-600 dark:text-gray-400 p-3">
+                                                    <div className="space-y-1 font-mono text-xs text-gray-600 dark:text-gray-400">
                                                         {message.logs.map((log, logIndex) => (
                                                             <div key={logIndex} className="opacity-90 leading-relaxed">
                                                                 {log}
