@@ -29,7 +29,6 @@ import {
   Trash2
 } from "lucide-react";
 import MarkdownRenderer from '@/components/main/code/markdown/MarkdownRenderer';
-import { TaskProgressDisplay } from './TaskProgressDisplay';
 
 export interface AIMessageType {
   text: string;
@@ -72,15 +71,6 @@ const Chat: React.FC = () => {
     const processedLogsRef = useRef(new Set<string>());
     const buildLogMessageIndexRef = useRef<number | null>(null);
     
-    // Add state for active tasks
-    const [activeTasks, setActiveTasks] = useState<Record<string, {
-      name: string;
-      status: 'running' | 'completed' | 'error';
-      pct: number;
-      stage: string;
-      message?: string;
-      thoughts?: string[];
-    }>>({});
   
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const messagesAreaRef = useRef<HTMLDivElement | null>(null);
@@ -277,83 +267,20 @@ const Chat: React.FC = () => {
         setLastLogIndex(systemLogs.length);
     }, [systemLogs, lastLogIndex]);
 
-    // Listen for SSE events
-    useEffect(() => {
-        const handleProgressEvent = (data: any) => {
-            console.log('[CHAT-DEBUG] Progress event:', data);
-            
-            // Handle different event types
-            if (data.type === 'task-start') {
-                setActiveTasks(prev => ({
-                    ...prev,
-                    [data.taskId]: { 
-                        name: data.taskName, 
-                        status: 'running', 
-                        pct: 0, 
-                        stage: data.stage 
-                    }
-                }));
-            } else if (data.type === 'task-update') {
-                setActiveTasks(prev => ({
-                    ...prev,
-                    [data.taskId]: { 
-                        ...prev[data.taskId], 
-                        pct: data.pct, 
-                        message: data.message 
-                    }
-                }));
-            } else if (data.type === 'task-complete') {
-                setActiveTasks(prev => ({
-                    ...prev,
-                    [data.taskId]: { 
-                        ...prev[data.taskId], 
-                        status: 'completed', 
-                        pct: 100 
-                    }
-                }));
-                // Remove completed tasks after delay
-                setTimeout(() => {
-                    setActiveTasks(prev => {
-                        const updated = { ...prev };
-                        delete updated[data.taskId];
-                        return updated;
-                    });
-                }, 2000);
-            }
-        };
-        
-        eventBus.on('progress', handleProgressEvent);
-        eventBus.on('code-generation', handleProgressEvent);
-        
-        return () => {
-            eventBus.off('progress', handleProgressEvent);
-            eventBus.off('code-generation', handleProgressEvent);
-        };
-    }, []);
 
     // Handle build completion
     useEffect(() => {
         const onComplete = () => {
-            setActiveTasks({});
             setIsThinking(false);
             setCurrentThinkingStage(null);
             buildLogMessageIndexRef.current = null;
             taskLogs.setSuppressToast(false);
         };
         
-        const onProgressUpdate = (data: any) => {
-            if (data.type === 'pipeline-complete' || 
-                (data.stage === 'build' && data.status === 'completed' && data.message?.includes('finished'))) {
-                setTimeout(onComplete, 1000);
-            }
-        };
-        
         eventBus.on("build-complete", onComplete);
-        eventBus.on("progress", onProgressUpdate);
         
         return () => {
             eventBus.off("build-complete", onComplete);
-            eventBus.off("progress", onProgressUpdate);
         };
     }, [taskLogs]);
 
@@ -488,9 +415,7 @@ const Chat: React.FC = () => {
         localStorage.removeItem('chatMessages');
     };
 
-    // Enhanced thinking states with more granular stages
     const showThinkingForStage = async (stage: string) => {
-        // Prevent duplicate thinking states
         if (currentThinkingStage === stage) return;
         setCurrentThinkingStage(stage);
         
@@ -604,7 +529,6 @@ const Chat: React.FC = () => {
         
         setThinkingSteps([]);
         
-        // Progressive reveal with better timing
         for (const [index, thought] of thoughts.entries()) {
             await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 200));
             
@@ -616,7 +540,6 @@ const Chat: React.FC = () => {
             ));
         }
         
-        // Keep final state visible briefly
         await new Promise(resolve => setTimeout(resolve, 800));
         setIsThinking(false);
         setThinkingSteps([]);
@@ -630,7 +553,6 @@ const Chat: React.FC = () => {
             <div 
                 className="chat-container flex flex-col h-full bg-card border-border overflow-hidden w-full"
             >
-                {/* Header */}
                 <div className="chat-header flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
                     <div className="flex items-center space-x-2">
                         <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
@@ -663,7 +585,6 @@ const Chat: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Messages */}
                 <div 
                     ref={messagesAreaRef}
                     className="messages-area text-sm flex-1 overflow-y-auto p-6 space-y-6 min-h-0"
@@ -699,7 +620,6 @@ const Chat: React.FC = () => {
                                         <div className="w-full">
                                             <div className="flex items-start gap-3 w-full">
                                                 <div className="leading-relaxed w-full min-w-0 flex-1">
-                                                    {/* Render logs if present */}
                                                     {message.logs && message.logs.length > 0 ? (
                                                         <div className="space-y-1 font-mono text-xs text-gray-400">
                                                             {message.logs.map((log, logIndex) => (
@@ -718,7 +638,6 @@ const Chat: React.FC = () => {
                                                 </div>
                                             </div>
                                         </div>
-                                        {/* Timestamp */}
                                         {displayTime && (
                                             <div className={`text-xs mt-2 ${isUser ? "text-gray-500" : "text-gray-500"}`}>
                                                 <div className="flex items-center gap-2">
@@ -737,19 +656,7 @@ const Chat: React.FC = () => {
                         })}
                     </AnimatePresence>
 
-                    {/* Task Progress Display */}
-                    {Object.keys(activeTasks).length > 0 && (
-                        <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className="w-full py-4"
-                        >
-                            <TaskProgressDisplay tasks={activeTasks} />
-                        </motion.div>
-                    )}
 
-                    {/* Thinking indicator */}
                     {isThinking && thinkingSteps.length > 0 && (
                         <motion.div 
                             initial={{ opacity: 0, y: 10 }} 
@@ -779,7 +686,6 @@ const Chat: React.FC = () => {
                         </motion.div>
                     )}
 
-                    {/* Typing indicator */}
                     {isTyping && (
                         <motion.div 
                             initial={{ opacity: 0, y: 10 }} 
@@ -797,7 +703,6 @@ const Chat: React.FC = () => {
                     <div ref={messagesEndRef} />
                 </div>
 
-                {/* Input area */}
                 <div className="input-area p-3 border-t border-border flex-shrink-0">
                     <div className="flex flex-col space-y-2">
                         <div className="flex items-center justify-end px-2">

@@ -49,15 +49,8 @@ const Code = () => {
     useEffect(() => {
         if (activeTab === 'code' && !selectedFile && fileTree) {
             let defaultFile = findFileByName(fileTree as FileTreeItemType, 'Anchor.toml');
-            
-            if (!defaultFile) {
-                defaultFile = findFirstFile(fileTree as FileTreeItemType);
-            }
-            
-            if (defaultFile) {
-                setSelectedFile(defaultFile);
-                //console.log('Auto-selected file:', defaultFile.name);
-            }
+            if (!defaultFile) defaultFile = findFirstFile(fileTree as FileTreeItemType);
+            if (defaultFile) setSelectedFile(defaultFile);
         }
     }, [activeTab, selectedFile, setSelectedFile, fileTree]);
 
@@ -67,9 +60,6 @@ const Code = () => {
         if (ext === "toml") return "toml";
         return "typescript";
     };
-
-    const terminalBg = useColorModeValue('var(--terminal-bg-light)', 'var(--terminal-bg-dark)');
-    const terminalBorder = useColorModeValue('var(--border-2-light)', 'var(--border-2-dark)');
     
     return (
       <div className="flex flex-col w-full h-full bg-card">

@@ -144,26 +144,20 @@ class ProgressManager {
   }
   
   addCodeGenerationEvent(fileName: string, content: string) {
-    // Track individual file generation for smooth progress
     this.generatedFiles.push({ fileName, content });
     
-    // More gradual progress curve with increased expected files
-    const expectedFiles = 20; // Increase for smoother progress
+    const expectedFiles = 20; 
     const baseProgress = Math.min((this.generatedFiles.length / expectedFiles) * 40, 40);
     
-    // Add processing phase progress for files
     const processingProgress = Math.min(30, this.generatedFiles.length * 1.5);
     
     const totalProgress = Math.min(70, baseProgress + processingProgress);
-    
-    this.updateProgress('code-gen', totalProgress, `Processing: ${fileName}`);
-    
-    // Send individual file updates to frontend immediately
+        
     this.sendProgress({
       type: 'file-generated',
       stage: 'code-gen',
       fileName,
-      content: content, // Include actual content
+      content: content, 
       fileIndex: this.generatedFiles.length,
       totalFiles: this.generatedFiles.length,
       pct: totalProgress,
