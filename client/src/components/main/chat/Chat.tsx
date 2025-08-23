@@ -22,7 +22,6 @@ import eventBus from '@/lib/eventBus';
 // Icons
 import { 
   Send, 
-  Loader2, 
   X, 
   Maximize2, 
   Minimize2,
@@ -423,100 +422,145 @@ const Chat: React.FC = () => {
         
         const stageThoughts = {
             'pipeline-init': [
-                "Initializing Solana deployment pipeline...",
+                "Initializing Solana deployment pipeline",
                 "Allocating computational resources for build process",
-                "Preparing secure isolated environment",
-                "Loading project configuration and dependencies"
+                "Preparing secure isolated environment", 
+                "Loading project configuration and dependencies",
+                "Establishing build context and parameters",
+                "Setting up security protocols for compilation"
             ],
             'validation': [
                 "Validating project structure and configuration",
-                "Checking workflow graph integrity",
-                "Verifying instruction dependencies",
-                "Analyzing account relationships"
+                "Checking workflow graph integrity and dependencies",
+                "Verifying instruction relationships and flow",
+                "Analyzing account structures and constraints",
+                "Ensuring compliance with Solana program standards",
+                "Cross-referencing instruction compatibility"
             ],
             'docker-setup': [
                 "Spinning up Docker container with Solana toolchain",
                 "Mounting project workspace securely",
-                "Configuring container networking",
-                "Setting up build cache for optimization"
+                "Configuring container networking and isolation",
+                "Setting up build cache for optimization",
+                "Installing container build dependencies",
+                "Applying security policies and restrictions"
             ],
             'dependencies': [
                 "Installing Rust stable toolchain",
                 "Setting up Solana BPF target support",
                 "Installing Anchor framework v0.30",
-                "Configuring Solana CLI tools"
+                "Configuring Solana CLI tools",
+                "Resolving dependency versions and conflicts",
+                "Updating package registry and cache",
+                "Verifying toolchain installation integrity"
             ],
             'program-structure': [
                 "Analyzing workflow to generate optimal program structure",
                 "Designing modular instruction architecture",
-                "Planning account data layouts",
-                "Calculating rent-exempt reserve requirements"
+                "Planning account data layouts and schemas",
+                "Calculating rent-exempt reserve requirements",
+                "Mapping instruction dependencies and flow",
+                "Optimizing program size and compute efficiency",
+                "Defining program entry points and handlers"
             ],
             'instruction-handlers': [
                 "Generating instruction handler functions",
-                "Implementing input validation logic",
-                "Adding security checks and constraints",
-                "Creating error handling mechanisms"
+                "Implementing input validation and sanitization",
+                "Adding security checks and access controls",
+                "Creating comprehensive error handling mechanisms",
+                "Implementing state transition logic",
+                "Adding logging and monitoring hooks",
+                "Optimizing handler performance and efficiency"
             ],
             'account-structures': [
-                "Creating account data structures",
+                "Creating account data structures and schemas",
                 "Implementing serialization/deserialization",
-                "Optimizing storage layout for efficiency",
-                "Adding account validation rules"
+                "Optimizing storage layout for space efficiency",
+                "Adding account validation rules and constraints",
+                "Defining account relationship mappings",
+                "Implementing account versioning and migration",
+                "Adding account security and ownership checks"
             ],
             'typescript-sdk': [
                 "Generating TypeScript SDK for frontend integration",
                 "Creating type definitions and interfaces",
                 "Building transaction helper functions",
-                "Implementing wallet adapter integration"
+                "Implementing wallet adapter integration",
+                "Adding async/await patterns for RPC calls",
+                "Creating account fetching utilities",
+                "Implementing error handling and retry logic"
             ],
             'react-components': [
                 "Creating React hooks for program interaction",
                 "Building UI components for transactions",
-                "Setting up state management utilities",
-                "Generating example usage patterns"
+                "Setting up state management with React Query",
+                "Generating example usage patterns and docs",
+                "Implementing form validation and UX flows",
+                "Adding loading states and error boundaries",
+                "Creating component test suites"
             ],
             'rust-compilation': [
                 "Compiling Rust source to BPF bytecode",
                 "Linking Solana runtime dependencies",
-                "Processing macro expansions",
-                "Building program binary"
+                "Processing macro expansions and attributes",
+                "Building optimized program binary",
+                "Running static analysis and linting",
+                "Generating compilation reports and metrics",
+                "Validating bytecode integrity and constraints"
             ],
             'security-checks': [
-                "Running static security analysis",
-                "Checking for common vulnerabilities",
-                "Validating access control patterns",
-                "Verifying arithmetic operations"
+                "Running comprehensive static security analysis",
+                "Checking for common vulnerabilities and exploits",
+                "Validating access control patterns and permissions",
+                "Verifying arithmetic operations and overflow protection",
+                "Scanning for reentrancy and state manipulation risks",
+                "Ensuring proper signer verification and authority checks",
+                "Generating security audit report and recommendations"
             ],
             'optimization': [
-                "Optimizing bytecode for size constraints",
-                "Reducing compute unit consumption",
-                "Minimizing account data usage",
-                "Applying compiler optimizations"
+                "Optimizing bytecode for Solana's 200KB size limit",
+                "Reducing compute unit consumption and costs",
+                "Minimizing account data usage and rent costs",
+                "Applying advanced compiler optimizations",
+                "Profiling instruction performance bottlenecks",
+                "Implementing code deduplication strategies",
+                "Fine-tuning for maximum execution efficiency"
             ],
             'keypair-generation': [
                 "Generating deterministic program keypair",
-                "Computing program derived addresses",
-                "Creating deployment configuration",
-                "Setting up program authority"
+                "Computing program derived addresses (PDAs)",
+                "Creating deployment configuration manifest",
+                "Setting up program authority and governance",
+                "Implementing upgrade authority management",
+                "Configuring security policies and access controls",
+                "Documenting key management procedures"
             ],
             'artifacts': [
-                "Packaging compiled program binary",
-                "Generating Interface Definition Language",
-                "Creating deployment metadata",
-                "Building distribution artifacts"
+                "Packaging compiled program binary and metadata",
+                "Generating Interface Definition Language (IDL)",
+                "Creating deployment metadata and manifests",
+                "Building distribution artifacts and documentation",
+                "Generating program analysis reports",
+                "Creating verification checksums and signatures",
+                "Preparing deployment instructions and guides"
             ],
             'finalization': [
-                "Performing final validation checks",
-                "Verifying all build artifacts",
-                "Generating deployment instructions",
-                "Preparing success summary"
+                "Performing comprehensive final validation checks",
+                "Verifying all build artifacts and checksums",
+                "Generating detailed deployment instructions",
+                "Preparing success summary and metrics",
+                "Validating program size and compute constraints",
+                "Running final security verification scan",
+                "Creating deployment documentation and guides"
             ],
             'completion': [
-                "Build pipeline completed successfully! ✅",
+                "Build pipeline completed successfully!",
                 "All artifacts generated and validated",
-                "Program ready for deployment",
-                "You can now deploy to devnet or mainnet"
+                "Program ready for deployment to Solana",
+                "You can now deploy to devnet or mainnet-beta",
+                "Build completed in record time with zero errors",
+                "Program optimized for maximum efficiency",
+                "Security checks passed with flying colors"
             ]
         };
         
@@ -590,6 +634,40 @@ const Chat: React.FC = () => {
                     className="messages-area text-sm flex-1 overflow-y-auto p-6 space-y-6 min-h-0"
                     onScroll={handleScroll}
                 >
+                    {isThinking && thinkingSteps.length > 0 && (
+                        <motion.div 
+                            initial={{ opacity: 0, y: 10 }} 
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="w-full mb-4"
+                        >
+                            <div className="thinking-container bg-blue-50/80 dark:bg-blue-900/20 border-l-3 border-blue-500 rounded-lg px-4 py-3 space-y-2">
+                                {thinkingSteps.map((step, index) => (
+                                    <motion.div
+                                        key={index}
+                                        initial={{ opacity: 0, x: -10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ delay: index * 0.05, duration: 0.4, ease: "easeOut" }}
+                                        className={`thinking-step flex items-center gap-3 transition-opacity duration-300 ${
+                                            step.completed ? 'opacity-100' : 'opacity-70'
+                                        }`}
+                                    >
+                                        <div className="thinking-indicator flex items-center justify-center w-5 h-5">
+                                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                        </div>
+                                        <span className={`text-sm font-mono leading-relaxed ${
+                                            step.completed 
+                                                ? "text-gray-600 dark:text-gray-400" 
+                                                : "text-gray-700 dark:text-gray-300"
+                                        }`}>
+                                            {step.text}
+                                        </span>
+                                    </motion.div>
+                                ))}
+                            </div>
+                        </motion.div>
+                    )}
+
                     <AnimatePresence>
                         {messages.map((message, index) => {
                             const isUser = message.sender === 'user';
@@ -605,46 +683,45 @@ const Chat: React.FC = () => {
                                     transition={{ duration: 0.4, ease: "easeOut" }}
                                     className={`w-full ${isUser ? "flex justify-end" : ""}`}
                                 >
-                                    <div
-                                        className={`${
-                                            isUser
-                                                ? "user-message bg-gray-900/20 rounded-lg px-4 py-3 max-w-[80%] shadow-sm"
-                                                : "w-full bg-transparent"
-                                        } overflow-hidden`}
-                                        style={{
-                                            whiteSpace: 'pre-wrap',
-                                            wordWrap: 'break-word', 
-                                            overflowWrap: 'break-word'
-                                        }}
-                                    >
-                                        <div className="w-full">
-                                            <div className="flex items-start gap-3 w-full">
-                                                <div className="leading-relaxed w-full min-w-0 flex-1 font-inter text-[15px] text-slate-100 font-medium">
-                                                    {message.logs && message.logs.length > 0 ? (
-                                                        <div className="space-y-1 font-mono text-xs text-gray-400">
-                                                            {message.logs.map((log, logIndex) => (
-                                                                <div key={logIndex} className="opacity-80">
-                                                                    {log}
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    ) : (
-                                                        <div className="w-full max-w-full overflow-hidden">
-                                                            <MarkdownRenderer 
-                                                                content={message.text}
-                                                            />
-                                                        </div>
-                                                    )}
+                                    <div className="w-full">
+                                        {isUser ? (
+                                            <div className="user-message bg-gray-900/20 rounded-lg px-4 py-3 max-w-[80%] shadow-sm overflow-hidden" style={{
+                                                whiteSpace: 'pre-wrap',
+                                                wordWrap: 'break-word', 
+                                                overflowWrap: 'break-word'
+                                            }}>
+                                                <div className="leading-relaxed font-inter text-[15px] text-slate-100 font-normal">
+                                                    <MarkdownRenderer content={message.text} />
                                                 </div>
                                             </div>
-                                        </div>
+                                        ) : (
+                                            <div className="w-full">
+                                                {message.logs && message.logs.length > 0 ? (
+                                                    <div className="space-y-1 font-mono text-xs text-gray-600 dark:text-gray-400 bg-gray-50/50 dark:bg-gray-800/30 rounded-md p-3 border border-gray-200/50 dark:border-gray-700/50">
+                                                        {message.logs.map((log, logIndex) => (
+                                                            <div key={logIndex} className="opacity-90 leading-relaxed">
+                                                                {log}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div className="w-full leading-relaxed font-inter text-[15px] text-gray-800 dark:text-gray-100 font-normal" style={{
+                                                        whiteSpace: 'pre-wrap',
+                                                        wordWrap: 'break-word', 
+                                                        overflowWrap: 'break-word'
+                                                    }}>
+                                                        <MarkdownRenderer content={message.text} />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                         {displayTime && (
                                             <div className={`text-xs mt-2 ${isUser ? "text-gray-500" : "text-gray-500"}`}>
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-mono">{displayTime}</span>
                                                     {isUser && (
                                                         <span className="flex items-center">
-                                                            {message.status === "sending" ? <Loader2 size={10} className="animate-spin mr-1" /> : "✓"}
+                                                            {message.status === "sending" ? <div className="sending-dots"><div></div><div></div><div></div></div> : "✓"}
                                                         </span>
                                                     )}
                                                 </div>
@@ -656,36 +733,6 @@ const Chat: React.FC = () => {
                         })}
                     </AnimatePresence>
 
-
-                    {isThinking && thinkingSteps.length > 0 && (
-                        <motion.div 
-                            initial={{ opacity: 0, y: 10 }} 
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className="w-full"
-                        >
-                            <div className="thinking-steps space-y-2">
-                                {thinkingSteps.map((step, index) => (
-                                    <motion.div
-                                        key={index}
-                                        initial={{ opacity: 0, x: -10 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        transition={{ delay: index * 0.05 }}
-                                        className="flex items-center gap-2 text-gray-500 text-sm"
-                                    >
-                                        <Loader2 
-                                            size={12} 
-                                            className={step.completed ? "text-green-500" : "animate-spin"}
-                                        />
-                                        <span className={`text-sm ${step.completed ? "text-gray-400" : "text-gray-500"}`}>
-                                            {step.text}
-                                        </span>
-                                    </motion.div>
-                                ))}
-                            </div>
-                        </motion.div>
-                    )}
-
                     {isTyping && (
                         <motion.div 
                             initial={{ opacity: 0, y: 10 }} 
@@ -693,9 +740,13 @@ const Chat: React.FC = () => {
                             exit={{ opacity: 0, y: -10 }}
                             className="w-full"
                         >
-                            <div className="flex items-center gap-3">
-                                <Loader2 size={16} className="animate-spin text-cyan-500" />
-                                <span className="text-sm text-gray-500 italic">AI is thinking...</span>
+                            <div className="flex items-center gap-3 px-1 py-2">
+                                <div className="thinking-dots flex gap-1">
+                                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                                </div>
+                                <span className="text-sm text-gray-600 dark:text-gray-400 font-inter">Processing your request...</span>
                             </div>
                         </motion.div>
                     )}

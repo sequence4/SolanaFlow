@@ -44,6 +44,7 @@
   --font-family-sans: "DM Sans", system-ui, sans-serif;
   --font-family-heading: "Space Grotesk", system-ui, sans-serif;
   --font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-family-inter: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
   
   /* AI-themed custom properties */
   --ai-glow-primary: rgba(139, 92, 246, 0.4);
@@ -109,6 +110,9 @@ html, body {
 @layer utilities {
   .font-heading {
     font-family: var(--font-family-heading);
+  }
+  .font-inter {
+    font-family: var(--font-family-inter);
   }
 }
 
