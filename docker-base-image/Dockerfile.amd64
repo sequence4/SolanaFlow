@@ -135,6 +135,34 @@ RUN set -euo pipefail; \
     apt-get clean && rm -rf /var/lib/apt/lists/* && \
     strip /usr/local/bin/solana* /usr/local/bin/anchor /usr/local/bin/sccache || true
 
+# Install and configure solana-test-validator
+# The validator is already included with Solana CLI, verify it's available
+RUN solana-test-validator --version && echo "Test validator available" || echo "Test validator not found"
+
+# Create validator directories for ledger and config
+RUN mkdir -p /usr/local/validator-ledger /usr/local/validator-config /usr/local/validator-logs
+
+# Pre-generate a deterministic validator identity keypair for consistent address
+RUN solana-keygen new \
+    --outfile /usr/local/validator-config/identity.json \
+    --no-bip39-passphrase \
+    --force \
+    --silent
+
+# Set proper permissions for validator directories
+RUN chmod -R 755 /usr/local/validator-ledger /usr/local/validator-config /usr/local/validator-logs
+
+# Copy validator startup script
+COPY docker-base-image/start-validator.sh /usr/local/bin/start-validator.sh
+RUN chmod +x /usr/local/bin/start-validator.sh
+
+# Create volume mount points for validator persistence
+VOLUME ["/usr/local/validator-ledger", "/usr/local/validator-logs"]
+
+# Ensure validator can write to these directories
+RUN chown -R root:root /usr/local/validator-ledger /usr/local/validator-logs && \
+    chmod -R 777 /usr/local/validator-ledger /usr/local/validator-logs
+
 # ----------------------------------------------------------------------
 #  ⬇️  **DO NOT** enable sccache yet – it still tries S3 during warm-up.
 # ----------------------------------------------------------------------

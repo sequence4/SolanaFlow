@@ -22,6 +22,10 @@ import {
   relaySignedTxHandler,
   relayTx,
   getNonceAccount,
+  startLocalValidator,
+  stopLocalValidator,
+  getLocalValidatorStatus,
+  getLocalValidatorHealth,
 } from '../controllers/projectController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { buildProject, testProject, getBuildArtifact } from '../controllers/projectController';
@@ -61,6 +65,13 @@ router.post('/:id/run-script', authMiddleware, runProjectCommand);
 router.post('/:id/install-packages', authMiddleware, installPackages);
 router.post('/:id/ephemeral', authMiddleware, createEphemeralKeypair);
 router.post('/:projectId/install-node-dependencies', authMiddleware, installNodeDependencies);
+
+// Local validator control endpoints
+router.post('/:id/local-validator/start', guard, startLocalValidator);
+router.post('/:id/local-validator/stop', guard, stopLocalValidator);
+router.get('/:id/local-validator/status', guard, getLocalValidatorStatus);
+router.get('/:id/local-validator/health', guard, getLocalValidatorHealth);
+
 router.get('/:id/local-port', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;

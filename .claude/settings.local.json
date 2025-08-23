@@ -27,7 +27,8 @@
       "Bash(timeout 60s npm run build)",
       "Bash(git reset:*)",
       "Bash(timeout 30s npm run build)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(docker build:*)"
     ],
     "deny": [],
     "ask": [],

@@ -1699,3 +1699,326 @@ export const relayTx = async (req: Request, res: Response, next: NextFunction) =
 };
 
 export const relaySignedTxHandler = catchAsync(relaySignedTx);
+
+/**
+ * GET /projects/:id/local-validator/health
+ * Health check for local validator - checks both process and RPC responsiveness
+ */
+export const getLocalValidatorHealth = async (
+  req: Request,
+  res: Response,
+  _next: NextFunction
+): Promise<void> => {
+  try {
+    const { id: projectId } = req.params;
+    
+    console.log(`[VALIDATOR_HEALTH] Checking health for project ${projectId}`);
+    
+    const containerName = await getContainerName(projectId);
+    if (!containerName) {
+      res.json({ 
+        healthy: false, 
+        running: false,
+        message: 'Container not found' 
+      });
+      return;
+    }
+    
+    // Check if validator process is running
+    const pidCheckCmd = `docker exec ${containerName} bash -c "[ -f /usr/local/validator-logs/validator.pid ] && cat /usr/local/validator-logs/validator.pid || echo 'no-pid'"`;
+    const pidResult = await runCommand(pidCheckCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    
+    if (pidResult.trim() === 'no-pid') {
+      res.json({ 
+        healthy: false, 
+        running: false,
+        message: 'Validator not running (no PID file)' 
+      });
+      return;
+    }
+    
+    const pid = pidResult.trim();
+    
+    // Check if process with that PID exists
+    const processCheckCmd = `docker exec ${containerName} bash -c "ps -p ${pid} > /dev/null 2>&1 && echo 'running' || echo 'dead'"`;
+    const processStatus = await runCommand(processCheckCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    
+    if (processStatus.trim() !== 'running') {
+      res.json({ 
+        healthy: false, 
+        running: false,
+        pid,
+        message: 'Validator process not found' 
+      });
+      return;
+    }
+    
+    // Check RPC endpoint responsiveness
+    let rpcHealthy = false;
+    let clusterVersion = null;
+    let slotInfo = null;
+    
+    try {
+      const rpcCheckCmd = `docker exec ${containerName} bash -c "curl -s -X POST http://localhost:8899 -H 'Content-Type: application/json' -d '{\\"jsonrpc\\":\\"2.0\\",\\"id\\":1,\\"method\\":\\"getVersion\\"}' | jq -r '.result[\\"solana-core\\"]' 2>/dev/null || echo 'no-response'"`;
+      const rpcResult = await runCommand(rpcCheckCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+      
+      if (rpcResult.trim() !== 'no-response') {
+        rpcHealthy = true;
+        clusterVersion = rpcResult.trim();
+        
+        // Get current slot for additional info
+        const slotCmd = `docker exec ${containerName} bash -c "solana slot --url http://localhost:8899 2>/dev/null || echo '0'"`;
+        const slotResult = await runCommand(slotCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+        slotInfo = parseInt(slotResult.trim()) || 0;
+      }
+    } catch (rpcError) {
+      console.error('[VALIDATOR_HEALTH] RPC check failed:', rpcError);
+    }
+    
+    // Get last few log lines for diagnostics
+    let recentLogs = null;
+    try {
+      const logCmd = `docker exec ${containerName} bash -c "tail -n 5 /usr/local/validator-logs/validator.log 2>/dev/null | head -c 500"`;
+      recentLogs = await runCommand(logCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    } catch (logError) {
+      // Non-critical, ignore
+    }
+    
+    const healthy = processStatus.trim() === 'running' && rpcHealthy;
+    
+    res.json({
+      healthy,
+      running: processStatus.trim() === 'running',
+      rpcResponsive: rpcHealthy,
+      pid,
+      clusterVersion,
+      currentSlot: slotInfo,
+      rpcUrl: 'http://localhost:8899',
+      faucetUrl: 'http://localhost:9900',
+      websocketUrl: 'ws://localhost:8900',
+      recentLogs: recentLogs ? recentLogs.substring(0, 200) : null
+    });
+    
+  } catch (error) {
+    console.error('[VALIDATOR_HEALTH] Error:', error);
+    res.json({ 
+      healthy: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    });
+  }
+};
+
+/**
+ * POST /projects/:id/local-validator/start
+ * Start the local test validator with optional reset
+ */
+export const startLocalValidator = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { id: projectId } = req.params;
+    const { reset = false, walletPubkey } = req.body;
+    
+    console.log(`[VALIDATOR_START] Starting validator for project ${projectId}`);
+    console.log(`[VALIDATOR_START] Reset: ${reset}, Wallet: ${walletPubkey || 'none'}`);
+    
+    const containerName = await getContainerName(projectId);
+    if (!containerName) {
+      return next(new AppError('Container not found', 404));
+    }
+    
+    // Check current status first
+    const statusCmd = `docker exec ${containerName} /usr/local/bin/start-validator.sh status`;
+    const currentStatus = await runCommand(statusCmd, '.', uuidv4(), { skipSuccessUpdate: true })
+      .catch(() => 'not-running');
+    
+    if (currentStatus.includes('running') && !reset) {
+      console.log('[VALIDATOR_START] Validator already running, returning existing info');
+      res.json({ 
+        message: 'Local validator already running',
+        status: 'already-running',
+        rpcUrl: 'http://localhost:8899',
+        faucetUrl: 'http://localhost:9900',
+        websocketUrl: 'ws://localhost:8900'
+      });
+      return;
+    }
+    
+    // Start or reset the validator
+    const command = reset ? 'reset' : '';
+    const startCmd = walletPubkey 
+      ? `docker exec -e WALLET_PUBKEY=${walletPubkey} ${containerName} /usr/local/bin/start-validator.sh ${command}`
+      : `docker exec ${containerName} /usr/local/bin/start-validator.sh ${command}`;
+    
+    console.log(`[VALIDATOR_START] Executing: ${startCmd}`);
+    
+    const output = await runCommand(startCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    
+    // Parse output to check if it started successfully
+    const success = output.includes('Validator started successfully') || 
+                   output.includes('Validator is ready');
+    
+    if (!success) {
+      console.error('[VALIDATOR_START] Failed to start validator:', output);
+      return next(new AppError(`Failed to start validator: ${output}`, 500));
+    }
+    
+    // Update project details with validator info
+    await pool.query(
+      `UPDATE solanaproject 
+       SET details = jsonb_set(
+         COALESCE(details, '{}'::jsonb),
+         '{localValidator}',
+         $1::jsonb
+       )
+       WHERE id = $2`,
+      [
+        JSON.stringify({
+          active: true,
+          rpcUrl: 'http://localhost:8899',
+          faucetUrl: 'http://localhost:9900',
+          websocketUrl: 'ws://localhost:8900',
+          startedAt: new Date().toISOString()
+        }),
+        projectId
+      ]
+    );
+    
+    console.log('[VALIDATOR_START] Validator started successfully');
+    
+    res.json({
+      message: reset ? 'Local validator reset and started' : 'Local validator started',
+      status: 'started',
+      rpcUrl: 'http://localhost:8899',
+      faucetUrl: 'http://localhost:9900',
+      websocketUrl: 'ws://localhost:8900',
+      output: output.substring(0, 500) // First 500 chars of output for debugging
+    });
+    
+  } catch (error) {
+    console.error('[VALIDATOR_START] Error:', error);
+    next(new AppError(`Failed to start validator: ${(error as Error).message}`, 500));
+  }
+};
+
+/**
+ * POST /projects/:id/local-validator/stop
+ * Stop the local test validator
+ */
+export const stopLocalValidator = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { id: projectId } = req.params;
+    
+    console.log(`[VALIDATOR_STOP] Stopping validator for project ${projectId}`);
+    
+    const containerName = await getContainerName(projectId);
+    if (!containerName) {
+      return next(new AppError('Container not found', 404));
+    }
+    
+    const stopCmd = `docker exec ${containerName} /usr/local/bin/start-validator.sh stop`;
+    const output = await runCommand(stopCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    
+    // Update project details
+    await pool.query(
+      `UPDATE solanaproject 
+       SET details = jsonb_set(
+         COALESCE(details, '{}'::jsonb),
+         '{localValidator,active}',
+         'false'
+       )
+       WHERE id = $1`,
+      [projectId]
+    );
+    
+    console.log('[VALIDATOR_STOP] Validator stopped');
+    
+    res.json({
+      message: 'Local validator stopped',
+      status: 'stopped',
+      output: output.substring(0, 500)
+    });
+    
+  } catch (error) {
+    console.error('[VALIDATOR_STOP] Error:', error);
+    next(new AppError(`Failed to stop validator: ${(error as Error).message}`, 500));
+  }
+};
+
+/**
+ * GET /projects/:id/local-validator/status
+ * Get detailed status of the local validator
+ */
+export const getLocalValidatorStatus = async (
+  req: Request,
+  res: Response,
+  _next: NextFunction
+): Promise<void> => {
+  try {
+    const { id: projectId } = req.params;
+    
+    const containerName = await getContainerName(projectId);
+    if (!containerName) {
+      res.json({ 
+        running: false, 
+        message: 'Container not found' 
+      });
+      return;
+    }
+    
+    // Use the validator script's status command
+    const statusCmd = `docker exec ${containerName} /usr/local/bin/start-validator.sh status`;
+    const statusOutput = await runCommand(statusCmd, '.', uuidv4(), { skipSuccessUpdate: true })
+      .catch(err => `Error: ${err.message}`);
+    
+    const isRunning = statusOutput.includes('Validator is running');
+    const isResponsive = statusOutput.includes('RPC endpoint is responsive');
+    
+    // Get additional details if running
+    let programCount = 0;
+    let balance = null;
+    
+    if (isRunning) {
+      try {
+        // Count deployed programs
+        const programCmd = `docker exec ${containerName} bash -c "solana program show --programs --url http://localhost:8899 2>/dev/null | grep -c '^[A-Za-z0-9]' || echo '0'"`;
+        const programResult = await runCommand(programCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+        programCount = parseInt(programResult.trim()) || 0;
+        
+        // Get balance if wallet pubkey in request
+        if (req.query.walletPubkey) {
+          const balanceCmd = `docker exec ${containerName} bash -c "solana balance ${req.query.walletPubkey} --url http://localhost:8899 2>/dev/null || echo '0'"`;
+          const balanceResult = await runCommand(balanceCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+          balance = balanceResult.trim();
+        }
+      } catch (detailError) {
+        // Non-critical, continue
+        console.warn('[VALIDATOR_STATUS] Error getting details:', detailError);
+      }
+    }
+    
+    res.json({
+      running: isRunning,
+      responsive: isResponsive,
+      programCount,
+      walletBalance: balance,
+      rpcUrl: isRunning ? 'http://localhost:8899' : null,
+      faucetUrl: isRunning ? 'http://localhost:9900' : null,
+      websocketUrl: isRunning ? 'ws://localhost:8900' : null,
+      statusOutput: statusOutput.substring(0, 500)
+    });
+    
+  } catch (error) {
+    console.error('[VALIDATOR_STATUS] Error:', error);
+    res.json({ 
+      running: false, 
+      error: (error as Error).message 
+    });
+  }
+};
