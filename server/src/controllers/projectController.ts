@@ -2284,7 +2284,7 @@ export const quickDeployLocal = async (
       params: { id: projectId },
       body: { reset: resetValidator, walletPubkey },
       user: req.user
-    } as Request;
+    } as unknown as Request;
     
     await new Promise((resolve, reject) => {
       startLocalValidator(startValidatorReq, {
@@ -2301,7 +2301,7 @@ export const quickDeployLocal = async (
       params: { id: projectId },
       body: { walletPubkey, forceRebuild: false },
       user: req.user
-    } as Request;
+    } as unknown as Request;
     
     const deployResult = await new Promise<any>((resolve, reject) => {
       deployToLocalValidator(deployReq, {
@@ -2404,12 +2404,12 @@ export const switchProjectCluster = async (
     }
     
     // Import cluster utilities
-    const { ClusterType, getClusterConfig } = 
+    const { getClusterConfig } = 
       await import('../utils/environment/clusterDetection');
     
     // Get cluster configuration
     const clusterConfig = getClusterConfig(
-      cluster as ClusterType,
+      cluster as any,
       customUrl
     );
     
