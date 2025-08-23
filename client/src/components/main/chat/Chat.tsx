@@ -609,7 +609,7 @@ const Chat: React.FC = () => {
                                         className={`${
                                             isUser
                                                 ? "user-message bg-gray-900/20 rounded-lg px-4 py-3 max-w-[80%] shadow-sm"
-                                                : "w-full"
+                                                : "w-full bg-transparent"
                                         } overflow-hidden`}
                                         style={{
                                             whiteSpace: 'pre-wrap',
@@ -619,7 +619,7 @@ const Chat: React.FC = () => {
                                     >
                                         <div className="w-full">
                                             <div className="flex items-start gap-3 w-full">
-                                                <div className="leading-relaxed w-full min-w-0 flex-1">
+                                                <div className="leading-relaxed w-full min-w-0 flex-1 font-inter text-[15px] text-slate-100 font-medium">
                                                     {message.logs && message.logs.length > 0 ? (
                                                         <div className="space-y-1 font-mono text-xs text-gray-400">
                                                             {message.logs.map((log, logIndex) => (

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, DM_Sans } from "next/font/google";
+import { Space_Grotesk, DM_Sans, Inter } from "next/font/google";
 import "@/styles/globals.css";
 import "@/utils/helpers/polyfills";
 
@@ -15,6 +15,12 @@ const dmSans = DM_Sans({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-dm-sans",
+})
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter",
 })
 
 export const metadata: Metadata = {
@@ -50,7 +56,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${spaceGrotesk.variable} ${dmSans.variable} dark font-sans antialiased`}>
+      <body className={`${spaceGrotesk.variable} ${dmSans.variable} ${inter.variable} dark font-sans antialiased`}>
         <Providers>{children}</Providers>
       </body>
     </html>

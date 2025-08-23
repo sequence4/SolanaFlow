@@ -9,6 +9,9 @@ module.exports = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        inter: ['var(--font-inter)'],
+      },
       // Chat component custom colors
       colors: {
         'chat-bg': 'oklch(0.245 0 0)',
