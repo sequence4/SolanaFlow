@@ -772,34 +772,19 @@ export async function runDeployPipeline({
     };
     
     findIdls(fileTree);
-    //console.log(`📋 Found ${idls.length} IDL file(s)`);
     
-    /* ──────────────────────────────────────────────────────────────
-     * Patch   idl.metadata.address  →  compiled program public key
-     * so the front-end can safely use  new anchor.Program(idl, provider)
-     * (Anchor ≥ 0.30 expects this field to be correct).
-     * ────────────────────────────────────────────────────────────── */
     if (idlContent) {
       try {
-        // Program ID was already determined above
         const programId = programIdStr!;
 
         idlContent.metadata = {
           ...(idlContent.metadata ?? {}),
           address: programId,
         };
-        //console.log(`🔑 Updated IDL metadata with program ID: ${programId}`);
 
-        /* ---------- ensure the front-end sees the Program ID ---------- */
         try {
           await writeProgramIdEnv(programId, absRoot);
-          //console.log(`📄 Program ID written to .env file`);
 
-          /* ----------------------------------------------------------
-           * The file change happens *after* the Next.js dev server
-           * is already running inside the container.  Restart once
-           * so the server reloads the updated env vars.
-           * --------------------------------------------------------- */
           try {
             await runCommand(
               `docker restart ${workspace.containerName}`,
@@ -823,7 +808,6 @@ export async function runDeployPipeline({
     console.log(`[PIPELINE] Found ${idls.length} IDL files`);
     console.log("[PIPELINE] Deployment pipeline completed successfully");
     
-    // Complete the build stage properly
     await progressMgr.completeStage('build', `Build finished successfully - Program ID: ${programIdStr}`);
     
     sendProgress(<ProgressEvent>{
