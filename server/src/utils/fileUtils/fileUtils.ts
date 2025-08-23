@@ -653,10 +653,6 @@ export const startDeleteFileTask = async (
   return taskId;
 };
 
-/** ------------------------------------------------------------------ *
- * Idempotent helper – create the file if it doesn't exist,
- * otherwise update it. Returns the task-id (or null on error).
- * ------------------------------------------------------------------ */
 export async function updateOrCreateFile(
   projectId: string,
   filePath: string,

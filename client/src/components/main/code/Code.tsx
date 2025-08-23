@@ -46,21 +46,17 @@ const Code = () => {
         return null;
     };
 
-    // Effect to set default file when code tab is active and no file is selected
     useEffect(() => {
         if (activeTab === 'code' && !selectedFile && fileTree) {
-            // First try to find Anchor.toml
             let defaultFile = findFileByName(fileTree as FileTreeItemType, 'Anchor.toml');
             
-            // If not found, just pick the first file in the tree
             if (!defaultFile) {
                 defaultFile = findFirstFile(fileTree as FileTreeItemType);
             }
             
-            // Set the selected file if we found one
             if (defaultFile) {
                 setSelectedFile(defaultFile);
-                console.log('Auto-selected file:', defaultFile.name);
+                //console.log('Auto-selected file:', defaultFile.name);
             }
         }
     }, [activeTab, selectedFile, setSelectedFile, fileTree]);
