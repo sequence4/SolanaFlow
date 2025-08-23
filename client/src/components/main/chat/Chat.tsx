@@ -634,39 +634,6 @@ const Chat: React.FC = () => {
                     className="messages-area text-sm flex-1 overflow-y-auto p-6 space-y-6 min-h-0"
                     onScroll={handleScroll}
                 >
-                    {isThinking && thinkingSteps.length > 0 && (
-                        <motion.div 
-                            initial={{ opacity: 0, y: 10 }} 
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className="w-full mb-4"
-                        >
-                            <div className="thinking-container bg-blue-50/80 dark:bg-blue-900/20 border-l-3 border-blue-500 rounded-lg px-4 py-3 space-y-2">
-                                {thinkingSteps.map((step, index) => (
-                                    <motion.div
-                                        key={index}
-                                        initial={{ opacity: 0, x: -10 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        transition={{ delay: index * 0.05, duration: 0.4, ease: "easeOut" }}
-                                        className={`thinking-step flex items-center gap-3 transition-opacity duration-300 ${
-                                            step.completed ? 'opacity-100' : 'opacity-70'
-                                        }`}
-                                    >
-                                        <div className="thinking-indicator flex items-center justify-center w-5 h-5">
-                                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                        </div>
-                                        <span className={`text-sm font-mono leading-relaxed ${
-                                            step.completed 
-                                                ? "text-gray-600 dark:text-gray-400" 
-                                                : "text-gray-700 dark:text-gray-300"
-                                        }`}>
-                                            {step.text}
-                                        </span>
-                                    </motion.div>
-                                ))}
-                            </div>
-                        </motion.div>
-                    )}
 
                     <AnimatePresence>
                         {messages.map((message, index) => {
@@ -696,8 +663,44 @@ const Chat: React.FC = () => {
                                             </div>
                                         ) : (
                                             <div className="w-full">
+                                                {/* Thinking process for this specific AI message */}
+                                                {isThinking && thinkingSteps.length > 0 && index === messages.length - 1 && (
+                                                    <motion.div 
+                                                        initial={{ opacity: 0, y: 10 }} 
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        exit={{ opacity: 0, y: -10 }}
+                                                        className="w-full mb-3"
+                                                    >
+                                                        <div className="thinking-container bg-blue-50/80 dark:bg-blue-900/20 border-l-3 border-blue-500 rounded-lg px-4 py-3 space-y-2">
+                                                            {thinkingSteps.map((step, stepIndex) => (
+                                                                <motion.div
+                                                                    key={stepIndex}
+                                                                    initial={{ opacity: 0, x: -10 }}
+                                                                    animate={{ opacity: 1, x: 0 }}
+                                                                    transition={{ delay: stepIndex * 0.05, duration: 0.4, ease: "easeOut" }}
+                                                                    className={`thinking-step flex items-center gap-3 transition-opacity duration-300 ${
+                                                                        step.completed ? 'opacity-100' : 'opacity-70'
+                                                                    }`}
+                                                                >
+                                                                    <div className="thinking-indicator flex items-center justify-center w-5 h-5">
+                                                                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                                                    </div>
+                                                                    <span className={`text-sm font-mono leading-relaxed ${
+                                                                        step.completed 
+                                                                            ? "text-gray-600 dark:text-gray-400" 
+                                                                            : "text-gray-700 dark:text-gray-300"
+                                                                    }`}>
+                                                                        {step.text}
+                                                                    </span>
+                                                                </motion.div>
+                                                            ))}
+                                                        </div>
+                                                    </motion.div>
+                                                )}
+                                                
+                                                {/* AI message content */}
                                                 {message.logs && message.logs.length > 0 ? (
-                                                    <div className="space-y-1 font-mono text-xs text-gray-600 dark:text-gray-400 bg-gray-50/50 dark:bg-gray-800/30 rounded-md p-3 border border-gray-200/50 dark:border-gray-700/50">
+                                                    <div className="space-y-1 font-mono text-xs text-gray-600 dark:text-gray-400 p-3">
                                                         {message.logs.map((log, logIndex) => (
                                                             <div key={logIndex} className="opacity-90 leading-relaxed">
                                                                 {log}
