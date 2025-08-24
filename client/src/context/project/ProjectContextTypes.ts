@@ -71,6 +71,7 @@ export interface ProjectContextType {
   containerUrl?: string;
   details?: ProjectDetailsType;
   injectingNodeTypes?: string[];
+  deployNetwork?: 'local' | 'devnet' | 'mainnet';
 }
 
 // ----------- Save Project -----------

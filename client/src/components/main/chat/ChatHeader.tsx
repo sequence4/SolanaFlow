@@ -10,7 +10,9 @@ import {
   Edit2,
   Trash2,
   Globe,
-  HardDrive
+  HardDrive,
+  ChevronDown,
+  Wallet
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,6 +21,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import ProjectContext from '@/context/project/ProjectContext';
 import FileContext from '@/context/file/FileContext';
@@ -31,6 +39,8 @@ import { handleSaveClick } from '@/utils/project/handleSaveClick';
 import { handleNewProjectClick } from '@/utils/project/handleNewProjectClick';
 import { deployPipeline } from '@/api/deployPipeline';
 import { useWalletSigner } from '@/utils/blockchain/wallet';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { PhantomWalletName } from '@solana/wallet-adapter-phantom';
 import { ensureId } from '@/utils/project/ensureId';
 import { ProgramDeployer } from '@/components/ProgramDeployer';
 import { projectApi } from '@/api/projectApi';
@@ -60,10 +70,11 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [isProjectListModalOpen, setIsProjectListModalOpen] = useState(false);
   const [projectsRefreshCounter, setProjectsRefreshCounter] = useState(0);
-  const [currentCluster, setCurrentCluster] = useState<'local' | 'devnet'>('devnet');
+  const [currentCluster, setCurrentCluster] = useState<'local' | 'devnet' | 'mainnet'>('devnet');
   const [isLocalDeploying, setIsLocalDeploying] = useState(false);
   
   const walletSigner = useWalletSigner();
+  const { connected, publicKey, connect, disconnect, select } = useWallet();
   const taskLogs = useTaskLogs();
   const esRef = useRef<ReturnType<typeof deployPipeline> | null>(null);
   const containerURLRef = useRef<string | null>(null);
@@ -76,14 +87,21 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
     setProjectName(projectContext.name || "My Token Project");
   }, [projectContext.name]);
 
-  // Subscribe to cluster changes
+  // Subscribe to cluster changes and update project context
   useEffect(() => {
     const unsubscribe = connectionManager.onClusterChange((cluster) => {
-      setCurrentCluster(cluster === 'local' ? 'local' : 'devnet');
+      const networkCluster = cluster === 'local' ? 'local' : cluster === 'mainnet-beta' ? 'mainnet' : 'devnet';
+      setCurrentCluster(networkCluster);
+      setProjectContext(prev => ({ ...prev, deployNetwork: networkCluster }));
     });
     
     // Set initial value
-    setCurrentCluster(connectionManager.getCurrentCluster() === 'local' ? 'local' : 'devnet');
+    const initialCluster = connectionManager.getCurrentCluster();
+    const initialNetwork = initialCluster === 'local' ? 'local' : initialCluster === 'mainnet-beta' ? 'mainnet' : 'devnet';
+    setCurrentCluster(initialNetwork);
+    if (!projectContext.deployNetwork) {
+      setProjectContext(prev => ({ ...prev, deployNetwork: initialNetwork }));
+    }
     
     return unsubscribe;
   }, []);
@@ -334,14 +352,30 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
     setIsDeployModalOpen(false);
   }, [projectContext, setProjectContext]);
 
-  const handleClusterToggle = async () => {
-    const targetCluster = currentCluster === 'local' ? 'devnet' : 'local';
+  const handleWalletClick = async () => {
+    try {
+      if (!connected) {
+        select(PhantomWalletName);
+        await connect();
+      } else {
+        await disconnect();
+      }
+    } catch (error) {
+      console.error("Wallet connect error:", error);
+    }
+  };
+
+  const handleNetworkChange = async (network: 'local' | 'devnet' | 'mainnet') => {
+    if (network === 'mainnet') return; // Mainnet is disabled
+    
+    const targetCluster = network;
     
     try {
       const switched = await connectionManager.switchCluster(targetCluster);
       
       if (switched) {
         setCurrentCluster(targetCluster);
+        setProjectContext(prev => ({ ...prev, deployNetwork: targetCluster }));
         
         if (projectContext.id) {
           await projectApi.switchCluster(projectContext.id, { cluster: targetCluster });
@@ -351,7 +385,7 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
       }
     } catch (error) {
       console.error('Cluster switch error:', error);
-      toast.error(`Failed to switch to ${targetCluster}`);
+      toast.error(`Failed to switch to ${network}`);
     }
   };
 
@@ -407,13 +441,13 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                 {projectName}
               </div>
             )}
-            <TooltipProvider delayDuration={700} skipDelayDuration={200}>
+            <TooltipProvider delayDuration={0} skipDelayDuration={0}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-6 w-6"
+                    className="h-6 w-6 cursor-pointer"
                     onClick={() => setIsEditing(true)}
                   >
                     <Edit2 className="h-3 w-3" />
@@ -429,14 +463,14 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
 
         {/* Center - Project action buttons */}
         <div className="flex items-center gap-1">
-          <TooltipProvider delayDuration={700} skipDelayDuration={200}>
+          <TooltipProvider delayDuration={0} skipDelayDuration={0}>
             {/* Open */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-8 w-8"
+                  className="h-8 w-8 cursor-pointer"
                   onClick={handleOpenProjectClick}
                 >
                   <FolderOpen className="h-4 w-4" />
@@ -453,7 +487,7 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-8 w-8"
+                  className={cn("h-8 w-8", projectContext.id ? "cursor-pointer" : "cursor-default")}
                   onClick={handleSaveProject}
                   disabled={!projectContext.id}
                 >
@@ -461,7 +495,7 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" sideOffset={8}>
-                <span>Save</span>
+                <span>{projectContext.id ? "Save" : "Save (project not created)"}</span>
               </TooltipContent>
             </Tooltip>
 
@@ -471,7 +505,7 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-8 w-8"
+                  className="h-8 w-8 cursor-pointer"
                   onClick={handleNewProject}
                 >
                   <Plus className="h-4 w-4" />
@@ -490,7 +524,7 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-8 w-8"
+                  className={cn("h-8 w-8", isBuilding ? "cursor-default" : "cursor-pointer")}
                   onClick={handleBuildClick}
                   disabled={isBuilding}
                 >
@@ -502,7 +536,7 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" sideOffset={8}>
-                <span>Build</span>
+                <span>{isBuilding ? "Building..." : "Build"}</span>
               </TooltipContent>
             </Tooltip>
 
@@ -512,7 +546,7 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-8 w-8"
+                  className={cn("h-8 w-8", (!walletSigner.isConnected || !built || isLocalDeploying) ? "cursor-default" : "cursor-pointer")}
                   onClick={handleDeployClick}
                   disabled={!walletSigner.isConnected || !built || isLocalDeploying}
                 >
@@ -524,56 +558,129 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" sideOffset={8}>
-                <span>{projectDeployed ? "Deployed" : "Deploy"}</span>
+                <span>
+                  {!walletSigner.isConnected 
+                    ? "Connect wallet to deploy" 
+                    : !built 
+                    ? "Build first to deploy"
+                    : isLocalDeploying
+                    ? "Deploying..."
+                    : projectDeployed 
+                    ? "Deployed" 
+                    : "Deploy"}
+                </span>
               </TooltipContent>
             </Tooltip>
 
             <div className="w-px h-6 bg-border mx-1" />
 
-            {/* Network Toggle - Now as an icon button */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="icon"
-                  variant="ghost"
+            {/* Network Dropdown */}
+            <DropdownMenu>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className={cn(
+                        "h-8 w-8 cursor-pointer relative",
+                        currentCluster === 'local' 
+                          ? "text-green-500 hover:text-green-600" 
+                          : currentCluster === 'mainnet'
+                          ? "text-orange-500 hover:text-orange-600"
+                          : "text-blue-500 hover:text-blue-600"
+                      )}
+                    >
+                      {currentCluster === 'local' ? (
+                        <HardDrive className="h-4 w-4" />
+                      ) : (
+                        <Globe className="h-4 w-4" />
+                      )}
+                      <ChevronDown className="h-2 w-2 absolute bottom-1 right-1" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" sideOffset={8}>
+                  <span>{currentCluster === 'local' ? 'Local Validator' : currentCluster === 'mainnet' ? 'Mainnet' : 'Devnet'}</span>
+                </TooltipContent>
+              </Tooltip>
+              <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuItem 
+                  onClick={() => handleNetworkChange('devnet')}
                   className={cn(
-                    "h-8 w-8",
-                    currentCluster === 'local' 
-                      ? "text-green-500 hover:text-green-600" 
-                      : "text-blue-500 hover:text-blue-600"
+                    "cursor-pointer",
+                    currentCluster === 'devnet' && "bg-accent"
                   )}
-                  onClick={handleClusterToggle}
                 >
-                  {currentCluster === 'local' ? (
-                    <HardDrive className="h-4 w-4" />
-                  ) : (
-                    <Globe className="h-4 w-4" />
+                  <Globe className="mr-2 h-4 w-4 text-blue-500" />
+                  Devnet
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => handleNetworkChange('local')}
+                  className={cn(
+                    "cursor-pointer",
+                    currentCluster === 'local' && "bg-accent"
                   )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" sideOffset={8}>
-                <div className="space-y-1">
-                  <div className="font-semibold">
-                    {currentCluster === 'local' ? 'Local Validator' : 'Devnet'}
-                  </div>
-                  <div className="text-[10px] opacity-70">
-                    Click to switch
-                  </div>
-                </div>
-              </TooltipContent>
-            </Tooltip>
+                >
+                  <HardDrive className="mr-2 h-4 w-4 text-green-500" />
+                  Localnet
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  disabled
+                  className="cursor-not-allowed opacity-50"
+                >
+                  <Globe className="mr-2 h-4 w-4 text-orange-500" />
+                  Mainnet (Disabled)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </TooltipProvider>
         </div>
 
-        {/* Right side - Delete button */}
-        <div className="flex items-center">
-          <TooltipProvider delayDuration={700} skipDelayDuration={200}>
+        {/* Right side - Wallet connect and Delete button */}
+        <div className="flex items-center gap-2">
+          {/* Wallet Connection */}
+          {connected && publicKey ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-full px-3 flex items-center gap-2 bg-muted/50 hover:bg-muted text-foreground border-none cursor-pointer"
+              onClick={handleWalletClick}
+            >
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              <span className="text-xs font-medium">
+                {publicKey.toBase58().slice(0, 4)}...{publicKey.toBase58().slice(-4)}
+              </span>
+            </Button>
+          ) : (
+            <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 rounded-full px-3 flex items-center gap-2 bg-muted/50 hover:bg-muted text-foreground border-border cursor-pointer"
+                    onClick={handleWalletClick}
+                  >
+                    <Wallet className="h-3 w-3" />
+                    <span className="text-xs font-medium">Connect</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" sideOffset={8}>
+                  <span>Connect Wallet</span>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+
+          {/* Delete Chat Button */}
+          <TooltipProvider delayDuration={0} skipDelayDuration={0}>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+                  className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive cursor-pointer"
                   onClick={onDeleteChat}
                 >
                   <Trash2 className="h-4 w-4" />
