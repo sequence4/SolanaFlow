@@ -9,10 +9,7 @@ import {
   Hammer, 
   Edit2,
   Trash2,
-  Globe,
-  HardDrive,
-  ChevronDown,
-  Wallet
+  Check
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -38,9 +35,6 @@ import { handleOpenProject } from '@/utils/project/handleOpenProject';
 import { handleSaveClick } from '@/utils/project/handleSaveClick';
 import { handleNewProjectClick } from '@/utils/project/handleNewProjectClick';
 import { deployPipeline } from '@/api/deployPipeline';
-import { useWalletSigner } from '@/utils/blockchain/wallet';
-import { useWallet } from '@solana/wallet-adapter-react';
-import { PhantomWalletName } from '@solana/wallet-adapter-phantom';
 import { ensureId } from '@/utils/project/ensureId';
 import { ProgramDeployer } from '@/components/ProgramDeployer';
 import { projectApi } from '@/api/projectApi';
@@ -51,7 +45,6 @@ import { Dialog, DialogContent, DialogDescription } from "@/components/ui/dialog
 import ProjectListPopover from '@/components/main/workflow/ProjectListPopover';
 import { connectionManager } from '@/utils/blockchain/connectionManager';
 
-const WALLET_TOAST_ID = 'wallet-not-connected';
 const NEED_BUILD_TOAST_ID = 'need-build';
 const IS_DEV_SERVER = process.env.NEXT_PUBLIC_SF_DEV_SERVER === '1';
 
@@ -70,40 +63,28 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [isProjectListModalOpen, setIsProjectListModalOpen] = useState(false);
   const [projectsRefreshCounter, setProjectsRefreshCounter] = useState(0);
-  const [currentCluster, setCurrentCluster] = useState<'local' | 'devnet' | 'mainnet'>('devnet');
   const [isLocalDeploying, setIsLocalDeploying] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   
-  const walletSigner = useWalletSigner();
-  const { connected, publicKey, connect, disconnect, select } = useWallet();
   const taskLogs = useTaskLogs();
   const esRef = useRef<ReturnType<typeof deployPipeline> | null>(null);
   const containerURLRef = useRef<string | null>(null);
   const pollingCancelledRef = useRef<boolean>(false);
+  const dropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const projectDeployed = !!projectContext?.details?.projectState?.deployed;
   const built = !!projectContext.details?.projectState?.built;
+  const currentNetwork = projectContext.deployNetwork || 'devnet';
 
   useEffect(() => {
     setProjectName(projectContext.name || "My Token Project");
   }, [projectContext.name]);
 
-  // Subscribe to cluster changes and update project context
+  // Initialize network state if not set
   useEffect(() => {
-    const unsubscribe = connectionManager.onClusterChange((cluster) => {
-      const networkCluster = cluster === 'local' ? 'local' : cluster === 'mainnet-beta' ? 'mainnet' : 'devnet';
-      setCurrentCluster(networkCluster);
-      setProjectContext(prev => ({ ...prev, deployNetwork: networkCluster }));
-    });
-    
-    // Set initial value
-    const initialCluster = connectionManager.getCurrentCluster();
-    const initialNetwork = initialCluster === 'local' ? 'local' : initialCluster === 'mainnet-beta' ? 'mainnet' : 'devnet';
-    setCurrentCluster(initialNetwork);
     if (!projectContext.deployNetwork) {
-      setProjectContext(prev => ({ ...prev, deployNetwork: initialNetwork }));
+      setProjectContext(prev => ({ ...prev, deployNetwork: 'devnet' }));
     }
-    
-    return unsubscribe;
   }, []);
 
   const handleNewProject = () => {
@@ -261,14 +242,6 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
   };
 
   const handleDeployClick = useCallback(() => {
-    if (!walletSigner.isConnected) {
-      toast.error('Please connect your wallet first', {
-        id: WALLET_TOAST_ID,
-        duration: 4000,
-      });
-      return;
-    }
-
     if (!built) {
       toast.error('Please build first', {
         id: NEED_BUILD_TOAST_ID,
@@ -277,12 +250,12 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
       return;
     }
 
-    if (currentCluster === 'local') {
+    if (currentNetwork === 'local') {
       handleLocalDeploy();
     } else {
       setIsDeployModalOpen(true);
     }
-  }, [walletSigner.isConnected, built, currentCluster]);
+  }, [built, currentNetwork]);
 
   const handleLocalDeploy = async () => {
     if (!projectContext.id || isLocalDeploying) return;
@@ -291,7 +264,7 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
     
     try {
       const response = await projectApi.quickDeployLocal(projectContext.id, {
-        walletPubkey: walletSigner.publicKey?.toBase58(),
+        walletPubkey: undefined, // Removed wallet dependency
         resetValidator: false
       });
       
@@ -352,41 +325,41 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
     setIsDeployModalOpen(false);
   }, [projectContext, setProjectContext]);
 
-  const handleWalletClick = async () => {
-    try {
-      if (!connected) {
-        select(PhantomWalletName);
-        await connect();
-      } else {
-        await disconnect();
-      }
-    } catch (error) {
-      console.error("Wallet connect error:", error);
-    }
-  };
-
   const handleNetworkChange = async (network: 'local' | 'devnet' | 'mainnet') => {
     if (network === 'mainnet') return; // Mainnet is disabled
     
-    const targetCluster = network;
-    
     try {
-      const switched = await connectionManager.switchCluster(targetCluster);
+      // Update project context with new network
+      setProjectContext(prev => ({ ...prev, deployNetwork: network }));
+      
+      // Update connection manager
+      const switched = await connectionManager.switchCluster(network);
       
       if (switched) {
-        setCurrentCluster(targetCluster);
-        setProjectContext(prev => ({ ...prev, deployNetwork: targetCluster }));
-        
         if (projectContext.id) {
-          await projectApi.switchCluster(projectContext.id, { cluster: targetCluster });
+          await projectApi.switchCluster(projectContext.id, { cluster: network });
         }
         
-        toast.success(`Switched to ${targetCluster === 'local' ? 'Local Validator' : 'Devnet'}`);
+        toast.success(`Switched to ${network === 'local' ? 'Local Validator' : 'Devnet'}`);
       }
     } catch (error) {
       console.error('Cluster switch error:', error);
       toast.error(`Failed to switch to ${network}`);
     }
+  };
+
+  // Handle dropdown hover logic
+  const handleMouseEnter = () => {
+    if (dropdownTimeoutRef.current) {
+      clearTimeout(dropdownTimeoutRef.current);
+    }
+    setIsDropdownOpen(true);
+  };
+
+  const handleMouseLeave = () => {
+    dropdownTimeoutRef.current = setTimeout(() => {
+      setIsDropdownOpen(false);
+    }, 300); // Small delay to prevent flicker
   };
 
   useEffect(() => {
@@ -400,7 +373,12 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
   }, [handleConfirmBuild, isBuilding, taskLogs]);
 
   useEffect(() => {
-    return () => esRef.current?.close();
+    return () => {
+      esRef.current?.close();
+      if (dropdownTimeoutRef.current) {
+        clearTimeout(dropdownTimeoutRef.current);
+      }
+    };
   }, []);
 
   return (
@@ -546,9 +524,9 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                 <Button
                   size="icon"
                   variant="ghost"
-                  className={cn("h-8 w-8", (!walletSigner.isConnected || !built || isLocalDeploying) ? "cursor-default" : "cursor-pointer")}
+                  className={cn("h-8 w-8", (!built || isLocalDeploying) ? "cursor-default" : "cursor-pointer")}
                   onClick={handleDeployClick}
-                  disabled={!walletSigner.isConnected || !built || isLocalDeploying}
+                  disabled={!built || isLocalDeploying}
                 >
                   {isLocalDeploying ? (
                     <PulseLoader color="currentColor" size={4} />
@@ -559,9 +537,7 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
               </TooltipTrigger>
               <TooltipContent side="bottom" sideOffset={8}>
                 <span>
-                  {!walletSigner.isConnected 
-                    ? "Connect wallet to deploy" 
-                    : !built 
+                  {!built 
                     ? "Build first to deploy"
                     : isLocalDeploying
                     ? "Deploying..."
@@ -574,105 +550,78 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
 
             <div className="w-px h-6 bg-border mx-1" />
 
-            {/* Network Dropdown */}
-            <DropdownMenu>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className={cn(
-                        "h-8 w-8 cursor-pointer relative",
-                        currentCluster === 'local' 
-                          ? "text-green-500 hover:text-green-600" 
-                          : currentCluster === 'mainnet'
-                          ? "text-orange-500 hover:text-orange-600"
-                          : "text-blue-500 hover:text-blue-600"
-                      )}
-                    >
-                      {currentCluster === 'local' ? (
-                        <HardDrive className="h-4 w-4" />
-                      ) : (
-                        <Globe className="h-4 w-4" />
-                      )}
-                      <ChevronDown className="h-2 w-2 absolute bottom-1 right-1" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" sideOffset={8}>
-                  <span>{currentCluster === 'local' ? 'Local Validator' : currentCluster === 'mainnet' ? 'Mainnet' : 'Devnet'}</span>
-                </TooltipContent>
-              </Tooltip>
-              <DropdownMenuContent align="end" className="w-40">
-                <DropdownMenuItem 
-                  onClick={() => handleNetworkChange('devnet')}
-                  className={cn(
-                    "cursor-pointer",
-                    currentCluster === 'devnet' && "bg-accent"
-                  )}
+            {/* Network Dropdown with hover */}
+            <div 
+              className="relative"
+              onMouseEnter={handleMouseEnter}
+              onMouseLeave={handleMouseLeave}
+            >
+              <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 px-2 cursor-pointer text-foreground hover:bg-accent"
+                      >
+                        <span className="text-xs font-medium">
+                          {currentNetwork === 'local' ? 'Localnet' : currentNetwork === 'mainnet' ? 'Mainnet' : 'Devnet'}
+                        </span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" sideOffset={8}>
+                    <span>Select Network</span>
+                  </TooltipContent>
+                </Tooltip>
+                <DropdownMenuContent 
+                  align="end" 
+                  className="w-40"
+                  onMouseEnter={handleMouseEnter}
+                  onMouseLeave={handleMouseLeave}
                 >
-                  <Globe className="mr-2 h-4 w-4 text-blue-500" />
-                  Devnet
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => handleNetworkChange('local')}
-                  className={cn(
-                    "cursor-pointer",
-                    currentCluster === 'local' && "bg-accent"
-                  )}
-                >
-                  <HardDrive className="mr-2 h-4 w-4 text-green-500" />
-                  Localnet
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  disabled
-                  className="cursor-not-allowed opacity-50"
-                >
-                  <Globe className="mr-2 h-4 w-4 text-orange-500" />
-                  Mainnet (Disabled)
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <DropdownMenuItem 
+                    onClick={() => handleNetworkChange('devnet')}
+                    className={cn(
+                      "cursor-pointer",
+                      currentNetwork === 'devnet' && "bg-accent"
+                    )}
+                  >
+                    <span className="flex-1">Devnet</span>
+                    {currentNetwork === 'devnet' && (
+                      <Check className="h-4 w-4 ml-2" />
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => handleNetworkChange('local')}
+                    className={cn(
+                      "cursor-pointer",
+                      currentNetwork === 'local' && "bg-accent"
+                    )}
+                  >
+                    <span className="flex-1">Localnet</span>
+                    {currentNetwork === 'local' && (
+                      <Check className="h-4 w-4 ml-2" />
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    disabled
+                    className="cursor-not-allowed opacity-50"
+                  >
+                    <span className="flex-1">Mainnet</span>
+                    {currentNetwork === 'mainnet' && (
+                      <Check className="h-4 w-4 ml-2" />
+                    )}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </TooltipProvider>
         </div>
 
-        {/* Right side - Wallet connect and Delete button */}
+        {/* Right side - Delete button only */}
         <div className="flex items-center gap-2">
-          {/* Wallet Connection */}
-          {connected && publicKey ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 rounded-full px-3 flex items-center gap-2 bg-muted/50 hover:bg-muted text-foreground border-none cursor-pointer"
-              onClick={handleWalletClick}
-            >
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              <span className="text-xs font-medium">
-                {publicKey.toBase58().slice(0, 4)}...{publicKey.toBase58().slice(-4)}
-              </span>
-            </Button>
-          ) : (
-            <TooltipProvider delayDuration={0} skipDelayDuration={0}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 rounded-full px-3 flex items-center gap-2 bg-muted/50 hover:bg-muted text-foreground border-border cursor-pointer"
-                    onClick={handleWalletClick}
-                  >
-                    <Wallet className="h-3 w-3" />
-                    <span className="text-xs font-medium">Connect</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" sideOffset={8}>
-                  <span>Connect Wallet</span>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
-
           {/* Delete Chat Button */}
           <TooltipProvider delayDuration={0} skipDelayDuration={0}>
             <Tooltip>
@@ -701,7 +650,7 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
         onSubmit={handleCreateProject}
       />
 
-      {isDeployModalOpen && projectContext.id && currentCluster === 'devnet' && (
+      {isDeployModalOpen && projectContext.id && currentNetwork === 'devnet' && (
         <ProgramDeployer
           projectId={projectContext.id}
           isOpen={isDeployModalOpen}
