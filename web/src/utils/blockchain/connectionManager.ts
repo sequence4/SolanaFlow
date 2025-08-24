@@ -40,7 +40,7 @@ class ConnectionManager {
   
   async switchCluster(cluster: ClusterType): Promise<boolean> {
     // Test connection first
-    const testUrl = cluster === 'local' ? 'http://localhost:8899' : 
+    const testUrl = cluster === 'local' ? 'http://localhost:18899' : 
                     cluster === 'devnet' ? 'https://api.devnet.solana.com' :
                     cluster === 'testnet' ? 'https://api.testnet.solana.com' :
                     'https://api.mainnet-beta.solana.com';
@@ -76,7 +76,7 @@ class ConnectionManager {
   
   async isLocalValidatorRunning(): Promise<boolean> {
     try {
-      const conn = new Connection('http://localhost:8899', 'confirmed');
+      const conn = new Connection('http://localhost:18899', 'confirmed');
       const version = await Promise.race([
         conn.getVersion(),
         new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2000))

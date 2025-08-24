@@ -520,10 +520,10 @@ export async function startProjectContainer(
       `--label=traefik.http.services.dapp-${projId}.loadbalancer.healthcheck.timeout=30s`,
       // pin to one SG-approved port so the UI link is always stable
       '-p', `${hostPort}:${INTERNAL_PORT}`,
-      // Expose Solana validator ports
-      '-p', '8899:8899',  // RPC port
-      '-p', '8900:8900',  // WebSocket port
-      '-p', '9900:9900',  // Faucet port
+      // Expose Solana validator ports - mapped to different host ports to avoid conflicts
+      '-p', '18899:8899',  // RPC: host 18899 -> container 8899
+      '-p', '18900:8900',  // WebSocket: host 18900 -> container 8900
+      '-p', '19900:9900',  // Faucet: host 19900 -> container 9900
       // Set working directory to the project's web folder
       '-w', `/usr/src/${rootPath}/web`,
       imageRef,

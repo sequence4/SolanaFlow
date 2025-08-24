@@ -29,7 +29,8 @@
       "Bash(timeout 30s npm run build)",
       "Bash(cat:*)",
       "Bash(docker build:*)",
-      "Bash(pnpm add:*)"
+      "Bash(pnpm add:*)",
+      "Bash(lsof:*)"
     ],
     "deny": [],
     "ask": [],

@@ -12,8 +12,8 @@ export interface ClusterConfig {
 const CLUSTERS: Record<ClusterType, ClusterConfig> = {
   local: {
     type: 'local',
-    url: 'http://localhost:8899',
-    websocket: 'ws://localhost:8900',
+    url: 'http://localhost:18899',
+    websocket: 'ws://localhost:18900',
     name: 'Local Validator'
   },
   devnet: {
@@ -51,7 +51,7 @@ export function getClusterConfig(): ClusterConfig {
   
   // Check if local validator is running
   if (typeof window !== 'undefined') {
-    fetch('http://localhost:8899', { method: 'POST', body: JSON.stringify({
+    fetch('http://localhost:18899', { method: 'POST', body: JSON.stringify({
       jsonrpc: '2.0',
       id: 1,
       method: 'getHealth'

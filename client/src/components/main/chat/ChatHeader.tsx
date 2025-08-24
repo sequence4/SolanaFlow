@@ -45,6 +45,8 @@ import { NewProjectModal } from '@/components/ui/new-project-modal';
 import { Dialog, DialogContent, DialogDescription } from "@/components/ui/dialog";
 import ProjectListPopover from '@/components/main/workflow/ProjectListPopover';
 import { connectionManager } from '@/utils/blockchain/connectionManager';
+import { useWallet } from "@solana/wallet-adapter-react";
+import { PhantomWalletName } from "@solana/wallet-adapter-phantom";
 
 const NEED_BUILD_TOAST_ID = 'need-build';
 const IS_DEV_SERVER = process.env.NEXT_PUBLIC_SF_DEV_SERVER === '1';
@@ -67,6 +69,7 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
   const [isLocalDeploying, setIsLocalDeploying] = useState(false);
   
   const taskLogs = useTaskLogs();
+  const { connected, publicKey, connect, disconnect, select } = useWallet();
   const esRef = useRef<ReturnType<typeof deployPipeline> | null>(null);
   const containerURLRef = useRef<string | null>(null);
   const pollingCancelledRef = useRef<boolean>(false);
@@ -347,6 +350,19 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
     }
   };
 
+  const handleWalletClick = async () => {
+    try {
+      if (!connected) {
+        await select(PhantomWalletName);
+        await connect();
+      } else {
+        await disconnect();
+      }
+    } catch (error) {
+      console.error("Wallet connect error:", error);
+    }
+  };
+
 
   useEffect(() => {
     const run = () => {
@@ -595,8 +611,30 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
           </TooltipProvider>
         </div>
 
-        {/* Right side - Delete button only */}
+        {/* Right side - Wallet and Delete button */}
         <div className="flex items-center gap-2">
+          {/* Wallet Connection */}
+          {connected ? (
+            <div 
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 hover:bg-muted cursor-pointer transition-colors"
+              onClick={handleWalletClick}
+            >
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              <span className="text-xs font-medium text-foreground">
+                {publicKey?.toBase58().slice(0, 4)}...{publicKey?.toBase58().slice(-4)}
+              </span>
+            </div>
+          ) : (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-8 rounded-full px-3 text-xs shadow-sm hover:shadow-md transition-shadow bg-transparent cursor-pointer"
+              onClick={handleWalletClick}
+            >
+              Connect Wallet
+            </Button>
+          )}
+
           {/* Delete Chat Button */}
           <TooltipProvider delayDuration={0} skipDelayDuration={0}>
             <Tooltip>

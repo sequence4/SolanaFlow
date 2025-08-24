@@ -44,9 +44,9 @@ export function getClusterConfig(type: ClusterType, customUrl?: string): Cluster
     case ClusterType.LOCAL:
       return {
         type: ClusterType.LOCAL,
-        url: 'http://localhost:8899',
-        websocketUrl: 'ws://localhost:8900',
-        faucetUrl: 'http://localhost:9900',
+        url: 'http://localhost:18899',
+        websocketUrl: 'ws://localhost:18900',
+        faucetUrl: 'http://localhost:19900',
         isLocal: true,
         name: 'Local Validator'
       };
@@ -89,7 +89,7 @@ export function getClusterConfig(type: ClusterType, customUrl?: string): Cluster
         type: ClusterType.CUSTOM,
         url: customUrl || 'https://api.devnet.solana.com',
         websocketUrl: customUrl ? customUrl.replace('http', 'ws').replace('https', 'wss') : 'wss://api.devnet.solana.com',
-        faucetUrl: isLocalCustom ? 'http://localhost:9900' : undefined,
+        faucetUrl: isLocalCustom ? 'http://localhost:19900' : undefined,
         isLocal: isLocalCustom,
         name: 'Custom RPC'
       };
@@ -143,7 +143,7 @@ export async function getProjectCluster(
 ): Promise<ClusterInfo> {
   // First, check if local validator is available
   if (preferLocal) {
-    const localTest = await testClusterConnection('http://localhost:8899');
+    const localTest = await testClusterConnection('http://localhost:18899');
     if (localTest.success) {
       console.log(`[CLUSTER] Using local validator for project ${projectId}`);
       return getClusterConfig(ClusterType.LOCAL);
