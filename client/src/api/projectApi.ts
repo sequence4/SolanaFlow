@@ -1,8 +1,7 @@
 import { api } from './apiHelper';
 import { 
   SaveProjectResponse, 
-  ProjectContextToSave, 
-  ListProjectsResponse,
+  ProjectContextToSave,
   ProjectContextType,
 } from '../context/project/ProjectContextTypes';
 import { TaskResponse } from './interfaces/Task';

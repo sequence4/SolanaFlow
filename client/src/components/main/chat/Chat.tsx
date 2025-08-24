@@ -21,11 +21,7 @@ import eventBus from '@/lib/eventBus';
 
 // Icons
 import { 
-  Send, 
-  X, 
-  Maximize2, 
-  Minimize2,
-  Trash2
+  Send
 } from "lucide-react";
 import MarkdownRenderer from '@/components/main/code/markdown/MarkdownRenderer';
 import { ChatHeader } from './ChatHeader';
@@ -58,7 +54,7 @@ const Chat: React.FC = () => {
     const [additionalFiles] = useState<FileTreeItemType[]>([]);
     const [messages, setMessages] = useState<AIMessageType[]>([]);
     const [input, setInput] = useState('');
-    const [isExpanded, setIsExpanded] = useState(false);
+    const [isExpanded] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
     const [isThinking, setIsThinking] = useState(false);
     const [thinkingSteps, setThinkingSteps] = useState<Array<{text: string, completed: boolean}>>([]);

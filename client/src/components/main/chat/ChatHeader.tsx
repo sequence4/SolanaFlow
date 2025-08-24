@@ -51,7 +51,7 @@ interface ChatHeaderProps {
 
 export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
   const { projectContext, setProjectContext } = useContext(ProjectContext);
-  const { fileTree, setFileTree, setSelectedFile } = useContext(FileContext);
+  const { setFileTree, setSelectedFile } = useContext(FileContext);
   const { setUxOpenPanel, setActiveTab } = useContext(UxContext);
   const [isEditing, setIsEditing] = useState(false);
   const [projectName, setProjectName] = useState(projectContext.name || "My Token Project");
