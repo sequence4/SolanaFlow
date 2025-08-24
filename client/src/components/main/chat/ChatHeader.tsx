@@ -38,7 +38,7 @@ import { useTaskLogs } from '@/context/logs/useTaskLogs';
 import eventBus from '@/lib/eventBus';
 import { NewProjectModal } from '@/components/ui/new-project-modal';
 import { Dialog, DialogContent, DialogDescription } from "@/components/ui/dialog";
-import ProjectListPopover from '../../workflow/ProjectListPopover';
+import ProjectListPopover from '../workflow/ProjectListPopover';
 import { connectionManager } from '@/utils/blockchain/connectionManager';
 
 const WALLET_TOAST_ID = 'wallet-not-connected';
