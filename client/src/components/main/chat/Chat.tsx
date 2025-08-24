@@ -28,6 +28,7 @@ import {
   Trash2
 } from "lucide-react";
 import MarkdownRenderer from '@/components/main/code/markdown/MarkdownRenderer';
+import { ChatHeader } from './ChatHeader';
 
 export interface AIMessageType {
   text: string;
@@ -597,37 +598,8 @@ const Chat: React.FC = () => {
             <div 
                 className="chat-container flex flex-col h-full bg-card border-border overflow-hidden w-full"
             >
-                <div className="chat-header flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
-                    <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                        <h4 className="font-medium text-sm text-foreground">AI Assistant</h4>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                            onClick={() => setIsExpanded(!isExpanded)}
-                        >
-                            {isExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                            onClick={clearChat}
-                        >
-                            <Trash2 size={14} />
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                        >
-                            <X size={14} />
-                        </Button>
-                    </div>
-                </div>
+                {/* New integrated header with project controls */}
+                <ChatHeader onDeleteChat={clearChat} />
 
                 <div 
                     ref={messagesAreaRef}

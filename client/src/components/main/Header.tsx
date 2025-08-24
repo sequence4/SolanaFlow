@@ -5,8 +5,6 @@ import UxContext from "@/context/ux/UxContext";
 import FileContext from "@/context/file/FileContext";
 import { useTaskLogs } from "@/context/logs/useTaskLogs";
 import type { FileTreeItemType } from "@/interfaces/FileTreeItemType";
-
-// shadcn UI components
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Header() {
@@ -14,17 +12,12 @@ export default function Header() {
   const { fileTree } = useContext(FileContext);
   const { isBuilding } = useTaskLogs();
 
-  /**
-   * Returns true if *any* node in the supplied tree is a file.
-   * A node is considered a file when it has **no `children` array**
-   * (covers generators that omit a `type` flag entirely).
-   */
   const nodeHasFile = (n: FileTreeItemType | FileTreeItemType[]): boolean =>
     Array.isArray(n)
-      ? n.some(nodeHasFile)                    // iterate over array roots
-      : n.children && n.children.length > 0    // directory ➜ drill down
+      ? n.some(nodeHasFile)
+      : n.children && n.children.length > 0
         ? n.children.some(nodeHasFile)
-        : true;                                // leaf  ➜ treat as file
+        : true;
 
   const hasFiles = fileTree ? nodeHasFile(fileTree) : false;
 
@@ -45,7 +38,6 @@ export default function Header() {
       </TabsTrigger>
       <TabsTrigger
         value="code"
-        /* visually muted while building, but NOT disabled */
         className={`tab-trigger ${(!hasFiles || isBuilding) ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${activeTab === "code" ? "tab-active" : "tab-inactive"}`}
       >
         code
