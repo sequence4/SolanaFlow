@@ -407,7 +407,7 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                 {projectName}
               </div>
             )}
-            <TooltipProvider>
+            <TooltipProvider delayDuration={700} skipDelayDuration={200}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -419,11 +419,8 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                     <Edit2 className="h-3 w-3" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent 
-                  side="bottom" 
-                  className="text-xs"
-                >
-                  Edit name
+                <TooltipContent side="bottom" sideOffset={8}>
+                  <span>Edit name</span>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -432,7 +429,7 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
 
         {/* Center - Project action buttons */}
         <div className="flex items-center gap-1">
-          <TooltipProvider>
+          <TooltipProvider delayDuration={700} skipDelayDuration={200}>
             {/* Open */}
             <Tooltip>
               <TooltipTrigger asChild>
@@ -445,11 +442,8 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                   <FolderOpen className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent 
-                side="bottom" 
-                className="text-xs"
-              >
-                Open
+              <TooltipContent side="bottom" sideOffset={8}>
+                <span>Open</span>
               </TooltipContent>
             </Tooltip>
 
@@ -466,11 +460,8 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                   <Save className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent 
-                side="bottom" 
-                className="text-xs"
-              >
-                Save
+              <TooltipContent side="bottom" sideOffset={8}>
+                <span>Save</span>
               </TooltipContent>
             </Tooltip>
 
@@ -486,11 +477,8 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                   <Plus className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent 
-                side="bottom" 
-                className="text-xs"
-              >
-                New
+              <TooltipContent side="bottom" sideOffset={8}>
+                <span>New</span>
               </TooltipContent>
             </Tooltip>
 
@@ -513,11 +501,8 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                   )}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent 
-                side="bottom" 
-                className="text-xs"
-              >
-                Build
+              <TooltipContent side="bottom" sideOffset={8}>
+                <span>Build</span>
               </TooltipContent>
             </Tooltip>
 
@@ -538,11 +523,8 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                   )}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent 
-                side="bottom" 
-                className="text-xs"
-              >
-                {projectDeployed ? "Deployed" : "Deploy"}
+              <TooltipContent side="bottom" sideOffset={8}>
+                <span>{projectDeployed ? "Deployed" : "Deploy"}</span>
               </TooltipContent>
             </Tooltip>
 
@@ -569,15 +551,12 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                   )}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent 
-                side="bottom" 
-                className="text-xs"
-              >
+              <TooltipContent side="bottom" sideOffset={8}>
                 <div className="space-y-1">
                   <div className="font-semibold">
                     {currentCluster === 'local' ? 'Local Validator' : 'Devnet'}
                   </div>
-                  <div className="text-[10px] text-muted-foreground">
+                  <div className="text-[10px] opacity-70">
                     Click to switch
                   </div>
                 </div>
@@ -588,7 +567,7 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
 
         {/* Right side - Delete button */}
         <div className="flex items-center">
-          <TooltipProvider>
+          <TooltipProvider delayDuration={700} skipDelayDuration={200}>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -600,11 +579,8 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent 
-                side="bottom" 
-                className="text-xs"
-              >
-                Clear chat
+              <TooltipContent side="bottom" sideOffset={8}>
+                <span>Clear chat</span>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>

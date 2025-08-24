@@ -9,8 +9,13 @@ class ConnectionManager {
   
   private constructor() {
     // Initialize with saved preference or default
-    const saved = localStorage.getItem('preferred-cluster') as ClusterType;
-    this.currentCluster = saved || 'devnet';
+    // Check if we're in browser environment before accessing localStorage
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem('preferred-cluster') as ClusterType;
+      this.currentCluster = saved || 'devnet';
+    } else {
+      this.currentCluster = 'devnet';
+    }
   }
   
   static getInstance(): ConnectionManager {
@@ -51,7 +56,11 @@ class ConnectionManager {
       
       // Connection successful, switch
       this.currentCluster = cluster;
-      localStorage.setItem('preferred-cluster', cluster);
+      
+      // Only save to localStorage if in browser
+      if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+        localStorage.setItem('preferred-cluster', cluster);
+      }
       
       // Clear connection cache
       this.connections.clear();

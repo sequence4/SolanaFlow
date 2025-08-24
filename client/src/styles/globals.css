@@ -165,3 +165,25 @@ html, body {
     animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 }
+
+/* Tooltip interaction fixes to prevent flickering */
+@layer utilities {
+  /* Prevent tooltip interaction issues */
+  [data-radix-popper-content-wrapper] {
+    pointer-events: none !important;
+  }
+
+  [data-radix-popper-content-wrapper] > * {
+    pointer-events: auto !important;
+  }
+
+  /* Ensure tooltips don't trigger hover states on buttons */
+  button[data-state="delayed-open"] {
+    pointer-events: all !important;
+  }
+
+  /* Fix tooltip z-index to always be on top */
+  [role="tooltip"] {
+    z-index: 9999 !important;
+  }
+}
