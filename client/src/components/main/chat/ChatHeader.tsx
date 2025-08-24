@@ -9,7 +9,8 @@ import {
   Hammer, 
   Edit2,
   Trash2,
-  Check
+  Check,
+  Network
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -64,13 +65,11 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
   const [isProjectListModalOpen, setIsProjectListModalOpen] = useState(false);
   const [projectsRefreshCounter, setProjectsRefreshCounter] = useState(0);
   const [isLocalDeploying, setIsLocalDeploying] = useState(false);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   
   const taskLogs = useTaskLogs();
   const esRef = useRef<ReturnType<typeof deployPipeline> | null>(null);
   const containerURLRef = useRef<string | null>(null);
   const pollingCancelledRef = useRef<boolean>(false);
-  const dropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const projectDeployed = !!projectContext?.details?.projectState?.deployed;
   const built = !!projectContext.details?.projectState?.built;
@@ -348,19 +347,6 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
     }
   };
 
-  // Handle dropdown hover logic
-  const handleMouseEnter = () => {
-    if (dropdownTimeoutRef.current) {
-      clearTimeout(dropdownTimeoutRef.current);
-    }
-    setIsDropdownOpen(true);
-  };
-
-  const handleMouseLeave = () => {
-    dropdownTimeoutRef.current = setTimeout(() => {
-      setIsDropdownOpen(false);
-    }, 300); // Small delay to prevent flicker
-  };
 
   useEffect(() => {
     const run = () => {
@@ -375,9 +361,6 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
   useEffect(() => {
     return () => {
       esRef.current?.close();
-      if (dropdownTimeoutRef.current) {
-        clearTimeout(dropdownTimeoutRef.current);
-      }
     };
   }, []);
 
@@ -550,73 +533,65 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
 
             <div className="w-px h-6 bg-border mx-1" />
 
-            {/* Network Dropdown with hover */}
-            <div 
-              className="relative"
-              onMouseEnter={handleMouseEnter}
-              onMouseLeave={handleMouseLeave}
-            >
-              <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 px-2 cursor-pointer text-foreground hover:bg-accent"
-                      >
-                        <span className="text-xs font-medium">
-                          {currentNetwork === 'local' ? 'Localnet' : currentNetwork === 'mainnet' ? 'Mainnet' : 'Devnet'}
-                        </span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" sideOffset={8}>
-                    <span>Select Network</span>
-                  </TooltipContent>
-                </Tooltip>
-                <DropdownMenuContent 
-                  align="end" 
-                  className="w-40"
-                  onMouseEnter={handleMouseEnter}
-                  onMouseLeave={handleMouseLeave}
+            {/* Network Dropdown */}
+            <DropdownMenu>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className={cn(
+                        "h-8 w-8 cursor-pointer",
+                        currentNetwork === 'local' && "text-green-500 hover:text-green-600",
+                        currentNetwork === 'devnet' && "text-blue-500 hover:text-blue-600",
+                        currentNetwork === 'mainnet' && "text-orange-500 hover:text-orange-600"
+                      )}
+                    >
+                      <Network className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" sideOffset={8}>
+                  <span>{currentNetwork === 'local' ? 'Localnet' : currentNetwork === 'mainnet' ? 'Mainnet' : 'Devnet'}</span>
+                </TooltipContent>
+              </Tooltip>
+              <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuItem 
+                  onClick={() => handleNetworkChange('devnet')}
+                  className={cn(
+                    "cursor-pointer flex items-center justify-between",
+                    currentNetwork === 'devnet' && "bg-accent"
+                  )}
                 >
-                  <DropdownMenuItem 
-                    onClick={() => handleNetworkChange('devnet')}
-                    className={cn(
-                      "cursor-pointer",
-                      currentNetwork === 'devnet' && "bg-accent"
-                    )}
-                  >
-                    <span className="flex-1">Devnet</span>
-                    {currentNetwork === 'devnet' && (
-                      <Check className="h-4 w-4 ml-2" />
-                    )}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => handleNetworkChange('local')}
-                    className={cn(
-                      "cursor-pointer",
-                      currentNetwork === 'local' && "bg-accent"
-                    )}
-                  >
-                    <span className="flex-1">Localnet</span>
-                    {currentNetwork === 'local' && (
-                      <Check className="h-4 w-4 ml-2" />
-                    )}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    disabled
-                    className="cursor-not-allowed opacity-50"
-                  >
-                    <span className="flex-1">Mainnet</span>
-                    {currentNetwork === 'mainnet' && (
-                      <Check className="h-4 w-4 ml-2" />
-                    )}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+                  <span>Devnet</span>
+                  {currentNetwork === 'devnet' && (
+                    <Check className="h-4 w-4 text-green-500" />
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => handleNetworkChange('local')}
+                  className={cn(
+                    "cursor-pointer flex items-center justify-between",
+                    currentNetwork === 'local' && "bg-accent"
+                  )}
+                >
+                  <span>Localnet</span>
+                  {currentNetwork === 'local' && (
+                    <Check className="h-4 w-4 text-green-500" />
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  disabled
+                  className="cursor-not-allowed opacity-50 flex items-center justify-between"
+                >
+                  <span>Mainnet</span>
+                  {currentNetwork === 'mainnet' && (
+                    <Check className="h-4 w-4 text-green-500" />
+                  )}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </TooltipProvider>
         </div>
 
