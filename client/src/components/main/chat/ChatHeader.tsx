@@ -19,7 +19,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
 import ProjectContext from '@/context/project/ProjectContext';
 import FileContext from '@/context/file/FileContext';
 import UxContext from '@/context/ux/UxContext';
@@ -38,7 +38,7 @@ import { useTaskLogs } from '@/context/logs/useTaskLogs';
 import eventBus from '@/lib/eventBus';
 import { NewProjectModal } from '@/components/ui/new-project-modal';
 import { Dialog, DialogContent, DialogDescription } from "@/components/ui/dialog";
-import ProjectListPopover from '../workflow/ProjectListPopover';
+import ProjectListPopover from '@/components/main/workflow/ProjectListPopover';
 import { connectionManager } from '@/utils/blockchain/connectionManager';
 
 const WALLET_TOAST_ID = 'wallet-not-connected';
@@ -334,8 +334,8 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
     setIsDeployModalOpen(false);
   }, [projectContext, setProjectContext]);
 
-  const handleClusterToggle = async (checked: boolean) => {
-    const targetCluster = checked ? 'local' : 'devnet';
+  const handleClusterToggle = async () => {
+    const targetCluster = currentCluster === 'local' ? 'devnet' : 'local';
     
     try {
       const switched = await connectionManager.switchCluster(targetCluster);
@@ -419,7 +419,12 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                     <Edit2 className="h-3 w-3" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Edit project name</TooltipContent>
+                <TooltipContent 
+                  side="bottom" 
+                  className="text-xs"
+                >
+                  Edit name
+                </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </div>
@@ -440,7 +445,12 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                   <FolderOpen className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Open project</TooltipContent>
+              <TooltipContent 
+                side="bottom" 
+                className="text-xs"
+              >
+                Open
+              </TooltipContent>
             </Tooltip>
 
             {/* Save */}
@@ -456,7 +466,12 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                   <Save className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Save project</TooltipContent>
+              <TooltipContent 
+                side="bottom" 
+                className="text-xs"
+              >
+                Save
+              </TooltipContent>
             </Tooltip>
 
             {/* New */}
@@ -471,10 +486,15 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                   <Plus className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>New project</TooltipContent>
+              <TooltipContent 
+                side="bottom" 
+                className="text-xs"
+              >
+                New
+              </TooltipContent>
             </Tooltip>
 
-            <div className="w-px h-6 bg-border mx-1" /> {/* Divider */}
+            <div className="w-px h-6 bg-border mx-1" />
 
             {/* Build */}
             <Tooltip>
@@ -493,7 +513,12 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                   )}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Build project</TooltipContent>
+              <TooltipContent 
+                side="bottom" 
+                className="text-xs"
+              >
+                Build
+              </TooltipContent>
             </Tooltip>
 
             {/* Deploy */}
@@ -513,44 +538,51 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                   )}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>
-                {projectDeployed ? "Deployed" : `Deploy to ${currentCluster === 'local' ? 'Local' : 'Devnet'}`}
+              <TooltipContent 
+                side="bottom" 
+                className="text-xs"
+              >
+                {projectDeployed ? "Deployed" : "Deploy"}
               </TooltipContent>
             </Tooltip>
 
-            <div className="w-px h-6 bg-border mx-1" /> {/* Divider */}
+            <div className="w-px h-6 bg-border mx-1" />
 
-            {/* Network Toggle */}
-            <div className="flex items-center gap-2 px-2">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center gap-2">
-                      {currentCluster === 'local' ? (
-                        <HardDrive className="h-4 w-4 text-green-500" />
-                      ) : (
-                        <Globe className="h-4 w-4 text-blue-500" />
-                      )}
-                      <Switch
-                        checked={currentCluster === 'local'}
-                        onCheckedChange={handleClusterToggle}
-                        className="h-4 w-8"
-                      />
-                      <span className="text-xs font-medium">
-                        {currentCluster === 'local' ? 'Local' : 'Devnet'}
-                      </span>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <div className="text-xs">
-                      {currentCluster === 'local' 
-                        ? 'Using local validator (instant & free)' 
-                        : 'Using Solana Devnet (requires SOL)'}
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
+            {/* Network Toggle - Now as an icon button */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className={cn(
+                    "h-8 w-8",
+                    currentCluster === 'local' 
+                      ? "text-green-500 hover:text-green-600" 
+                      : "text-blue-500 hover:text-blue-600"
+                  )}
+                  onClick={handleClusterToggle}
+                >
+                  {currentCluster === 'local' ? (
+                    <HardDrive className="h-4 w-4" />
+                  ) : (
+                    <Globe className="h-4 w-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent 
+                side="bottom" 
+                className="text-xs"
+              >
+                <div className="space-y-1">
+                  <div className="font-semibold">
+                    {currentCluster === 'local' ? 'Local Validator' : 'Devnet'}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    Click to switch
+                  </div>
+                </div>
+              </TooltipContent>
+            </Tooltip>
           </TooltipProvider>
         </div>
 
@@ -568,7 +600,12 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Clear chat</TooltipContent>
+              <TooltipContent 
+                side="bottom" 
+                className="text-xs"
+              >
+                Clear chat
+              </TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </div>
