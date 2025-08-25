@@ -18,7 +18,6 @@ import {
   getLocalValidatorHealth,
   getProjectClusterInfo,
   switchProjectCluster,
-  testProject,
   relaySignedTxHandler,
 } from '../controllers/projectController';
 import { authMiddleware } from '../middleware/authMiddleware';
@@ -34,6 +33,7 @@ import { quickDeployLocal } from '../controllers/deploy/quickDeployLocal';
 import { buildProject } from '../controllers/build/buildProject';
 import { compileTsController } from '../controllers/build/compileTsController';
 import { getBuildArtifact } from '../controllers/build/getBuildArtifact';
+import { testProject } from '../controllers/project/testProject';
 
 const router = express.Router();
 
