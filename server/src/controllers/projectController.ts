@@ -861,8 +861,6 @@ export async function getContainerUrl(
 
 export const relaySignedTx = async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params;
-  const userId = req.user?.id;
-  const orgId = req.user?.org_id;
   const { encodedTx, programId, serverSignFor = [], signerHint } = req.body;
   
   if (!encodedTx || !programId) {

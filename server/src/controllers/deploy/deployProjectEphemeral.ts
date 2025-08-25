@@ -64,7 +64,7 @@ export const deployProjectEphemeral = async (
   
       const { details: detailsStr } = projectCheck.rows[0];
       let details = {};
-      try {
+      try { 
         if (typeof detailsStr === 'object' && detailsStr !== null) {
           details = detailsStr;
         } else {
