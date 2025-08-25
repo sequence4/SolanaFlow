@@ -4,7 +4,6 @@ import {
   runProjectCommand,
   installPackages,
   installNodeDependencies,
-  runCommandController,
   startContainer,
   getContainerUrl,
   relaySignedTxHandler,
@@ -34,6 +33,7 @@ import { getLocalValidatorHealth } from '../controllers/blockchain/getLocalValid
 import { startLocalValidator } from '../controllers/blockchain/startLocalValidator';
 import { stopLocalValidator } from '../controllers/blockchain/stopLocalValidator';
 import { getLocalValidatorStatus } from '../controllers/blockchain/getLocalValidatorStatus';
+import { runCommandController } from '../controllers/commands/runCommandController';
 
 const router = express.Router();
 

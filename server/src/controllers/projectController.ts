@@ -128,37 +128,6 @@ async function loadProgramKeypair(projectId: string): Promise<Keypair | null> {
 
 import { catchAsync } from '../utils/middleware/catchAsync';
 import { relaySignedTx } from './deploy/relaySignedTx';
-import { getProjectPorts } from './container/getProjectPorts';
-
-export const runCommandController = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const { command, cwd } = req.body;
-
-    if (!command || !cwd) {
-      return next(
-        new AppError('You must provide both "command" and "cwd" in the request body.', 400)
-      );
-    }
-
-    const taskId = uuidv4();
-    const output = await runCommand(command, cwd, taskId);
-
-    res.status(200).json({
-      message: 'Command executed successfully.',
-      command,
-      cwd,
-      taskId,
-      output,
-    });
-    return;
-  } catch (error) {
-    return next(error);
-  }
-};
 
 export const anchorInitProject = async (
   req: Request,
