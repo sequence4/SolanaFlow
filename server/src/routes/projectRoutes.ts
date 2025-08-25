@@ -2,7 +2,6 @@ import express from 'express';
 import {
   anchorInitProject,
   runProjectCommand,
-  getProgramStatus,
   installPackages,
   setCluster,
   installNodeDependencies,
@@ -34,6 +33,7 @@ import { getBuildArtifact } from '../controllers/build/getBuildArtifact';
 import { testProject } from '../controllers/project/testProject';
 import { getNonceAccount } from '../controllers/blockchain/getNonceAccount';
 import { createEphemeralKeypair } from '../controllers/blockchain/createEphemeralKeypair';
+import { getProgramStatus } from '../controllers/blockchain/getProgramStatus';
 
 const router = express.Router();
 
