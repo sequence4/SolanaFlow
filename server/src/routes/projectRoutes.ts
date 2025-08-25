@@ -11,7 +11,6 @@ import {
   startContainer,
   getContainerUrl,
   getProgramId,
-  getNonceAccount,
   startLocalValidator,
   stopLocalValidator,
   getLocalValidatorStatus,
@@ -34,6 +33,7 @@ import { buildProject } from '../controllers/build/buildProject';
 import { compileTsController } from '../controllers/build/compileTsController';
 import { getBuildArtifact } from '../controllers/build/getBuildArtifact';
 import { testProject } from '../controllers/project/testProject';
+import { getNonceAccount } from '../controllers/blockchain/getNonceAccount';
 
 const router = express.Router();
 
