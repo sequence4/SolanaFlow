@@ -8,7 +8,6 @@ import {
   runCommandController,
   startContainer,
   getContainerUrl,
-  getProgramId,
   startLocalValidator,
   stopLocalValidator,
   getLocalValidatorStatus,
@@ -34,6 +33,7 @@ import { testProject } from '../controllers/project/testProject';
 import { getNonceAccount } from '../controllers/blockchain/getNonceAccount';
 import { createEphemeralKeypair } from '../controllers/blockchain/createEphemeralKeypair';
 import { getProgramStatus } from '../controllers/blockchain/getProgramStatus';
+import { getProgramId } from '../controllers/blockchain/getProgramId';
 
 const router = express.Router();
 
