@@ -641,10 +641,11 @@ export async function startProjectContainer(
         'React Fast Refresh will update code instantly',
         'Perfect for iterative development workflow'
       ]);
-      // Development mode with Next.js dev server - POSIX compliant syntax
+      // Development mode with Next.js dev server - fixed conditional logic
       runArgs.push(
         '-c',
-        `test ! -f /usr/src/${rootPath}/web/package.json && cp -af /usr/share/solanaflow/web/. /usr/src/${rootPath}/web/ 2>/dev/null || true; ` +
+        `mkdir -p /usr/src/${rootPath}/web && ` +
+        `(test -f /usr/src/${rootPath}/web/package.json || cp -af /usr/share/solanaflow/web/. /usr/src/${rootPath}/web/ 2>/dev/null); ` +
         `cd /usr/src/${rootPath}/web && ` +
         `export NEXT_DISABLE_REACT_REFRESH=\${NEXT_DISABLE_REACT_REFRESH:-0} && ` +
         `npx next dev -H 0.0.0.0 -p ${INTERNAL_PORT}`
@@ -655,10 +656,11 @@ export async function startProjectContainer(
         'Lower resource usage, better performance',
         'Standalone server ready for deployment'
       ]);
-      // Production mode with standalone Next.js server - POSIX compliant syntax
+      // Production mode with standalone Next.js server - fixed conditional logic
       runArgs.push(
         '-c',
-        `test ! -f /usr/src/${rootPath}/web/package.json && cp -af /usr/share/solanaflow/web/. /usr/src/${rootPath}/web/ 2>/dev/null || true; ` +
+        `mkdir -p /usr/src/${rootPath}/web && ` +
+        `(test -f /usr/src/${rootPath}/web/package.json || cp -af /usr/share/solanaflow/web/. /usr/src/${rootPath}/web/ 2>/dev/null); ` +
         `cd /usr/src/${rootPath}/web && ` +
         `until [ -d .next ]; do sleep 1; done && ` +
         `node .next/standalone/server.js -H 0.0.0.0 -p ${INTERNAL_PORT}`
