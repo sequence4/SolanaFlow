@@ -1,7 +1,6 @@
 import express from 'express';
 import {
   anchorInitProject,
-  installNodeDependencies,
   startContainer,
   getContainerUrl,
   relaySignedTxHandler,
@@ -34,6 +33,7 @@ import { getLocalValidatorStatus } from '../controllers/blockchain/getLocalValid
 import { runCommandController } from '../controllers/commands/runCommandController';
 import { runProjectCommand } from '../controllers/commands/runProjectCommand';
 import { installPackages } from '../controllers/project/installPackages';
+import { installNodeDependencies } from '../controllers/project/installNodeDependencies';
 
 const router = express.Router();
 
