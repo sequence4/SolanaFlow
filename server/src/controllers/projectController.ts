@@ -7,7 +7,6 @@ import { startProjectContainer } from '../utils/container';
 import { runCommand } from '../utils/command-execution/runCommand';
 import { startAnchorInitTask } from '../utils/anchor/startAnchorInitTask';
 import { startInstallPackagesTask } from '../utils/project/startInstallPackagesTask';
-import { startSetClusterTask } from '../utils/anchor/startSetClusterTask';
 import { startInstallNodeDependenciesTask } from '../utils/project/startInstallNodeDependenciesTask';
 import { getContainerName } from '../utils/container/getContainerName';
 
@@ -187,43 +186,6 @@ export const anchorInitProject = async (
     });
   } catch (error) {
     return next(error);
-  }
-};
-
-export const installPackages = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  const { id } = req.params;
-  const { packages } = req.body;
-  const userId = req.user?.id ?? 'mock-user';
-  // org_id checks temporarily disabled until auth lands
-  
-  try {
-    const projectCheck = await pool.query(
-      'SELECT * FROM solanaproject WHERE id = $1',
-      [id]
-    );
-
-    if (projectCheck.rows.length === 0) {
-      return next(
-        new AppError(
-          'Project not found or you do not have permission to access it',
-          404
-        )
-      );
-    }
-
-    const taskId = await startInstallPackagesTask(id, userId, packages);
-
-    res.status(200).json({
-      message: 'NPM packages installation started successfully',
-      taskId: taskId,
-    });
-  } catch (error) {
-    console.error('Error in installPackages:', error);
-    next(new AppError('Failed to start package installation process', 500));
   }
 };
 
