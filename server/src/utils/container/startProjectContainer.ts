@@ -254,7 +254,7 @@ function ensureDockerSpace(minBytes = 3 * 1024 * 1024 * 1024): void {
 /**
  * Find available ports for Solana validator
  */
-async function findAvailablePorts(): Promise<{ rpc: number, ws: number, faucet: number }> {
+export async function findAvailablePorts(): Promise<{ rpc: number, ws: number, faucet: number }> {
   const net = require('net');
   
   const checkPort = (port: number): Promise<boolean> => {

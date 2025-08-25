@@ -133,8 +133,8 @@ export function ClusterToggle({
         }
       }
       
-      // Switch cluster
-      const switched = await connectionManager.switchCluster(targetCluster);
+      // Switch cluster - pass projectId for dynamic port resolution
+      const switched = await connectionManager.switchCluster(targetCluster, projectId);
       
       if (!switched) {
         throw new Error(`Failed to connect to ${targetCluster}`);

@@ -5,6 +5,8 @@ class ConnectionManager {
   private static instance: ConnectionManager;
   private connections: Map<string, Connection> = new Map();
   private currentCluster: ClusterType = 'devnet';
+  private currentProjectId: string | null = null;
+  private portsCache: { rpc: number, ws: number, faucet: number } | null = null;
   private listeners: ((cluster: ClusterType) => void)[] = [];
   
   private constructor() {
@@ -21,7 +23,17 @@ class ConnectionManager {
   }
   
   getConnection(commitment: Commitment = 'confirmed'): Connection {
-    const config = getClusterConfig();
+    let config = getClusterConfig();
+    
+    // Override URL if local and we have cached ports
+    if (this.currentCluster === 'local' && this.portsCache) {
+      config = {
+        ...config,
+        url: `http://localhost:${this.portsCache.rpc}`,
+        websocket: `ws://localhost:${this.portsCache.ws}`
+      };
+    }
+    
     const key = `${config.url}-${commitment}`;
     
     if (!this.connections.has(key)) {
@@ -34,16 +46,21 @@ class ConnectionManager {
     return this.connections.get(key)!;
   }
   
+  private getCachedPorts() {
+    return this.portsCache;
+  }
+  
   getCurrentCluster(): ClusterType {
     return this.currentCluster;
   }
   
   async getProjectPorts(projectId?: string): Promise<{ rpc: number, ws: number, faucet: number }> {
-    if (projectId) {
+    if (projectId || this.currentProjectId) {
       try {
-        const response = await fetch(`/api/projects/${projectId}/ports`);
+        const response = await fetch(`/api/projects/${projectId || this.currentProjectId}/ports`);
         if (response.ok) {
           const data = await response.json();
+          this.portsCache = data.ports; // Cache the ports
           return data.ports;
         }
       } catch (e) {
@@ -52,15 +69,22 @@ class ConnectionManager {
     }
     
     // Fallback
-    return { rpc: 28899, ws: 28900, faucet: 28901 };
+    const fallback = { rpc: 28899, ws: 28900, faucet: 28901 };
+    this.portsCache = fallback;
+    return fallback;
   }
   
   async switchCluster(cluster: ClusterType, projectId?: string): Promise<boolean> {
+    // Store the projectId for future use
+    if (projectId) {
+      this.currentProjectId = projectId;
+    }
+    
     // Test connection first
     let testUrl: string;
     
-    if (cluster === 'local' && projectId) {
-      const ports = await this.getProjectPorts(projectId);
+    if (cluster === 'local' && (projectId || this.currentProjectId)) {
+      const ports = await this.getProjectPorts(projectId || this.currentProjectId);
       testUrl = `http://localhost:${ports.rpc}`;
     } else {
       testUrl = cluster === 'local' ? 'http://localhost:28899' : 
