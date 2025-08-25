@@ -17,7 +17,6 @@ import {
   stopLocalValidator,
   getLocalValidatorStatus,
   getLocalValidatorHealth,
-  deployToLocalValidator,
   quickDeployLocal,
   getProjectClusterInfo,
   switchProjectCluster,
@@ -34,6 +33,7 @@ import { editProject } from '../controllers/project/editProject';
 import { getProjectDetails } from '../controllers/project/getProjectDetails';
 import { deployProjectEphemeral } from '../controllers/deploy/deployProjectEphemeral';
 import { relayTx } from '../controllers/deploy/relayTx';
+import { deployToLocalValidator } from '../controllers/deploy/deployToLocalValidator';
 
 const router = express.Router();
 
