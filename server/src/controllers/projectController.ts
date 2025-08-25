@@ -189,27 +189,6 @@ export const anchorInitProject = async (
   }
 };
 
-export const startContainer = async (req: Request, res: Response, next: NextFunction) => {
-  const { id } = req.params;
-  const userId = req.user?.id;
-  
-  if (!userId) {
-    return next(new AppError('User not found', 400));
-  }
-
-  try {
-    const container = await startProjectContainer(id);
-    
-    res.status(200).json({
-      message: 'Container start process initiated',
-      containerName: container.containerName,
-      containerUrl: container.containerUrl
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
 export async function getContainerUrl(
   req: Request,
   res: Response,

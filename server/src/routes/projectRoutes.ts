@@ -1,7 +1,6 @@
 import express from 'express';
 import {
   anchorInitProject,
-  startContainer,
   getContainerUrl,
   relaySignedTxHandler,
 } from '../controllers/projectController';
@@ -34,6 +33,7 @@ import { runCommandController } from '../controllers/commands/runCommandControll
 import { runProjectCommand } from '../controllers/commands/runProjectCommand';
 import { installPackages } from '../controllers/project/installPackages';
 import { installNodeDependencies } from '../controllers/project/installNodeDependencies';
+import { startContainerController } from '../controllers/container/startContainerController';
 
 const router = express.Router();
 
@@ -50,7 +50,7 @@ router.post('/create', guard, createProject);
 router.put('/update/:id', authMiddleware, editProject);
 router.get('/details/:id', guard, getProjectDetails);
 router.delete('/:id', authMiddleware, deleteProject);
-router.post('/:id/start-container', authMiddleware, startContainer);
+router.post('/:id/start-container', authMiddleware, startContainerController);
 router.get('/:id/container-url', authMiddleware, getContainerUrl);
 router.post('/init', authMiddleware, anchorInitProject);
 router.post('/:id/set-cluster', authMiddleware, setCluster);
