@@ -641,64 +641,17 @@ export async function startProjectContainer(
         'React Fast Refresh will update code instantly',
         'Perfect for iterative development workflow'
       ]);
+      // TEMPORARY DEBUG: Simplified startup to identify crash cause
       runArgs.push(
-        'bash', '-lc',
-        // Ensure validator setup and copy base Next.js app if needed, then start dev server
-        `"mkdir -p /usr/local/validator-logs; ` +
-        `if [ ! -f /usr/local/bin/start-validator.sh ]; then ` +
+        '/bin/bash', '-c',
+        `mkdir -p /usr/local/validator-logs && ` +
         `echo '#!/bin/bash' > /usr/local/bin/start-validator.sh && ` +
-        `echo 'case "\\$1" in' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '  status)' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    if [ -f /usr/local/validator-logs/validator.pid ]; then' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '      PID=\\$(cat /usr/local/validator-logs/validator.pid)' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '      if ps -p \\$PID > /dev/null 2>&1; then' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '        echo "Validator is running with PID \\$PID"' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '        echo "RPC endpoint is responsive"' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '        exit 0' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '      fi' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    fi' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    echo "Validator is not running"' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    exit 1' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    ;;' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '  reset)' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    if [ -f /usr/local/validator-logs/validator.pid ]; then' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '      PID=\\$(cat /usr/local/validator-logs/validator.pid)' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '      kill \\$PID 2>/dev/null || true' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    fi' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    rm -rf /usr/local/validator-logs/*' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    mkdir -p /usr/local/validator-logs' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    solana-test-validator --reset --bind-address 0.0.0.0 --rpc-port 8899 --faucet-port 9900 > /usr/local/validator-logs/validator.log 2>&1 &' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    echo \\$! > /usr/local/validator-logs/validator.pid' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    sleep 2' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    echo "Validator reset and started successfully"' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    echo "Validator is ready"' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    ;;' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '  *)' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    if [ -f /usr/local/validator-logs/validator.pid ]; then' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '      PID=\\$(cat /usr/local/validator-logs/validator.pid)' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '      if ps -p \\$PID > /dev/null 2>&1; then' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '        echo "Validator already running with PID \\$PID"' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '        echo "Validator is ready"' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '        exit 0' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '      fi' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    fi' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    mkdir -p /usr/local/validator-logs' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    solana-test-validator --bind-address 0.0.0.0 --rpc-port 8899 --faucet-port 9900 > /usr/local/validator-logs/validator.log 2>&1 &' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    echo \\$! > /usr/local/validator-logs/validator.pid' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    sleep 2' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    echo "Validator started successfully"' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    echo "Validator is ready"' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    ;;' >> /usr/local/bin/start-validator.sh && ` +
-        `echo 'esac' >> /usr/local/bin/start-validator.sh && ` +
-        `chmod +x /usr/local/bin/start-validator.sh; fi; ` +
-        `if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
-        `rm -rf /usr/src/${rootPath}/web/node_modules 2>/dev/null || true; ` +
-        `rm -rf /usr/src/${rootPath}/web/.next 2>/dev/null || true; ` +
-        `cp -af /usr/share/solanaflow/web/. /usr/src/${rootPath}/web/ 2>/dev/null || true; fi; ` +
-        `cd /usr/src/${rootPath}/web && ` +
-        `export NEXT_DISABLE_REACT_REFRESH=\${NEXT_DISABLE_REACT_REFRESH:-0}; ` +
-        `npx next dev -H 0.0.0.0 -p ${INTERNAL_PORT} & ` +
-        `pid=$!; trap 'kill $pid' TERM INT; wait $pid"`
+        `echo 'echo "Validator stub for debugging"' >> /usr/local/bin/start-validator.sh && ` +
+        `chmod +x /usr/local/bin/start-validator.sh && ` +
+        `echo "Container started successfully - debugging mode" && ` +
+        `cd /usr/src/${rootPath}/web || mkdir -p /usr/src/${rootPath}/web && ` +
+        `echo "Keeping container alive for debugging..." && ` +
+        `tail -f /dev/null`  // Keep container running
       );
     } else {
       sendContainerSetupProgress('env-container-config', 'Container Configuration', 'Configuring production mode...', 65, [
@@ -706,64 +659,17 @@ export async function startProjectContainer(
         'Lower resource usage, better performance',
         'Standalone server ready for deployment'
       ]);
+      // TEMPORARY DEBUG: Simplified startup to identify crash cause
       runArgs.push(
-        'bash', '-lc',
-        // Setup validator script and copy base Next.js app if needed, then run standalone server
-        `"mkdir -p /usr/local/validator-logs; ` +
-        `if [ ! -f /usr/local/bin/start-validator.sh ]; then ` +
+        '/bin/bash', '-c',
+        `mkdir -p /usr/local/validator-logs && ` +
         `echo '#!/bin/bash' > /usr/local/bin/start-validator.sh && ` +
-        `echo 'case "\\$1" in' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '  status)' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    if [ -f /usr/local/validator-logs/validator.pid ]; then' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '      PID=\\$(cat /usr/local/validator-logs/validator.pid)' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '      if ps -p \\$PID > /dev/null 2>&1; then' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '        echo "Validator is running with PID \\$PID"' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '        echo "RPC endpoint is responsive"' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '        exit 0' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '      fi' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    fi' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    echo "Validator is not running"' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    exit 1' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    ;;' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '  reset)' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    if [ -f /usr/local/validator-logs/validator.pid ]; then' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '      PID=\\$(cat /usr/local/validator-logs/validator.pid)' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '      kill \\$PID 2>/dev/null || true' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    fi' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    rm -rf /usr/local/validator-logs/*' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    mkdir -p /usr/local/validator-logs' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    solana-test-validator --reset --bind-address 0.0.0.0 --rpc-port 8899 --faucet-port 9900 > /usr/local/validator-logs/validator.log 2>&1 &' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    echo \\$! > /usr/local/validator-logs/validator.pid' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    sleep 2' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    echo "Validator reset and started successfully"' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    echo "Validator is ready"' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    ;;' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '  *)' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    if [ -f /usr/local/validator-logs/validator.pid ]; then' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '      PID=\\$(cat /usr/local/validator-logs/validator.pid)' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '      if ps -p \\$PID > /dev/null 2>&1; then' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '        echo "Validator already running with PID \\$PID"' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '        echo "Validator is ready"' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '        exit 0' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '      fi' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    fi' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    mkdir -p /usr/local/validator-logs' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    solana-test-validator --bind-address 0.0.0.0 --rpc-port 8899 --faucet-port 9900 > /usr/local/validator-logs/validator.log 2>&1 &' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    echo \\$! > /usr/local/validator-logs/validator.pid' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    sleep 2' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    echo "Validator started successfully"' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    echo "Validator is ready"' >> /usr/local/bin/start-validator.sh && ` +
-        `echo '    ;;' >> /usr/local/bin/start-validator.sh && ` +
-        `echo 'esac' >> /usr/local/bin/start-validator.sh && ` +
-        `chmod +x /usr/local/bin/start-validator.sh; fi; ` +
-        `if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
-        `rm -rf /usr/src/${rootPath}/web/node_modules 2>/dev/null || true; ` +
-        `rm -rf /usr/src/${rootPath}/web/.next 2>/dev/null || true; ` +
-        `cp -af /usr/share/solanaflow/web/. /usr/src/${rootPath}/web/ 2>/dev/null || true; fi; ` +
-        `cd /usr/src/${rootPath}/web && ` +
-        `until [ -d .next ]; do sleep 1; done && ` +
-        `node .next/standalone/server.js -H 0.0.0.0 -p ${INTERNAL_PORT} & ` +
-        `pid=$!; trap 'kill $pid' TERM INT; wait $pid"`
+        `echo 'echo "Validator stub for debugging"' >> /usr/local/bin/start-validator.sh && ` +
+        `chmod +x /usr/local/bin/start-validator.sh && ` +
+        `echo "Container started successfully - debugging mode (production)" && ` +
+        `cd /usr/src/${rootPath}/web || mkdir -p /usr/src/${rootPath}/web && ` +
+        `echo "Keeping container alive for debugging..." && ` +
+        `tail -f /dev/null`  // Keep container running
       );
     }
 
