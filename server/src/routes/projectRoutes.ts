@@ -84,6 +84,28 @@ router.post('/:id/local-validator/quick-deploy', guard, quickDeployLocal);
 router.get('/:id/cluster-info', guard, getProjectClusterInfo);
 router.post('/:id/switch-cluster', guard, switchProjectCluster);
 
+// Get project's allocated ports
+router.get('/:id/ports', guard, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const pool = require('../config/database').default;
+    
+    const result = await pool.query(
+      'SELECT details->>\'containerPorts\' as ports FROM solanaproject WHERE id = $1',
+      [id]
+    );
+    
+    const ports = result.rows[0]?.ports 
+      ? JSON.parse(result.rows[0].ports)
+      : { rpc: 28899, ws: 28900, faucet: 28901 };
+      
+    res.json({ ports });
+  } catch (error) {
+    console.error('[projectRoutes] Error fetching ports:', error);
+    res.status(500).json({ error: 'Failed to fetch project ports' });
+  }
+});
+
 router.get('/:id/local-port', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;

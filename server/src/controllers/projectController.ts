@@ -22,6 +22,28 @@ import path from 'path';
 import { APP_CONFIG } from '../config/appConfig';
 import { Buffer } from 'buffer';
 import fs from 'fs';
+
+/**
+ * Helper function to get project's allocated ports from database
+ */
+async function getProjectPorts(projectId: string): Promise<{ rpc: number, ws: number, faucet: number }> {
+  try {
+    const result = await pool.query(
+      'SELECT details->>\'containerPorts\' as ports FROM solanaproject WHERE id = $1',
+      [projectId]
+    );
+    
+    if (result.rows[0]?.ports) {
+      return JSON.parse(result.rows[0].ports);
+    }
+  } catch (e) {
+    console.warn('[getProjectPorts] Error fetching ports:', e);
+  }
+  
+  // Fallback to default ports if not found
+  console.log('[getProjectPorts] Using fallback ports for project', projectId);
+  return { rpc: 28899, ws: 28900, faucet: 28901 };
+}
 /*  --------------------------------------------------------------------
     NOTE:  BpfLoader is flagged "deprecated" in @solana/web3.js v1.98.x
            because a new loader API is coming in v2.  There is **no**
@@ -1724,6 +1746,9 @@ export const getLocalValidatorHealth = async (
       return;
     }
     
+    // Get dynamic ports for this project
+    const ports = await getProjectPorts(projectId);
+    
     // Check if validator process is running
     const pidCheckCmd = `docker exec ${containerName} bash -c "[ -f /usr/local/validator-logs/validator.pid ] && cat /usr/local/validator-logs/validator.pid || echo 'no-pid'"`;
     const pidResult = await runCommand(pidCheckCmd, '.', uuidv4(), { skipSuccessUpdate: true });
@@ -1759,7 +1784,7 @@ export const getLocalValidatorHealth = async (
     let slotInfo = null;
     
     try {
-      const rpcCheckCmd = `docker exec ${containerName} bash -c "curl -s -X POST http://localhost:18899 -H 'Content-Type: application/json' -d '{\\"jsonrpc\\":\\"2.0\\",\\"id\\":1,\\"method\\":\\"getVersion\\"}' | jq -r '.result[\\"solana-core\\"]' 2>/dev/null || echo 'no-response'"`;
+      const rpcCheckCmd = `docker exec ${containerName} bash -c "curl -s -X POST http://localhost:8899 -H 'Content-Type: application/json' -d '{\\"jsonrpc\\":\\"2.0\\",\\"id\\":1,\\"method\\":\\"getVersion\\"}' | jq -r '.result[\\"solana-core\\"]' 2>/dev/null || echo 'no-response'"`;
       const rpcResult = await runCommand(rpcCheckCmd, '.', uuidv4(), { skipSuccessUpdate: true });
       
       if (rpcResult.trim() !== 'no-response') {
@@ -1767,7 +1792,7 @@ export const getLocalValidatorHealth = async (
         clusterVersion = rpcResult.trim();
         
         // Get current slot for additional info
-        const slotCmd = `docker exec ${containerName} bash -c "solana slot --url http://localhost:18899 2>/dev/null || echo '0'"`;
+        const slotCmd = `docker exec ${containerName} bash -c "solana slot --url http://localhost:8899 2>/dev/null || echo '0'"`;
         const slotResult = await runCommand(slotCmd, '.', uuidv4(), { skipSuccessUpdate: true });
         slotInfo = parseInt(slotResult.trim()) || 0;
       }
@@ -1793,9 +1818,9 @@ export const getLocalValidatorHealth = async (
       pid,
       clusterVersion,
       currentSlot: slotInfo,
-      rpcUrl: 'http://localhost:18899',
-      faucetUrl: 'http://localhost:19900',
-      websocketUrl: 'ws://localhost:18900',
+      rpcUrl: `http://localhost:${ports.rpc}`,
+      faucetUrl: `http://localhost:${ports.faucet}`,
+      websocketUrl: `ws://localhost:${ports.ws}`,
       recentLogs: recentLogs ? recentLogs.substring(0, 200) : null
     });
     
@@ -1829,6 +1854,9 @@ export const startLocalValidator = async (
       return next(new AppError('Container not found', 404));
     }
     
+    // Get dynamic ports for this project
+    const ports = await getProjectPorts(projectId);
+    
     // Check current status first
     const statusCmd = `docker exec ${containerName} /usr/local/bin/start-validator.sh status`;
     const currentStatus = await runCommand(statusCmd, '.', uuidv4(), { skipSuccessUpdate: true })
@@ -1839,9 +1867,9 @@ export const startLocalValidator = async (
       res.json({ 
         message: 'Local validator already running',
         status: 'already-running',
-        rpcUrl: 'http://localhost:18899',
-        faucetUrl: 'http://localhost:19900',
-        websocketUrl: 'ws://localhost:18900'
+        rpcUrl: 'http://localhost:8899',
+        faucetUrl: 'http://localhost:9900',
+        websocketUrl: 'ws://localhost:8900'
       });
       return;
     }
@@ -1877,9 +1905,9 @@ export const startLocalValidator = async (
       [
         JSON.stringify({
           active: true,
-          rpcUrl: 'http://localhost:18899',
-          faucetUrl: 'http://localhost:19900',
-          websocketUrl: 'ws://localhost:18900',
+          rpcUrl: 'http://localhost:8899',
+          faucetUrl: 'http://localhost:9900',
+          websocketUrl: 'ws://localhost:8900',
           startedAt: new Date().toISOString()
         }),
         projectId
@@ -1891,9 +1919,9 @@ export const startLocalValidator = async (
     res.json({
       message: reset ? 'Local validator reset and started' : 'Local validator started',
       status: 'started',
-      rpcUrl: 'http://localhost:18899',
-      faucetUrl: 'http://localhost:19900',
-      websocketUrl: 'ws://localhost:18900',
+      rpcUrl: `http://localhost:${ports.rpc}`,
+      faucetUrl: `http://localhost:${ports.faucet}`,
+      websocketUrl: `ws://localhost:${ports.ws}`,
       output: output.substring(0, 500) // First 500 chars of output for debugging
     });
     
@@ -1987,13 +2015,13 @@ export const getLocalValidatorStatus = async (
     if (isRunning) {
       try {
         // Count deployed programs
-        const programCmd = `docker exec ${containerName} bash -c "solana program show --programs --url http://localhost:18899 2>/dev/null | grep -c '^[A-Za-z0-9]' || echo '0'"`;
+        const programCmd = `docker exec ${containerName} bash -c "solana program show --programs --url http://localhost:8899 2>/dev/null | grep -c '^[A-Za-z0-9]' || echo '0'"`;
         const programResult = await runCommand(programCmd, '.', uuidv4(), { skipSuccessUpdate: true });
         programCount = parseInt(programResult.trim()) || 0;
         
         // Get balance if wallet pubkey in request
         if (req.query.walletPubkey) {
-          const balanceCmd = `docker exec ${containerName} bash -c "solana balance ${req.query.walletPubkey} --url http://localhost:18899 2>/dev/null || echo '0'"`;
+          const balanceCmd = `docker exec ${containerName} bash -c "solana balance ${req.query.walletPubkey} --url http://localhost:8899 2>/dev/null || echo '0'"`;
           const balanceResult = await runCommand(balanceCmd, '.', uuidv4(), { skipSuccessUpdate: true });
           balance = balanceResult.trim();
         }
@@ -2008,9 +2036,9 @@ export const getLocalValidatorStatus = async (
       responsive: isResponsive,
       programCount,
       walletBalance: balance,
-      rpcUrl: isRunning ? 'http://localhost:18899' : null,
-      faucetUrl: isRunning ? 'http://localhost:19900' : null,
-      websocketUrl: isRunning ? 'ws://localhost:18900' : null,
+      rpcUrl: isRunning ? 'http://localhost:8899' : null,
+      faucetUrl: isRunning ? 'http://localhost:9900' : null,
+      websocketUrl: isRunning ? 'ws://localhost:8900' : null,
       statusOutput: statusOutput.substring(0, 500)
     });
     
@@ -2122,14 +2150,14 @@ export const deployToLocalValidator = async (
     // Step 4: Configure Solana CLI for local validator
     console.log('[LOCAL_DEPLOY] Configuring Solana CLI for local validator...');
     const configCmd = `docker exec ${containerName} bash -c "
-      solana config set --url http://localhost:18899 &&
+      solana config set --url http://localhost:8899 &&
       solana config set --commitment confirmed
     "`;
     await runCommand(configCmd, '.', uuidv4(), { skipSuccessUpdate: true });
     
     // Step 5: Check if program is already deployed
     const checkDeployedCmd = `docker exec ${containerName} bash -c "
-      solana program show ${programId} --url http://localhost:18899 2>&1 || echo 'not-found'
+      solana program show ${programId} --url http://localhost:8899 2>&1 || echo 'not-found'
     "`;
     const deployedCheck = await runCommand(checkDeployedCmd, '.', uuidv4(), { skipSuccessUpdate: true });
     
@@ -2159,7 +2187,7 @@ export const deployToLocalValidator = async (
       const upgradeCmd = `docker exec ${containerName} bash -c "
         solana program deploy ${soFile} \\
           --program-id ${keypairFile} \\
-          --url http://localhost:18899 \\
+          --url http://localhost:8899 \\
           --commitment confirmed
       "`;
       
@@ -2168,7 +2196,7 @@ export const deployToLocalValidator = async (
     
     // Step 7: Verify deployment
     const verifyCmd = `docker exec ${containerName} bash -c "
-      solana program show ${programId} --url http://localhost:18899 | head -5
+      solana program show ${programId} --url http://localhost:8899 | head -5
     "`;
     const verifyOutput = await runCommand(verifyCmd, '.', uuidv4(), { skipSuccessUpdate: true });
     
@@ -2221,7 +2249,7 @@ export const deployToLocalValidator = async (
           deployedAt: new Date().toISOString(),
           programName,
           deploymentType,
-          validatorUrl: 'http://localhost:18899'
+          validatorUrl: 'http://localhost:8899'
         }),
         programId,
         projectId
@@ -2232,7 +2260,7 @@ export const deployToLocalValidator = async (
     const envCmd = `docker exec ${containerName} bash -c "
       echo 'NEXT_PUBLIC_PROGRAM_ID=${programId}' > ${programPath}/web/.env.local &&
       echo 'NEXT_PUBLIC_CLUSTER=custom' >> ${programPath}/web/.env.local &&
-      echo 'NEXT_PUBLIC_RPC_URL=http://localhost:18899' >> ${programPath}/web/.env.local
+      echo 'NEXT_PUBLIC_RPC_URL=http://localhost:8899' >> ${programPath}/web/.env.local
     "`;
     await runCommand(envCmd, '.', uuidv4(), { skipSuccessUpdate: true });
     
@@ -2251,9 +2279,9 @@ export const deployToLocalValidator = async (
       programId,
       programName,
       deploymentType,
-      rpcUrl: 'http://localhost:18899',
-      websocketUrl: 'ws://localhost:18900',
-      faucetUrl: 'http://localhost:19900',
+      rpcUrl: 'http://localhost:8899',
+      websocketUrl: 'ws://localhost:8900',
+      faucetUrl: 'http://localhost:9900',
       idl: idlContent ? JSON.parse(idlContent) : null,
       deployOutput: deployOutput.substring(0, 1000) // First 1000 chars for debugging
     });

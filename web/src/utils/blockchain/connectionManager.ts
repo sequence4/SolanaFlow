@@ -38,12 +38,36 @@ class ConnectionManager {
     return this.currentCluster;
   }
   
-  async switchCluster(cluster: ClusterType): Promise<boolean> {
+  async getProjectPorts(projectId?: string): Promise<{ rpc: number, ws: number, faucet: number }> {
+    if (projectId) {
+      try {
+        const response = await fetch(`/api/projects/${projectId}/ports`);
+        if (response.ok) {
+          const data = await response.json();
+          return data.ports;
+        }
+      } catch (e) {
+        console.warn('Failed to fetch project ports, using defaults');
+      }
+    }
+    
+    // Fallback
+    return { rpc: 28899, ws: 28900, faucet: 28901 };
+  }
+  
+  async switchCluster(cluster: ClusterType, projectId?: string): Promise<boolean> {
     // Test connection first
-    const testUrl = cluster === 'local' ? 'http://localhost:18899' : 
-                    cluster === 'devnet' ? 'https://api.devnet.solana.com' :
-                    cluster === 'testnet' ? 'https://api.testnet.solana.com' :
-                    'https://api.mainnet-beta.solana.com';
+    let testUrl: string;
+    
+    if (cluster === 'local' && projectId) {
+      const ports = await this.getProjectPorts(projectId);
+      testUrl = `http://localhost:${ports.rpc}`;
+    } else {
+      testUrl = cluster === 'local' ? 'http://localhost:28899' : 
+                cluster === 'devnet' ? 'https://api.devnet.solana.com' :
+                cluster === 'testnet' ? 'https://api.testnet.solana.com' :
+                'https://api.mainnet-beta.solana.com';
+    }
     
     try {
       const testConn = new Connection(testUrl, 'confirmed');
@@ -74,9 +98,10 @@ class ConnectionManager {
     };
   }
   
-  async isLocalValidatorRunning(): Promise<boolean> {
+  async isLocalValidatorRunning(projectId?: string): Promise<boolean> {
     try {
-      const conn = new Connection('http://localhost:18899', 'confirmed');
+      const ports = await this.getProjectPorts(projectId);
+      const conn = new Connection(`http://localhost:${ports.rpc}`, 'confirmed');
       const version = await Promise.race([
         conn.getVersion(),
         new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2000))

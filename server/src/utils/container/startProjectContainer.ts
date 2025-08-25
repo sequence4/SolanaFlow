@@ -252,6 +252,72 @@ function ensureDockerSpace(minBytes = 3 * 1024 * 1024 * 1024): void {
 }
 
 /**
+ * Find available ports for Solana validator
+ */
+async function findAvailablePorts(): Promise<{ rpc: number, ws: number, faucet: number }> {
+  const net = require('net');
+  
+  const checkPort = (port: number): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const server = net.createServer();
+      server.once('error', () => resolve(false));
+      server.once('listening', () => {
+        server.close();
+        resolve(true);
+      });
+      server.listen(port, '0.0.0.0');
+    });
+  };
+  
+  // Try ranges starting from 28899 (less common)
+  const basePort = 28899;
+  for (let offset = 0; offset < 100; offset += 10) {
+    const rpc = basePort + offset;
+    const ws = rpc + 1;
+    const faucet = rpc + 2;
+    
+    const rpcAvailable = await checkPort(rpc);
+    const wsAvailable = await checkPort(ws);
+    const faucetAvailable = await checkPort(faucet);
+    
+    if (rpcAvailable && wsAvailable && faucetAvailable) {
+      console.log(`[CONTAINER] Found available ports - RPC: ${rpc}, WS: ${ws}, Faucet: ${faucet}`);
+      return { rpc, ws, faucet };
+    }
+  }
+  
+  // Fallback to default ports if no range available
+  console.warn('[CONTAINER] No ports found in range 28899-29899, using defaults');
+  return { rpc: 18899, ws: 18900, faucet: 19900 };
+}
+
+/**
+ * Clean up existing containers for a project
+ */
+async function cleanupExistingContainers(projectId: string): Promise<void> {
+  try {
+    // Find any existing containers for this project
+    const listCmd = `docker ps -a --filter "name=userproj-${projectId}" --format "{{.Names}}"`;
+    const existingContainers = execSync(listCmd, { encoding: 'utf8' }).trim();
+    
+    if (existingContainers) {
+      const containers = existingContainers.split('\n').filter(c => c);
+      for (const container of containers) {
+        console.log(`[CONTAINER] Cleaning up existing container: ${container}`);
+        try {
+          execSync(`docker stop ${container} 2>/dev/null || true`, { stdio: 'ignore' });
+          execSync(`docker rm ${container} 2>/dev/null || true`, { stdio: 'ignore' });
+        } catch (e) {
+          console.warn(`[CONTAINER] Failed to cleanup ${container}:`, e);
+        }
+      }
+    }
+  } catch (e) {
+    console.log('[CONTAINER] No existing containers to clean up');
+  }
+}
+
+/**
  * Resolves the container URL using the appropriate host and port
  */
 export function resolveContainerUrl(port: string) {
@@ -423,6 +489,17 @@ export async function startProjectContainer(
     }
     
     completeContainerTask('env-docker-init', 'Docker environment initialized');
+    
+    /* 1c ─ Clean up any existing containers for this project */
+    startContainerTask('env-cleanup', 'Container Cleanup');
+    sendContainerSetupProgress('env-cleanup', 'Container Cleanup', 'Cleaning up existing containers...', 28, [
+      'Checking for existing project containers',
+      'Stopping and removing old containers',
+      'This prevents port conflicts and resource leaks'
+    ]);
+    
+    await cleanupExistingContainers(projId);
+    completeContainerTask('env-cleanup', 'Existing containers cleaned up');
 
     /* 2 ─ run container with explicit platform, project label & random host-port */
     startContainerTask('env-disk-check', 'Storage Space Verification');
@@ -482,6 +559,29 @@ export async function startProjectContainer(
       'Reverse proxy will handle SSL termination automatically'
     ]);
     
+    // Allocate dynamic ports for Solana validator
+    sendContainerSetupProgress('env-container-config', 'Container Configuration', 'Finding available ports for Solana...', 47, [
+      'Scanning for available ports in range 28899-29899',
+      'Ensuring no conflicts with existing services',
+      'This prevents port binding errors'
+    ]);
+    
+    const ports = await findAvailablePorts();
+    
+    // Store allocated ports in database
+    await pool.query(
+      `UPDATE solanaproject 
+       SET details = jsonb_set(
+         COALESCE(details, '{}'::jsonb),
+         '{containerPorts}',
+         $1::jsonb
+       )
+       WHERE id = $2`,
+      [JSON.stringify(ports), projId]
+    );
+    
+    console.log(`[CONTAINER] Allocated ports for project ${projId}: RPC=${ports.rpc}, WS=${ports.ws}, Faucet=${ports.faucet}`);
+    
     const runArgs: string[] = [
       'docker', 'run',
       ...(withPullAlways ? ['--pull=always'] : []),     // refresh tag (Docker ≥ 23)
@@ -520,10 +620,10 @@ export async function startProjectContainer(
       `--label=traefik.http.services.dapp-${projId}.loadbalancer.healthcheck.timeout=30s`,
       // pin to one SG-approved port so the UI link is always stable
       '-p', `${hostPort}:${INTERNAL_PORT}`,
-      // Expose Solana validator ports - mapped to different host ports to avoid conflicts
-      '-p', '18899:8899',  // RPC: host 18899 -> container 8899
-      '-p', '18900:8900',  // WebSocket: host 18900 -> container 8900
-      '-p', '19900:9900',  // Faucet: host 19900 -> container 9900
+      // Expose Solana validator ports - mapped to dynamic host ports to avoid conflicts
+      '-p', `${ports.rpc}:8899`,  // RPC: dynamic host port -> container 8899
+      '-p', `${ports.ws}:8900`,   // WebSocket: dynamic host port -> container 8900
+      '-p', `${ports.faucet}:9900`,  // Faucet: dynamic host port -> container 9900
       // Set working directory to the project's web folder
       '-w', `/usr/src/${rootPath}/web`,
       imageRef,
