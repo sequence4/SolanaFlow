@@ -5,7 +5,6 @@ import { AppError } from '../middleware/errorHandler';
 import { getProjectRootPath } from '../utils/fileUtils';
 import { startProjectContainer } from '../utils/container';
 import { runCommand } from '../utils/command-execution/runCommand';
-import { startAnchorBuildTask } from '../utils/anchor/startAnchorBuildTask';
 import { startAnchorInitTask } from '../utils/anchor/startAnchorInitTask';
 import { startAnchorTestTask } from '../utils/anchor/startAnchorTestTask';
 import { startCustomCommandTask } from '../utils/tasks/startCustomCommandTask';
@@ -400,63 +399,6 @@ export const setCluster = async (
   } catch (error) {
     console.error('Error in setCluster controller:', error);
     next(new AppError('Failed to set cluster devnet', 500));
-  }
-};
-
-export const buildProject = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  const { id } = req.params;
-  const userId = req.user?.id ?? 'mock-user';
-  // org_id checks temporarily disabled until auth lands
-
-  try {
-    const projectCheck = await pool.query(
-      'SELECT details FROM solanaproject WHERE id = $1',
-      [id]
-    );
-
-    if (projectCheck.rows.length === 0) {
-      return next(
-        new AppError(
-          'Project not found or you do not have permission to access it',
-          404
-        )
-      );
-    }
-
-    const { details: detailsStr } = projectCheck.rows[0];
-    let details = {};
-    try {
-      if (typeof detailsStr === 'object' && detailsStr !== null) {
-        details = detailsStr;
-      } else {
-        details = JSON.parse(detailsStr || '{}');
-      }
-    } catch (err) {
-      console.error('Failed to parse details JSON:', err);
-      return next(new AppError('Error parsing project details', 500));
-    }
-
-    if ((details as any).isLite === true) {
-      //console.log('Skipping build process for lite project');
-      res.status(200).json({ 
-        message: 'Build operation skipped for lite project',
-        isLite: true
-      });
-      return;
-    }
-
-    const taskId = await startAnchorBuildTask(id, userId);
-
-    res.status(200).json({
-      message: 'Anchor build process started',
-      taskId: taskId,
-    });
-  } catch (error) {
-    return next(error);
   }
 };
 
