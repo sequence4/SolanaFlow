@@ -7,7 +7,6 @@ import {
   runCommandController,
   startContainer,
   getContainerUrl,
-  getLocalValidatorStatus,
   relaySignedTxHandler,
 } from '../controllers/projectController';
 import { authMiddleware } from '../middleware/authMiddleware';
@@ -34,6 +33,7 @@ import { switchProjectCluster } from '../controllers/blockchain/switchProjectClu
 import { getLocalValidatorHealth } from '../controllers/blockchain/getLocalValidatorHealth';
 import { startLocalValidator } from '../controllers/blockchain/startLocalValidator';
 import { stopLocalValidator } from '../controllers/blockchain/stopLocalValidator';
+import { getLocalValidatorStatus } from '../controllers/blockchain/getLocalValidatorStatus';
 
 const router = express.Router();
 
