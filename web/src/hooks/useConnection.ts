@@ -20,6 +20,6 @@ export function useDynamicConnection() {
     connection,
     cluster,
     isLocal: cluster === 'local',
-    rpcUrl: cluster === 'local' ? 'http://localhost:8899' : 'https://api.devnet.solana.com'
+    rpcUrl: cluster === 'local' ? 'http://localhost:18899' : 'https://api.devnet.solana.com'
   };
 }
