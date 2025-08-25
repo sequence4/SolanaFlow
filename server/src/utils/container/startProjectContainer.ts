@@ -649,7 +649,7 @@ export async function startProjectContainer(
         `"mkdir -p /usr/local/validator-logs; ` +
         `if [ ! -f /usr/local/bin/start-validator.sh ]; then ` +
         `echo '#!/bin/bash' > /usr/local/bin/start-validator.sh && ` +
-        `echo 'solana-test-validator --bind-address 0.0.0.0 --rpc-port 8899 --ws-port 8900 --faucet-port 9900 --log /usr/local/validator-logs/validator.log 2>&1 &' >> /usr/local/bin/start-validator.sh && ` +
+        `echo 'solana-test-validator --bind-address 0.0.0.0 --rpc-port 8899 --faucet-port 9900 > /usr/local/validator-logs/validator.log 2>&1 &' >> /usr/local/bin/start-validator.sh && ` +
         `echo 'echo \\$! > /usr/local/validator-logs/validator.pid' >> /usr/local/bin/start-validator.sh && ` +
         `chmod +x /usr/local/bin/start-validator.sh; fi; ` +
         `if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
