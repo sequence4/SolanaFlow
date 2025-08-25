@@ -20,7 +20,6 @@ import {
   getProjectClusterInfo,
   switchProjectCluster,
   testProject,
-  getBuildArtifact,
   relaySignedTxHandler,
 } from '../controllers/projectController';
 import { authMiddleware } from '../middleware/authMiddleware';
@@ -34,6 +33,7 @@ import { relayTx } from '../controllers/deploy/relayTx';
 import { deployToLocalValidator } from '../controllers/deploy/deployToLocalValidator';
 import { quickDeployLocal } from '../controllers/deploy/quickDeployLocal';
 import { buildProject } from '../controllers/build/buildProject';
+import { getBuildArtifact } from '../controllers/build/getBuildArtifact';
 
 const router = express.Router();
 
