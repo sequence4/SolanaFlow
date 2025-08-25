@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-import { startLocalValidator } from "../projectController";
+import { startLocalValidator } from "../blockchain/startLocalValidator";
 import { getContainerName } from "../../utils/fileUtils";
 import { runCommand } from "../../utils/command-execution/runCommand";
 import { v4 as uuidv4 } from "uuid";

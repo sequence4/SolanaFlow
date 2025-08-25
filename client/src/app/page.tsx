@@ -2,11 +2,11 @@
 
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Code, Cpu, Layers } from "lucide-react"
+import { ArrowRight, Code } from "lucide-react"
 import { BsTelegram } from "react-icons/bs";
 import { BsTwitterX } from "react-icons/bs";
 import { BsYoutube } from "react-icons/bs";
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState } from "react"
 import InstructionFlow from "@/components/landing/InstructionFlow"
 import Head from "next/head"
 import TypewriterCode from "@/components/landing/TypeWriterCode"

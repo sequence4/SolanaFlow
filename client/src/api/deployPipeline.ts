@@ -9,8 +9,6 @@ export function deployPipeline(
   walletSigned = true,
 ) {
   if (!projectId) throw new Error("deployPipeline called without projectId");
-  //console.log(`[SSE] Starting deploy pipeline for project: ${projectId}`);
-  //console.log(`[SSE] API_URL: ${API_URL}`);
   
   const token =
     typeof window !== 'undefined' ? localStorage.getItem('token') : null;
@@ -20,8 +18,6 @@ export function deployPipeline(
   };
   if (token) headers.Authorization = `Bearer ${token}`;
   
-  //console.log(`[SSE] Headers prepared, auth token ${token ? 'present' : 'missing'}`);
-
   const url = `${API_URL}/api/deploy/${projectId}/deploy-pipeline`;
   
   const controller = new AbortController();
@@ -34,7 +30,6 @@ export function deployPipeline(
     openWhenHidden: true,
     
     async onopen(response) {
-    //  console.log(`[SSE] Connection opened with status: ${response.status}`);
       if (response.status >= 400) {
         throw new Error(`HTTP ${response.status} while opening SSE`);
       }
@@ -42,21 +37,14 @@ export function deployPipeline(
     
     onmessage(event: EventSourceMessage) {
       try {
-        // Skip empty data (SSE comments/ping messages)
         if (!event.data || event.data.trim() === '') {
           return;
         }
         
         const msg = JSON.parse(event.data);
-      //  console.log(`[SSE] Received message:`, msg);
-        
-        // Emit BOTH the original progress event AND a specific code-generation event
         eventBus.emit('progress', msg);
         
-        // Also emit a specific event for code generation
         if (msg.type === 'code-generation' && msg.files) {
-        //  console.log('[SSE] ✅ Emitting code-generation event with', msg.files.length, 'files');
-         // console.log('[SSE] Files being emitted:', msg.files.map((f: any) => f.filename));
           eventBus.emit('code-generation', msg);
         }
         
@@ -77,19 +65,13 @@ export function deployPipeline(
     },
   });
   
- // console.log(`[SSE] EventSource created for project: ${projectId}`);
-  
-  // Return an object with the same interface as EventSource for compatibility
   return {
     close: () => {
       console.log(`[SSE] Manually closing connection`);
       controller.abort();
     },
-    addEventListener: (event: string, handler: EventListener) => {
-      // This is a minimal implementation to match the interface
+    addEventListener: (event: string) => {
       if (event === 'close') {
-        // We can't really add listeners to the fetch stream,
-        // but this will be called from our wrapper code
       }
     }
   };

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useContext, useEffect } from 'react';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Header } from "@/components/header";
 import Workflow from "@/components/main/workflow/Workflow";
 import Interface from "@/components/main/interface/Interface";
@@ -17,17 +17,12 @@ export default function MainPage() {
   const { activeTab, setActiveTab } = useContext(UxContext);
   const { fileTree } = useContext(FileContext);
 
-  /**
-   * Returns true if any node in the tree is a file.
-   * A node is considered a file when it has **no children array**
-   * (covers arrays, single-root objects, and generators that omit `type: "file"`).
-   */
   const treeHasFile = (n: FileTreeItemType | FileTreeItemType[]): boolean =>
     Array.isArray(n)
-      ? n.some(treeHasFile)                     // iterate over array roots
-      : n.children && n.children.length > 0     // directory ➜ drill down
+      ? n.some(treeHasFile)       
+      : n.children && n.children.length > 0 
         ? n.children.some(treeHasFile)
-        : true;                                 // leaf ➜ treat as file
+        : true;                       
 
   const hasFiles = fileTree ? treeHasFile(fileTree) : false;
 
