@@ -17,7 +17,6 @@ import { startInstallNodeDependenciesTask } from '../utils/project/startInstallN
 import { compileTs } from '../utils/compilation/compileTs';
 import { signDeployTxAndBroadcast } from '../utils/blockchain/signDeployTxAndBroadcast';
 import { getContainerName } from '../utils/container/getContainerName';
-
 import path from 'path';
 import { APP_CONFIG } from '../config/appConfig';
 import { Buffer } from 'buffer';
@@ -188,7 +187,7 @@ async function loadProgramKeypair(projectId: string): Promise<Keypair | null> {
   return null;
 }
 
-import { waitForTaskCompletion, updateTaskStatus } from '../utils/taskUtils';
+import { waitForTaskCompletion } from '../utils/taskUtils';
 import { createProject as createProjectDb } from '../utils/project/createProject';
 import { catchAsync } from '../utils/middleware/catchAsync';
 import { ensureNonceAccount } from '../utils/blockchain/nonceUtils';
@@ -327,78 +326,6 @@ export const compileTsController = async (
   }
 };
 
-export const createProject = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const { name, description } = req.body;
-    const details = req.body.details ?? {};
-    const safeName = (name && name.trim()) ? name : `Untitled-${new Date().toISOString().slice(0,10)}`;
-
-    const project = await createProjectDb({ 
-      name: safeName, 
-      description, 
-      details 
-    });
-
-    res.status(201).json({
-      message: 'Project created successfully',
-      project
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-
-/* Removed createProjectDirectory - functionality no longer needed
-export const createProjectDirectory = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  const userId = req.user?.id;
-  // org_id checks temporarily disabled until auth lands
-
-  try {
-    const { name, description, projectId = '' } = req.body;
-    
-    if (!name) {
-      return next(new AppError('Project name is required', 400));
-    }
-
-    const normalizedName = normalizeProjectName(name);
-    const randomSuffix = uuidv4().slice(0, 8);
-    const root_path = `${normalizedName}-${randomSuffix}`;
-    
-    if (projectId) {
-      const client = await pool.connect();
-      try {
-        const result = await client.query(
-          'SELECT id FROM solanaproject WHERE id = $1',
-          [projectId]
-        );
-        
-        if (result.rows.length === 0) {
-          return next(new AppError('Project ID not found', 404));
-        }
-      } finally {
-        client.release();
-      }
-    }
-    
-    res.status(200).json({
-      message: 'Project directory creation is no longer required',
-      rootPath: root_path,
-      taskId: null
-    });
-  } catch (error) {
-    console.error('Error in createProjectDirectory:', error);
-    return next(new AppError('Failed to start project directory creation', 500));
-  }
-};
-*/
 
 export const editProject = async (
   req: Request,
