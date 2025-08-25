@@ -11,7 +11,6 @@ import {
   stopLocalValidator,
   getLocalValidatorStatus,
   getLocalValidatorHealth,
-  switchProjectCluster,
   relaySignedTxHandler,
 } from '../controllers/projectController';
 import { authMiddleware } from '../middleware/authMiddleware';
@@ -34,6 +33,7 @@ import { getProgramStatus } from '../controllers/blockchain/getProgramStatus';
 import { getProgramId } from '../controllers/blockchain/getProgramId';
 import { setCluster } from '../controllers/blockchain/setCluster';
 import { getProjectClusterInfo } from '../controllers/blockchain/getProjectClusterInfo';
+import { switchProjectCluster } from '../controllers/blockchain/switchProjectCluster';
 
 const router = express.Router();
 
