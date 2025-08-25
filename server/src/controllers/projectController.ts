@@ -763,67 +763,6 @@ export const getLocalValidatorStatus = async (
 };
 
 /**
- * GET /projects/:id/cluster-info
- * Get current cluster configuration for the project
- */
-export const getProjectClusterInfo = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const { id: projectId } = req.params;
-    const { preferLocal } = req.query;
-    
-    // Import the cluster detection utilities
-    const { getProjectCluster, testClusterConnection } = 
-      await import('../utils/environment/clusterDetection');
-    
-    // Get project details to check for local deployment
-    const projectResult = await pool.query(
-      'SELECT details FROM solanaproject WHERE id = $1',
-      [projectId]
-    );
-    
-    if (projectResult.rows.length === 0) {
-      return next(new AppError('Project not found', 404));
-    }
-    
-    const details = projectResult.rows[0].details || {};
-    const hasLocalDeployment = !!details.localProgramId;
-    const hasDevnetDeployment = !!details.programId;
-    
-    // Get cluster config
-    const cluster = await getProjectCluster(
-      projectId, 
-      preferLocal === 'true' || hasLocalDeployment
-    );
-    
-    // Test the connection
-    const connectionTest = await testClusterConnection(cluster.url);
-    
-    // Get program IDs for each environment
-    const programIds = {
-      local: details.localProgramId || null,
-      devnet: details.programId || details.projectState?.programId || null
-    };
-    
-    res.json({
-      cluster,
-      connectionTest,
-      programIds,
-      hasLocalDeployment,
-      hasDevnetDeployment,
-      recommendedCluster: hasLocalDeployment ? 'local' : 'devnet'
-    });
-    
-  } catch (error) {
-    console.error('[CLUSTER_INFO] Error:', error);
-    next(new AppError('Failed to get cluster info', 500));
-  }
-};
-
-/**
  * POST /projects/:id/switch-cluster
  * Switch between local and remote clusters
  */

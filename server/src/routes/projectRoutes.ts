@@ -11,7 +11,6 @@ import {
   stopLocalValidator,
   getLocalValidatorStatus,
   getLocalValidatorHealth,
-  getProjectClusterInfo,
   switchProjectCluster,
   relaySignedTxHandler,
 } from '../controllers/projectController';
@@ -34,6 +33,7 @@ import { createEphemeralKeypair } from '../controllers/blockchain/createEphemera
 import { getProgramStatus } from '../controllers/blockchain/getProgramStatus';
 import { getProgramId } from '../controllers/blockchain/getProgramId';
 import { setCluster } from '../controllers/blockchain/setCluster';
+import { getProjectClusterInfo } from '../controllers/blockchain/getProjectClusterInfo';
 
 const router = express.Router();
 
