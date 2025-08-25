@@ -645,50 +645,52 @@ export async function startProjectContainer(
         'bash', '-lc',
         // Ensure validator setup and copy base Next.js app if needed, then start dev server
         `"mkdir -p /usr/local/validator-logs; ` +
-        `echo '#!/bin/bash
-case "$1" in
-  status)
-    if [ -f /usr/local/validator-logs/validator.pid ]; then
-      PID=$(cat /usr/local/validator-logs/validator.pid)
-      if ps -p $PID > /dev/null 2>&1; then
-        echo "Validator is running with PID $PID"
-        echo "RPC endpoint is responsive"
-        exit 0
-      fi
-    fi
-    echo "Validator is not running"
-    exit 1
-    ;;
-  reset)
-    if [ -f /usr/local/validator-logs/validator.pid ]; then
-      PID=$(cat /usr/local/validator-logs/validator.pid)
-      kill $PID 2>/dev/null || true
-    fi
-    rm -rf /usr/local/validator-logs/*
-    mkdir -p /usr/local/validator-logs
-    solana-test-validator --reset --bind-address 0.0.0.0 --rpc-port 8899 --faucet-port 9900 > /usr/local/validator-logs/validator.log 2>&1 &
-    echo $! > /usr/local/validator-logs/validator.pid
-    sleep 2
-    echo "Validator reset and started successfully"
-    echo "Validator is ready"
-    ;;
-  *)
-    if [ -f /usr/local/validator-logs/validator.pid ]; then
-      PID=$(cat /usr/local/validator-logs/validator.pid)
-      if ps -p $PID > /dev/null 2>&1; then
-        echo "Validator already running with PID $PID"
-        echo "Validator is ready"
-        exit 0
-      fi
-    fi
-    mkdir -p /usr/local/validator-logs
-    solana-test-validator --bind-address 0.0.0.0 --rpc-port 8899 --faucet-port 9900 > /usr/local/validator-logs/validator.log 2>&1 &
-    echo $! > /usr/local/validator-logs/validator.pid
-    sleep 2
-    echo "Validator started successfully"
-    echo "Validator is ready"
-    ;;
-esac' > /usr/local/bin/start-validator.sh && chmod +x /usr/local/bin/start-validator.sh; ` +
+        `if [ ! -f /usr/local/bin/start-validator.sh ]; then ` +
+        `echo '#!/bin/bash' > /usr/local/bin/start-validator.sh && ` +
+        `echo 'case "\\$1" in' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '  status)' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    if [ -f /usr/local/validator-logs/validator.pid ]; then' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '      PID=\\$(cat /usr/local/validator-logs/validator.pid)' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '      if ps -p \\$PID > /dev/null 2>&1; then' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '        echo "Validator is running with PID \\$PID"' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '        echo "RPC endpoint is responsive"' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '        exit 0' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '      fi' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    fi' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    echo "Validator is not running"' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    exit 1' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    ;;' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '  reset)' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    if [ -f /usr/local/validator-logs/validator.pid ]; then' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '      PID=\\$(cat /usr/local/validator-logs/validator.pid)' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '      kill \\$PID 2>/dev/null || true' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    fi' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    rm -rf /usr/local/validator-logs/*' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    mkdir -p /usr/local/validator-logs' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    solana-test-validator --reset --bind-address 0.0.0.0 --rpc-port 8899 --faucet-port 9900 > /usr/local/validator-logs/validator.log 2>&1 &' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    echo \\$! > /usr/local/validator-logs/validator.pid' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    sleep 2' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    echo "Validator reset and started successfully"' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    echo "Validator is ready"' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    ;;' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '  *)' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    if [ -f /usr/local/validator-logs/validator.pid ]; then' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '      PID=\\$(cat /usr/local/validator-logs/validator.pid)' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '      if ps -p \\$PID > /dev/null 2>&1; then' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '        echo "Validator already running with PID \\$PID"' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '        echo "Validator is ready"' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '        exit 0' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '      fi' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    fi' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    mkdir -p /usr/local/validator-logs' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    solana-test-validator --bind-address 0.0.0.0 --rpc-port 8899 --faucet-port 9900 > /usr/local/validator-logs/validator.log 2>&1 &' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    echo \\$! > /usr/local/validator-logs/validator.pid' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    sleep 2' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    echo "Validator started successfully"' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    echo "Validator is ready"' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    ;;' >> /usr/local/bin/start-validator.sh && ` +
+        `echo 'esac' >> /usr/local/bin/start-validator.sh && ` +
+        `chmod +x /usr/local/bin/start-validator.sh; fi; ` +
         `if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
         `rm -rf /usr/src/${rootPath}/web/node_modules 2>/dev/null || true; ` +
         `rm -rf /usr/src/${rootPath}/web/.next 2>/dev/null || true; ` +
@@ -708,50 +710,52 @@ esac' > /usr/local/bin/start-validator.sh && chmod +x /usr/local/bin/start-valid
         'bash', '-lc',
         // Setup validator script and copy base Next.js app if needed, then run standalone server
         `"mkdir -p /usr/local/validator-logs; ` +
-        `echo '#!/bin/bash
-case "$1" in
-  status)
-    if [ -f /usr/local/validator-logs/validator.pid ]; then
-      PID=$(cat /usr/local/validator-logs/validator.pid)
-      if ps -p $PID > /dev/null 2>&1; then
-        echo "Validator is running with PID $PID"
-        echo "RPC endpoint is responsive"
-        exit 0
-      fi
-    fi
-    echo "Validator is not running"
-    exit 1
-    ;;
-  reset)
-    if [ -f /usr/local/validator-logs/validator.pid ]; then
-      PID=$(cat /usr/local/validator-logs/validator.pid)
-      kill $PID 2>/dev/null || true
-    fi
-    rm -rf /usr/local/validator-logs/*
-    mkdir -p /usr/local/validator-logs
-    solana-test-validator --reset --bind-address 0.0.0.0 --rpc-port 8899 --faucet-port 9900 > /usr/local/validator-logs/validator.log 2>&1 &
-    echo $! > /usr/local/validator-logs/validator.pid
-    sleep 2
-    echo "Validator reset and started successfully"
-    echo "Validator is ready"
-    ;;
-  *)
-    if [ -f /usr/local/validator-logs/validator.pid ]; then
-      PID=$(cat /usr/local/validator-logs/validator.pid)
-      if ps -p $PID > /dev/null 2>&1; then
-        echo "Validator already running with PID $PID"
-        echo "Validator is ready"
-        exit 0
-      fi
-    fi
-    mkdir -p /usr/local/validator-logs
-    solana-test-validator --bind-address 0.0.0.0 --rpc-port 8899 --faucet-port 9900 > /usr/local/validator-logs/validator.log 2>&1 &
-    echo $! > /usr/local/validator-logs/validator.pid
-    sleep 2
-    echo "Validator started successfully"
-    echo "Validator is ready"
-    ;;
-esac' > /usr/local/bin/start-validator.sh && chmod +x /usr/local/bin/start-validator.sh; ` +
+        `if [ ! -f /usr/local/bin/start-validator.sh ]; then ` +
+        `echo '#!/bin/bash' > /usr/local/bin/start-validator.sh && ` +
+        `echo 'case "\\$1" in' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '  status)' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    if [ -f /usr/local/validator-logs/validator.pid ]; then' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '      PID=\\$(cat /usr/local/validator-logs/validator.pid)' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '      if ps -p \\$PID > /dev/null 2>&1; then' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '        echo "Validator is running with PID \\$PID"' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '        echo "RPC endpoint is responsive"' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '        exit 0' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '      fi' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    fi' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    echo "Validator is not running"' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    exit 1' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    ;;' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '  reset)' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    if [ -f /usr/local/validator-logs/validator.pid ]; then' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '      PID=\\$(cat /usr/local/validator-logs/validator.pid)' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '      kill \\$PID 2>/dev/null || true' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    fi' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    rm -rf /usr/local/validator-logs/*' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    mkdir -p /usr/local/validator-logs' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    solana-test-validator --reset --bind-address 0.0.0.0 --rpc-port 8899 --faucet-port 9900 > /usr/local/validator-logs/validator.log 2>&1 &' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    echo \\$! > /usr/local/validator-logs/validator.pid' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    sleep 2' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    echo "Validator reset and started successfully"' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    echo "Validator is ready"' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    ;;' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '  *)' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    if [ -f /usr/local/validator-logs/validator.pid ]; then' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '      PID=\\$(cat /usr/local/validator-logs/validator.pid)' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '      if ps -p \\$PID > /dev/null 2>&1; then' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '        echo "Validator already running with PID \\$PID"' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '        echo "Validator is ready"' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '        exit 0' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '      fi' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    fi' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    mkdir -p /usr/local/validator-logs' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    solana-test-validator --bind-address 0.0.0.0 --rpc-port 8899 --faucet-port 9900 > /usr/local/validator-logs/validator.log 2>&1 &' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    echo \\$! > /usr/local/validator-logs/validator.pid' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    sleep 2' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    echo "Validator started successfully"' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    echo "Validator is ready"' >> /usr/local/bin/start-validator.sh && ` +
+        `echo '    ;;' >> /usr/local/bin/start-validator.sh && ` +
+        `echo 'esac' >> /usr/local/bin/start-validator.sh && ` +
+        `chmod +x /usr/local/bin/start-validator.sh; fi; ` +
         `if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
         `rm -rf /usr/src/${rootPath}/web/node_modules 2>/dev/null || true; ` +
         `rm -rf /usr/src/${rootPath}/web/.next 2>/dev/null || true; ` +
