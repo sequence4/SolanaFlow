@@ -641,10 +641,15 @@ export async function startProjectContainer(
         'React Fast Refresh will update code instantly',
         'Perfect for iterative development workflow'
       ]);
-      // Simplified startup with entrypoint override
+      // Development mode with Next.js dev server
       runArgs.push(
         '-c',
-        `echo "Container started successfully - debugging mode" && sleep infinity`
+        `if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
+        `  cp -af /usr/share/solanaflow/web/. /usr/src/${rootPath}/web/ 2>/dev/null || true; ` +
+        `fi && ` +
+        `cd /usr/src/${rootPath}/web && ` +
+        `export NEXT_DISABLE_REACT_REFRESH=\${NEXT_DISABLE_REACT_REFRESH:-0} && ` +
+        `npx next dev -H 0.0.0.0 -p ${INTERNAL_PORT}`
       );
     } else {
       sendContainerSetupProgress('env-container-config', 'Container Configuration', 'Configuring production mode...', 65, [
@@ -652,10 +657,15 @@ export async function startProjectContainer(
         'Lower resource usage, better performance',
         'Standalone server ready for deployment'
       ]);
-      // Simplified startup with entrypoint override
+      // Production mode with standalone Next.js server
       runArgs.push(
         '-c',
-        `echo "Container started successfully - debugging mode (production)" && sleep infinity`
+        `if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
+        `  cp -af /usr/share/solanaflow/web/. /usr/src/${rootPath}/web/ 2>/dev/null || true; ` +
+        `fi && ` +
+        `cd /usr/src/${rootPath}/web && ` +
+        `until [ -d .next ]; do sleep 1; done && ` +
+        `node .next/standalone/server.js -H 0.0.0.0 -p ${INTERNAL_PORT}`
       );
     }
 
@@ -682,13 +692,60 @@ export async function startProjectContainer(
       execSync(`docker exec ${name} sh -c 'mkdir -p /usr/local/validator-logs'`);
       execSync(`docker exec ${name} sh -c 'mkdir -p /usr/src/${rootPath}/web'`);
       
-      // Create validator script in /tmp first (writable by any user)
-      execSync(`docker exec ${name} sh -c 'echo "#!/bin/sh" > /tmp/start-validator.sh'`);
-      execSync(`docker exec ${name} sh -c 'echo "case \\"\\\$1\\" in" >> /tmp/start-validator.sh'`);
-      execSync(`docker exec ${name} sh -c 'echo "  status) echo \\"Validator is not running\\"; exit 1 ;;" >> /tmp/start-validator.sh'`);
-      execSync(`docker exec ${name} sh -c 'echo "  reset) echo \\"Validator reset and started successfully\\"; echo \\"Validator is ready\\" ;;" >> /tmp/start-validator.sh'`);
-      execSync(`docker exec ${name} sh -c 'echo "  *) echo \\"Validator started successfully\\"; echo \\"Validator is ready\\" ;;" >> /tmp/start-validator.sh'`);
-      execSync(`docker exec ${name} sh -c 'echo "esac" >> /tmp/start-validator.sh'`);
+      // Create a complete validator script in /tmp first (writable by any user)
+      const validatorScript = [
+        '#!/bin/sh',
+        'case "$1" in',
+        '  status)',
+        '    if [ -f /usr/local/validator-logs/validator.pid ]; then',
+        '      PID=$(cat /usr/local/validator-logs/validator.pid)',
+        '      if ps -p $PID > /dev/null 2>&1; then',
+        '        echo "Validator is running with PID $PID"',
+        '        echo "RPC endpoint is responsive"',
+        '        exit 0',
+        '      fi',
+        '    fi',
+        '    echo "Validator is not running"',
+        '    exit 1',
+        '    ;;',
+        '  reset)',
+        '    if [ -f /usr/local/validator-logs/validator.pid ]; then',
+        '      PID=$(cat /usr/local/validator-logs/validator.pid)',
+        '      kill $PID 2>/dev/null || true',
+        '    fi',
+        '    rm -rf /usr/local/validator-logs/*',
+        '    mkdir -p /usr/local/validator-logs',
+        '    solana-test-validator --reset --bind-address 0.0.0.0 --rpc-port 8899 --faucet-port 9900 > /usr/local/validator-logs/validator.log 2>&1 &',
+        '    echo $! > /usr/local/validator-logs/validator.pid',
+        '    sleep 2',
+        '    echo "Validator reset and started successfully"',
+        '    echo "Validator is ready"',
+        '    ;;',
+        '  *)',
+        '    if [ -f /usr/local/validator-logs/validator.pid ]; then',
+        '      PID=$(cat /usr/local/validator-logs/validator.pid)',
+        '      if ps -p $PID > /dev/null 2>&1; then',
+        '        echo "Validator already running with PID $PID"',
+        '        echo "Validator is ready"',
+        '        exit 0',
+        '      fi',
+        '    fi',
+        '    mkdir -p /usr/local/validator-logs',
+        '    solana-test-validator --bind-address 0.0.0.0 --rpc-port 8899 --faucet-port 9900 > /usr/local/validator-logs/validator.log 2>&1 &',
+        '    echo $! > /usr/local/validator-logs/validator.pid',
+        '    sleep 2',
+        '    echo "Validator started successfully"',
+        '    echo "Validator is ready"',
+        '    ;;',
+        'esac'
+      ];
+      
+      // Write the script line by line
+      for (let i = 0; i < validatorScript.length; i++) {
+        const line = validatorScript[i].replace(/'/g, "'\\''"); // Escape single quotes
+        const redirect = i === 0 ? '>' : '>>';
+        execSync(`docker exec ${name} sh -c 'echo '"'"'${line}'"'"' ${redirect} /tmp/start-validator.sh'`);
+      }
       execSync(`docker exec ${name} sh -c 'chmod +x /tmp/start-validator.sh'`);
       
       // Try to copy to /usr/local/bin (may fail if no permissions)
