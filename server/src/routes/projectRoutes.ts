@@ -1,9 +1,6 @@
 import express from 'express';
-import {
-  anchorInitProject,
-  relaySignedTxHandler,
-} from '../controllers/projectController';
 import { authMiddleware } from '../middleware/authMiddleware';
+import { catchAsync } from '../utils/middleware/catchAsync';
 import { listProjects } from '../controllers/project/listProject';
 import { createProject } from '../controllers/project/createProject';
 import { deleteProject } from '../controllers/project/deleteProject';
@@ -34,6 +31,8 @@ import { installPackages } from '../controllers/project/installPackages';
 import { installNodeDependencies } from '../controllers/project/installNodeDependencies';
 import { startContainerController } from '../controllers/container/startContainerController';
 import { getContainerUrlController } from '../controllers/container/getContainerUrlController';
+import { anchorInitProjectController } from '../controllers/anchorInitProjectController';
+import { relaySignedTx } from '../controllers/blockchain/relaySignedTx';
 
 const router = express.Router();
 
@@ -52,7 +51,7 @@ router.get('/details/:id', guard, getProjectDetails);
 router.delete('/:id', authMiddleware, deleteProject);
 router.post('/:id/start-container', authMiddleware, startContainerController);
 router.get('/:id/container-url', authMiddleware, getContainerUrlController);
-router.post('/init', authMiddleware, anchorInitProject);
+router.post('/init', authMiddleware, anchorInitProjectController);
 router.post('/:id/set-cluster', authMiddleware, setCluster);
 router.post('/:id/build', authMiddleware, buildProject);
 router.get('/:id/build-artifact', authMiddleware, getBuildArtifact);
@@ -61,7 +60,7 @@ router.get('/:id/program-status', authMiddleware, getProgramStatus);
 
 router.get('/:id/program-id', authMiddleware, getProgramId);
 router.post('/:id/relay-tx', authMiddleware, relayTx);
-router.post('/:id/relay-signed-tx', authMiddleware, relaySignedTxHandler);
+router.post('/:id/relay-signed-tx', authMiddleware, catchAsync(relaySignedTx));
 router.post('/:id/nonce', authMiddleware, getNonceAccount);
 router.post('/:id/test', authMiddleware, testProject);
 router.post('/:id/run-command', authMiddleware, runProjectCommand);
