@@ -6,7 +6,6 @@ import { getProjectRootPath } from '../utils/fileUtils';
 import { startProjectContainer } from '../utils/container';
 import { runCommand } from '../utils/command-execution/runCommand';
 import { startAnchorBuildTask } from '../utils/anchor/startAnchorBuildTask';
-import { startAnchorDeployTask } from '../utils/anchor/startAnchorDeployTask';
 import { startAnchorInitTask } from '../utils/anchor/startAnchorInitTask';
 import { startAnchorTestTask } from '../utils/anchor/startAnchorTestTask';
 import { startCustomCommandTask } from '../utils/tasks/startCustomCommandTask';
@@ -17,14 +16,12 @@ import { startInstallNodeDependenciesTask } from '../utils/project/startInstallN
 import { compileTs } from '../utils/compilation/compileTs';
 import { signDeployTxAndBroadcast } from '../utils/blockchain/signDeployTxAndBroadcast';
 import { getContainerName } from '../utils/container/getContainerName';
-import path from 'path';
-import { APP_CONFIG } from '../config/appConfig';
 import { Buffer } from 'buffer';
-import fs from 'fs';
 
-/**
- * Helper function to get project's allocated ports from database
- */
+const ephemeralKeys = new Map<string, Keypair>();
+
+
+
 async function getProjectPorts(projectId: string): Promise<{ rpc: number, ws: number, faucet: number }> {
   try {
     const result = await pool.query(
@@ -62,19 +59,11 @@ async function getProjectPorts(projectId: string): Promise<{ rpc: number, ws: nu
   console.log('[getProjectPorts] Using fallback ports for project', projectId);
   return { rpc: 28899, ws: 28900, faucet: 28901 };
 }
-/*  --------------------------------------------------------------------
-    NOTE:  BpfLoader is flagged "deprecated" in @solana/web3.js v1.98.x
-           because a new loader API is coming in v2.  There is **no**
-           replacement in v1.x, so we keep using it and suppress the
-           lint warning until we migrate to v2.
-    -------------------------------------------------------------------- */
-/* eslint-disable-next-line deprecation/deprecation */
+
 import {
   Keypair,
   Connection,
   PublicKey,
-  LAMPORTS_PER_SOL,
-  SendTransactionError,
   Transaction,
   SystemProgram,
   NONCE_ACCOUNT_LENGTH,
@@ -88,11 +77,6 @@ import {
 const BPF_LOADER_UPGRADEABLE_PROGRAM_ID = new PublicKey(
   'BPFLoaderUpgradeab1e11111111111111111111111',
 );
-
-import { deployOrUpgradeUpgradeable } from '../solana/upgradeableDeploy';
-
-// In-memory storage for ephemeral keypairs
-const ephemeralKeys = new Map<string, Keypair>();
 
 /**
  * Ensure the server fee‑payer has enough lamports on‑chain before any
