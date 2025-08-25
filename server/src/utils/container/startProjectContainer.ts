@@ -645,9 +645,17 @@ export async function startProjectContainer(
       ]);
       runArgs.push(
         'bash', '-lc',
-        // Copy base Next.js app if needed, then start dev server with hot-reload
-        `"if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
-        `cp -a /usr/share/solanaflow/web/. /usr/src/${rootPath}/web/; fi; ` +
+        // Ensure validator setup and copy base Next.js app if needed, then start dev server
+        `"mkdir -p /usr/local/validator-logs; ` +
+        `if [ ! -f /usr/local/bin/start-validator.sh ]; then ` +
+        `echo '#!/bin/bash' > /usr/local/bin/start-validator.sh && ` +
+        `echo 'solana-test-validator --bind-address 0.0.0.0 --rpc-port 8899 --ws-port 8900 --faucet-port 9900 --log /usr/local/validator-logs/validator.log 2>&1 &' >> /usr/local/bin/start-validator.sh && ` +
+        `echo 'echo \\$! > /usr/local/validator-logs/validator.pid' >> /usr/local/bin/start-validator.sh && ` +
+        `chmod +x /usr/local/bin/start-validator.sh; fi; ` +
+        `if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
+        `rm -rf /usr/src/${rootPath}/web/node_modules 2>/dev/null || true; ` +
+        `rm -rf /usr/src/${rootPath}/web/.next 2>/dev/null || true; ` +
+        `cp -af /usr/share/solanaflow/web/. /usr/src/${rootPath}/web/ 2>/dev/null || true; fi; ` +
         `cd /usr/src/${rootPath}/web && ` +
         `export NEXT_DISABLE_REACT_REFRESH=\${NEXT_DISABLE_REACT_REFRESH:-0}; ` +
         `npx next dev -H 0.0.0.0 -p ${INTERNAL_PORT} & ` +
@@ -663,7 +671,9 @@ export async function startProjectContainer(
         'bash', '-lc',
         // Copy base Next.js app if needed, then run standalone server
         `"if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
-        `cp -a /usr/share/solanaflow/web/. /usr/src/${rootPath}/web/; fi; ` +
+        `rm -rf /usr/src/${rootPath}/web/node_modules 2>/dev/null || true; ` +
+        `rm -rf /usr/src/${rootPath}/web/.next 2>/dev/null || true; ` +
+        `cp -af /usr/share/solanaflow/web/. /usr/src/${rootPath}/web/ 2>/dev/null || true; fi; ` +
         `cd /usr/src/${rootPath}/web && ` +
         `until [ -d .next ]; do sleep 1; done && ` +
         `node .next/standalone/server.js -H 0.0.0.0 -p ${INTERNAL_PORT} & ` +

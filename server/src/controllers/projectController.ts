@@ -2131,12 +2131,63 @@ export const deployToLocalValidator = async (
     if (soExists.trim() === 'missing' || forceRebuild) {
       console.log('[LOCAL_DEPLOY] Building program...');
       
-      // Build the program
-      const buildCmd = `docker exec ${containerName} bash -lc "cd ${programPath} && anchor build"`;
-      const buildOutput = await runCommand(buildCmd, '.', projectId);
+      // Fix workspace configuration before building
+      const fixWorkspaceCmd = `docker exec ${containerName} bash -c "
+        cd ${programPath} &&
+        # Ensure Cargo.toml has correct workspace members
+        if [ -f Cargo.toml ]; then
+          # Check if programs directory exists
+          if [ -d programs ]; then
+            # Add all program directories to workspace
+            for dir in programs/*/; do
+              if [ -f \\"\$dir/Cargo.toml\\" ]; then
+                dirname=\\$(basename \\"\$dir\\")
+                if ! grep -q \\\"programs/\$dirname\\\" Cargo.toml; then
+                  sed -i '/members = \\[/a\\\\    \\\"programs/'\$dirname'\\\",' Cargo.toml
+                fi
+              fi
+            done
+          fi
+        fi
+      "`;
       
-      if (!buildOutput.includes('Finished') && !buildOutput.includes('success')) {
-        throw new Error(`Build failed: ${buildOutput.substring(0, 500)}`);
+      await runCommand(fixWorkspaceCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+      console.log('[LOCAL_DEPLOY] Fixed workspace configuration');
+      
+      // Build the program with better error handling
+      const buildCmd = `docker exec ${containerName} bash -lc "
+        cd ${programPath} &&
+        # Clean up any previous build artifacts
+        cargo clean 2>/dev/null || true &&
+        # Set proper permissions
+        chmod -R 755 . &&
+        # Build with verbose output
+        anchor build --verifiable 2>&1
+      "`;
+      
+      let buildOutput: string;
+      try {
+        buildOutput = await runCommand(buildCmd, '.', projectId);
+      } catch (buildError: any) {
+        console.error('[LOCAL_DEPLOY] Build command failed:', buildError);
+        // Extract meaningful error from output
+        const errorMsg = buildError.message || buildError.toString();
+        const relevantError = errorMsg.split('\n').find((line: string) => 
+          line.includes('error') || line.includes('Error') || line.includes('failed')
+        ) || errorMsg.substring(0, 500);
+        throw new Error(`Build failed: ${relevantError}`);
+      }
+      
+      // Check for success indicators
+      if (!buildOutput.includes('Finished') && 
+          !buildOutput.includes('success') && 
+          !buildOutput.includes('Program Id:')) {
+        // Extract the actual error from build output
+        const lines = buildOutput.split('\n');
+        const errorLine = lines.find(line => 
+          line.includes('error:') || line.includes('Error:')
+        ) || 'Unknown build error';
+        throw new Error(`Build failed: ${errorLine}`);
       }
       
       console.log('[LOCAL_DEPLOY] Build completed successfully');
@@ -2362,19 +2413,47 @@ export const quickDeployLocal = async (
         .catch(err => console.warn('[QUICK_DEPLOY] Workspace fix warning:', err));
     }
     
-    // Step 2: Deploy to local validator
-    const deployReq = {
-      params: { id: projectId },
-      body: { walletPubkey, forceRebuild: false },
-      user: req.user
-    } as unknown as Request;
+    // Step 2: Deploy to local validator with retry logic
+    let deployResult: any;
+    let retryCount = 0;
+    const maxRetries = 2;
     
-    const deployResult = await new Promise<any>((resolve, reject) => {
-      deployToLocalValidator(deployReq, {
-        json: resolve,
-        status: () => ({ json: resolve })
-      } as any, reject);
-    });
+    while (retryCount <= maxRetries) {
+      try {
+        const deployReq = {
+          params: { id: projectId },
+          body: { walletPubkey, forceRebuild: retryCount > 0 }, // Force rebuild on retry
+          user: req.user
+        } as unknown as Request;
+        
+        deployResult = await new Promise<any>((resolve, reject) => {
+          deployToLocalValidator(deployReq, {
+            json: resolve,
+            status: () => ({ json: resolve })
+          } as any, reject);
+        });
+        
+        break; // Success, exit retry loop
+      } catch (deployError: any) {
+        retryCount++;
+        if (retryCount > maxRetries) {
+          throw deployError;
+        }
+        console.log(`[QUICK_DEPLOY] Retry ${retryCount}/${maxRetries} after error:`, deployError.message);
+        
+        // Clean workspace before retry
+        if (containerName) {
+          const rootPath = await getProjectRootPath(projectId);
+          await runCommand(
+            `docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && cargo clean"`,
+            '.', uuidv4(), { skipSuccessUpdate: true }
+          ).catch(() => {}); // Ignore clean errors
+        }
+        
+        // Wait a bit before retry
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
     
     res.json({
       message: 'Quick local deployment completed',
