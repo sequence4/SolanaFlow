@@ -1,14 +1,8 @@
 import express from 'express';
 import {
-  createProject,
-  deleteProject,
-  editProject,
-  getProjectDetails,
   anchorInitProject,
   runProjectCommand,
   createEphemeralKeypair,
-  deployProject,
-  deployProjectEphemeral,
   getProgramStatus,
   installPackages,
   setCluster,
@@ -17,10 +11,7 @@ import {
   compileTsController,
   startContainer,
   getContainerUrl,
-  listProjects,
   getProgramId,
-  relaySignedTxHandler,
-  relayTx,
   getNonceAccount,
   startLocalValidator,
   stopLocalValidator,
@@ -30,9 +21,19 @@ import {
   quickDeployLocal,
   getProjectClusterInfo,
   switchProjectCluster,
+  buildProject,
+  testProject,
+  getBuildArtifact,
+  relaySignedTxHandler,
 } from '../controllers/projectController';
 import { authMiddleware } from '../middleware/authMiddleware';
-import { buildProject, testProject, getBuildArtifact } from '../controllers/projectController';
+import { listProjects } from '../controllers/project/listProject';
+import { createProject } from '../controllers/project/createProject';
+import { deleteProject } from '../controllers/project/deleteProject';
+import { editProject } from '../controllers/project/editProject';
+import { getProjectDetails } from '../controllers/project/getProjectDetails';
+import { deployProjectEphemeral } from '../controllers/deploy/deployProjectEphemeral';
+import { relayTx } from '../controllers/deploy/relayTx';
 
 const router = express.Router();
 
@@ -55,7 +56,6 @@ router.post('/init', authMiddleware, anchorInitProject);
 router.post('/:id/set-cluster', authMiddleware, setCluster);
 router.post('/:id/build', authMiddleware, buildProject);
 router.get('/:id/build-artifact', authMiddleware, getBuildArtifact);
-router.post('/:id/deploy', authMiddleware, deployProject);
 router.post('/:id/deploy-ephemeral', authMiddleware, deployProjectEphemeral);
 router.get('/:id/program-status', authMiddleware, getProgramStatus);
 
