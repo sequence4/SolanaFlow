@@ -30,7 +30,9 @@
       "Bash(cat:*)",
       "Bash(docker build:*)",
       "Bash(pnpm add:*)",
-      "Bash(lsof:*)"
+      "Bash(lsof:*)",
+      "Bash(node:*)",
+      "Bash(npx eslint:*)"
     ],
     "deny": [],
     "ask": [],
