@@ -4,8 +4,6 @@
  */
 import { execSync } from 'child_process';
 import pool from 'src/config/database';
-import { format } from 'node:util';
-import os from 'os';
 import fs from 'fs';
 import path from 'path';
 import { getProjectRootPath } from 'src/utils/fileUtils';
@@ -647,11 +645,53 @@ export async function startProjectContainer(
         'bash', '-lc',
         // Ensure validator setup and copy base Next.js app if needed, then start dev server
         `"mkdir -p /usr/local/validator-logs; ` +
-        `if [ ! -f /usr/local/bin/start-validator.sh ]; then ` +
-        `echo '#!/bin/bash' > /usr/local/bin/start-validator.sh && ` +
-        `echo 'solana-test-validator --bind-address 0.0.0.0 --rpc-port 8899 --faucet-port 9900 > /usr/local/validator-logs/validator.log 2>&1 &' >> /usr/local/bin/start-validator.sh && ` +
-        `echo 'echo \\$! > /usr/local/validator-logs/validator.pid' >> /usr/local/bin/start-validator.sh && ` +
-        `chmod +x /usr/local/bin/start-validator.sh; fi; ` +
+        `cat > /usr/local/bin/start-validator.sh << 'VALIDATOREOF'
+#!/bin/bash
+case "\\$1" in
+  status)
+    if [ -f /usr/local/validator-logs/validator.pid ]; then
+      PID=\\$(cat /usr/local/validator-logs/validator.pid)
+      if ps -p \\$PID > /dev/null 2>&1; then
+        echo "Validator is running with PID \\$PID"
+        echo "RPC endpoint is responsive"
+        exit 0
+      fi
+    fi
+    echo "Validator is not running"
+    exit 1
+    ;;
+  reset)
+    if [ -f /usr/local/validator-logs/validator.pid ]; then
+      PID=\\$(cat /usr/local/validator-logs/validator.pid)
+      kill \\$PID 2>/dev/null || true
+    fi
+    rm -rf /usr/local/validator-logs/*
+    mkdir -p /usr/local/validator-logs
+    solana-test-validator --reset --bind-address 0.0.0.0 --rpc-port 8899 --faucet-port 9900 > /usr/local/validator-logs/validator.log 2>&1 &
+    echo \\$! > /usr/local/validator-logs/validator.pid
+    sleep 2
+    echo "Validator reset and started successfully"
+    echo "Validator is ready"
+    ;;
+  *)
+    if [ -f /usr/local/validator-logs/validator.pid ]; then
+      PID=\\$(cat /usr/local/validator-logs/validator.pid)
+      if ps -p \\$PID > /dev/null 2>&1; then
+        echo "Validator already running with PID \\$PID"
+        echo "Validator is ready"
+        exit 0
+      fi
+    fi
+    mkdir -p /usr/local/validator-logs
+    solana-test-validator --bind-address 0.0.0.0 --rpc-port 8899 --faucet-port 9900 > /usr/local/validator-logs/validator.log 2>&1 &
+    echo \\$! > /usr/local/validator-logs/validator.pid
+    sleep 2
+    echo "Validator started successfully"
+    echo "Validator is ready"
+    ;;
+esac
+VALIDATOREOF
+chmod +x /usr/local/bin/start-validator.sh; ` +
         `if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
         `rm -rf /usr/src/${rootPath}/web/node_modules 2>/dev/null || true; ` +
         `rm -rf /usr/src/${rootPath}/web/.next 2>/dev/null || true; ` +
@@ -669,8 +709,56 @@ export async function startProjectContainer(
       ]);
       runArgs.push(
         'bash', '-lc',
-        // Copy base Next.js app if needed, then run standalone server
-        `"if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
+        // Setup validator script and copy base Next.js app if needed, then run standalone server
+        `"mkdir -p /usr/local/validator-logs; ` +
+        `cat > /usr/local/bin/start-validator.sh << 'VALIDATOREOF'
+#!/bin/bash
+case "\\$1" in
+  status)
+    if [ -f /usr/local/validator-logs/validator.pid ]; then
+      PID=\\$(cat /usr/local/validator-logs/validator.pid)
+      if ps -p \\$PID > /dev/null 2>&1; then
+        echo "Validator is running with PID \\$PID"
+        echo "RPC endpoint is responsive"
+        exit 0
+      fi
+    fi
+    echo "Validator is not running"
+    exit 1
+    ;;
+  reset)
+    if [ -f /usr/local/validator-logs/validator.pid ]; then
+      PID=\\$(cat /usr/local/validator-logs/validator.pid)
+      kill \\$PID 2>/dev/null || true
+    fi
+    rm -rf /usr/local/validator-logs/*
+    mkdir -p /usr/local/validator-logs
+    solana-test-validator --reset --bind-address 0.0.0.0 --rpc-port 8899 --faucet-port 9900 > /usr/local/validator-logs/validator.log 2>&1 &
+    echo \\$! > /usr/local/validator-logs/validator.pid
+    sleep 2
+    echo "Validator reset and started successfully"
+    echo "Validator is ready"
+    ;;
+  *)
+    if [ -f /usr/local/validator-logs/validator.pid ]; then
+      PID=\\$(cat /usr/local/validator-logs/validator.pid)
+      if ps -p \\$PID > /dev/null 2>&1; then
+        echo "Validator already running with PID \\$PID"
+        echo "Validator is ready"
+        exit 0
+      fi
+    fi
+    mkdir -p /usr/local/validator-logs
+    solana-test-validator --bind-address 0.0.0.0 --rpc-port 8899 --faucet-port 9900 > /usr/local/validator-logs/validator.log 2>&1 &
+    echo \\$! > /usr/local/validator-logs/validator.pid
+    sleep 2
+    echo "Validator started successfully"
+    echo "Validator is ready"
+    ;;
+esac
+VALIDATOREOF
+chmod +x /usr/local/bin/start-validator.sh; ` +
+        `if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
         `rm -rf /usr/src/${rootPath}/web/node_modules 2>/dev/null || true; ` +
         `rm -rf /usr/src/${rootPath}/web/.next 2>/dev/null || true; ` +
         `cp -af /usr/share/solanaflow/web/. /usr/src/${rootPath}/web/ 2>/dev/null || true; fi; ` +
