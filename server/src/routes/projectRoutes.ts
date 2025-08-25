@@ -8,7 +8,6 @@ import {
   setCluster,
   installNodeDependencies,
   runCommandController,
-  compileTsController,
   startContainer,
   getContainerUrl,
   getProgramId,
@@ -33,6 +32,7 @@ import { relayTx } from '../controllers/deploy/relayTx';
 import { deployToLocalValidator } from '../controllers/deploy/deployToLocalValidator';
 import { quickDeployLocal } from '../controllers/deploy/quickDeployLocal';
 import { buildProject } from '../controllers/build/buildProject';
+import { compileTsController } from '../controllers/build/compileTsController';
 import { getBuildArtifact } from '../controllers/build/getBuildArtifact';
 
 const router = express.Router();
