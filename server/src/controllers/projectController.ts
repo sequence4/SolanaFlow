@@ -294,32 +294,6 @@ export const setCluster = async (
   }
 };
 
-export const createEphemeralKeypair = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const projectId = req.params.id;
-    
-    // Generate a new ephemeral keypair
-    const ephem = Keypair.generate();
-    const pubkey = ephem.publicKey.toBase58();
-    
-    // Store the keypair in memory only
-    ephemeralKeys.set(pubkey, ephem);
-    //console.log(`[EPHEMERAL] Generated new ephemeral keypair: ${pubkey}`);
-    //console.log(`[EPHEMERAL] Total ephemeral keys now stored: ${ephemeralKeys.size}`);
-   // console.log(`[EPHEMERAL] All stored keys: ${Array.from(ephemeralKeys.keys()).join(', ')}`);
-    
-    // Return only the public key to the client
-    res.status(200).json({
-      message: 'Ephemeral keypair created successfully',
-      pubkey,
-      ephemeralPubkey: pubkey
-    });
-  } catch (error) {
-    console.error('Error creating ephemeral keypair:', error);
-    next(new AppError('Failed to create ephemeral keypair', 500));
-  }
-};
-
 export const getProgramStatus = async (
   req: Request,
   res: Response,
