@@ -326,43 +326,6 @@ export const compileTsController = async (
   }
 };
 
-export const deleteProject = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  const { id } = req.params;
-
-  try {
-    // 1) fetch container name *before* we delete the project
-    const { rows } = await pool.query(
-      `SELECT container_name FROM solanaproject WHERE id = $1`,
-      [id]
-    );
-    const container = rows[0]?.container_name;
-
-    // 2) delete the project row
-    const { rowCount } = await pool.query(
-      `DELETE FROM solanaproject WHERE id = $1`,
-      [id]
-    );
-    if (rowCount === 0) return next(new AppError('Not found', 404));
-
-    // 3) queue container for cleanup (if we had one)
-    if (container) {
-      await pool.query(
-        `INSERT INTO cleanup_queue (container_name, project_id)
-         VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-        [container, id]
-      );
-    }
-
-    res.status(204).end();
-  } catch (err) {
-    next(err);
-  }
-};
-
 export const anchorInitProject = async (
   req: Request,
   res: Response,
