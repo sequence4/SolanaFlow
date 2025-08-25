@@ -3,7 +3,6 @@ import {
   anchorInitProject,
   runProjectCommand,
   installPackages,
-  setCluster,
   installNodeDependencies,
   runCommandController,
   startContainer,
@@ -34,6 +33,7 @@ import { getNonceAccount } from '../controllers/blockchain/getNonceAccount';
 import { createEphemeralKeypair } from '../controllers/blockchain/createEphemeralKeypair';
 import { getProgramStatus } from '../controllers/blockchain/getProgramStatus';
 import { getProgramId } from '../controllers/blockchain/getProgramId';
+import { setCluster } from '../controllers/blockchain/setCluster';
 
 const router = express.Router();
 

@@ -6,13 +6,10 @@ import { getProjectRootPath } from '../utils/fileUtils';
 import { startProjectContainer } from '../utils/container';
 import { runCommand } from '../utils/command-execution/runCommand';
 import { startAnchorInitTask } from '../utils/anchor/startAnchorInitTask';
-import { startAnchorTestTask } from '../utils/anchor/startAnchorTestTask';
 import { startCustomCommandTask } from '../utils/tasks/startCustomCommandTask';
 import { startInstallPackagesTask } from '../utils/project/startInstallPackagesTask';
-import { getBuildArtifactTask } from '../utils/anchor/getBuildArtefactTask';
 import { startSetClusterTask } from '../utils/anchor/startSetClusterTask';
 import { startInstallNodeDependenciesTask } from '../utils/project/startInstallNodeDependenciesTask';
-import { compileTs } from '../utils/compilation/compileTs';
 import { getContainerName } from '../utils/container/getContainerName';
 
 const ephemeralKeys = new Map<string, Keypair>();
@@ -260,37 +257,6 @@ export const anchorInitProject = async (
     });
   } catch (error) {
     return next(error);
-  }
-};
-
-export const setCluster = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  const { id } = req.params;
-  const userId = req.user?.id ?? 'mock-user';
-  // org_id checks temporarily disabled until auth lands
-
-  try {
-    const projectCheck = await pool.query(
-      'SELECT * FROM solanaproject WHERE id = $1',
-      [id]
-    );
-
-    if (projectCheck.rows.length === 0) {
-      return next(new AppError('Project not found or no permission to access it', 404));
-    }
-
-    const taskId = await startSetClusterTask(id, userId);
-
-    res.status(200).json({
-      message: 'Anchor config set cluster devnet process started',
-      taskId,
-    });
-  } catch (error) {
-    console.error('Error in setCluster controller:', error);
-    next(new AppError('Failed to set cluster devnet', 500));
   }
 };
 
