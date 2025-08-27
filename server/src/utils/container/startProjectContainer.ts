@@ -675,8 +675,11 @@ export async function startProjectContainer(
       'All volumes and environment variables configured'
     ]);
 
-    const dockerCmd = runArgs.slice(0, -2).join(' ') + ` '${runArgs[runArgs.length - 1]}'`;
-    timed(dockerCmd, 'docker-run');
+    const { spawnSync } = require('child_process');
+    console.time('[docker-run]');
+    const result = spawnSync('docker', runArgs.slice(1), { stdio: 'inherit' });
+    console.timeEnd('[docker-run]');
+    if (result.status !== 0) throw new Error(`Docker run failed with status ${result.status}`);
 
     sendContainerSetupProgress('env-container-config', 'Container Configuration', 'Container started, setting up tools...', 80, [
       'Container is now running successfully',
