@@ -331,6 +331,24 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
     if (network === 'mainnet') return; // Mainnet is disabled
     
     try {
+      // Start local validator first if switching to local
+      if (network === 'local' && projectContext.id) {
+        try {
+          toast.info('Starting local validator...');
+          // Start validator first
+          await projectApi.startLocalValidator(projectContext.id, { 
+            reset: false 
+          });
+          // Wait a moment for it to initialize
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          toast.success('Local validator started');
+        } catch (error) {
+          console.error('Failed to start validator:', error);
+          // Continue with network switch even if validator fails
+          toast.warning('Local validator may not be running');
+        }
+      }
+      
       // Update project context with new network
       setProjectContext(prev => ({ ...prev, deployNetwork: network }));
       
