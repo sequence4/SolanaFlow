@@ -20,64 +20,82 @@ async function ensureValidatorRunning(containerName: string): Promise<void> {
   
   await new Promise(resolve => setTimeout(resolve, 2000));
   
-  // Start validator directly using detached mode (-d flag)
-  const startCmd = `docker exec -d ${containerName} solana-test-validator --reset --quiet`;
+  // Start validator using sh -c to ensure it runs in background
+  const startCmd = `docker exec ${containerName} sh -c "solana-test-validator --reset --quiet > /dev/null 2>&1 & echo 'Started'"`;
   
   try {
-    await runCommand(startCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-    console.log('[LOCAL_DEPLOY] Validator start command issued');
+    const output = await runCommand(startCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    console.log('[LOCAL_DEPLOY] Start output:', output);
   } catch (err) {
-    console.error('[LOCAL_DEPLOY] Failed to issue start command:', err);
-    // Try alternative start method
+    console.error('[LOCAL_DEPLOY] Start failed:', err);
+    // Try alternative method
     try {
-      const altStartCmd = `docker exec ${containerName} bash -c "nohup solana-test-validator --reset --quiet > /dev/null 2>&1 &"`;
-      await runCommand(altStartCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-      console.log('[LOCAL_DEPLOY] Used alternative start method');
+      const altCmd = `docker exec ${containerName} sh -c "nohup solana-test-validator --reset --quiet > /tmp/validator.log 2>&1 & echo $!"`;
+      const pid = await runCommand(altCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+      console.log('[LOCAL_DEPLOY] Started validator with PID:', pid);
     } catch (altErr) {
       throw new Error(`Failed to start validator: ${err}`);
     }
+  }
+  
+  // Give validator time to initialize
+  await new Promise(resolve => setTimeout(resolve, 5000));
+  
+  // Check if validator is actually running
+  const psCmd = `docker exec ${containerName} ps aux | grep solana-test-validator | grep -v grep`;
+  try {
+    const psOutput = await runCommand(psCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    console.log('[LOCAL_DEPLOY] Validator process:', psOutput.substring(0, 200));
+  } catch {
+    console.error('[LOCAL_DEPLOY] No validator process found');
+    throw new Error('Validator failed to start - no process found');
   }
   
   // Wait for validator to be ready
   console.log('[LOCAL_DEPLOY] Waiting for validator to be ready...');
   for (let i = 1; i <= 30; i++) {
     try {
-      const checkCmd = `docker exec ${containerName} solana --url http://127.0.0.1:8899 cluster-version`;
-      const result = await runCommand(checkCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+      // Try direct curl to health endpoint
+      const curlCmd = `docker exec ${containerName} curl -s http://127.0.0.1:8899/health`;
+      const result = await runCommand(curlCmd, '.', uuidv4(), { skipSuccessUpdate: true });
       
-      if (result && result.includes('solana-core')) {
+      if (result && result.includes('ok')) {
         console.log('[LOCAL_DEPLOY] Validator is ready!');
-        
-        // Double-check with curl
-        const curlCheck = `docker exec ${containerName} curl -s -X POST http://127.0.0.1:8899 -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}'`;
-        try {
-          const curlResult = await runCommand(curlCheck, '.', uuidv4(), { skipSuccessUpdate: true });
-          if (curlResult.includes('result')) {
-            console.log('[LOCAL_DEPLOY] Validator confirmed healthy via JSON-RPC');
-            return;
-          }
-        } catch {
-          // Continue if curl fails, cluster-version was successful
-        }
-        
         return;
       }
     } catch {
-      // Not ready yet, continue waiting
+      // Try JSON-RPC health check
+      try {
+        const rpcCmd = `docker exec ${containerName} curl -s -X POST http://127.0.0.1:8899 -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}'`;
+        const rpcResult = await runCommand(rpcCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+        if (rpcResult && rpcResult.includes('result')) {
+          console.log('[LOCAL_DEPLOY] Validator is ready (via RPC)!');
+          return;
+        }
+      } catch {
+        // Try solana CLI as last resort
+        try {
+          const checkCmd = `docker exec ${containerName} solana --url http://127.0.0.1:8899 balance 11111111111111111111111111111111`;
+          await runCommand(checkCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+          console.log('[LOCAL_DEPLOY] Validator is ready (via CLI)!');
+          return;
+        } catch {
+          // Not ready yet
+        }
+      }
     }
     
-    if (i % 10 === 0) {
+    if (i % 5 === 0) {
       console.log(`[LOCAL_DEPLOY] Still waiting... (${i}/30)`);
       
-      // Check if process is still running
-      const psCheck = `docker exec ${containerName} pgrep -f solana-test-validator || echo "not-running"`;
-      const psResult = await runCommand(psCheck, '.', uuidv4(), { skipSuccessUpdate: true });
-      
-      if (psResult.trim() === "not-running") {
+      // Check if process is still alive
+      const aliveCheck = `docker exec ${containerName} pgrep -f solana-test-validator || echo "dead"`;
+      const aliveResult = await runCommand(aliveCheck, '.', uuidv4(), { skipSuccessUpdate: true });
+      if (aliveResult.trim() === "dead") {
         console.error('[LOCAL_DEPLOY] Validator process died, attempting restart...');
-        // Try to restart
+        const restartCmd = `docker exec ${containerName} sh -c "solana-test-validator --reset --quiet > /dev/null 2>&1 & echo 'Restarted'"`;
         try {
-          await runCommand(`docker exec -d ${containerName} solana-test-validator --reset --quiet`, '.', uuidv4(), { skipSuccessUpdate: true });
+          await runCommand(restartCmd, '.', uuidv4(), { skipSuccessUpdate: true });
         } catch {
           // Continue waiting
         }
@@ -87,11 +105,20 @@ async function ensureValidatorRunning(containerName: string): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
   
-  // Last attempt to check logs
+  // Debug: check what's listening on port 8899
   try {
-    const logsCmd = `docker exec ${containerName} bash -c "ls -la /tmp/*.log 2>/dev/null || echo 'No logs found'"`;
-    const logs = await runCommand(logsCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-    console.error('[LOCAL_DEPLOY] Log files:', logs);
+    const netstatCmd = `docker exec ${containerName} netstat -tlnp 2>/dev/null | grep 8899 || echo "Nothing on 8899"`;
+    const netstatOutput = await runCommand(netstatCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    console.error('[LOCAL_DEPLOY] Port 8899 status:', netstatOutput);
+  } catch {
+    // Netstat might not be available
+  }
+  
+  // Check validator log if it exists
+  try {
+    const logCmd = `docker exec ${containerName} tail -20 /tmp/validator.log 2>/dev/null || echo "No log"`;
+    const logOutput = await runCommand(logCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    console.error('[LOCAL_DEPLOY] Validator log tail:', logOutput);
   } catch {
     // Ignore
   }
