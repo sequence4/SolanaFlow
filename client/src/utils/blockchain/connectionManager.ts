@@ -106,12 +106,19 @@ class ConnectionManager {
     
     // Special handling for local cluster
     if (cluster === 'local') {
-      // First check if validator is actually running
-      const isRunning = await this.isLocalValidatorRunning();
-      if (!isRunning) {
-        //console.warn('Local validator is not running. Please start it first.');
-        // Don't switch if local validator isn't running
-        return false;
+      console.log(`[ConnectionManager] Switching to local cluster with port ${this.localValidatorPort}`);
+      // Skip validator check if we're still on default port (port not set yet)
+      // The port will be set by ChatHeader before calling this
+      if (this.localValidatorPort !== '8899') {
+        // Only check if validator is running if we have a custom port set
+        const isRunning = await this.isLocalValidatorRunning();
+        if (!isRunning) {
+          console.warn('Local validator is not accessible on port', this.localValidatorPort);
+          // Don't switch if local validator isn't running
+          return false;
+        }
+      } else {
+        console.log('[ConnectionManager] Skipping validator check - using default port');
       }
     }
     

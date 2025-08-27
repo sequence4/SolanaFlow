@@ -331,20 +331,30 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
     if (network === 'mainnet') return; // Mainnet is disabled
     
     try {
-      // Start local validator first if switching to local
+      // Handle local network setup first
       if (network === 'local' && projectContext.id) {
+        // First, get the ports before any connection attempts
+        try {
+          const portsResponse = await projectApi.getProjectPorts(projectContext.id);
+          if (portsResponse.data?.rpc) {
+            console.log(`[ChatHeader] Setting port to ${portsResponse.data.rpc} before validator start`);
+            connectionManager.setLocalValidatorPort(portsResponse.data.rpc.toString());
+          }
+        } catch (error) {
+          console.error('Failed to get project ports:', error);
+        }
+        
+        // Now start the validator
         try {
           toast.info('Starting local validator...');
-          // Start validator and get the actual ports
           const response = await projectApi.startLocalValidator(projectContext.id, { 
             reset: false 
           });
           
-          // Extract port from the RPC URL if available
+          // Update port again if returned by start command
           if (response.data?.rpcUrl) {
             const url = new URL(response.data.rpcUrl);
             const rpcPort = url.port || '8899';
-            // Update connection manager with the actual port
             connectionManager.setLocalValidatorPort(rpcPort);
           }
           
@@ -353,7 +363,6 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
           toast.success('Local validator started');
         } catch (error) {
           console.error('Failed to start validator:', error);
-          // Continue with network switch even if validator fails
           toast.warning('Local validator may not be running');
         }
       }
@@ -361,7 +370,7 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
       // Update project context with new network
       setProjectContext(prev => ({ ...prev, deployNetwork: network }));
       
-      // Update connection manager
+      // Update connection manager - it will now use the correct port
       const switched = await connectionManager.switchCluster(network);
       
       if (switched) {
@@ -370,6 +379,9 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
         }
         
         toast.success(`Switched to ${network === 'local' ? 'Local Validator' : 'Devnet'}`);
+      } else if (network === 'local') {
+        // If switch failed for local, show more helpful error
+        toast.error('Failed to connect to local validator. Please ensure it is running.');
       }
     } catch (error) {
       console.error('Cluster switch error:', error);
