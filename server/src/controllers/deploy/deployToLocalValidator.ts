@@ -10,138 +10,93 @@ import pool from "src/config/database";
  * Helper function to ensure validator is running and accessible
  */
 async function ensureValidatorRunning(containerName: string): Promise<void> {
-  const maxAttempts = 3;
+  console.log('[LOCAL_DEPLOY] Starting validator...');
   
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    console.log(`[LOCAL_DEPLOY] Checking validator health (attempt ${attempt}/${maxAttempts})...`);
-    
-    // Check if validator process exists
-    const psCmd = `docker exec ${containerName} pgrep -f solana-test-validator || echo "not-running"`;
-    const psResult = await runCommand(psCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-    
-    if (psResult.trim() === "not-running") {
-      console.log('[LOCAL_DEPLOY] Validator not running, starting it...');
-      
-      // Start validator with better error handling and diagnostics
-      const startCmd = `docker exec ${containerName} bash -c "
-        # First, verify validator binary exists and is executable
-        if ! command -v solana-test-validator &> /dev/null; then
-          echo 'ERROR: solana-test-validator not found in PATH'
-          echo 'PATH is: '\$PATH
-          exit 1
-        fi
-        
-        # Show version for debugging
-        echo 'Checking Solana installation...'
-        solana --version 2>&1 || echo 'Warning: solana CLI not available'
-        solana-test-validator --version 2>&1 || echo 'Warning: validator version check failed'
-        
-        # Kill any existing validator processes
-        pkill -f solana-test-validator || true
-        sleep 1
-        
-        # Clean up any stale ledger that might be corrupted
-        rm -rf /tmp/test-ledger 2>/dev/null || true
-        rm -rf ~/.config/solana/test-ledger 2>/dev/null || true
-        
-        # Start validator with minimal options and explicit ledger path
-        echo 'Starting validator...'
-        nohup solana-test-validator \\
-          --reset \\
-          --ledger /tmp/test-ledger \\
-          --bind-address 0.0.0.0 \\
-          --rpc-port 8899 \\
-          --faucet-port 9900 \\
-          --quiet \\
-          > /tmp/validator.log 2>&1 &
-        
-        VALIDATOR_PID=\$!
-        echo 'Started validator with PID: '\$VALIDATOR_PID
-        
-        # Give it a moment to start
-        sleep 2
-        
-        # Check if process is still running
-        if ! kill -0 \$VALIDATOR_PID 2>/dev/null; then
-          echo 'ERROR: Validator process died immediately'
-          echo 'Last 20 lines of log:'
-          tail -20 /tmp/validator.log 2>/dev/null || echo 'No log file found'
-          exit 1
-        fi
-        
-        # Wait for validator to be accessible
-        echo 'Waiting for validator to become accessible...'
-        for i in {1..30}; do
-          if curl -s -f -X POST http://127.0.0.1:8899 \\
-               -H 'Content-Type: application/json' \\
-               -d '{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"id\\\":1,\\\"method\\\":\\\"getHealth\\\"}' &>/dev/null; then
-            echo 'Validator is ready and accepting connections!'
-            exit 0
-          fi
-          
-          # Check if process is still running
-          if ! kill -0 \$VALIDATOR_PID 2>/dev/null; then
-            echo 'ERROR: Validator process died while waiting'
-            echo 'Last 20 lines of log:'
-            tail -20 /tmp/validator.log 2>/dev/null
-            exit 1
-          fi
-          
-          if [ \$i -eq 10 ] || [ \$i -eq 20 ]; then
-            echo \\\"Still waiting... (attempt \$i/30)\\\"
-          fi
-          sleep 1
-        done
-        
-        # If we get here, validator is running but not accessible
-        echo 'ERROR: Validator started but not accessible after 30 seconds'
-        echo 'Process still running:' 
-        ps aux | grep solana-test-validator | grep -v grep
-        echo 'Last 30 lines of validator log:'
-        tail -30 /tmp/validator.log 2>/dev/null || echo 'No log file'
-        exit 1
-      "`;
-      
-      try {
-        const validatorOutput = await runCommand(startCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-        console.log('[LOCAL_DEPLOY] Validator output:', validatorOutput);
-      } catch (err) {
-        console.error('[LOCAL_DEPLOY] Failed to start validator:', err);
-        if (attempt === maxAttempts) {
-          throw new Error(`Validator failed to start after ${maxAttempts} attempts. Last error: ${err}`);
-        }
-        // Wait before retry
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        continue;
-      }
-    }
-    
-    // Test connection using curl instead of solana CLI for better reliability
-    const testCmd = `docker exec ${containerName} bash -c "
-      curl -s -X POST http://127.0.0.1:8899 \\
-        -H 'Content-Type: application/json' \\
-        -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getHealth\"}' 2>&1 || echo 'FAILED'
-    "`;
-    
+  // Kill any existing validator
+  await runCommand(
+    `docker exec ${containerName} pkill -f solana-test-validator || true`,
+    '.', uuidv4(), { skipSuccessUpdate: true }
+  );
+  
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
+  // Start validator directly using detached mode (-d flag)
+  const startCmd = `docker exec -d ${containerName} solana-test-validator --reset --quiet`;
+  
+  try {
+    await runCommand(startCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    console.log('[LOCAL_DEPLOY] Validator start command issued');
+  } catch (err) {
+    console.error('[LOCAL_DEPLOY] Failed to issue start command:', err);
+    // Try alternative start method
     try {
-      const result = await runCommand(testCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-      if (!result.includes('FAILED') && result.includes('result')) {
-        console.log('[LOCAL_DEPLOY] Validator is healthy and responding to RPC calls');
-        return;
-      } else {
-        throw new Error(`Health check failed: ${result}`);
-      }
-    } catch (err) {
-      console.warn(`[LOCAL_DEPLOY] Validator health check failed on attempt ${attempt}:`, err);
-    }
-    
-    if (attempt < maxAttempts) {
-      console.log('[LOCAL_DEPLOY] Waiting before retry...');
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      const altStartCmd = `docker exec ${containerName} bash -c "nohup solana-test-validator --reset --quiet > /dev/null 2>&1 &"`;
+      await runCommand(altStartCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+      console.log('[LOCAL_DEPLOY] Used alternative start method');
+    } catch (altErr) {
+      throw new Error(`Failed to start validator: ${err}`);
     }
   }
   
-  throw new Error('Failed to start validator after multiple attempts');
+  // Wait for validator to be ready
+  console.log('[LOCAL_DEPLOY] Waiting for validator to be ready...');
+  for (let i = 1; i <= 30; i++) {
+    try {
+      const checkCmd = `docker exec ${containerName} solana --url http://127.0.0.1:8899 cluster-version`;
+      const result = await runCommand(checkCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+      
+      if (result && result.includes('solana-core')) {
+        console.log('[LOCAL_DEPLOY] Validator is ready!');
+        
+        // Double-check with curl
+        const curlCheck = `docker exec ${containerName} curl -s -X POST http://127.0.0.1:8899 -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}'`;
+        try {
+          const curlResult = await runCommand(curlCheck, '.', uuidv4(), { skipSuccessUpdate: true });
+          if (curlResult.includes('result')) {
+            console.log('[LOCAL_DEPLOY] Validator confirmed healthy via JSON-RPC');
+            return;
+          }
+        } catch {
+          // Continue if curl fails, cluster-version was successful
+        }
+        
+        return;
+      }
+    } catch {
+      // Not ready yet, continue waiting
+    }
+    
+    if (i % 10 === 0) {
+      console.log(`[LOCAL_DEPLOY] Still waiting... (${i}/30)`);
+      
+      // Check if process is still running
+      const psCheck = `docker exec ${containerName} pgrep -f solana-test-validator || echo "not-running"`;
+      const psResult = await runCommand(psCheck, '.', uuidv4(), { skipSuccessUpdate: true });
+      
+      if (psResult.trim() === "not-running") {
+        console.error('[LOCAL_DEPLOY] Validator process died, attempting restart...');
+        // Try to restart
+        try {
+          await runCommand(`docker exec -d ${containerName} solana-test-validator --reset --quiet`, '.', uuidv4(), { skipSuccessUpdate: true });
+        } catch {
+          // Continue waiting
+        }
+      }
+    }
+    
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+  
+  // Last attempt to check logs
+  try {
+    const logsCmd = `docker exec ${containerName} bash -c "ls -la /tmp/*.log 2>/dev/null || echo 'No logs found'"`;
+    const logs = await runCommand(logsCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    console.error('[LOCAL_DEPLOY] Log files:', logs);
+  } catch {
+    // Ignore
+  }
+  
+  throw new Error('Validator failed to become accessible after 30 seconds');
 }
 
 
