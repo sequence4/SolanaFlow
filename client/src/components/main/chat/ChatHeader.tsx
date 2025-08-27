@@ -328,68 +328,84 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
   }, [projectContext, setProjectContext]);
 
   const handleNetworkChange = async (network: 'local' | 'devnet' | 'mainnet') => {
-    if (network === 'mainnet') return; // Mainnet is disabled
+    if (network === 'mainnet') return;
     
     try {
-      // Handle local network setup first
+      // Handle local network setup
       if (network === 'local' && projectContext.id) {
-        // First, get the ports before any connection attempts
+        // First, try to get existing ports
+        let actualPort = '8899'; // Default fallback
+        
         try {
           const portsResponse = await projectApi.getProjectPorts(projectContext.id);
+          console.log('[ChatHeader] Ports response:', portsResponse);
+          
           if (portsResponse.data?.rpc) {
-            const port = portsResponse.data.rpc.toString();
-            console.log(`[ChatHeader] Setting port to ${port} before validator start`);
-            connectionManager.setLocalValidatorPort(port);
-            
-            // Double-check the port was set
-            console.log(`[ChatHeader] Port set verification: ${connectionManager.getLocalValidatorPort()}`);
+            actualPort = portsResponse.data.rpc.toString();
+            console.log(`[ChatHeader] Using existing port: ${actualPort}`);
           } else {
-            console.error('[ChatHeader] No RPC port in response:', portsResponse);
+            console.log('[ChatHeader] No custom ports found, will start validator on default');
           }
         } catch (error) {
-          console.error('[ChatHeader] Failed to get project ports:', error);
-          // If we can't get ports, we can't connect to local
-          toast.error('Failed to get container ports. Please ensure the project container is running.');
-          return;
+          console.log('[ChatHeader] Could not get ports, will use defaults');
         }
         
-        // Now start the validator
+        // Set the port BEFORE starting validator
+        connectionManager.setLocalValidatorPort(actualPort);
+        
+        // Start/verify validator
         try {
-          toast.info('Starting local validator...');
+          toast.info('Starting local validator...', {
+            duration: Infinity,
+            id: 'validator-starting'
+          });
+          
           const response = await projectApi.startLocalValidator(projectContext.id, { 
             reset: false 
           });
           
-          // Update port again if returned by start command
+          toast.dismiss('validator-starting');
+          
+          // Update port if different from response
           if (response.data?.rpcUrl) {
             const url = new URL(response.data.rpcUrl);
-            const rpcPort = url.port || '8899';
-            connectionManager.setLocalValidatorPort(rpcPort);
+            const rpcPort = url.port || actualPort;
+            if (rpcPort !== actualPort) {
+              console.log(`[ChatHeader] Updating port from validator response: ${rpcPort}`);
+              connectionManager.setLocalValidatorPort(rpcPort);
+              actualPort = rpcPort;
+            }
           }
           
-          // Wait a moment for it to initialize
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          toast.success('Local validator started');
+          if (response.data?.validatorRunning) {
+            // Give validator time to fully initialize
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            toast.success('Local validator started');
+          } else {
+            toast.warning('Local validator may not be running');
+          }
         } catch (error) {
+          toast.dismiss('validator-starting');
           console.error('Failed to start validator:', error);
           toast.warning('Local validator may not be running');
         }
+        
+        // Clear connection cache before switching
+        connectionManager.clearConnectionCache();
       }
       
-      // Update project context with new network
+      // Update project context
       setProjectContext(prev => ({ ...prev, deployNetwork: network }));
       
-      // Update connection manager - it will now use the correct port
+      // Switch cluster
       const switched = await connectionManager.switchCluster(network);
       
       if (switched) {
         if (projectContext.id) {
           await projectApi.switchCluster(projectContext.id, { cluster: network });
         }
-        
         toast.success(`Switched to ${network === 'local' ? 'Local Validator' : 'Devnet'}`);
       } else if (network === 'local') {
-        // If switch failed for local, show more helpful error
         toast.error('Failed to connect to local validator. Please ensure it is running.');
       }
     } catch (error) {

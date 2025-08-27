@@ -38,6 +38,7 @@ export const startLocalValidator = async (
         res.json({ 
           message: 'Local validator already running',
           status: 'already-running',
+          validatorRunning: true,
           rpcUrl: `http://localhost:${ports.rpc}`,
           faucetUrl: `http://localhost:${ports.faucet}`,
           websocketUrl: `ws://localhost:${ports.ws}`
@@ -87,6 +88,7 @@ export const startLocalValidator = async (
       res.json({
         message: reset ? 'Local validator reset and started' : 'Local validator started',
         status: 'started',
+        validatorRunning: true,
         rpcUrl: `http://localhost:${ports.rpc}`,
         faucetUrl: `http://localhost:${ports.faucet}`,
         websocketUrl: `ws://localhost:${ports.ws}`,

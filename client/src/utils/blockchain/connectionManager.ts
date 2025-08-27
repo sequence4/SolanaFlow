@@ -105,6 +105,11 @@ class ConnectionManager {
     return CLUSTER_CONFIGS[this.currentCluster];
   }
   
+  clearConnectionCache(): void {
+    console.log('[ConnectionManager] Clearing connection cache');
+    this.connections.clear();
+  }
+  
   async switchCluster(cluster: ClusterType): Promise<boolean> {
     const config = CLUSTER_CONFIGS[cluster];
     if (!config) {

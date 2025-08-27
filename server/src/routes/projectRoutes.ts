@@ -97,8 +97,11 @@ router.get('/:id/ports', guard, async (req, res) => {
     const ports = result.rows[0]?.ports 
       ? JSON.parse(result.rows[0].ports)
       : { rpc: 28899, ws: 28900, faucet: 28901 };
-      
-    res.json({ ports });
+    
+    console.log(`[GET_PORTS] Returning ports for project ${id}:`, ports);
+    
+    // Return ports directly, not wrapped in { ports }
+    res.json(ports);
   } catch (error) {
     console.error('[projectRoutes] Error fetching ports:', error);
     res.status(500).json({ error: 'Failed to fetch project ports' });
