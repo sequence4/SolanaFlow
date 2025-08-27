@@ -115,19 +115,9 @@ class ConnectionManager {
     // Special handling for local cluster
     if (cluster === 'local') {
       console.log(`[ConnectionManager] Switching to local cluster with port ${this.localValidatorPort}`);
-      // Skip validator check if we're still on default port (port not set yet)
-      // The port will be set by ChatHeader before calling this
-      if (this.localValidatorPort !== '8899') {
-        // Only check if validator is running if we have a custom port set
-        const isRunning = await this.isLocalValidatorRunning();
-        if (!isRunning) {
-          console.warn('Local validator is not accessible on port', this.localValidatorPort);
-          // Don't switch if local validator isn't running
-          return false;
-        }
-      } else {
-        console.log('[ConnectionManager] Skipping validator check - using default port');
-      }
+      // Always skip the validator check here - it will be checked with the test connection below
+      // The isLocalValidatorRunning check uses the wrong port timing
+      console.log('[ConnectionManager] Skipping pre-check, will verify with test connection');
     }
     
     try {
@@ -136,10 +126,12 @@ class ConnectionManager {
         `http://localhost:${this.localValidatorPort}` : 
         config.url;
       
+      console.log(`[ConnectionManager] Testing connection to ${cluster} at ${connectionUrl}`);
+      
       // Test connection with timeout
       const testConn = new Connection(connectionUrl, {
         commitment: 'confirmed',
-        wsEndpoint: config.websocket,
+        wsEndpoint: cluster === 'local' ? `ws://localhost:${parseInt(this.localValidatorPort) + 1}` : config.websocket,
         disableRetryOnRateLimit: true
       });
       

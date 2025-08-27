@@ -337,11 +337,20 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
         try {
           const portsResponse = await projectApi.getProjectPorts(projectContext.id);
           if (portsResponse.data?.rpc) {
-            console.log(`[ChatHeader] Setting port to ${portsResponse.data.rpc} before validator start`);
-            connectionManager.setLocalValidatorPort(portsResponse.data.rpc.toString());
+            const port = portsResponse.data.rpc.toString();
+            console.log(`[ChatHeader] Setting port to ${port} before validator start`);
+            connectionManager.setLocalValidatorPort(port);
+            
+            // Double-check the port was set
+            console.log(`[ChatHeader] Port set verification: ${connectionManager.getLocalValidatorPort()}`);
+          } else {
+            console.error('[ChatHeader] No RPC port in response:', portsResponse);
           }
         } catch (error) {
-          console.error('Failed to get project ports:', error);
+          console.error('[ChatHeader] Failed to get project ports:', error);
+          // If we can't get ports, we can't connect to local
+          toast.error('Failed to get container ports. Please ensure the project container is running.');
+          return;
         }
         
         // Now start the validator
