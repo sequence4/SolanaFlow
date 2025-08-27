@@ -96,6 +96,10 @@ export const deployToLocalValidator = async (
           cd ${programPath} &&
           # Clean up any previous build artifacts
           cargo clean 2>/dev/null || true &&
+          # Remove existing symlinks that may conflict with anchor build
+          rm -f target/deploy 2>/dev/null || true &&
+          rm -f target/idl 2>/dev/null || true &&
+          mkdir -p target &&
           # Set proper permissions
           chmod -R 755 . &&
           # Build with verbose output
