@@ -18,10 +18,10 @@ export const deployToLocalValidator = async (
   ): Promise<void> => {
     try {
       const { id: projectId } = req.params;
-      const { forceRebuild = false, walletPubkey } = req.body;
+      const { walletPubkey } = req.body;
       
       console.log(`[LOCAL_DEPLOY] Starting local deployment for project ${projectId}`);
-      console.log(`[LOCAL_DEPLOY] Force rebuild: ${forceRebuild}, Wallet: ${walletPubkey || 'none'}`);
+      console.log(`[LOCAL_DEPLOY] Wallet: ${walletPubkey || 'none'}`);
       
       const containerName = await getContainerName(projectId);
       if (!containerName) {
@@ -47,115 +47,56 @@ export const deployToLocalValidator = async (
         await new Promise(resolve => setTimeout(resolve, 3000));
       }
       
-      // Step 2: Check if program needs building
+      // Step 2: Get program details from the already-built artifacts
       const rootPath = await getProjectRootPath(projectId);
       const programPath = `/usr/src/${rootPath}`;
       
-      // Find the program name from Anchor.toml
+      // Get the program name from Anchor.toml
       const getProgramNameCmd = `docker exec ${containerName} bash -c "cd ${programPath} && grep '^\\[programs.localnet\\]' -A 1 Anchor.toml | grep -oP '^\\w+' | tail -1"`;
       const programName = (await runCommand(getProgramNameCmd, '.', uuidv4(), { skipSuccessUpdate: true }))
         .trim() || 'solanaflow';
       
       console.log(`[LOCAL_DEPLOY] Program name: ${programName}`);
       
+      // The artifacts are in the warm cache location
       const soFile = `/usr/src/target/deploy/${programName}.so`;
       const keypairFile = `/usr/src/target/deploy/${programName}-keypair.json`;
       
-      // Check if .so file exists or if rebuild is forced
+      // Verify the .so file exists (it should from the build pipeline)
       const soExistsCmd = `docker exec ${containerName} test -f ${soFile} && echo "exists" || echo "missing"`;
       const soExists = await runCommand(soExistsCmd, '.', uuidv4(), { skipSuccessUpdate: true });
       
-      if (soExists.trim() === 'missing' || forceRebuild) {
-        console.log('[LOCAL_DEPLOY] Building program...');
-        
-        // Fix workspace configuration before building
-        const fixWorkspaceCmd = `docker exec ${containerName} bash -c "
-          cd ${programPath} &&
-          # Ensure Cargo.toml has correct workspace members
-          if [ -f Cargo.toml ]; then
-            # Check if programs directory exists
-            if [ -d programs ]; then
-              # Add all program directories to workspace
-              for dir in programs/*/; do
-                if [ -f \\"\$dir/Cargo.toml\\" ]; then
-                  dirname=\\$(basename \\"\$dir\\")
-                  if ! grep -q \\\"programs/\$dirname\\\" Cargo.toml; then
-                    sed -i '/members = \\[/a\\\\    \\\"programs/'\$dirname'\\\",' Cargo.toml
-                  fi
-                fi
-              done
-            fi
-          fi
-        "`;
-        
-        await runCommand(fixWorkspaceCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-        console.log('[LOCAL_DEPLOY] Fixed workspace configuration');
-        
-        // Build the program with better error handling
-        const buildCmd = `docker exec ${containerName} bash -lc "
-          cd ${programPath} &&
-          # Clean up any previous build artifacts
-          cargo clean 2>/dev/null || true &&
-          # Remove existing symlinks that may conflict with anchor build
-          rm -f target/deploy 2>/dev/null || true &&
-          rm -f target/idl 2>/dev/null || true &&
-          mkdir -p target &&
-          # Set proper permissions
-          chmod -R 755 . &&
-          # Build WITHOUT --verifiable flag (avoids Docker-in-Docker)
-          anchor build 2>&1
-        "`;
-        
-        let buildOutput: string;
-        try {
-          buildOutput = await runCommand(buildCmd, '.', projectId);
-        } catch (buildError: any) {
-          console.error('[LOCAL_DEPLOY] Build command failed:', buildError);
-          // Extract meaningful error from output
-          const errorMsg = buildError.message || buildError.toString();
-          const relevantError = errorMsg.split('\n').find((line: string) => 
-            line.includes('error') || line.includes('Error') || line.includes('failed')
-          ) || errorMsg.substring(0, 500);
-          throw new Error(`Build failed: ${relevantError}`);
-        }
-        
-        // Check for success indicators
-        if (!buildOutput.includes('Finished') && 
-            !buildOutput.includes('success') && 
-            !buildOutput.includes('Program Id:')) {
-          // Extract the actual error from build output
-          const lines = buildOutput.split('\n');
-          const errorLine = lines.find(line => 
-            line.includes('error:') || line.includes('Error:')
-          ) || 'Unknown build error';
-          throw new Error(`Build failed: ${errorLine}`);
-        }
-        
-        console.log('[LOCAL_DEPLOY] Build completed successfully');
-      } else {
-        console.log('[LOCAL_DEPLOY] Using existing build artifact');
+      if (soExists.trim() === 'missing') {
+        throw new Error('Program artifact not found. Please build the project first.');
       }
       
-      // Step 3: Get or generate program keypair
+      console.log('[LOCAL_DEPLOY] Using existing build artifact from pipeline');
+      
+      // Step 3: Get program ID from database or keypair
       let programId: string;
       
-      const keypairExistsCmd = `docker exec ${containerName} test -f ${keypairFile} && echo "exists" || echo "missing"`;
-      const keypairExists = await runCommand(keypairExistsCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+      // Try to get program ID from database first
+      const result = await pool.query(
+        'SELECT details FROM solanaproject WHERE id = $1',
+        [projectId]
+      );
       
-      if (keypairExists.trim() === 'exists') {
-        // Get existing program ID
-        const getProgramIdCmd = `docker exec ${containerName} solana-keygen pubkey ${keypairFile}`;
-        programId = (await runCommand(getProgramIdCmd, '.', uuidv4(), { skipSuccessUpdate: true })).trim();
-        console.log(`[LOCAL_DEPLOY] Using existing program ID: ${programId}`);
+      if (result.rows[0]?.details?.projectState?.programId) {
+        programId = result.rows[0].details.projectState.programId;
+        console.log(`[LOCAL_DEPLOY] Using program ID from build: ${programId}`);
       } else {
-        // Generate new keypair
-        console.log('[LOCAL_DEPLOY] Generating new program keypair...');
-        const genKeypairCmd = `docker exec ${containerName} solana-keygen new --outfile ${keypairFile} --no-bip39-passphrase --force`;
-        await runCommand(genKeypairCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+        // Fall back to reading from keypair file
+        const keypairExistsCmd = `docker exec ${containerName} test -f ${keypairFile} && echo "exists" || echo "missing"`;
+        const keypairExists = await runCommand(keypairExistsCmd, '.', uuidv4(), { skipSuccessUpdate: true });
         
-        const getProgramIdCmd = `docker exec ${containerName} solana-keygen pubkey ${keypairFile}`;
-        programId = (await runCommand(getProgramIdCmd, '.', uuidv4(), { skipSuccessUpdate: true })).trim();
-        console.log(`[LOCAL_DEPLOY] Generated new program ID: ${programId}`);
+        if (keypairExists.trim() === 'exists') {
+          // Get existing program ID
+          const getProgramIdCmd = `docker exec ${containerName} solana-keygen pubkey ${keypairFile}`;
+          programId = (await runCommand(getProgramIdCmd, '.', uuidv4(), { skipSuccessUpdate: true })).trim();
+          console.log(`[LOCAL_DEPLOY] Using existing program ID from keypair: ${programId}`);
+        } else {
+          throw new Error('Program keypair not found. Please build the project first.');
+        }
       }
       
       // Step 4: Configure Solana CLI for local validator
