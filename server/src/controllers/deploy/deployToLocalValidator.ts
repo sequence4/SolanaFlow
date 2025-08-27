@@ -183,13 +183,28 @@ export const deployToLocalValidator = async (
       // Step 6: Deploy or upgrade the program
       console.log(`[LOCAL_DEPLOY] Starting ${deploymentType} deployment...`);
       
+      // Ensure validator is running before deployment
+      console.log('[LOCAL_DEPLOY] Ensuring validator is running...');
+      const startValidatorCmd = `docker exec ${containerName} bash -c "
+        # Check if validator is already running
+        if ! pgrep -x 'solana-test-val' > /dev/null; then
+          echo 'Starting validator...'
+          solana-test-validator --reset --quiet > /dev/null 2>&1 &
+          sleep 3
+          echo 'Validator started'
+        else
+          echo 'Validator already running'
+        fi
+      "`;
+      await runCommand(startValidatorCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+      
       let deployOutput: string;
       
       if (deploymentType === 'new') {
-        // Initial deployment using anchor deploy
+        // Initial deployment using anchor deploy with program-name
         const deployCmd = `docker exec ${containerName} bash -lc "
           cd ${programPath} &&
-          anchor deploy --provider.cluster localnet --program-keypair ${keypairFile}
+          anchor deploy --program-name ${programName} --provider.cluster localnet --program-keypair ${keypairFile}
         "`;
         
         deployOutput = await runCommand(deployCmd, '.', projectId);
