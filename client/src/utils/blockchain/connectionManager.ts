@@ -74,7 +74,15 @@ class ConnectionManager {
   }
   
   getConnection(commitment: Commitment = 'confirmed'): Connection {
-    const config = CLUSTER_CONFIGS[this.currentCluster];
+    // For local cluster, always use the current dynamic port
+    const config = this.currentCluster === 'local' ? 
+      {
+        ...CLUSTER_CONFIGS[this.currentCluster],
+        url: `http://localhost:${this.localValidatorPort}`,
+        websocket: `ws://localhost:${parseInt(this.localValidatorPort) + 1}`
+      } : 
+      CLUSTER_CONFIGS[this.currentCluster];
+    
     const key = `${config.url}-${commitment}`;
     
     if (!this.connections.has(key)) {
@@ -123,8 +131,13 @@ class ConnectionManager {
     }
     
     try {
+      // For local cluster, make sure we're using the updated URL with the correct port
+      const connectionUrl = cluster === 'local' ? 
+        `http://localhost:${this.localValidatorPort}` : 
+        config.url;
+      
       // Test connection with timeout
-      const testConn = new Connection(config.url, {
+      const testConn = new Connection(connectionUrl, {
         commitment: 'confirmed',
         wsEndpoint: config.websocket,
         disableRetryOnRateLimit: true
