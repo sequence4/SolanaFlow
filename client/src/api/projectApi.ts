@@ -508,5 +508,15 @@ export const projectApi = {
       throw error;                // propagate anything else
     }
   },
+  
+  getProjectPorts: async (projectId: string): Promise<{ data: { rpc: number; ws: number; faucet: number } }> => {
+    try {
+      const response = await api.get(`/projects/${projectId}/ports`);
+      return response;
+    } catch (error) {
+      console.error('Error getting project ports:', error);
+      throw error;
+    }
+  },
 
 };

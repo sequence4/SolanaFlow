@@ -36,6 +36,7 @@ class ConnectionManager {
   private connections: Map<string, Connection> = new Map();
   private currentCluster: ClusterType = 'devnet';
   private listeners: ((cluster: ClusterType) => void)[] = [];
+  private localValidatorPort: string = '8899'; // Dynamic port for local validator
   
   private constructor() {
     // Initialize with saved preference or default
@@ -43,6 +44,19 @@ class ConnectionManager {
       const saved = localStorage.getItem('preferred-cluster') as ClusterType;
       if (saved && CLUSTER_CONFIGS[saved]) {
         this.currentCluster = saved;
+      }
+    }
+  }
+  
+  setLocalValidatorPort(port: string) {
+    this.localValidatorPort = port;
+    // Update the local cluster config
+    CLUSTER_CONFIGS.local.url = `http://localhost:${port}`;
+    CLUSTER_CONFIGS.local.websocket = `ws://localhost:${parseInt(port) + 1}`;
+    // Clear cached connections for local cluster
+    for (const [key] of this.connections) {
+      if (key.includes('localhost')) {
+        this.connections.delete(key);
       }
     }
   }
@@ -90,7 +104,7 @@ class ConnectionManager {
       // First check if validator is actually running
       const isRunning = await this.isLocalValidatorRunning();
       if (!isRunning) {
-        console.warn('Local validator is not running. Please start it first.');
+        //console.warn('Local validator is not running. Please start it first.');
         // Don't switch if local validator isn't running
         return false;
       }
@@ -160,7 +174,9 @@ class ConnectionManager {
   
   async isLocalValidatorRunning(): Promise<boolean> {
     try {
-      const conn = new Connection('http://localhost:8899', {
+      // Use the configured local validator port
+      const url = `http://localhost:${this.localValidatorPort}`;
+      const conn = new Connection(url, {
         commitment: 'confirmed',
         disableRetryOnRateLimit: true
       });

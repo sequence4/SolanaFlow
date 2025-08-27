@@ -38,9 +38,9 @@ export const startLocalValidator = async (
         res.json({ 
           message: 'Local validator already running',
           status: 'already-running',
-          rpcUrl: 'http://localhost:8899',
-          faucetUrl: 'http://localhost:9900',
-          websocketUrl: 'ws://localhost:8900'
+          rpcUrl: `http://localhost:${ports.rpc}`,
+          faucetUrl: `http://localhost:${ports.faucet}`,
+          websocketUrl: `ws://localhost:${ports.ws}`
         });
         return;
       }

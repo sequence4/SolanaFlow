@@ -335,10 +335,19 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
       if (network === 'local' && projectContext.id) {
         try {
           toast.info('Starting local validator...');
-          // Start validator first
-          await projectApi.startLocalValidator(projectContext.id, { 
+          // Start validator and get the actual ports
+          const response = await projectApi.startLocalValidator(projectContext.id, { 
             reset: false 
           });
+          
+          // Extract port from the RPC URL if available
+          if (response.data?.rpcUrl) {
+            const url = new URL(response.data.rpcUrl);
+            const rpcPort = url.port || '8899';
+            // Update connection manager with the actual port
+            connectionManager.setLocalValidatorPort(rpcPort);
+          }
+          
           // Wait a moment for it to initialize
           await new Promise(resolve => setTimeout(resolve, 2000));
           toast.success('Local validator started');
@@ -397,6 +406,25 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
       esRef.current?.close();
     };
   }, []);
+  
+  // Initialize local validator port on component mount if we have a project
+  useEffect(() => {
+    const initializeLocalPort = async () => {
+      if (projectContext.id && projectContext.deployNetwork === 'local') {
+        try {
+          // Get the project's container ports
+          const response = await projectApi.getProjectPorts(projectContext.id);
+          if (response.data?.rpc) {
+            connectionManager.setLocalValidatorPort(response.data.rpc.toString());
+          }
+        } catch (error) {
+          console.error('Failed to get project ports:', error);
+        }
+      }
+    };
+    
+    initializeLocalPort();
+  }, [projectContext.id]);
 
   return (
     <>
