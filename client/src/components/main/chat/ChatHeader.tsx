@@ -410,12 +410,18 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
   // Initialize local validator port on component mount if we have a project
   useEffect(() => {
     const initializeLocalPort = async () => {
-      if (projectContext.id && projectContext.deployNetwork === 'local') {
+      if (projectContext.id) {
         try {
-          // Get the project's container ports
+          // Always get the project's container ports, regardless of current network
           const response = await projectApi.getProjectPorts(projectContext.id);
           if (response.data?.rpc) {
+            console.log(`[ChatHeader] Setting local validator port to ${response.data.rpc}`);
             connectionManager.setLocalValidatorPort(response.data.rpc.toString());
+            
+            // If we're already on local network, update the connection immediately
+            if (projectContext.deployNetwork === 'local') {
+              await connectionManager.switchCluster('local');
+            }
           }
         } catch (error) {
           console.error('Failed to get project ports:', error);
@@ -424,7 +430,7 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
     };
     
     initializeLocalPort();
-  }, [projectContext.id]);
+  }, [projectContext.id, projectContext.deployNetwork]);
 
   return (
     <>

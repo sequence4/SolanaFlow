@@ -59,6 +59,11 @@ class ConnectionManager {
         this.connections.delete(key);
       }
     }
+    console.log(`[ConnectionManager] Local validator port set to ${port}`);
+  }
+  
+  getLocalValidatorPort(): string {
+    return this.localValidatorPort;
   }
   
   static getInstance(): ConnectionManager {

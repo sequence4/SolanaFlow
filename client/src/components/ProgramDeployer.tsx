@@ -23,6 +23,7 @@ import {
   TransactionInstruction,
   SYSVAR_RENT_PUBKEY,
   SYSVAR_CLOCK_PUBKEY,
+  Connection,
 } from "@solana/web3.js";
 import ProjectContext from "@/context/project/ProjectContext";
 import {
@@ -35,6 +36,7 @@ import {
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { connection } from "@/utils/blockchain/connection";
+import { connectionManager } from "@/utils/blockchain/connectionManager";
 import { useWalletSigner } from "@/utils/blockchain/wallet";
 
 import { createEphemeralKey, EphemeralDeployOptions, deployWithEphemeralKey } from "@/api/projectDeploy";
@@ -72,7 +74,7 @@ function u64LE(n: number): Buffer {
 /** Ensure a legacy Transaction has a recentBlockhash (or durable nonce) */
 async function ensureLegacyTxBlockhash(
   tx: Transaction,
-  conn: typeof connection,
+  conn: Connection,
 ): Promise<void> {
   if (!tx.recentBlockhash) {
     let nonceValue: string | null = null;
@@ -192,7 +194,8 @@ export function ProgramDeployer({
       // (prevents wallet‑side simulation failures)
       // @ts-expect-error - accessing private connection properties
       const walletCluster = wallet.adapter?.network;
-      const rpcUrl = (connection as any)._rpcEndpoint || (connection as any).rpcEndpoint;
+      const conn = connectionManager.getConnection();
+      const rpcUrl = (conn as any)._rpcEndpoint || (conn as any).rpcEndpoint;
       const connCluster = rpcUrl?.includes("devnet") ? "devnet"
         : rpcUrl?.includes("testnet") ? "testnet"
         : "mainnet‑beta";
@@ -229,7 +232,7 @@ export function ProgramDeployer({
 
         if (looksLikePubkey) {
           const candidatePk = new PublicKey(ctxProgramId!);
-          const acctInfo = await connection.getAccountInfo(candidatePk, "confirmed");
+          const acctInfo = await connectionManager.getConnection().getAccountInfo(candidatePk, "confirmed");
 
           // Check if program exists on-chain
 
@@ -347,7 +350,7 @@ export function ProgramDeployer({
         const FEE_PER_TX = 15000; // 15k lamports per transaction (conservative)
         
         const fundingBufferSpace = 37 + programBytes.byteLength;
-        const fundingBufferRent = await connection.getMinimumBalanceForRentExemption(fundingBufferSpace);
+        const fundingBufferRent = await connectionManager.getConnection().getMinimumBalanceForRentExemption(fundingBufferSpace);
         const totalFeesNeeded = totalTxCount * FEE_PER_TX;
         const SAFETY_CUSHION = 200_000_000; // 0.2 SOL safety
         
@@ -806,7 +809,7 @@ export function ProgramDeployer({
           
           // Set fee payer and blockhash BEFORE compiling message
           tx.feePayer = wallet.publicKey!;
-          await ensureLegacyTxBlockhash(tx, connection);
+          await ensureLegacyTxBlockhash(tx, connectionManager.getConnection());
           
           // Force recompile to ensure fee payer is properly set
           tx.compileMessage();
@@ -931,10 +934,10 @@ export function ProgramDeployer({
             if ('signature' in result) {
               // Wait for transaction confirmation before returning
               try {
-                await connection.confirmTransaction({
+                await connectionManager.getConnection().confirmTransaction({
                   signature: result.signature,
                   blockhash: tx.recentBlockhash!,
-                  lastValidBlockHeight: tx.lastValidBlockHeight || (await connection.getLatestBlockhash()).lastValidBlockHeight
+                  lastValidBlockHeight: tx.lastValidBlockHeight || (await connectionManager.getConnection().getLatestBlockhash()).lastValidBlockHeight
                 }, 'confirmed');
                 return result.signature;
               } catch (confirmError) {
@@ -1029,7 +1032,7 @@ export function ProgramDeployer({
               throw new Error('WALLET_NOT_REQUIRED_SIGNER');
             }
             if (tx instanceof Transaction) {
-              await ensureLegacyTxBlockhash(tx, connection);
+              await ensureLegacyTxBlockhash(tx, connectionManager.getConnection());
               tx.feePayer = wallet.publicKey!;
             }
             const signed = await wallet.signTransaction(tx as any);
