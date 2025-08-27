@@ -102,8 +102,8 @@ export const deployToLocalValidator = async (
           mkdir -p target &&
           # Set proper permissions
           chmod -R 755 . &&
-          # Build with verbose output
-          anchor build --verifiable 2>&1
+          # Build WITHOUT --verifiable flag (avoids Docker-in-Docker)
+          anchor build 2>&1
         "`;
         
         let buildOutput: string;

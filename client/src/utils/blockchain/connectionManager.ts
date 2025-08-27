@@ -1,5 +1,35 @@
 import { Connection, Commitment } from '@solana/web3.js';
-import { getClusterConfig, ClusterType } from '../cluster';
+
+export type ClusterType = 'local' | 'devnet' | 'testnet' | 'mainnet';
+
+interface ClusterConfig {
+  url: string;
+  websocket?: string;
+  label: string;
+}
+
+const CLUSTER_CONFIGS: Record<ClusterType, ClusterConfig> = {
+  local: {
+    url: 'http://localhost:8899',
+    websocket: 'ws://localhost:8900',
+    label: 'Local Validator'
+  },
+  devnet: {
+    url: 'https://api.devnet.solana.com',
+    websocket: undefined, // Will be auto-derived
+    label: 'Devnet'
+  },
+  testnet: {
+    url: 'https://api.testnet.solana.com',
+    websocket: undefined,
+    label: 'Testnet'
+  },
+  mainnet: {
+    url: 'https://api.mainnet-beta.solana.com',
+    websocket: undefined,
+    label: 'Mainnet'
+  }
+};
 
 class ConnectionManager {
   private static instance: ConnectionManager;
@@ -9,12 +39,11 @@ class ConnectionManager {
   
   private constructor() {
     // Initialize with saved preference or default
-    // Check if we're in browser environment before accessing localStorage
     if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
       const saved = localStorage.getItem('preferred-cluster') as ClusterType;
-      this.currentCluster = saved || 'devnet';
-    } else {
-      this.currentCluster = 'devnet';
+      if (saved && CLUSTER_CONFIGS[saved]) {
+        this.currentCluster = saved;
+      }
     }
   }
   
@@ -26,13 +55,15 @@ class ConnectionManager {
   }
   
   getConnection(commitment: Commitment = 'confirmed'): Connection {
-    const config = getClusterConfig();
+    const config = CLUSTER_CONFIGS[this.currentCluster];
     const key = `${config.url}-${commitment}`;
     
     if (!this.connections.has(key)) {
       this.connections.set(key, new Connection(config.url, {
         commitment,
-        wsEndpoint: config.websocket
+        wsEndpoint: config.websocket,
+        disableRetryOnRateLimit: true,
+        confirmTransactionInitialTimeout: 30000
       }));
     }
     
@@ -43,21 +74,52 @@ class ConnectionManager {
     return this.currentCluster;
   }
   
+  getClusterConfig(): ClusterConfig {
+    return CLUSTER_CONFIGS[this.currentCluster];
+  }
+  
   async switchCluster(cluster: ClusterType): Promise<boolean> {
-    // Test connection first
-    const testUrl = cluster === 'local' ? 'http://localhost:8899' : 
-                    cluster === 'devnet' ? 'https://api.devnet.solana.com' :
-                    cluster === 'testnet' ? 'https://api.testnet.solana.com' :
-                    'https://api.mainnet-beta.solana.com';
+    const config = CLUSTER_CONFIGS[cluster];
+    if (!config) {
+      console.error(`Invalid cluster: ${cluster}`);
+      return false;
+    }
+    
+    // Special handling for local cluster
+    if (cluster === 'local') {
+      // First check if validator is actually running
+      const isRunning = await this.isLocalValidatorRunning();
+      if (!isRunning) {
+        console.warn('Local validator is not running. Please start it first.');
+        // Don't switch if local validator isn't running
+        return false;
+      }
+    }
     
     try {
-      const testConn = new Connection(testUrl, 'confirmed');
-      await testConn.getVersion();
+      // Test connection with timeout
+      const testConn = new Connection(config.url, {
+        commitment: 'confirmed',
+        wsEndpoint: config.websocket,
+        disableRetryOnRateLimit: true
+      });
+      
+      const timeoutMs = cluster === 'local' ? 3000 : 5000;
+      const version = await Promise.race([
+        testConn.getVersion(),
+        new Promise<null>((_, reject) => 
+          setTimeout(() => reject(new Error('Connection timeout')), timeoutMs)
+        )
+      ]);
+      
+      if (!version) {
+        throw new Error('Failed to get version');
+      }
       
       // Connection successful, switch
       this.currentCluster = cluster;
       
-      // Only save to localStorage if in browser
+      // Save preference
       if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
         localStorage.setItem('preferred-cluster', cluster);
       }
@@ -66,11 +128,24 @@ class ConnectionManager {
       this.connections.clear();
       
       // Notify listeners
-      this.listeners.forEach(listener => listener(cluster));
+      this.listeners.forEach(listener => {
+        try {
+          listener(cluster);
+        } catch (e) {
+          console.error('Listener error:', e);
+        }
+      });
       
       return true;
     } catch (error) {
-      console.error(`Failed to connect to ${cluster}:`, error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error(`Failed to connect to ${cluster}: ${errorMsg}`);
+      
+      // If local cluster fails, provide helpful message
+      if (cluster === 'local') {
+        console.info('Tip: Ensure local validator is running with: solana-test-validator');
+      }
+      
       return false;
     }
   }
@@ -85,15 +160,33 @@ class ConnectionManager {
   
   async isLocalValidatorRunning(): Promise<boolean> {
     try {
-      const conn = new Connection('http://localhost:8899', 'confirmed');
+      const conn = new Connection('http://localhost:8899', {
+        commitment: 'confirmed',
+        disableRetryOnRateLimit: true
+      });
+      
       const version = await Promise.race([
         conn.getVersion(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2000))
+        new Promise<null>((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout')), 2000)
+        )
       ]);
+      
       return !!version;
     } catch {
       return false;
     }
+  }
+  
+  // Helper to get all available clusters
+  getAvailableClusters(): ClusterType[] {
+    return Object.keys(CLUSTER_CONFIGS) as ClusterType[];
+  }
+  
+  // Get cluster label for UI
+  getClusterLabel(cluster?: ClusterType): string {
+    const c = cluster || this.currentCluster;
+    return CLUSTER_CONFIGS[c]?.label || c;
   }
 }
 
