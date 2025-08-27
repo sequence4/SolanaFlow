@@ -6,6 +6,100 @@ import { v4 as uuidv4 } from "uuid";
 import { getProjectRootPath } from '../../utils/fileUtils';
 import pool from "src/config/database";
 
+/**
+ * Helper function to ensure validator is running and accessible
+ */
+async function ensureValidatorRunning(containerName: string): Promise<void> {
+  const maxAttempts = 3;
+  
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    console.log(`[LOCAL_DEPLOY] Checking validator health (attempt ${attempt}/${maxAttempts})...`);
+    
+    // Check if validator process exists
+    const psCmd = `docker exec ${containerName} pgrep -f solana-test-validator || echo "not-running"`;
+    const psResult = await runCommand(psCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    
+    if (psResult.trim() === "not-running") {
+      console.log('[LOCAL_DEPLOY] Validator not running, starting it...');
+      
+      // Start validator with proper options for reliability
+      const startCmd = `docker exec ${containerName} bash -c "
+        # Kill any existing validator processes
+        pkill -f solana-test-validator || true
+        sleep 1
+        
+        # Start validator in background with proper logging
+        solana-test-validator \\
+          --reset \\
+          --bind-address 0.0.0.0 \\
+          --rpc-port 8899 \\
+          --ws-port 8900 \\
+          --faucet-port 9900 \\
+          --log /tmp/validator.log \\
+          > /tmp/validator-stdout.log 2>&1 &
+        
+        # Wait for validator to start
+        echo 'Waiting for validator to start...'
+        for i in {1..30}; do
+          if solana cluster-version --url http://127.0.0.1:8899 2>/dev/null; then
+            echo 'Validator is ready!'
+            exit 0
+          fi
+          sleep 1
+        done
+        
+        # If we get here, validator failed to start
+        echo 'Validator failed to start. Logs:'
+        cat /tmp/validator-stdout.log | tail -20
+        exit 1
+      "`;
+      
+      try {
+        const validatorOutput = await runCommand(startCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+        console.log('[LOCAL_DEPLOY] Validator started:', validatorOutput);
+      } catch (err) {
+        console.error('[LOCAL_DEPLOY] Failed to start validator:', err);
+        if (attempt === maxAttempts) {
+          throw new Error(`Validator failed to start after ${maxAttempts} attempts: ${err}`);
+        }
+      }
+    }
+    
+    // Test connection
+    const testCmd = `docker exec ${containerName} bash -c "
+      solana cluster-version --url http://127.0.0.1:8899 2>&1
+    "`;
+    
+    try {
+      const result = await runCommand(testCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+      if (result.includes('solana-core')) {
+        console.log('[LOCAL_DEPLOY] Validator is healthy');
+        
+        // Verify connection with JSON-RPC
+        const verifyConnectionCmd = `docker exec ${containerName} bash -c "
+          curl -s -X POST http://127.0.0.1:8899 -H 'Content-Type: application/json' \\
+            -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getHealth\"}' || echo 'Connection failed'
+        "`;
+        
+        const connectionCheck = await runCommand(verifyConnectionCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+        if (connectionCheck.includes('failed')) {
+          throw new Error('Validator is not accessible on port 8899');
+        }
+        
+        return;
+      }
+    } catch (err) {
+      console.warn(`[LOCAL_DEPLOY] Validator health check failed on attempt ${attempt}:`, err);
+    }
+    
+    if (attempt < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+  }
+  
+  throw new Error('Failed to start validator after multiple attempts');
+}
+
 
 /**
  * POST /projects/:id/local-validator/deploy
@@ -28,24 +122,8 @@ export const deployToLocalValidator = async (
         return next(new AppError('Container not found', 404));
       }
       
-      // Step 1: Ensure validator is running
-      console.log('[LOCAL_DEPLOY] Checking validator status...');
-      const validatorCheck = `docker exec ${containerName} /usr/local/bin/start-validator.sh status`;
-      const validatorStatus = await runCommand(validatorCheck, '.', uuidv4(), { skipSuccessUpdate: true })
-        .catch(() => 'not-running');
-      
-      if (!validatorStatus.includes('running')) {
-        console.log('[LOCAL_DEPLOY] Validator not running, starting it...');
-        // Start validator
-        const startCmd = walletPubkey 
-          ? `docker exec -e WALLET_PUBKEY=${walletPubkey} ${containerName} /usr/local/bin/start-validator.sh`
-          : `docker exec ${containerName} /usr/local/bin/start-validator.sh`;
-        
-        await runCommand(startCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-        
-        // Wait for validator to be ready
-        await new Promise(resolve => setTimeout(resolve, 3000));
-      }
+      // Step 1: Ensure validator is running and accessible
+      await ensureValidatorRunning(containerName);
       
       // Step 2: Get program details from the already-built artifacts
       const rootPath = await getProjectRootPath(projectId);
@@ -99,17 +177,27 @@ export const deployToLocalValidator = async (
         }
       }
       
-      // Step 4: Configure Solana CLI for local validator
+      // Step 4: Configure Solana CLI with retry and verification
       console.log('[LOCAL_DEPLOY] Configuring Solana CLI for local validator...');
       const configCmd = `docker exec ${containerName} bash -c "
-        solana config set --url http://localhost:8899 &&
-        solana config set --commitment confirmed
+        # Set config with explicit localhost
+        solana config set --url http://127.0.0.1:8899 &&
+        solana config set --commitment confirmed &&
+        
+        # Verify the configuration works
+        solana cluster-version --url http://127.0.0.1:8899
       "`;
-      await runCommand(configCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+      
+      try {
+        const configOutput = await runCommand(configCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+        console.log('[LOCAL_DEPLOY] Solana CLI configured:', configOutput);
+      } catch (err) {
+        throw new Error(`Failed to configure Solana CLI: ${err}`);
+      }
       
       // Step 5: Check if program is already deployed
       const checkDeployedCmd = `docker exec ${containerName} bash -c "
-        solana program show ${programId} --url http://localhost:8899 2>&1 || echo 'not-found'
+        solana program show ${programId} --url http://127.0.0.1:8899 2>&1 || echo 'not-found'
       "`;
       const deployedCheck = await runCommand(checkDeployedCmd, '.', uuidv4(), { skipSuccessUpdate: true });
       
@@ -124,37 +212,32 @@ export const deployToLocalValidator = async (
       // Step 6: Deploy or upgrade the program
       console.log(`[LOCAL_DEPLOY] Starting ${deploymentType} deployment...`);
       
-      // Ensure validator is running before deployment
-      console.log('[LOCAL_DEPLOY] Ensuring validator is running...');
-      const startValidatorCmd = `docker exec ${containerName} bash -c "
-        # Check if validator is already running
-        if ! pgrep -x 'solana-test-val' > /dev/null; then
-          echo 'Starting validator...'
-          solana-test-validator --reset --quiet > /dev/null 2>&1 &
-          sleep 3
-          echo 'Validator started'
-        else
-          echo 'Validator already running'
-        fi
-      "`;
-      await runCommand(startValidatorCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+      // Double-check validator is still running before deployment
+      await ensureValidatorRunning(containerName);
       
       let deployOutput: string;
       
       if (deploymentType === 'new') {
-        // Initial deployment using anchor deploy with program-name
+        // Initial deployment using anchor deploy with explicit URL
         const deployCmd = `docker exec ${containerName} bash -lc "
           cd ${programPath} &&
-          anchor deploy --program-name ${programName} --provider.cluster localnet --program-keypair ${keypairFile}
+          # Set explicit cluster URL in Anchor.toml if needed
+          sed -i 's/\\[provider\\]/[provider]\\ncluster = \"http:\\/\\/127.0.0.1:8899\"/' Anchor.toml 2>/dev/null || true &&
+          
+          # Deploy with explicit URL
+          anchor deploy \\
+            --program-name ${programName} \\
+            --provider.cluster 'http://127.0.0.1:8899' \\
+            --program-keypair ${keypairFile}
         "`;
         
         deployOutput = await runCommand(deployCmd, '.', projectId);
       } else {
-        // Upgrade using solana program deploy
+        // Upgrade using solana program deploy with explicit URL
         const upgradeCmd = `docker exec ${containerName} bash -c "
           solana program deploy ${soFile} \\
             --program-id ${keypairFile} \\
-            --url http://localhost:8899 \\
+            --url http://127.0.0.1:8899 \\
             --commitment confirmed
         "`;
         
@@ -163,7 +246,7 @@ export const deployToLocalValidator = async (
       
       // Step 7: Verify deployment
       const verifyCmd = `docker exec ${containerName} bash -c "
-        solana program show ${programId} --url http://localhost:8899 | head -5
+        solana program show ${programId} --url http://127.0.0.1:8899 | head -5
       "`;
       const verifyOutput = await runCommand(verifyCmd, '.', uuidv4(), { skipSuccessUpdate: true });
       
