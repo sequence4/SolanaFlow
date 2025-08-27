@@ -675,9 +675,9 @@ export async function startProjectContainer(
       'All volumes and environment variables configured'
     ]);
 
-    //console.log("[startProjectContainer] RUN CMD:\n", runArgs.join(" "));
-    timed(runArgs.join(" "), 'docker-run');
-    
+    const dockerCmd = runArgs.slice(0, -2).join(' ') + ` '${runArgs[runArgs.length - 1]}'`;
+    timed(dockerCmd, 'docker-run');
+
     sendContainerSetupProgress('env-container-config', 'Container Configuration', 'Container started, setting up tools...', 80, [
       'Container is now running successfully',
       'Setting up Yarn package manager via Corepack',
