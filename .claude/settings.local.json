@@ -32,7 +32,8 @@
       "Bash(pnpm add:*)",
       "Bash(lsof:*)",
       "Bash(node:*)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "Bash(git remote set-url:*)"
     ],
     "deny": [],
     "ask": [],
