@@ -59,7 +59,7 @@ router.post('/:id/deploy-ephemeral', authMiddleware, deployProjectEphemeral);
 router.get('/:id/program-status', authMiddleware, getProgramStatus);
 
 router.get('/:id/program-id', authMiddleware, getProgramId);
-router.post('/:id/relay-tx', authMiddleware, relayTx);
+router.post('/:id/relay-tx', authMiddleware, catchAsync(relayTx));
 router.post('/:id/relay-signed-tx', authMiddleware, catchAsync(relaySignedTx));
 router.post('/:id/nonce', authMiddleware, getNonceAccount);
 router.post('/:id/test', authMiddleware, testProject);

@@ -1,17 +1,18 @@
 import { Keypair } from "@solana/web3.js";
 import { AppError } from "../../middleware/errorHandler";
 import { NextFunction, Request, Response } from "express";
-
-const ephemeralKeys = new Map<string, Keypair>();
+import { storeProjectEphemeralKey } from "../../utils/ephemeralKeyStore";
 
 export const createEphemeralKeypair = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      //const projectId = req.params.id;
+      const projectId = req.params.id;
       
       const ephem = Keypair.generate();
       const pubkey = ephem.publicKey.toBase58();
       
-      ephemeralKeys.set(pubkey, ephem);
+      // Store the keypair for later use by relayTx
+      storeProjectEphemeralKey(projectId, ephem);
+      
       res.status(200).json({
         message: 'Ephemeral keypair created successfully',
         pubkey,

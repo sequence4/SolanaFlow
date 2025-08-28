@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import { Keypair } from '@solana/web3.js';
 import { catchAsync } from '../utils/middleware/catchAsync';
+import { storeProjectEphemeralKey } from '../utils/ephemeralKeyStore';
 
 const router = express.Router();
 
@@ -15,7 +16,8 @@ router.post(
     if (!pubkey) {
       const kp = Keypair.generate();               // secret stays on server
       pubkey = kp.publicKey.toBase58();
-      // TODO: persist kp.secretKey tied to projectId in a secure store
+      // Store the keypair for later use by relayTx
+      storeProjectEphemeralKey(req.params.projectId, kp);
       console.log(
         `[EPHEMERAL] Generated new ephemeral keypair: ${pubkey} ` +
           `for project ${req.params.projectId}`
