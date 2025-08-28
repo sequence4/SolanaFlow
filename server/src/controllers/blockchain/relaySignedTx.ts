@@ -6,8 +6,7 @@ import pool from 'src/config/database';
 import { Transaction } from '@solana/web3.js';
 import { signDeployTxAndBroadcast } from 'src/utils/blockchain/signDeployTxAndBroadcast';
 import { v4 as uuidv4 } from 'uuid';
-
-const ephemeralKeys = new Map<string, Keypair>();
+import { getProjectEphemeralKey } from '../../utils/ephemeralKeyStore';
 
 export const relaySignedTx = async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params;
@@ -21,22 +20,31 @@ export const relaySignedTx = async (req: Request, res: Response, next: NextFunct
     // Collect extra server-side signers (ephemeral etc.)
     const extraSigners: Keypair[] = [];
 
-    // From explicit list
+    // Get the project ephemeral key if it exists
+    const projectEphemeralKey = getProjectEphemeralKey(id);
+    if (projectEphemeralKey) {
+      extraSigners.push(projectEphemeralKey);
+      console.log(`[RELAY_SIGNED_TX] Found project ephemeral key: ${projectEphemeralKey.publicKey.toBase58()}`);
+    }
+
+    // From explicit list (for backward compatibility if needed)
     if (Array.isArray(serverSignFor)) {
       for (const pk of serverSignFor) {
-        const kp = (ephemeralKeys as Map<string, Keypair>).get(pk);
-        if (kp) {
-          extraSigners.push(kp);
-        } else {
+        // Check if this is the project ephemeral key we already added
+        if (projectEphemeralKey && pk === projectEphemeralKey.publicKey.toBase58()) {
+          // Already added, skip
+          continue;
         }
+        // If you have other server keys, handle them here
+        console.log(`[RELAY_SIGNED_TX] Requested server sign for ${pk} but key not found`);
       }
     }
-    // From signer hint
+    
+    // From signer hint (for backward compatibility)
     if (signerHint?.type === 'ephemeral' && signerHint?.pubkey) {
-      const kp = (ephemeralKeys as Map<string, Keypair>).get(signerHint.pubkey);
-      if (kp) {
-        extraSigners.push(kp);
-      } else {
+      // Check if this is the project ephemeral key we already added
+      if (!projectEphemeralKey || signerHint.pubkey !== projectEphemeralKey.publicKey.toBase58()) {
+        console.log(`[RELAY_SIGNED_TX] Signer hint for ${signerHint.pubkey} but key not found`);
       }
     }
 
