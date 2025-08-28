@@ -4,7 +4,7 @@ import { AppError } from 'src/middleware/errorHandler';
 import { getProjectEphemeralKey } from '../../utils/ephemeralKeyStore';
 
 export const relayTx = async (req: Request, res: Response, next: NextFunction) => {
-  const { projectId } = req.params;
+  const { id: projectId } = req.params;
   const { encodedTx, programId } = req.body;
   
   if (!encodedTx || !programId) {
