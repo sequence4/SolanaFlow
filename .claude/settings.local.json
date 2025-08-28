@@ -33,7 +33,11 @@
       "Bash(lsof:*)",
       "Bash(node:*)",
       "Bash(npx eslint:*)",
-      "Bash(git remote set-url:*)"
+      "Bash(git remote set-url:*)",
+      "Bash(curl:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker inspect:*)"
     ],
     "deny": [],
     "ask": [],
