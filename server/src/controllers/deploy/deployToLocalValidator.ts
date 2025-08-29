@@ -88,65 +88,127 @@ export const deployToLocalValidator = async (
       // Step 1: Ensure validator is running and accessible
       await ensureValidatorRunning(containerName);
       
-      // Step 2: Get program details from the already-built artifacts
-      const rootPath = await getProjectRootPath(projectId);
+      // Step 2: Get program details from the database and built artifacts
+      const db = pool;
+      
+      // Get the actual program name and root path from the database
+      const programQuery = await db.query(
+        `SELECT p.name, p.program_name, p.root_path 
+         FROM projects p 
+         WHERE p.id = $1`,
+        [projectId]
+      );
+      
+      if (!programQuery.rows[0]) {
+        throw new Error('Project not found');
+      }
+      
+      // Use program_name if set, otherwise derive from project name
+      const projectData = programQuery.rows[0];
+      const programName = projectData.program_name || 
+                         projectData.name?.toLowerCase().replace(/[^a-z0-9]/g, '_') || 
+                         'untitled_project';
+      
+      // Get the actual root path from the database or use the one from getProjectRootPath
+      const rootPath = projectData.root_path || await getProjectRootPath(projectId);
       const programPath = `/usr/src/${rootPath}`;
       
-      // Get the program name from Anchor.toml
-      const getProgramNameCmd = `docker exec ${containerName} bash -c "cd ${programPath} && grep '^\\[programs.localnet\\]' -A 1 Anchor.toml | grep -oP '^\\w+' | tail -1"`;
-      const programName = (await runCommand(getProgramNameCmd, '.', uuidv4(), { skipSuccessUpdate: true }))
-        .trim() || 'solanaflow';
+      console.log('[LOCAL_DEPLOY] Program name:', programName);
+      console.log('[LOCAL_DEPLOY] Root path:', rootPath);
+      console.log('[LOCAL_DEPLOY] Program path:', programPath);
       
-      console.log(`[LOCAL_DEPLOY] Program name: ${programName}`);
+      // Check if build artifact exists in the container at the correct location
+      let soFile = `/usr/src/${rootPath}/target/deploy/${programName}.so`;
+      let keypairFile = `/usr/src/${rootPath}/target/deploy/${programName}-keypair.json`;
       
-      // The artifacts are in the warm cache location
-      const soFile = `/usr/src/target/deploy/${programName}.so`;
-      const keypairFile = `/usr/src/target/deploy/${programName}-keypair.json`;
+      console.log('[LOCAL_DEPLOY] Checking for artifact at:', soFile);
       
       // Verify the .so file exists (it should from the build pipeline)
-      const soExistsCmd = `docker exec ${containerName} test -f ${soFile} && echo "exists" || echo "missing"`;
+      const soExistsCmd = `docker exec ${containerName} test -f "${soFile}" && echo "exists" || echo "missing"`;
       const soExists = await runCommand(soExistsCmd, '.', uuidv4(), { skipSuccessUpdate: true });
       
       if (soExists.trim() === 'missing') {
-        // Try to copy from the project's target directory
-        const hostRoot = process.env.ROOT_FOLDER;
-        if (hostRoot) {
-          const hostArtifactPath = `${hostRoot}/${rootPath}/target/deploy/${programName}.so`;
-          const hostKeypairPath = `${hostRoot}/${rootPath}/target/deploy/${programName}-keypair.json`;
-          
-          // Check if artifacts exist on host
-          const fs = require('fs');
-          if (fs.existsSync(hostArtifactPath) && fs.existsSync(hostKeypairPath)) {
-            console.log('[LOCAL_DEPLOY] Copying artifacts from host to container...');
+        // Try alternate paths first - check if it's in /usr/src/target/deploy (without project subdirectory)
+        const altSoPath = `/usr/src/target/deploy/${programName}.so`;
+        const altKeypairPath = `/usr/src/target/deploy/${programName}-keypair.json`;
+        
+        console.log('[LOCAL_DEPLOY] Checking alternate path:', altSoPath);
+        const altCheckCmd = `docker exec ${containerName} test -f "${altSoPath}" && echo "exists" || echo "missing"`;
+        const altExists = await runCommand(altCheckCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+        
+        if (altExists.trim() === 'exists') {
+          console.log('[LOCAL_DEPLOY] Found artifacts at alternate location:', altSoPath);
+          // Update paths to use alternate location
+          soFile = altSoPath;
+          keypairFile = altKeypairPath;
+        } else {
+          // Try to copy from the project's target directory on host
+          const hostRoot = process.env.ROOT_FOLDER;
+          if (hostRoot) {
+            // Try multiple possible paths
+            const possiblePaths = [
+              `${hostRoot}/${rootPath}/target/deploy/${programName}.so`,
+              `${hostRoot}/target/deploy/${programName}.so`,
+              `${hostRoot}/projects/${projectId}/target/deploy/${programName}.so`
+            ];
             
-            // Create target directory if it doesn't exist
-            const mkdirCmd = `docker exec ${containerName} mkdir -p /usr/src/target/deploy`;
-            await runCommand(mkdirCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+            const fs = require('fs');
+            let foundPath = null;
+            let foundKeypairPath = null;
             
-            // Copy artifacts to container
-            const copySoCmd = `docker cp "${hostArtifactPath}" "${containerName}:${soFile}"`;
-            const copyKeypairCmd = `docker cp "${hostKeypairPath}" "${containerName}:${keypairFile}"`;
-            
-            await runCommand(copySoCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-            await runCommand(copyKeypairCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-            
-            // Verify copy succeeded
-            const verifyCopyCmd = `docker exec ${containerName} test -f ${soFile} && echo "exists" || echo "missing"`;
-            const copyVerify = await runCommand(verifyCopyCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-            
-            if (copyVerify.trim() === 'missing') {
-              throw new Error('Failed to copy program artifacts to container');
+            for (const path of possiblePaths) {
+              const keypairPath = path.replace('.so', '-keypair.json');
+              console.log('[LOCAL_DEPLOY] Checking host path:', path);
+              if (fs.existsSync(path) && fs.existsSync(keypairPath)) {
+                foundPath = path;
+                foundKeypairPath = keypairPath;
+                console.log('[LOCAL_DEPLOY] Found artifacts on host at:', path);
+                break;
+              }
             }
             
-            console.log('[LOCAL_DEPLOY] Artifacts copied successfully');
+            if (foundPath && foundKeypairPath) {
+              console.log('[LOCAL_DEPLOY] Copying artifacts from host to container...');
+              
+              // Create target directory if it doesn't exist
+              const targetDir = `/usr/src/${rootPath}/target/deploy`;
+              const mkdirCmd = `docker exec ${containerName} mkdir -p "${targetDir}"`;
+              await runCommand(mkdirCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+              
+              // Copy artifacts to container
+              const copySoCmd = `docker cp "${foundPath}" "${containerName}:${soFile}"`;
+              const copyKeypairCmd = `docker cp "${foundKeypairPath}" "${containerName}:${keypairFile}"`;
+              
+              await runCommand(copySoCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+              await runCommand(copyKeypairCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+              
+              // Verify copy succeeded
+              const verifyCopyCmd = `docker exec ${containerName} test -f "${soFile}" && echo "exists" || echo "missing"`;
+              const copyVerify = await runCommand(verifyCopyCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+              
+              if (copyVerify.trim() === 'missing') {
+                throw new Error('Failed to copy program artifacts to container');
+              }
+              
+              console.log('[LOCAL_DEPLOY] Artifacts copied successfully');
+            } else {
+              // Last resort: look for any .so file in the container's project directory
+              const findCmd = `docker exec ${containerName} find /usr/src -name "*.so" -type f 2>/dev/null | head -5`;
+              const foundSo = await runCommand(findCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+              
+              if (foundSo && foundSo.trim()) {
+                console.log('[LOCAL_DEPLOY] Found .so files at:', foundSo.trim());
+                throw new Error(`Program artifact not found at expected location. Found .so files at: ${foundSo.trim()}. Please check the program name in Anchor.toml matches the deployment configuration.`);
+              } else {
+                throw new Error('Program artifact not found. Please build the project first.');
+              }
+            }
           } else {
-            throw new Error('Program artifact not found. Please build the project first.');
+            throw new Error('ROOT_FOLDER not set, cannot locate artifacts');
           }
-        } else {
-          throw new Error('ROOT_FOLDER not set, cannot locate artifacts');
         }
       } else {
-        console.log('[LOCAL_DEPLOY] Using existing build artifact from pipeline');
+        console.log('[LOCAL_DEPLOY] Using existing build artifact from pipeline at:', soFile);
       }
       
       // Step 3: Get program ID from database or keypair
@@ -163,12 +225,12 @@ export const deployToLocalValidator = async (
         console.log(`[LOCAL_DEPLOY] Using program ID from build: ${programId}`);
       } else {
         // Fall back to reading from keypair file
-        const keypairExistsCmd = `docker exec ${containerName} test -f ${keypairFile} && echo "exists" || echo "missing"`;
+        const keypairExistsCmd = `docker exec ${containerName} test -f "${keypairFile}" && echo "exists" || echo "missing"`;
         const keypairExists = await runCommand(keypairExistsCmd, '.', uuidv4(), { skipSuccessUpdate: true });
         
         if (keypairExists.trim() === 'exists') {
           // Get existing program ID
-          const getProgramIdCmd = `docker exec ${containerName} solana-keygen pubkey ${keypairFile}`;
+          const getProgramIdCmd = `docker exec ${containerName} solana-keygen pubkey "${keypairFile}"`;
           programId = (await runCommand(getProgramIdCmd, '.', uuidv4(), { skipSuccessUpdate: true })).trim();
           console.log(`[LOCAL_DEPLOY] Using existing program ID from keypair: ${programId}`);
         } else {
@@ -227,15 +289,15 @@ export const deployToLocalValidator = async (
           anchor deploy \\
             --program-name ${programName} \\
             --provider.cluster 'http://127.0.0.1:8899' \\
-            --program-keypair ${keypairFile}
+            --program-keypair "${keypairFile}"
         "`;
         
         deployOutput = await runCommand(deployCmd, '.', projectId);
       } else {
         // Upgrade using solana program deploy with explicit URL
         const upgradeCmd = `docker exec ${containerName} bash -c "
-          solana program deploy ${soFile} \\
-            --program-id ${keypairFile} \\
+          solana program deploy \"${soFile}\" \\
+            --program-id \"${keypairFile}\" \\
             --url http://127.0.0.1:8899 \\
             --commitment confirmed
         "`;
