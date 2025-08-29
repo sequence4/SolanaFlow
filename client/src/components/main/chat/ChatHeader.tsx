@@ -11,8 +11,7 @@ import {
   Trash2,
   Check,
   Network,
-  Copy,
-  Code2
+  Copy
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -75,11 +74,13 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
   const esRef = useRef<ReturnType<typeof deployPipeline> | null>(null);
   const containerURLRef = useRef<string | null>(null);
   const pollingCancelledRef = useRef<boolean>(false);
+  const buildTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const projectDeployed = !!projectContext?.details?.projectState?.deployed;
   const built = !!projectContext.details?.projectState?.built;
   const currentNetwork = projectContext.deployNetwork || 'devnet';
   const programId = projectContext.details?.projectState?.programId;
+  const hasNodes = (projectContext.details?.projectState?.nodes?.length || 0) > 0;
 
   useEffect(() => {
     setProjectName(projectContext.name || "My Token Project");
@@ -133,6 +134,12 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
 
   const handleConfirmBuild = useCallback(async () => {
     if (isBuilding) return;
+    
+    // Check if there are nodes to build
+    if (!hasNodes) {
+      toast.error("No nodes to build", { description: "Please add nodes to the workflow first" });
+      return;
+    }
 
     const projectId = projectContext.id
       ? projectContext.id
@@ -152,6 +159,16 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
       config: projectContext.details?.projectState?.config || {},
     };
 
+    // Set a maximum timeout for the build process (5 minutes)
+    buildTimeoutRef.current = setTimeout(() => {
+      console.warn("[build] Build timeout reached, stopping spinner");
+      setIsBuilding(false);
+      taskLogs.setSuppressToast(false);
+      esRef.current?.close();
+      buildTimeoutRef.current = null;
+      toast.error("Build timeout", { description: "Build process took too long" });
+    }, 5 * 60 * 1000);
+
     try {
       esRef.current = deployPipeline(
         projectId,
@@ -159,6 +176,10 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
         (msg: any) => {
           // Handle error messages
           if (msg.error || msg.stage === "error") {
+            if (buildTimeoutRef.current) {
+              clearTimeout(buildTimeoutRef.current);
+              buildTimeoutRef.current = null;
+            }
             pollingCancelledRef.current = true;
             setIsBuilding(false);
             taskLogs.setSuppressToast(false);
@@ -225,6 +246,10 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
           }
 
           if (msg.stage === "done" || msg.stage === "build-done") {
+            if (buildTimeoutRef.current) {
+              clearTimeout(buildTimeoutRef.current);
+              buildTimeoutRef.current = null;
+            }
             pollingCancelledRef.current = true;
             setIsBuilding(false);
             taskLogs.setSuppressToast(false);
@@ -248,16 +273,20 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
           .catch(err => console.error("[persist build]", err));
       }
     } catch (err) {
+      if (buildTimeoutRef.current) {
+        clearTimeout(buildTimeoutRef.current);
+        buildTimeoutRef.current = null;
+      }
       console.error("[build] SSE error:", err);
       toast.error("Build error", { description: String(err) });
       setIsBuilding(false);
       taskLogs.setSuppressToast(false);
       esRef.current?.close();
     }
-  }, [isBuilding, projectContext, setProjectContext, setFileTree, setActiveTab, taskLogs]);
+  }, [isBuilding, hasNodes, projectContext, setProjectContext, setFileTree, setActiveTab, taskLogs]);
 
   const handleBuildClick = async () => {
-    if (isBuilding) return;
+    if (isBuilding || !hasNodes) return;
     await handleConfirmBuild();
   };
 
@@ -469,6 +498,10 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
       if (esRef.current) {
         esRef.current.close();
       }
+      if (buildTimeoutRef.current) {
+        clearTimeout(buildTimeoutRef.current);
+        buildTimeoutRef.current = null;
+      }
       if (isBuilding) {
         setIsBuilding(false);
         taskLogs.setSuppressToast(false);
@@ -650,9 +683,9 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                 <Button
                   size="icon"
                   variant="ghost"
-                  className={cn("h-8 w-8", isBuilding ? "cursor-default" : "cursor-pointer")}
+                  className={cn("h-8 w-8", (isBuilding || !hasNodes) ? "cursor-default" : "cursor-pointer")}
                   onClick={handleBuildClick}
-                  disabled={isBuilding}
+                  disabled={isBuilding || !hasNodes}
                 >
                   {isBuilding ? (
                     <PulseLoader color="currentColor" size={4} />
@@ -662,7 +695,7 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" sideOffset={8}>
-                <span>{isBuilding ? "Building..." : "Build"}</span>
+                <span>{!hasNodes ? "Add nodes to workflow first" : isBuilding ? "Building..." : "Build"}</span>
               </TooltipContent>
             </Tooltip>
 
