@@ -25,8 +25,24 @@ export async function handleEphemeralDeploy(
 
     onProgress(0, 'Starting ephemeral key deployment...');
 
-    // 1. Generate an in-memory Keypair; it signs chunk uploads
-    const ephem = Keypair.generate();
+    // 1. Request server to create ephemeral key for this deployment
+    const ephemeralResponse = await fetch(`/api/projects/${projectId}/ephemeral`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    
+    if (!ephemeralResponse.ok) {
+      throw new Error('Failed to create ephemeral key on server');
+    }
+    
+    const { ephemeralPubkey } = await ephemeralResponse.json();
+    const ephem = Keypair.generate(); // Still generate locally for signing buffer operations
+    
+    console.log(`[DEPLOY] Server ephemeral key: ${ephemeralPubkey}`);
+    console.log(`[DEPLOY] Local ephemeral key: ${ephem.publicKey.toBase58()}`);
 
     // 2. Fetch the code-generated program ID from the server
     const projectDetails = await projectApi.getProjectDetails(projectId);

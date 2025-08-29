@@ -1,7 +1,11 @@
 import { NextFunction, Request, Response } from 'express';
-import { Connection, Transaction } from '@solana/web3.js';
+import { Connection, Transaction, Keypair, PublicKey } from '@solana/web3.js';
 import { AppError } from 'src/middleware/errorHandler';
 import { getProjectEphemeralKey } from '../../utils/ephemeralKeyStore';
+import { getProgramSecret } from '../../utils/aws/awsSecrets';
+import * as fs from 'fs';
+import * as path from 'path';
+import { APP_CONFIG } from '../../config/appConfig';
 
 export const relayTx = async (req: Request, res: Response, next: NextFunction) => {
   const { id: projectId } = req.params;
@@ -58,6 +62,43 @@ export const relayTx = async (req: Request, res: Response, next: NextFunction) =
       }
     }
     
+    // Load program keypair if this is a deployment transaction
+    let programKeypair: Keypair | null = null;
+    const programPubkey = new PublicKey(programId);
+    
+    // Check if program is a required signer (indicates deployment)
+    const programIsRequired = requiredSigners.some(k => k.equals(programPubkey));
+    
+    if (programIsRequired) {
+      console.log(`[RELAY_TX] Program ${programId} is a required signer, loading keypair...`);
+      
+      try {
+        // Try AWS Secrets first
+        const secretKey = await getProgramSecret(programId);
+        programKeypair = Keypair.fromSecretKey(secretKey);
+        console.log(`[RELAY_TX] Loaded program keypair from AWS Secrets`);
+      } catch (awsError) {
+        console.log(`[RELAY_TX] AWS Secrets failed: ${awsError}, trying local file...`);
+        
+        // Fallback to local file
+        const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${programId}.json`);
+        if (fs.existsSync(walletPath)) {
+          const walletData = JSON.parse(fs.readFileSync(walletPath, 'utf-8'));
+          programKeypair = Keypair.fromSecretKey(Uint8Array.from(walletData));
+          console.log(`[RELAY_TX] Loaded program keypair from local file`);
+        } else {
+          console.error(`[RELAY_TX] Program keypair not found for ${programId}`);
+          return next(new AppError(`Program keypair not found for ${programId}`, 400));
+        }
+      }
+      
+      // Verify the loaded keypair matches the expected program ID
+      if (!programKeypair.publicKey.equals(programPubkey)) {
+        console.error(`[RELAY_TX] Keypair mismatch: expected ${programId}, got ${programKeypair.publicKey.toBase58()}`);
+        return next(new AppError('Program keypair does not match program ID', 400));
+      }
+    }
+    
     // Check if ephemeral key already signed
     const ephemeralSigIndex = msg.accountKeys.findIndex(k => k.equals(ephemeralKey.publicKey));
     const alreadySigned = ephemeralSigIndex >= 0 && 
@@ -70,6 +111,21 @@ export const relayTx = async (req: Request, res: Response, next: NextFunction) =
       console.log(`[RELAY_TX] Signed with ephemeral key: ${ephemeralKey.publicKey.toBase58()}`);
     } else {
       console.log(`[RELAY_TX] Ephemeral key ${ephemeralKey.publicKey.toBase58()} already signed`);
+    }
+    
+    // Sign with program keypair if needed
+    if (programKeypair) {
+      const programSigIndex = msg.accountKeys.findIndex(k => k.equals(programPubkey));
+      const programAlreadySigned = programSigIndex >= 0 && 
+                                   programSigIndex < transaction.signatures.length &&
+                                   transaction.signatures[programSigIndex].signature !== null;
+      
+      if (!programAlreadySigned) {
+        transaction.partialSign(programKeypair);
+        console.log(`[RELAY_TX] Signed with program keypair: ${programId}`);
+      } else {
+        console.log(`[RELAY_TX] Program keypair ${programId} already signed`);
+      }
     }
     
     // Verify all required signatures are present
@@ -99,6 +155,12 @@ export const relayTx = async (req: Request, res: Response, next: NextFunction) =
     
     // Send the fully signed transaction
     console.log(`[RELAY_TX] Sending fully signed transaction...`);
+    console.log(`[RELAY_TX] Transaction accounts: ${msg.accountKeys.map(k => k.toBase58()).join(', ')}`);
+    console.log(`[RELAY_TX] Transaction signers: ${transaction.signatures
+      .filter(s => s.signature)
+      .map((s, i) => msg.accountKeys[i].toBase58())
+      .join(', ')}`);
+    
     const signature = await connection.sendRawTransaction(
       transaction.serialize(),
       { skipPreflight: false }
@@ -108,7 +170,11 @@ export const relayTx = async (req: Request, res: Response, next: NextFunction) =
     
     // Wait for confirmation
     try {
-      await connection.confirmTransaction(signature, 'confirmed');
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+      await connection.confirmTransaction(
+        { signature, blockhash, lastValidBlockHeight },
+        'confirmed'
+      );
       console.log(`[RELAY_TX] Transaction confirmed: ${signature}`);
     } catch (confirmError) {
       console.warn(`[RELAY_TX] Confirmation timeout (continuing): ${confirmError}`);
