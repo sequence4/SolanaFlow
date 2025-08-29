@@ -32,18 +32,42 @@ async function ensureValidatorRunning(containerName: string): Promise<void> {
   await runCommand(killCmd, '.', uuidv4(), { skipSuccessUpdate: true });
   await new Promise(resolve => setTimeout(resolve, 2000));
   
-  // Start validator with explicit bind address for external access
-  const startCmd = `docker exec -d ${containerName} solana-test-validator \
-    --bind-address 0.0.0.0 \
-    --rpc-port 8899 \
-    --ws-port 8900 \
-    --faucet-port 9900 \
-    --reset \
-    --quiet`;
+  // Start validator with nohup to ensure it stays running after deployment
+  const startCmd = `docker exec ${containerName} bash -c "
+    # Create log directory
+    mkdir -p /usr/local/validator-logs
+    
+    # Start validator with nohup to persist after this command exits
+    nohup solana-test-validator \
+      --bind-address 0.0.0.0 \
+      --rpc-port 8899 \
+      --ws-port 8900 \
+      --faucet-port 9900 \
+      --reset \
+      --quiet > /usr/local/validator-logs/validator.log 2>&1 &
+    
+    # Save PID for management
+    echo \\$! > /usr/local/validator-logs/validator.pid
+    
+    # Give it a moment to start
+    sleep 3
+    
+    # Verify it's running
+    if ps -p \\$(cat /usr/local/validator-logs/validator.pid) > /dev/null; then
+      echo 'Validator started successfully'
+    else
+      echo 'Validator failed to start'
+      exit 1
+    fi
+  "`;
   
   try {
-    await runCommand(startCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-    console.log('[LOCAL_DEPLOY] Validator start command issued');
+    const output = await runCommand(startCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    console.log('[LOCAL_DEPLOY] Validator start output:', output);
+    
+    if (!output.includes('Validator started successfully')) {
+      throw new Error('Validator did not start properly');
+    }
   } catch (err) {
     // Try alternative start method using the script
     console.log('[LOCAL_DEPLOY] Trying alternative start method...');
@@ -434,6 +458,42 @@ export const deployToLocalValidator = async (
       
       console.log(`[LOCAL_DEPLOY] Deployment successful! Program ID: ${programId}`);
       
+      // Step 11: Final validator health check to ensure it's still running
+      console.log('[LOCAL_DEPLOY] Performing final validator health check...');
+      const finalHealthCmd = `docker exec ${containerName} bash -c "
+        # Check if validator process is still running
+        if [ -f /usr/local/validator-logs/validator.pid ]; then
+          PID=\\$(cat /usr/local/validator-logs/validator.pid)
+          if ps -p \\$PID > /dev/null 2>&1; then
+            # Also verify RPC is responsive
+            curl -s http://127.0.0.1:8899/health | grep -q 'ok' && echo 'validator-healthy' || echo 'validator-unresponsive'
+          else
+            echo 'validator-stopped'
+          fi
+        else
+          echo 'validator-not-found'
+        fi
+      "`;
+      
+      const finalHealth = await runCommand(finalHealthCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+      const validatorHealthy = finalHealth.includes('validator-healthy');
+      
+      if (!validatorHealthy) {
+        console.warn('[LOCAL_DEPLOY] Validator may have stopped after deployment:', finalHealth);
+        // Try to restart it one more time
+        console.log('[LOCAL_DEPLOY] Attempting to restart validator...');
+        const restartCmd = `docker exec ${containerName} bash -c "
+          nohup solana-test-validator \
+            --bind-address 0.0.0.0 \
+            --rpc-port 8899 \
+            --ws-port 8900 \
+            --faucet-port 9900 \
+            --quiet > /usr/local/validator-logs/validator.log 2>&1 &
+          echo \\$! > /usr/local/validator-logs/validator.pid
+        "`;
+        await runCommand(restartCmd, '.', uuidv4(), { skipSuccessUpdate: true }).catch(() => {});
+      }
+      
       res.json({
         message: `Program ${deploymentType === 'new' ? 'deployed' : 'upgraded'} successfully to local validator`,
         programId,
@@ -442,6 +502,7 @@ export const deployToLocalValidator = async (
         rpcUrl: 'http://localhost:8899',
         websocketUrl: 'ws://localhost:8900',
         faucetUrl: 'http://localhost:9900',
+        validatorStatus: validatorHealthy ? 'running' : 'may need restart',
         idl: idlContent ? JSON.parse(idlContent) : null,
         deployOutput: deployOutput.substring(0, 1000) // First 1000 chars for debugging
       });
