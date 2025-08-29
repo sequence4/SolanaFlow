@@ -1,52 +1,189 @@
 @import "tailwindcss";
+@import "./global-enhancements.css";
+@import "./toolbox/modern-toolbox.css";
+@import "./chat/modern-chat.css";
+@import "./header/modern-header.css";
+@import "./header/modern-top-bar.css";
+@import "./enhanced-instruction-node.css";
 
+@theme {
+  /* Enhanced AI-themed color scheme */
+  --color-background: oklch(0.12 0 0);
+  --color-foreground: oklch(0.95 0 0);
+  --color-card: oklch(0.16 0 0);
+  --color-card-foreground: oklch(0.95 0 0);
+  --color-popover: oklch(0.18 0 0);
+  --color-popover-foreground: oklch(0.95 0 0);
+  --color-primary: oklch(0.65 0.25 265);
+  --color-primary-foreground: oklch(0.95 0 0);
+  --color-secondary: oklch(0.25 0 0);
+  --color-secondary-foreground: oklch(0.95 0 0);
+  --color-muted: oklch(0.20 0 0);
+  --color-muted-foreground: oklch(0.65 0 0);
+  --color-accent: oklch(0.68 0.22 280);
+  --color-accent-foreground: oklch(0.95 0 0);
+  --color-destructive: oklch(0.577 0.245 27.325);
+  --color-destructive-foreground: oklch(0.95 0 0);
+  --color-border: oklch(0.25 0 0);
+  --color-input: oklch(0.16 0 0);
+  --color-ring: oklch(0.65 0.25 265);
+  --color-sidebar: oklch(0.14 0 0);
+  --color-sidebar-foreground: oklch(0.95 0 0);
+  --color-sidebar-primary: oklch(0.65 0.25 265);
+  --color-sidebar-primary-foreground: oklch(0.95 0 0);
+  --color-sidebar-accent: oklch(0.20 0 0);
+  --color-sidebar-accent-foreground: oklch(0.95 0 0);
+  --color-sidebar-border: oklch(0.25 0 0);
+  --color-sidebar-ring: oklch(0.65 0.25 265);
+  
+  --radius: 0.5rem;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  
+  --font-family-sans: "DM Sans", system-ui, sans-serif;
+  --font-family-heading: "Space Grotesk", system-ui, sans-serif;
+  --font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-family-inter: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  
+  /* AI-themed custom properties */
+  --ai-glow-primary: rgba(139, 92, 246, 0.4);
+  --ai-glow-secondary: rgba(168, 85, 247, 0.3);
+  --ai-glow-accent: rgba(59, 130, 246, 0.2);
+  --ai-border-glow: rgba(139, 92, 246, 0.15);
+  --ai-gradient-1: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(168, 85, 247, 0.05));
+  --ai-gradient-2: linear-gradient(225deg, rgba(59, 130, 246, 0.08), rgba(139, 92, 246, 0.05));
+  --ai-gradient-3: radial-gradient(circle, rgba(139, 92, 246, 0.03), transparent 70%);
+  --ai-pulse-duration: 3s;
+  --ai-glow-duration: 2s;
+}
+
+.dark {
+  /* Same values as root for consistency */
+  --color-background: oklch(0.12 0 0);
+  --color-foreground: oklch(0.95 0 0);
+  --color-card: oklch(0.16 0 0);
+  --color-card-foreground: oklch(0.95 0 0);
+  --color-popover: oklch(0.18 0 0);
+  --color-popover-foreground: oklch(0.95 0 0);
+  --color-primary: oklch(0.65 0.25 265);
+  --color-primary-foreground: oklch(0.95 0 0);
+  --color-secondary: oklch(0.25 0 0);
+  --color-secondary-foreground: oklch(0.95 0 0);
+  --color-muted: oklch(0.20 0 0);
+  --color-muted-foreground: oklch(0.65 0 0);
+  --color-accent: oklch(0.68 0.22 280);
+  --color-accent-foreground: oklch(0.95 0 0);
+  --color-destructive: oklch(0.396 0.141 25.723);
+  --color-destructive-foreground: oklch(0.637 0.237 25.331);
+}
+
+/* Force immediate application of colors to prevent flash */
+html, body {
+  background-color: oklch(0.12 0 0) !important;
+  color: oklch(0.95 0 0) !important;
+}
+
+/* Force CSS custom property recalculation to prevent stale cache */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --foreground-rgb: 255, 255, 255;
-  --background-start-rgb: 13, 15, 20;
-  --background-end-rgb: 13, 15, 20;
-
-  --border-2-dark: #2d3748;
+  --force-repaint: calc(1px);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-family-sans);
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-family-heading);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(to bottom, transparent, rgb(var(--background-end-rgb))) rgb(var(--background-start-rgb));
+@layer utilities {
+  .font-heading {
+    font-family: var(--font-family-heading);
+  }
+  .font-inter {
+    font-family: var(--font-family-inter);
+  }
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* Added custom scrollbar styling for better visual consistency */
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(75 85 99) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: rgb(75 85 99);
+    border-radius: 3px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(107 114 128);
+  }
+
+  /* Spinner animations */
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .animate-spin {
+    animation: spin 1s linear infinite;
+  }
+
+  /* Optional: Add a pulsing effect for the loading text */
+  @keyframes pulse-slow {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  .animate-pulse-slow {
+    animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
 }
 
-::-webkit-scrollbar-track {
-  background: #0d0f14;
-}
+/* Tooltip interaction fixes to prevent flickering */
+@layer utilities {
+  /* Prevent tooltip interaction issues */
+  [data-radix-popper-content-wrapper] {
+    pointer-events: none !important;
+  }
 
-::-webkit-scrollbar-thumb {
-  background: #2a2e36;
-  border-radius: 4px;
-}
+  [data-radix-popper-content-wrapper] > * {
+    pointer-events: auto !important;
+  }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #3b4048;
+  /* Ensure tooltips don't trigger hover states on buttons */
+  button[data-state="delayed-open"] {
+    pointer-events: all !important;
+  }
+
+  /* Fix tooltip z-index to always be on top */
+  [role="tooltip"] {
+    z-index: 9999 !important;
+  }
 }

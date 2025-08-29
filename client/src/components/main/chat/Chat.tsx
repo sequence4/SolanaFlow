@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useContext } from 'react';
+import React, { useState, useRef, useEffect, useContext, useCallback } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -15,34 +15,16 @@ import { fileApi } from '@/api/fileApi';
 import { taskApi } from '@/api/taskApi';
 
 // UI Components
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { useTaskLogs } from "@/context/logs/useTaskLogs";
 import eventBus from '@/lib/eventBus';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 // Icons
 import { 
-  Send, 
-  Bot, 
-  Loader2, 
-  X, 
-  Maximize2, 
-  Minimize2, 
-  Code, 
-  Image, 
-  Paperclip,
-  Plus,
-  Trash2
+  Send
 } from "lucide-react";
 import MarkdownRenderer from '@/components/main/code/markdown/MarkdownRenderer';
-import ChatChecklistBubble from './ChatChecklistBubble';
+import { ChatHeader } from './ChatHeader';
 
 export interface AIMessageType {
   text: string;
@@ -52,42 +34,105 @@ export interface AIMessageType {
   status?: 'sending' | 'sent' | 'error';
   isLogLine?: boolean;
   isChecklist?: boolean;
+  stage?: string;
+  pct?: number;
+  type?: string;
+  logs?: string[]; // Store logs as array for deduplication
+  codeGenFiles?: Array<{
+    filename: string;
+    content: string;
+    language: string;
+  }>;
 }
 
 const Chat: React.FC = () => {
     const { projectContext } = useContext(ProjectContext);
     const { 
-        selectedFile, 
-        fileTree 
+        selectedFile
     } = useContext(FileContext);
 
-    const [additionalFiles, setAdditionalFiles] = useState<FileTreeItemType[]>([]);
+    const [additionalFiles] = useState<FileTreeItemType[]>([]);
     const [messages, setMessages] = useState<AIMessageType[]>([]);
     const [input, setInput] = useState('');
-    const [selectedModel, setSelectedModel] = useState('gpt-4o');
-    const [isExpanded, setIsExpanded] = useState(false);
+    const [isExpanded] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
-    const taskLogs = useTaskLogs();  // Complete taskLogs object including systemLogs and setSuppressToast
+    const [isThinking, setIsThinking] = useState(false);
+    const [thinkingSteps, setThinkingSteps] = useState<Array<{text: string, completed: boolean}>>([]);
+    const [currentThinkingStage, setCurrentThinkingStage] = useState<string | null>(null);
+    const taskLogs = useTaskLogs();
     const { systemLogs } = taskLogs;
-    const [lastLogIndex, setLastLogIndex] = useState(0);  // 🟡 NEW
+    const [lastLogIndex, setLastLogIndex] = useState(0);
+    
+    // Track processed logs to prevent duplicates
+    const processedLogsRef = useRef(new Set<string>());
+    const buildLogMessageIndexRef = useRef<number | null>(null);
+    
   
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
+    const messagesAreaRef = useRef<HTMLDivElement | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-    const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const scrollStateRef = useRef({
+        userHasScrolledUp: false,
+        lastScrollHeight: 0,
+    });
 
-    const scrollToBottom = () => {
-        if (messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    // Smart scroll to bottom function
+    const scrollToBottom = useCallback((force = false) => {
+        if (!messagesAreaRef.current) return;
+        
+        const container = messagesAreaRef.current;
+        
+        // Only scroll if user hasn't scrolled up, OR if forced (user message)
+        if (force || !scrollStateRef.current.userHasScrolledUp) {
+            container.scrollTo({
+                top: container.scrollHeight,
+                behavior: 'smooth'
+            });
         }
-    };
-
-    useEffect(() => {
-        scrollToBottom();
-    }, [messages, isTyping]);
-
-    useEffect(() => {
-        console.log(selectedFile);
     }, []);
+
+    // Detect if user has manually scrolled
+    const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+        const element = e.target as HTMLDivElement;
+        const scrollTop = element.scrollTop;
+        const scrollHeight = element.scrollHeight;
+        const clientHeight = element.clientHeight;
+        
+        // Check if user is near the bottom (within 50px tolerance)
+        const isNearBottom = scrollHeight - scrollTop <= clientHeight + 50;
+        
+        // Update user scroll state
+        scrollStateRef.current.userHasScrolledUp = !isNearBottom;
+    }, []);
+
+    // Auto-scroll when content changes
+    useEffect(() => {
+        if (!messagesAreaRef.current) return;
+        
+        const container = messagesAreaRef.current;
+        const currentScrollHeight = container.scrollHeight;
+        
+        // If content height increased and user hasn't scrolled up
+        if (currentScrollHeight > scrollStateRef.current.lastScrollHeight && 
+            !scrollStateRef.current.userHasScrolledUp) {
+            scrollToBottom();
+        }
+        
+        scrollStateRef.current.lastScrollHeight = currentScrollHeight;
+    }, [messages, scrollToBottom]);
+
+    // Force scroll on user messages
+    useEffect(() => {
+        if (messages.length === 0) return;
+        
+        const lastMessage = messages[messages.length - 1];
+        
+        // When a new user message is sent, reset scroll behavior and force scroll
+        if (lastMessage.sender === 'user') {
+            scrollStateRef.current.userHasScrolledUp = false;
+            setTimeout(() => scrollToBottom(true), 100);
+        }
+    }, [messages, scrollToBottom]);
 
     useEffect(() => {
         const savedMessages = sessionStorage.getItem('chatMessages');
@@ -112,109 +157,149 @@ const Chat: React.FC = () => {
         }
     }, [input]);
 
-    // ───────────────────────────────────────────────────────────────────────────
-    //  Whenever TaskLogsProvider pushes new lines, append them as AI messages
-    // ───────────────────────────────────────────────────────────────────────────
+    // Process system logs and SSE events
     useEffect(() => {
         if (!systemLogs?.length) return;
         
-        // Suppress log spam while building
-        if (taskLogs.isBuilding || messages.some(m => m.isChecklist)) {
-          setLastLogIndex(systemLogs.length); // swallow logs
-          return;
-        }
-
-        // Grab the slice we have not injected yet
+        // Don't suppress logs during build, we want to see them
         const fresh = systemLogs.slice(lastLogIndex);
-
-        /* 🔽 skip the environment / progress status lines we don't want in chat */
-        const IGNORE_PREFIXES = [
-          "Preparing your build environment",
-          "Container is up",
-          "Container URL",
-          "Generating Anchor code",
-          "Code generation complete",
-          "Building program",
-          "Linking target/deploy",
-          "Collecting project files"
-        ];
-
-        const visible = fresh.filter(
-          line => !IGNORE_PREFIXES.some(p => line.startsWith(p))
-        );
-
-        if (visible.length) {
-            const logMessages: AIMessageType[] = visible.map(line => ({
-                text: line,
-                sender: 'ai',           // show as if the assistant "thinks out loud"
-                timestamp: new Date(),
-                status: 'sent',
-                isLogLine: true,
-            }));
-
-            setMessages(prev => [...prev, ...logMessages]);
-            setLastLogIndex(systemLogs.length);
-            // Ensure scroll sticks to bottom
-            scrollToBottom();
+        
+        if (fresh.length === 0) return;
+        
+        // Process logs and trigger thinking states
+        fresh.forEach(line => {
+            // Trigger appropriate thinking stage based on log content
+            if (line.includes("Initializing deployment pipeline")) {
+                showThinkingForStage('pipeline-init');
+            } else if (line.includes("Validating project configuration")) {
+                showThinkingForStage('validation');
+            } else if (line.includes("Setting up Docker environment")) {
+                showThinkingForStage('docker-setup');
+            } else if (line.includes("Installing dependencies")) {
+                showThinkingForStage('dependencies');
+            } else if (line.includes("Generating program structure")) {
+                showThinkingForStage('program-structure');
+            } else if (line.includes("Writing instruction handlers")) {
+                showThinkingForStage('instruction-handlers');
+            } else if (line.includes("Creating account structures")) {
+                showThinkingForStage('account-structures');
+            } else if (line.includes("Generating TypeScript SDK")) {
+                showThinkingForStage('typescript-sdk');
+            } else if (line.includes("Building React components")) {
+                showThinkingForStage('react-components');
+            } else if (line.includes("Compiling Rust program")) {
+                showThinkingForStage('rust-compilation');
+            } else if (line.includes("Running security checks")) {
+                showThinkingForStage('security-checks');
+            } else if (line.includes("Optimizing bytecode")) {
+                showThinkingForStage('optimization');
+            } else if (line.includes("Generating program keypair")) {
+                showThinkingForStage('keypair-generation');
+            } else if (line.includes("Creating deployment artifacts")) {
+                showThinkingForStage('artifacts');
+            } else if (line.includes("Finalizing build")) {
+                showThinkingForStage('finalization');
+            } else if (line.includes("Build completed successfully")) {
+                showThinkingForStage('completion');
+            }
+        });
+        
+        // Filter and deduplicate logs
+        const newLogs = fresh.filter(log => {
+            // Create a unique key for this log
+            const logKey = log.trim();
+            
+            // Skip if already processed
+            if (processedLogsRef.current.has(logKey)) {
+                return false;
+            }
+            
+            // Skip certain types of logs
+            if (log.includes('Program ID:') || 
+                log.includes('[...] Program ID:') ||
+                log.trim() === '') {
+                return false;
+            }
+            
+            // Mark as processed
+            processedLogsRef.current.add(logKey);
+            return true;
+        });
+        
+        // Update or create the build log message
+        if (newLogs.length > 0) {
+            setMessages(prev => {
+                // Find existing build log message or create new one
+                if (buildLogMessageIndexRef.current !== null && 
+                    prev[buildLogMessageIndexRef.current]) {
+                    // Update existing message
+                    const updated = [...prev];
+                    const existingMessage = updated[buildLogMessageIndexRef.current];
+                    const existingLogs = existingMessage.logs || [];
+                    
+                    updated[buildLogMessageIndexRef.current] = {
+                        ...existingMessage,
+                        logs: [...existingLogs, ...newLogs],
+                        timestamp: new Date()
+                    };
+                    
+                    return updated;
+                } else {
+                    // Create new build log message
+                    const newMessage: AIMessageType = {
+                        text: '',
+                        sender: 'ai',
+                        timestamp: new Date(),
+                        status: 'sent',
+                        logs: newLogs
+                    };
+                    
+                    buildLogMessageIndexRef.current = prev.length;
+                    return [...prev, newMessage];
+                }
+            });
         }
-    }, [systemLogs, lastLogIndex, taskLogs.isBuilding, messages]);
+        
+        setLastLogIndex(systemLogs.length);
+    }, [systemLogs, lastLogIndex]);
 
-    // ———————————————————————————————
-    //  Inject a friendly AI note once the build completes
-    // ———————————————————————————————
+
+    // Handle build completion
     useEffect(() => {
         const onComplete = () => {
-            setMessages(prev => [
-                ...prev,
-                {
-                    text: "✅ Build finished successfully! Let me know what you'd like to do next.",
-                    sender: "ai",
-                    timestamp: new Date(),
-                    status: "sent"
-                }
-            ]);
-            taskLogs.setSuppressToast(false);      // re-enable normal task-log toasts
+            setIsThinking(false);
+            setCurrentThinkingStage(null);
+            buildLogMessageIndexRef.current = null;
+            taskLogs.setSuppressToast(false);
         };
+        
         eventBus.on("build-complete", onComplete);
-        return () => eventBus.off("build-complete", onComplete);
+        
+        return () => {
+            eventBus.off("build-complete", onComplete);
+        };
     }, [taskLogs]);
-
-    const fetchFileContent = async (projectId: string, filePath: string): Promise<string> => {
-        try {
-            const data = await fileApi.getFileContent(projectId, filePath);
-            return data.message;
-        } catch (error) {
-            console.error(`Error fetching content for ${filePath}:`, error);
-            return 'Error loading content.';
-        }
-    };
 
     const { publicKey, connected } = useWallet();
 
-    useEffect(() => {
-        console.log('Wallet connection status:', connected);
-        console.log('Wallet public key:', publicKey?.toBase58() || 'Not connected');
-    }, [connected, publicKey]);
-
-
-
     const sendMessage = async () => {
         const trimmed = input.trim().toLowerCase();
+
         if (trimmed === 'build') {
-          // 1) prevent toast
-          taskLogs.setSuppressToast(true);
+            taskLogs.setSuppressToast(true);
+            processedLogsRef.current.clear();
+            buildLogMessageIndexRef.current = null;
 
-          // 2) forward build command globally
-          eventBus.emit('chat-build-command');
-
-          // 3) insert checklist bubble before returning
-          setMessages(prev => [
-            ...prev,
-            { text: input, sender: 'user', timestamp: new Date(), status: 'sent' },
-            { text: "", sender: 'ai', isChecklist: true, timestamp: new Date(), status: 'sent' }
-          ]);
-          setInput('');
-          return;                             // stop normal AI flow
+            setMessages(prev => [
+                ...prev,
+                { text: input, sender: 'user', timestamp: new Date(), status: 'sent' }
+            ]);
+            
+            setInput('');
+            showThinkingForStage('pipeline-init');
+            console.log('[CHAT-DEBUG] Emitting chat-build-command');
+            eventBus.emit('chat-build-command');
+            return;
         }
         
         if (input.trim()) {
@@ -222,8 +307,6 @@ const Chat: React.FC = () => {
                 (file): file is FileTreeItemType => Boolean(file)
             );
 
-            console.log("Files selected for context:", selectedFiles);
-            
             setMessages([...messages, { 
                 text: input, 
                 sender: 'user',
@@ -231,15 +314,14 @@ const Chat: React.FC = () => {
                 timestamp: new Date(),
                 status: 'sending'
             }]);
-            setInput('');
 
+            setInput('');
             setIsTyping(true);
 
             try {
                 const fileTasks = await Promise.all(
                     selectedFiles.map(async (file) => {
                         if (file.path && projectContext.id) {
-                            console.log("Fetching content for file:", file.path);
                             const taskResponse = await fileApi.getFileContent(projectContext.id, file.path);
                             return { filePath: file.path, taskId: taskResponse.taskId };
                         }
@@ -260,7 +342,6 @@ const Chat: React.FC = () => {
                     fileTasks.map(async (fileTask) => {
                         if (fileTask) {
                             const content = await fetchContent(fileTask.taskId);
-                            console.log("Fetched content for file:", fileTask.filePath, "Length:", content.length);
                             return {
                                 path: fileTask.filePath,
                                 content: content || 'No content available',
@@ -271,7 +352,6 @@ const Chat: React.FC = () => {
                 );
 
                 const userPublicKeyString = connected && publicKey ? publicKey.toBase58() : '';
-                console.log('Using wallet public key for AI request:', userPublicKeyString || 'No wallet connected');
 
                 setMessages(prevMessages => 
                     prevMessages.map(msg => 
@@ -297,7 +377,6 @@ const Chat: React.FC = () => {
                 ]);
             } catch (error) {
                 setIsTyping(false);
-                console.error('Failed to send message to AI:', error);
                 setMessages(prevMessages => [
                     ...prevMessages,
                     { 
@@ -318,49 +397,6 @@ const Chat: React.FC = () => {
         }
     };
 
-    const handleFileSelect = (file: FileTreeItemType) => {
-        if (!additionalFiles.find((f) => f.path === file.path)) {
-            setAdditionalFiles(prev => [...prev, file]);
-        }
-    };
-
-    const removeFile = (path: string) => {
-        setAdditionalFiles(prevFiles => 
-            prevFiles.filter((file) => file.path !== path)
-        );
-    };
-
-    const getAllFiles = (nodes: FileTreeItemType[], basePath = ''): FileTreeItemType[] => {
-        let allFiles: FileTreeItemType[] = [];
-        nodes.forEach(node => {
-            const currentPath = `${basePath}/${node.name}`;
-            if (node.type === 'file') {
-                allFiles.push({ ...node, path: currentPath });
-            } else if (node.type === 'directory' && node.children) {
-                allFiles = allFiles.concat(getAllFiles(node.children, currentPath));
-            }
-        });
-        return allFiles;
-    };
-
-    const allFiles = fileTree ? getAllFiles([fileTree as FileTreeItemType]) : [];
-
-    const handleCustomFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            const newFile: FileTreeItemType = {
-                name: file.name,
-                path: `custom/${file.name}`,
-                type: 'file',
-            };
-            setAdditionalFiles([...additionalFiles, newFile]);
-            toast.success("File added", {
-                description: `${file.name} has been added to the chat context.`,
-                duration: 3000,
-            });
-        }
-    };
-
     const formatTime = (dateValue?: Date | string) => {
         if (!dateValue) return "";
         const dateObj = typeof dateValue === "string" ? new Date(dateValue) : dateValue;
@@ -369,132 +405,321 @@ const Chat: React.FC = () => {
 
     const clearChat = () => {
         setMessages([]);
+        processedLogsRef.current.clear();
+        buildLogMessageIndexRef.current = null;
         sessionStorage.removeItem('chatMessages');
         localStorage.removeItem('chatMessages');
     };
 
+    const showThinkingForStage = async (stage: string) => {
+        if (currentThinkingStage === stage) return;
+        setCurrentThinkingStage(stage);
+        
+        setIsThinking(true);
+        
+        const stageThoughts = {
+            'pipeline-init': [
+                "Initializing Solana deployment pipeline",
+                "Allocating computational resources for build process",
+                "Preparing secure isolated environment", 
+                "Loading project configuration and dependencies",
+                "Establishing build context and parameters",
+                "Setting up security protocols for compilation"
+            ],
+            'validation': [
+                "Validating project structure and configuration",
+                "Checking workflow graph integrity and dependencies",
+                "Verifying instruction relationships and flow",
+                "Analyzing account structures and constraints",
+                "Ensuring compliance with Solana program standards",
+                "Cross-referencing instruction compatibility"
+            ],
+            'docker-setup': [
+                "Spinning up Docker container with Solana toolchain",
+                "Mounting project workspace securely",
+                "Configuring container networking and isolation",
+                "Setting up build cache for optimization",
+                "Installing container build dependencies",
+                "Applying security policies and restrictions"
+            ],
+            'dependencies': [
+                "Installing Rust stable toolchain",
+                "Setting up Solana BPF target support",
+                "Installing Anchor framework v0.30",
+                "Configuring Solana CLI tools",
+                "Resolving dependency versions and conflicts",
+                "Updating package registry and cache",
+                "Verifying toolchain installation integrity"
+            ],
+            'program-structure': [
+                "Analyzing workflow to generate optimal program structure",
+                "Designing modular instruction architecture",
+                "Planning account data layouts and schemas",
+                "Calculating rent-exempt reserve requirements",
+                "Mapping instruction dependencies and flow",
+                "Optimizing program size and compute efficiency",
+                "Defining program entry points and handlers"
+            ],
+            'instruction-handlers': [
+                "Generating instruction handler functions",
+                "Implementing input validation and sanitization",
+                "Adding security checks and access controls",
+                "Creating comprehensive error handling mechanisms",
+                "Implementing state transition logic",
+                "Adding logging and monitoring hooks",
+                "Optimizing handler performance and efficiency"
+            ],
+            'account-structures': [
+                "Creating account data structures and schemas",
+                "Implementing serialization/deserialization",
+                "Optimizing storage layout for space efficiency",
+                "Adding account validation rules and constraints",
+                "Defining account relationship mappings",
+                "Implementing account versioning and migration",
+                "Adding account security and ownership checks"
+            ],
+            'typescript-sdk': [
+                "Generating TypeScript SDK for frontend integration",
+                "Creating type definitions and interfaces",
+                "Building transaction helper functions",
+                "Implementing wallet adapter integration",
+                "Adding async/await patterns for RPC calls",
+                "Creating account fetching utilities",
+                "Implementing error handling and retry logic"
+            ],
+            'react-components': [
+                "Creating React hooks for program interaction",
+                "Building UI components for transactions",
+                "Setting up state management with React Query",
+                "Generating example usage patterns and docs",
+                "Implementing form validation and UX flows",
+                "Adding loading states and error boundaries",
+                "Creating component test suites"
+            ],
+            'rust-compilation': [
+                "Compiling Rust source to BPF bytecode",
+                "Linking Solana runtime dependencies",
+                "Processing macro expansions and attributes",
+                "Building optimized program binary",
+                "Running static analysis and linting",
+                "Generating compilation reports and metrics",
+                "Validating bytecode integrity and constraints"
+            ],
+            'security-checks': [
+                "Running comprehensive static security analysis",
+                "Checking for common vulnerabilities and exploits",
+                "Validating access control patterns and permissions",
+                "Verifying arithmetic operations and overflow protection",
+                "Scanning for reentrancy and state manipulation risks",
+                "Ensuring proper signer verification and authority checks",
+                "Generating security audit report and recommendations"
+            ],
+            'optimization': [
+                "Optimizing bytecode for Solana's 200KB size limit",
+                "Reducing compute unit consumption and costs",
+                "Minimizing account data usage and rent costs",
+                "Applying advanced compiler optimizations",
+                "Profiling instruction performance bottlenecks",
+                "Implementing code deduplication strategies",
+                "Fine-tuning for maximum execution efficiency"
+            ],
+            'keypair-generation': [
+                "Generating deterministic program keypair",
+                "Computing program derived addresses (PDAs)",
+                "Creating deployment configuration manifest",
+                "Setting up program authority and governance",
+                "Implementing upgrade authority management",
+                "Configuring security policies and access controls",
+                "Documenting key management procedures"
+            ],
+            'artifacts': [
+                "Packaging compiled program binary and metadata",
+                "Generating Interface Definition Language (IDL)",
+                "Creating deployment metadata and manifests",
+                "Building distribution artifacts and documentation",
+                "Generating program analysis reports",
+                "Creating verification checksums and signatures",
+                "Preparing deployment instructions and guides"
+            ],
+            'finalization': [
+                "Performing comprehensive final validation checks",
+                "Verifying all build artifacts and checksums",
+                "Generating detailed deployment instructions",
+                "Preparing success summary and metrics",
+                "Validating program size and compute constraints",
+                "Running final security verification scan",
+                "Creating deployment documentation and guides"
+            ],
+            'completion': [
+                "Build pipeline completed successfully!",
+                "All artifacts generated and validated",
+                "Program ready for deployment to Solana",
+                "You can now deploy to devnet or mainnet-beta",
+                "Build completed in record time with zero errors",
+                "Program optimized for maximum efficiency",
+                "Security checks passed with flying colors"
+            ]
+        };
+        
+        const thoughts = stageThoughts[stage as keyof typeof stageThoughts] || [
+            "Processing...",
+            "Analyzing requirements...",
+            "Generating code...",
+            "Finalizing..."
+        ];
+        
+        setThinkingSteps([]);
+        
+        for (const [index, thought] of thoughts.entries()) {
+            await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 200));
+            
+            setThinkingSteps(prev => [...prev, { text: thought, completed: false }]);
+            
+            await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
+            setThinkingSteps(prev => prev.map((step, i) => 
+                i === index ? { ...step, completed: true } : step
+            ));
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 800));
+        setIsThinking(false);
+        setThinkingSteps([]);
+        setCurrentThinkingStage(null);
+    };
+
     return (
         <div
-            className={`flex flex-col w-[32%] ${isExpanded ? "fixed inset-4 z-50" : "h-full"} transition-all duration-300 ease-in-out`}
+            className={`flex flex-col h-full ${isExpanded ? "fixed inset-4 z-50" : ""} transition-all duration-300 ease-in-out`}
         >
-            <div className="flex flex-col h-full bg-[#0e0e12] overflow-hidden border border-[#232329] shadow-2xl">
-                {/* Header */}
-                <div className="flex items-center justify-between px-4 py-3 bg-[#121218] border-b border-[#232329]">
-                    <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                        <h4 className="font-medium text-sm text-gray-300">AI Assistant</h4>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-[#232329]"
-                            onClick={() => setIsExpanded(!isExpanded)}
-                        >
-                            {isExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-[#232329]"
-                            onClick={clearChat}
-                        >
-                            <Trash2 size={14} />
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-[#232329]"
-                        >
-                            <X size={14} />
-                        </Button>
-                    </div>
-                </div>
+            <div 
+                className="chat-container flex flex-col h-full bg-card border-border overflow-hidden w-full"
+            >
+                {/* New integrated header with project controls */}
+                <ChatHeader onDeleteChat={clearChat} />
 
-                {/* Messages */}
-                <div className="text-xs flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-[#232329] scrollbar-track-transparent">
+                <div 
+                    ref={messagesAreaRef}
+                    className="messages-area text-sm flex-1 overflow-y-auto p-6 space-y-6 min-h-0"
+                    onScroll={handleScroll}
+                >
+
                     <AnimatePresence>
                         {messages.map((message, index) => {
                             const isUser = message.sender === 'user';
-                            const isLog  = message.isLogLine === true;
                             const displayTime = message.timestamp
                                 ? formatTime(message.timestamp)
-                                : "03:02 PM";
+                                : "";
                             
                             return (
                                 <motion.div
                                     key={index}
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.3 }}
-                                    className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+                                    initial={{ opacity: 0, y: 20, filter: "blur(4px)" }}
+                                    animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                                    transition={{ duration: 0.4, ease: "easeOut" }}
+                                    className={`w-full ${isUser ? "flex justify-end" : ""}`}
                                 >
-                                    <div
-                                        className={`max-w-[85%] rounded-lg ${
-                                            isUser
-                                                ? "bg-[#0066ff] text-white rounded-tr-none"
-                                                : isLog
-                                                  ? "bg-transparent text-[#7dd3fc]"           /* cyan-ish text, no bubble */
-                                                  : "bg-[#1a1a22] text-gray-100 rounded-tl-none border border-[#2a2a33]"
-                                        }`}
-                                        style={{
-                                            whiteSpace: 'pre-wrap',
-                                            wordWrap: 'break-word', 
-                                            overflowWrap: 'break-word',
-                                            overflowX: 'hidden'
-                                        }}
-                                    >
-                                        <div className="p-3">
-                                            <div className="flex items-start gap-2">
-                                                {!isUser && (
-                                                    <div className="mt-1 bg-[#232329] p-1 rounded-full">
-                                                        <Bot size={14} className="text-[#0066ff]" />
+                                    <div className="w-full">
+                                        {isUser ? (
+                                            <div className="flex justify-end w-full">
+                                                <div className="user-message bg-gray-900/20 rounded-lg px-4 py-3 max-w-[80%] shadow-sm overflow-hidden" style={{
+                                                    whiteSpace: 'pre-wrap',
+                                                    wordWrap: 'break-word', 
+                                                    overflowWrap: 'break-word'
+                                                }}>
+                                                    <div className="leading-relaxed font-inter text-[15px] text-slate-100 font-normal">
+                                                        <MarkdownRenderer content={message.text} />
                                                     </div>
-                                                )}
-                                                <div className="leading-relaxed">
-                                                    {message.isChecklist
-                                                        ? <ChatChecklistBubble />
-                                                        : <MarkdownRenderer content={message.text} />}
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div
-                                            className={`flex items-center justify-between text-[10px] px-3 pb-1.5 ${isUser ? "text-blue-50" : "text-gray-500"}`}
-                                        >
-                                            <span className="font-mono">{displayTime}</span>
-                                            {isUser && (
-                                                <span className="flex items-center">
-                                                    {message.status === "sending" ? <Loader2 size={10} className="animate-spin mr-1" /> : "✓"}
-                                                </span>
-                                            )}
-                                        </div>
+                                        ) : (
+                                            <div className="w-full ai-message-container">
+                                                {/* Thinking process for this specific AI message */}
+                                                {isThinking && thinkingSteps.length > 0 && index === messages.length - 1 && (
+                                                    <motion.div 
+                                                        initial={{ opacity: 0, y: 10 }} 
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        exit={{ opacity: 0, y: -10 }}
+                                                        className="w-full mb-3"
+                                                    >
+                                                        <div className="thinking-container px-2 py-1 space-y-2">
+                                                            {thinkingSteps.map((step, stepIndex) => (
+                                                                <motion.div
+                                                                    key={stepIndex}
+                                                                    initial={{ opacity: 0, x: -10 }}
+                                                                    animate={{ opacity: 1, x: 0 }}
+                                                                    transition={{ delay: stepIndex * 0.05, duration: 0.4, ease: "easeOut" }}
+                                                                    className={`thinking-step flex items-center gap-3 transition-opacity duration-300 ${
+                                                                        step.completed ? 'opacity-100' : 'opacity-70'
+                                                                    }`}
+                                                                >
+                                                                    <div className="thinking-indicator flex items-center justify-center w-4 h-4">
+                                                                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full opacity-60"></div>
+                                                                    </div>
+                                                                    <span className={`text-xs font-mono leading-relaxed opacity-70 ${
+                                                                        step.completed 
+                                                                            ? "text-gray-500 dark:text-gray-500" 
+                                                                            : "text-gray-600 dark:text-gray-400"
+                                                                    }`}>
+                                                                        {step.text}
+                                                                    </span>
+                                                                </motion.div>
+                                                            ))}
+                                                        </div>
+                                                    </motion.div>
+                                                )}
+                                                
+                                                {/* AI message content */}
+                                                {message.logs && message.logs.length > 0 ? (
+                                                    <div className="space-y-1 font-mono text-xs text-gray-600 dark:text-gray-400">
+                                                        {message.logs.map((log, logIndex) => (
+                                                            <div key={logIndex} className="opacity-90 leading-relaxed">
+                                                                {log}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div className="w-full leading-relaxed font-inter text-[15px] text-gray-800 dark:text-gray-100 font-normal" style={{
+                                                        whiteSpace: 'pre-wrap',
+                                                        wordWrap: 'break-word', 
+                                                        overflowWrap: 'break-word'
+                                                    }}>
+                                                        <MarkdownRenderer content={message.text} />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                        {displayTime && (
+                                            <div className={`text-xs mt-2 ${isUser ? "flex justify-end text-gray-500" : "text-gray-500"}`}>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-mono">{displayTime}</span>
+                                                    {isUser && (
+                                                        <span className="flex items-center">
+                                                            {message.status === "sending" ? <div className="sending-dots"><div></div><div></div><div></div></div> : "✓"}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </motion.div>
                             );
                         })}
                     </AnimatePresence>
 
-                    {/* Typing indicator */}
                     {isTyping && (
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
-                            <div className="bg-[#1a1a22] text-gray-100 rounded-lg rounded-tl-none border border-[#2a2a33] p-3 max-w-[85%]"
-                                style={{
-                                    whiteSpace: 'pre-wrap',
-                                    wordWrap: 'break-word', 
-                                    overflowWrap: 'break-word',
-                                    overflowX: 'hidden'
-                                }}
-                            >
-                                <div className="flex items-center gap-2">
-                                    <div className="bg-[#232329] p-1 rounded-full">
-                                        <Bot size={14} className="text-[#0066ff]" />
-                                    </div>
-                                    <div className="flex space-x-1">
-                                        <div className="w-2 h-2 rounded-full bg-gray-400 animate-pulse"></div>
-                                        <div className="w-2 h-2 rounded-full bg-gray-400 animate-pulse delay-150"></div>
-                                        <div className="w-2 h-2 rounded-full bg-gray-400 animate-pulse delay-300"></div>
-                                    </div>
+                        <motion.div 
+                            initial={{ opacity: 0, y: 10 }} 
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="w-full"
+                        >
+                            <div className="flex items-center gap-3 px-1 py-2">
+                                <div className="thinking-dots flex gap-1">
+                                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
                                 </div>
+                                <span className="text-sm text-gray-600 dark:text-gray-400 font-inter">Processing your request...</span>
                             </div>
                         </motion.div>
                     )}
@@ -502,77 +727,47 @@ const Chat: React.FC = () => {
                     <div ref={messagesEndRef} />
                 </div>
 
-                {/* Input area */}
-                <div className="p-3 bg-[#121218] border-t border-[#232329]">
+                <div className="input-area p-3 border-t border-border flex-shrink-0">
                     <div className="flex flex-col space-y-2">
-                        <div className="flex items-center gap-1 px-2">
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-[#232329]"
-                            >
-                                <Code size={14} />
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-[#232329]"
-                            >
-                                <Image size={14} />
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-[#232329]"
-                            >
-                                <Paperclip size={14} />
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 rounded-full text-gray-400 hover:text-gray-200 hover:bg-[#232329]"
-                            >
-                                <Plus size={14} />
-                            </Button>
-                            <div className="flex-1"></div>
-                            <div className="text-xs text-gray-500 font-mono">
-                                {input.length > 0 ? `${input.length} chars` : "gpt-4o"}
+                        <div className="flex items-center justify-end px-2">
+                            <div className="char-count text-xs text-muted-foreground font-mono">
+                                {input.length > 0 ? `${input.length} chars` : "Claude AI"}
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-2 bg-[#1a1a22] rounded-lg p-1 border border-[#2a2a33] focus-within:ring-1 focus-within:ring-[#0066ff] focus-within:border-[#0066ff]">
+                        <div className="flex items-center gap-2 bg-background rounded-lg p-1 border border-border focus-within:ring-1 focus-within:ring-ring transition-all duration-200">
                             <textarea
                                 ref={textareaRef}
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 onKeyDown={handleKeyPress}
                                 placeholder="Message the AI Assistant"
-                                className="flex-1 bg-transparent text-gray-200 px-2 py-1.5 min-h-[40px] max-h-[120px] resize-none focus:outline-none text-xs"
+                                className="chat-input flex-1 bg-transparent text-foreground px-2 py-1.5 min-h-[40px] max-h-[120px] resize-none focus:outline-none text-sm"
                                 rows={1}
                             />
 
                             <Button
                                 onClick={sendMessage}
                                 disabled={input.trim() === ""}
-                                className={`rounded-md px-3 py-1.5 h-auto ${
+                                className={`rounded-lg px-3 py-1.5 h-auto transition-all duration-200 ${
                                     input.trim() === ""
-                                        ? "bg-[#232329] text-gray-500"
-                                        : "bg-[#0066ff] hover:bg-[#0052cc] text-white"
+                                        ? "send-button-inactive bg-muted text-muted-foreground"
+                                        : "send-button-active bg-primary hover:bg-primary/90 text-primary-foreground"
                                 }`}
                             >
                                 <Send size={12} className="mr-2" />
-                                <span className="text-xs font-medium">Send</span>
+                                <span className="text-sm font-medium">Send</span>
                             </Button>
                         </div>
                     </div>
                 </div>
 
                 {/* Status bar */}
-                <div className="px-4 py-1.5 bg-[#0e0e12] border-t border-[#232329] flex items-center justify-between">
-                    <div className="text-xs text-gray-500 font-mono">v1.0.0</div>
+                <div className="status-bar px-4 py-1.5 border-t border-border flex items-center justify-between flex-shrink-0">
+                    <div className="text-xs text-muted-foreground font-mono">v1.0.0</div>
                     <div className="flex items-center space-x-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-                        <span className="text-xs text-gray-500 font-mono">ONLINE</span>
+                        <div className="status-online-dot w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                        <span className="text-xs text-muted-foreground font-mono">ONLINE</span>
                     </div>
                 </div>
             </div>

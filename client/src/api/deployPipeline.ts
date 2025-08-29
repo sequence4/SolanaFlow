@@ -9,8 +9,6 @@ export function deployPipeline(
   walletSigned = true,
 ) {
   if (!projectId) throw new Error("deployPipeline called without projectId");
-  console.log(`[SSE] Starting deploy pipeline for project: ${projectId}`);
-  console.log(`[SSE] API_URL: ${API_URL}`);
   
   const token =
     typeof window !== 'undefined' ? localStorage.getItem('token') : null;
@@ -20,8 +18,6 @@ export function deployPipeline(
   };
   if (token) headers.Authorization = `Bearer ${token}`;
   
-  console.log(`[SSE] Headers prepared, auth token ${token ? 'present' : 'missing'}`);
-
   const url = `${API_URL}/api/deploy/${projectId}/deploy-pipeline`;
   
   const controller = new AbortController();
@@ -34,7 +30,6 @@ export function deployPipeline(
     openWhenHidden: true,
     
     async onopen(response) {
-      console.log(`[SSE] Connection opened with status: ${response.status}`);
       if (response.status >= 400) {
         throw new Error(`HTTP ${response.status} while opening SSE`);
       }
@@ -42,14 +37,22 @@ export function deployPipeline(
     
     onmessage(event: EventSourceMessage) {
       try {
+        if (!event.data || event.data.trim() === '') {
+          return;
+        }
+        
         const msg = JSON.parse(event.data);
-        console.log(`[SSE] Received message:`, msg);
         eventBus.emit('progress', msg);
+        
+        if (msg.type === 'code-generation' && msg.files) {
+          eventBus.emit('code-generation', msg);
+        }
+        
         if (onProgress) {
           onProgress(msg);
         }
       } catch (error) {
-        console.error(`[SSE] Error parsing message:`, error);
+        console.error(`[SSE] Error parsing message:`, error, 'Raw data:', event.data);
       }
     },
     
@@ -62,19 +65,13 @@ export function deployPipeline(
     },
   });
   
-  console.log(`[SSE] EventSource created for project: ${projectId}`);
-  
-  // Return an object with the same interface as EventSource for compatibility
   return {
     close: () => {
       console.log(`[SSE] Manually closing connection`);
       controller.abort();
     },
-    addEventListener: (event: string, handler: EventListener) => {
-      // This is a minimal implementation to match the interface
+    addEventListener: (event: string) => {
       if (event === 'close') {
-        // We can't really add listeners to the fetch stream,
-        // but this will be called from our wrapper code
       }
     }
   };

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   AccordionRoot,
   AccordionItem,
@@ -14,7 +14,7 @@ import {
   Briefcase, 
   Droplet 
 } from "lucide-react";
-
+import { motion, AnimatePresence } from "framer-motion";
 import { InstructionCard } from "./ToolboxInstructions";
 
 const accordionStyles = `
@@ -24,81 +24,146 @@ const accordionStyles = `
 `;
 
 export function GroupedInstructionsAccordion() {
-  // Use exact colors from the new design
-  const textColor = "#fff";
-  const iconColor = "#fff";
-  const borderColor = "#2a2a2d";
-  const accordionBgColor = "#121214";
+  const [openItems, setOpenItems] = useState<string[]>(["SPL Token Instructions"]);
 
   // Map of category labels to their icons and colors
-  const categoryIcons: Record<string, { icon: any; color: string }> = {
-    "SPL Token Instructions": { icon: <Package className="h-4 w-4 text-white" />, color: "blue" },
-    "NFT and Metaplex Instructions": { icon: <Layers className="h-4 w-4 text-white" />, color: "purple" },
-    "Governance Instructions": { icon: <Briefcase className="h-4 w-4 text-white" />, color: "green" },
-    "DeFi Instructions": { icon: <Droplet className="h-4 w-4 text-white" />, color: "amber" },
+  const categoryIcons: Record<string, { icon: any; color: string; gradient: string }> = {
+    "SPL Token Instructions": { 
+      icon: <Package className="h-4 w-4 text-foreground" />, 
+      color: "muted",
+      gradient: "from-muted to-muted"
+    },
+    "NFT and Metaplex Instructions": { 
+      icon: <Layers className="h-4 w-4 text-foreground" />, 
+      color: "muted",
+      gradient: "from-muted to-muted"
+    },
+    "Governance Instructions": { 
+      icon: <Briefcase className="h-4 w-4 text-foreground" />, 
+      color: "muted",
+      gradient: "from-muted to-muted"
+    },
+    "DeFi Instructions": { 
+      icon: <Droplet className="h-4 w-4 text-foreground" />, 
+      color: "muted",
+      gradient: "from-muted to-muted"
+    },
   };
 
   const getColorClass = (color: string) => {
     switch (color) {
-      case "blue":
-        return "bg-blue-500";
-      case "green":
-        return "bg-emerald-500";
-      case "purple":
-        return "bg-purple-500";
-      case "amber":
-        return "bg-amber-500";
+      case "muted":
+        return "bg-muted";
+      case "card":
+        return "bg-card";
       default:
-        return "bg-blue-500";
+        return "bg-muted";
     }
   };
 
   return (
-    <div style={{ backgroundColor: accordionBgColor, padding: 0 }}>
+    <div className="bg-card p-0">
       <style>{accordionStyles}</style>
-      <AccordionRoot type="multiple" defaultValue={["SPL Token Instructions"]}>
-        {groupedInstructions.map((group) => {
-          const categoryInfo = categoryIcons[group.label] || { icon: <Package className="h-4 w-4 text-white" />, color: "blue" };
+      <AccordionRoot 
+        type="multiple" 
+        defaultValue={["SPL Token Instructions"]}
+      >
+        {groupedInstructions.map((group, index) => {
+          const categoryInfo = categoryIcons[group.label] || { 
+            icon: <Package className="h-4 w-4 text-foreground" />, 
+            color: "muted",
+            gradient: "from-muted to-muted"
+          };
+          const isOpen = openItems.includes(group.label);
 
           return (
-            <AccordionItem
+            <motion.div
               key={group.label}
-              value={group.label}
-              className="border-b border-[#2a2a2d] accordion-item"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: index * 0.1 }}
             >
-              <AccordionItemTrigger
-                className="flex items-center justify-between w-full p-3 text-sm font-medium transition-all duration-200 hover:bg-[#2a2a2d]/20"
+              <AccordionItem
+                value={group.label}
+                className="border-b accordion-item overflow-hidden border-border"
               >
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`h-5 w-5 rounded flex items-center justify-center ${getColorClass(categoryInfo.color)}`}
-                  >
-                    {categoryInfo.icon}
+                <AccordionItemTrigger
+                  className="group flex items-center justify-between w-full px-3 py-2 text-sm font-medium transition-all duration-300 backdrop-blur-sm relative hover:bg-muted/5 bg-transparent"
+                >
+                  {/* Muted background on hover */}
+                  <div className="absolute inset-0 bg-muted/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  
+                  <div className="flex items-center gap-2 relative z-10">
+                    <motion.div
+                      whileHover={{ scale: 1.1, rotate: 5 }}
+                      className="h-6 w-6 rounded-md flex items-center justify-center bg-muted border border-border"
+                    >
+                      {categoryInfo.icon}
+                    </motion.div>
+                    <span 
+                      className="text-xs font-medium transition-colors duration-200 text-foreground"
+                    >
+                      {group.label}
+                    </span>
                   </div>
-                  <span className="font-medium">{group.label}</span>
-                </div>
-                <div className="flex items-center cursor-pointer">
-                  <span className="mr-2 text-xs px-1.5 py-0.5 rounded bg-[#2a2a2d] text-white">{group.items.length}</span>
-                  <ChevronDown
-                    className="chevron-icon h-4 w-4 text-[#6e6e76] transition-transform duration-200"
-                  />
-                </div>
-              </AccordionItemTrigger>
-
-              <AccordionItemContent className="animate-accordion-down">
-                <div>
-                  {group.items.map((instruction) => (
-                    <div key={instruction.name} className="text-sm w-full">
-                      <InstructionCard
-                        key={instruction.name}
-                        name={instruction.name}
-                        flow={instruction.flow}
+                  
+                  <div className="flex items-center gap-2 relative z-10">
+                    <motion.span 
+                      whileHover={{ scale: 1.05 }}
+                      className="px-1.5 py-0.5 text-[10px] rounded-md border bg-muted border-border text-muted-foreground"
+                    >
+                      {group.items.length}
+                    </motion.span>
+                    <motion.div
+                      animate={{ rotate: isOpen ? 180 : 0 }}
+                      transition={{ duration: 0.3, ease: "easeInOut" }}
+                    >
+                      <ChevronDown 
+                        className="h-3 w-3 transition-colors duration-200 text-muted-foreground" 
                       />
-                    </div>
-                  ))}
-                </div>
-              </AccordionItemContent>
-            </AccordionItem>
+                    </motion.div>
+                  </div>
+                </AccordionItemTrigger>
+
+                <AccordionItemContent className="overflow-hidden">
+                  <AnimatePresence>
+                    {isOpen && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3, ease: "easeInOut" }}
+                        className="border-l-2 ml-4 border-border"
+                      >
+                        <div className="pl-4 pr-3 pb-1 space-y-0.5">
+                          {group.items.map((instruction, itemIndex) => (
+                            <motion.div
+                              key={instruction.name}
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ 
+                                duration: 0.2, 
+                                delay: itemIndex * 0.03,
+                                ease: "easeOut"
+                              }}
+                              className="text-sm w-full"
+                            >
+                              <InstructionCard
+                                key={instruction.name}
+                                name={instruction.name}
+                                flow={instruction.flow}
+                                isNew={itemIndex < 1} // Mark first item as new
+                                isFavorite={itemIndex === 0 && index === 0} // Mark first item of first group as favorite
+                              />
+                            </motion.div>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </AccordionItemContent>
+              </AccordionItem>
+            </motion.div>
           );
         })}
       </AccordionRoot>

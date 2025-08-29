@@ -1,0 +1,202 @@
+/* Global Enhancements - AI-like Futuristic Appearance */
+
+/* Enhanced body background with neural patterns */
+body {
+  background-image: 
+    radial-gradient(circle at 20% 20%, rgba(139, 92, 246, 0.02) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(168, 85, 247, 0.02) 0%, transparent 50%),
+    radial-gradient(circle at 40% 60%, rgba(59, 130, 246, 0.01) 0%, transparent 50%) !important;
+  background-attachment: fixed;
+}
+
+/* Enhanced typography with better contrast */
+h1, h2, h3, h4, h5, h6 {
+  color: oklch(0.98 0 0) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* AI-inspired utility classes */
+@layer utilities {
+  .ai-glow {
+    box-shadow: 
+      0 0 20px var(--ai-glow-primary),
+      0 0 40px var(--ai-glow-secondary),
+      inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  }
+  
+  .ai-glow-subtle {
+    box-shadow: 
+      0 2px 8px var(--ai-glow-primary),
+      0 1px 4px var(--ai-glow-secondary),
+      inset 0 1px 0 rgba(255, 255, 255, 0.01);
+  }
+  
+  .ai-border {
+    border: 1px solid var(--ai-border-glow);
+  }
+  
+  .ai-gradient-bg {
+    background: var(--ai-gradient-1);
+  }
+  
+  .ai-gradient-border {
+    border-image: linear-gradient(135deg, var(--ai-border-glow), transparent) 1;
+  }
+  
+  .neural-pattern {
+    background-image: 
+      radial-gradient(circle at 25% 25%, rgba(139, 92, 246, 0.03) 0%, transparent 50%),
+      radial-gradient(circle at 75% 75%, rgba(168, 85, 247, 0.02) 0%, transparent 50%);
+    background-size: 100px 100px, 150px 150px;
+  }
+  
+  .text-ai {
+    color: oklch(0.75 0.2 265);
+    text-shadow: 0 0 4px rgba(139, 92, 246, 0.3);
+  }
+  
+  .bg-ai-dark {
+    background: rgba(20, 20, 35, 0.9);
+    backdrop-filter: blur(20px);
+  }
+  
+  .bg-ai-darker {
+    background: rgba(15, 15, 25, 0.95);
+    backdrop-filter: blur(24px);
+  }
+}
+
+
+/* Apply AI scrollbar globally */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ai-border-glow) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: rgba(20, 20, 35, 0.3);
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--ai-border-glow);
+  border-radius: 4px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--ai-glow-primary);
+  box-shadow: 0 0 8px var(--ai-glow-primary);
+}
+
+/* AI-inspired animations */
+@layer utilities {
+  .animate-ai-pulse {
+    animation: ai-pulse var(--ai-pulse-duration) cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  .animate-ai-glow {
+    animation: ai-glow var(--ai-glow-duration) ease-in-out infinite alternate;
+  }
+  
+  .animate-neural {
+    animation: neural-activity 4s ease-in-out infinite;
+  }
+}
+
+@keyframes ai-pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 20px var(--ai-glow-primary);
+  }
+  50% {
+    opacity: 0.8;
+    box-shadow: 0 0 40px var(--ai-glow-secondary);
+  }
+}
+
+@keyframes ai-glow {
+  from {
+    box-shadow: 0 0 20px var(--ai-glow-primary);
+  }
+  to {
+    box-shadow: 
+      0 0 30px var(--ai-glow-primary),
+      0 0 50px var(--ai-glow-secondary);
+  }
+}
+
+@keyframes neural-activity {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  25% {
+    background-position: 25% 25%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  75% {
+    background-position: 75% 75%;
+  }
+}
+
+/* Enhanced focus states with AI theme */
+@layer base {
+  *:focus-visible {
+    outline: 2px solid var(--ai-glow-primary);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1);
+  }
+}
+
+/* Micro-interactions for better UX */
+@layer utilities {
+  .ai-interactive {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .ai-interactive:hover {
+    transform: translateY(-2px);
+    box-shadow: 
+      0 4px 12px var(--ai-glow-primary),
+      0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+  
+  .ai-interactive:active {
+    transform: translateY(-1px);
+  }
+}
+
+/* Selection styling */
+::selection {
+  background: rgba(139, 92, 246, 0.3);
+  color: white;
+}
+
+/* Enhanced code blocks and inputs */
+code, pre, .font-mono {
+  background: rgba(0, 0, 0, 0.4) !important;
+  border: 1px solid var(--ai-border-glow);
+  color: oklch(0.85 0.1 265);
+}
+
+/* Loading states with AI theme */
+.loading-ai {
+  background: linear-gradient(90deg, 
+    transparent, 
+    rgba(139, 92, 246, 0.1), 
+    transparent
+  );
+  background-size: 200% 100%;
+  animation: shimmer-ai 1.5s infinite;
+}
+
+@keyframes shimmer-ai {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}

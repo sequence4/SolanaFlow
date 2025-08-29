@@ -8,12 +8,13 @@ import { useTaskLogs } from '@/context/logs/useTaskLogs';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { LuSave, LuPlus } from "react-icons/lu";
+import { LuSave, LuPlus, LuSun, LuMoon } from "react-icons/lu";
 import { FaRegFolderOpen } from "react-icons/fa";
 import ProjectListPopover from './workflow/ProjectListPopover';
 import '@/styles/toolbar/ToolbarStyle.css';
-import { useColorModeValue } from '@/components/ui/color-mode';
+import { useColorModeValue, useColorMode } from '@/components/ui/color-mode';
 import { NewProjectModal } from '@/components/ui/new-project-modal';
+import { darkTheme } from '@/styles/theme';
 
 export const ProjectInfo: React.FC = () => {
     const { projectContext, setProjectContext } = useContext(ProjectContext);
@@ -25,6 +26,7 @@ export const ProjectInfo: React.FC = () => {
     const taskLogs = useTaskLogs();
 
     const buttonTextColor = useColorModeValue('var(--toolbar-button-text-light)', 'var(--toolbar-button-text-dark)');
+    const { colorMode, toggleColorMode } = useColorMode();
 
     useEffect(() => {
         console.log('ProjectContext:', projectContext);
@@ -64,10 +66,12 @@ export const ProjectInfo: React.FC = () => {
     };
 
     return (
-        <div className="flex flex-1 flex-row justify-between w-full items-center p-[10px_25px] gap-[30px] text-[10px]"
-            style={{ 
-                backgroundColor: "var(--foreground-dark)",
-                borderBottom: "1px solid var(--border-2-dark)" 
+        <div 
+            className="flex flex-1 flex-row justify-between w-full items-center p-[10px_25px] gap-[30px] text-[10px] backdrop-blur-xl border-b shadow-lg"
+            style={{
+                backgroundColor: darkTheme.background.secondary,
+                borderColor: darkTheme.border.default,
+                backdropFilter: `blur(${darkTheme.glass.blur})`,
             }}
         >
             <div className="flex flex-row gap-[20px] items-center justify-between min-w-[250px] w-full">
@@ -77,7 +81,7 @@ export const ProjectInfo: React.FC = () => {
                         <Button
                             variant="ghost"
                             onClick={handleNewProjectToggle}
-                            className="flex items-center justify-center gap-[10px] text-sm rounded-md"
+                            className="flex items-center justify-center gap-[10px] text-sm rounded-lg hover:bg-white/10 transition-all duration-200 hover:scale-105 backdrop-blur-sm"
                             style={{ color: buttonTextColor }}
                         >
                             <LuPlus size={18} />
@@ -90,7 +94,7 @@ export const ProjectInfo: React.FC = () => {
                         <Button
                             variant="ghost"
                             onClick={handleOpenProjectClick}
-                            className="flex items-center justify-center gap-[10px] text-sm rounded-md"
+                            className="flex items-center justify-center gap-[10px] text-sm rounded-lg hover:bg-white/10 transition-all duration-200 hover:scale-105 backdrop-blur-sm"
                             style={{ color: buttonTextColor }}
                         >
                             <FaRegFolderOpen size={18} />
@@ -103,12 +107,26 @@ export const ProjectInfo: React.FC = () => {
                         <Button
                             variant="ghost"
                             onClick={() => handleSaveClick(projectContext, setProjectContext, projectsRefreshCounter, setProjectsRefreshCounter)}
-                            className="flex items-center justify-center gap-[10px] text-sm rounded-md"
+                            className="flex items-center justify-center gap-[10px] text-sm rounded-lg hover:bg-white/10 transition-all duration-200 hover:scale-105 backdrop-blur-sm disabled:opacity-50"
                             style={{ color: buttonTextColor }}
                             disabled={!projectContext.id}
                         >
                             <LuSave size={18} />
                             <span>Save</span>
+                        </Button>
+                    </Tooltip>
+                </div>
+                
+                {/* Theme Toggle Button */}
+                <div className="flex items-center">
+                    <Tooltip content={`Switch to ${colorMode === 'dark' ? 'light' : 'dark'} mode`}>
+                        <Button
+                            variant="ghost"
+                            onClick={toggleColorMode}
+                            className="flex items-center justify-center p-2 text-sm rounded-lg hover:bg-white/10 transition-all duration-200 hover:scale-105 backdrop-blur-sm"
+                            style={{ color: buttonTextColor }}
+                        >
+                            {colorMode === 'dark' ? <LuSun size={18} /> : <LuMoon size={18} />}
                         </Button>
                     </Tooltip>
                 </div>
@@ -123,8 +141,8 @@ export const ProjectInfo: React.FC = () => {
 
             {/* Project List Modal */}
             <Dialog open={isProjectListModalOpen} onOpenChange={(open) => setIsProjectListModalOpen(open)}>
-                <DialogContent className="bg-[#111827] text-slate-100 " 
-                style={{width: "fit-content", border: "1px solid rgb(36, 45, 68)"}}>
+                <DialogContent className="bg-gradient-to-br from-slate-900/90 via-slate-800/80 to-slate-900/90 backdrop-blur-xl text-slate-100 border-white/10" 
+                style={{width: "fit-content"}}>
                     <ProjectListPopover
                         modalIsOpen={isProjectListModalOpen}
                         refreshTrigger={projectsRefreshCounter}

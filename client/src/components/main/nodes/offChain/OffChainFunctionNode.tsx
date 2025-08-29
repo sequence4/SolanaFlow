@@ -162,13 +162,13 @@ const FieldInput: React.FC<FieldInputProps> = ({ parameter, value, onChange }) =
               alt={value.name || "Uploaded file"}
               className="h-[70px] w-auto object-contain rounded-md mb-1"
             />
-            <p className="text-[8px] text-gray-300 mb-1">
+            <p className="text-[8px] text-muted-foreground mb-1">
               {value.name}
             </p>
             <Button 
               size="sm"
               variant="secondary"
-              className="h-5 text-[8px] bg-gray-800 hover:bg-gray-700"
+              className="h-5 text-[8px] bg-muted hover:bg-muted/80"
               onClick={() => fileInputRef.current?.click()}
             >
               <Upload className="mr-1 h-3 w-3" />
@@ -180,10 +180,10 @@ const FieldInput: React.FC<FieldInputProps> = ({ parameter, value, onChange }) =
             <Input
               placeholder={`Select ${isImageField ? 'image' : 'file'}`}
               readOnly
-              className="flex-1 border-gray-700 bg-gray-800 text-gray-100"
+              className="flex-1 border-border bg-muted text-foreground"
             />
             <div className="relative">
-              <Button variant="secondary" className="bg-gray-800 hover:bg-gray-700">
+              <Button variant="secondary" className="bg-muted hover:bg-muted/80">
                 <ImageIcon className="mr-1 h-4 w-4" />
                 Browse
               </Button>
@@ -211,7 +211,7 @@ const FieldInput: React.FC<FieldInputProps> = ({ parameter, value, onChange }) =
       value={value || ''}
       onChange={(e) => onChange(parameter.label, e.target.value)}
       placeholder={`Enter ${parameter.label.toLowerCase()}`}
-      className="min-h-[80px] border-gray-700 bg-gray-800 text-gray-100"
+      className="min-h-[80px] border-border bg-muted text-foreground"
     />
   ) : (
     <Input
@@ -219,7 +219,7 @@ const FieldInput: React.FC<FieldInputProps> = ({ parameter, value, onChange }) =
       type={parameter.type === 'number' ? 'number' : 'text'}
       onChange={(e) => onChange(parameter.label, e.target.value)}
       placeholder={`Enter ${parameter.label.toLowerCase()}`}
-      className="border-gray-700 bg-gray-800 text-gray-100"
+      className="border-border bg-muted text-foreground"
     />
   );
 };
@@ -317,13 +317,13 @@ export function OffChainFunctionNode({ data, id, type }: OffChainFunctionNodePro
 
   return (
     <div className="relative">
-      <Card className="w-full border-gray-800 bg-gray-900 shadow-lg">
-        <CardHeader className="flex flex-row items-center gap-2 border-b border-gray-800 bg-gray-900 px-4 py-3">
+      <Card className="w-full border-border bg-card shadow-lg">
+        <CardHeader className="flex flex-row items-center gap-2 border-b border-border bg-card px-4 py-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary">
             <Upload className="h-4 w-4" />
           </div>
           <div className="flex flex-1 items-center">
-            <h3 className="text-lg font-semibold text-white">{label}</h3>
+            <h3 className="text-lg font-semibold text-foreground">{label}</h3>
             <Badge variant="outline" className="ml-2 border-primary/20 bg-primary/10 text-primary">
               IPFS
             </Badge>
@@ -346,16 +346,16 @@ export function OffChainFunctionNode({ data, id, type }: OffChainFunctionNodePro
         </CardHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 bg-gray-900 p-0">
+          <TabsList className="grid w-full grid-cols-2 bg-card p-0">
             <TabsTrigger
               value="config"
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-gray-800"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-muted"
             >
               Configuration
             </TabsTrigger>
             <TabsTrigger
               value="output"
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-gray-800"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-muted"
             >
               Output
             </TabsTrigger>
@@ -378,7 +378,7 @@ export function OffChainFunctionNode({ data, id, type }: OffChainFunctionNodePro
                     <div key={idx} className="space-y-2">
                       <div className="flex items-center">
                         <div className="h-2 w-2 rounded-full bg-primary"></div>
-                        <Label className="ml-2 text-sm font-medium text-gray-200">
+                        <Label className="ml-2 text-sm font-medium text-muted-foreground">
                           {parameter.label}
                           {parameter.required && (
                             <span className="ml-1 text-red-500">*</span>
@@ -387,7 +387,7 @@ export function OffChainFunctionNode({ data, id, type }: OffChainFunctionNodePro
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Info className="ml-1 h-3.5 w-3.5 cursor-help text-gray-400" />
+                              <Info className="ml-1 h-3.5 w-3.5 cursor-help text-muted-foreground/70" />
                             </TooltipTrigger>
                             <TooltipContent side="right">
                               <p className="w-[200px] text-xs">{parameter.description || `Enter ${parameter.label.toLowerCase()}`}</p>
@@ -406,7 +406,7 @@ export function OffChainFunctionNode({ data, id, type }: OffChainFunctionNodePro
               </SimpleBar>
             </CardContent>
 
-            <CardFooter className="flex justify-end border-t border-gray-800 p-4">
+            <CardFooter className="flex justify-end border-t border-border p-4">
               <Button
                 onClick={handleRunFunction}
                 disabled={isRunning || isInjecting}
@@ -433,37 +433,37 @@ export function OffChainFunctionNode({ data, id, type }: OffChainFunctionNodePro
                 <div className="space-y-4">
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-400 text-sm">Transaction Signature</span>
-                      <span className="text-white text-sm font-mono bg-[#1a202c] px-2 py-1 rounded truncate max-w-[220px]">
+                      <span className="text-muted-foreground text-sm">Transaction Signature</span>
+                      <span className="text-white text-sm font-mono bg-muted px-2 py-1 rounded truncate max-w-[220px]">
                         {fieldValues.transactionSignature}
                       </span>
                     </div>
 
-                    <div className="border-t border-[#1e2530] pt-3">
-                      <h3 className="text-white text-sm mb-2">Accounts Created</h3>
+                    <div className="border-t border-border pt-3">
+                      <h3 className="text-foreground text-sm mb-2">Accounts Created</h3>
                       <div className="space-y-2 pl-2">
                         <div className="flex justify-between items-center">
-                          <span className="text-gray-400 text-xs">Mint Account</span>
+                          <span className="text-muted-foreground text-xs">Mint Account</span>
                           <div className="flex items-center gap-2">
-                            <span className="text-white text-xs font-mono bg-[#1a202c] px-2 py-1 rounded truncate max-w-[220px]">
+                            <span className="text-white text-xs font-mono bg-muted px-2 py-1 rounded truncate max-w-[220px]">
                               {fieldValues.mintAccount}
                             </span>
                             <span className="text-green-500">✓</span>
                           </div>
                         </div>
                         <div className="flex justify-between items-center">
-                          <span className="text-gray-400 text-xs">Metadata Account</span>
+                          <span className="text-muted-foreground text-xs">Metadata Account</span>
                           <div className="flex items-center gap-2">
-                            <span className="text-white text-xs font-mono bg-[#1a202c] px-2 py-1 rounded truncate max-w-[220px]">
+                            <span className="text-white text-xs font-mono bg-muted px-2 py-1 rounded truncate max-w-[220px]">
                               {fieldValues.metadataAccount}
                             </span>
                             <span className="text-green-500">✓</span>
                           </div>
                         </div>
                         <div className="flex justify-between items-center">
-                          <span className="text-gray-400 text-xs">Associated Token Account</span>
+                          <span className="text-muted-foreground text-xs">Associated Token Account</span>
                           <div className="flex items-center gap-2">
-                            <span className="text-white text-xs font-mono bg-[#1a202c] px-2 py-1 rounded truncate max-w-[220px]">
+                            <span className="text-white text-xs font-mono bg-muted px-2 py-1 rounded truncate max-w-[220px]">
                               {fieldValues.associatedTokenAccount}
                             </span>
                             <span className="text-green-500">✓</span>
@@ -472,24 +472,24 @@ export function OffChainFunctionNode({ data, id, type }: OffChainFunctionNodePro
                       </div>
                     </div>
 
-                    <div className="border-t border-[#1e2530] pt-3">
-                      <h3 className="text-white text-sm mb-2">Authorities</h3>
+                    <div className="border-t border-border pt-3">
+                      <h3 className="text-foreground text-sm mb-2">Authorities</h3>
                       <div className="space-y-2 pl-2">
                         <div className="flex justify-between items-center">
-                          <span className="text-gray-400 text-xs">Mint Authority</span>
-                          <span className="text-white text-xs font-mono bg-[#1a202c] px-2 py-1 rounded truncate max-w-[220px]">
+                          <span className="text-muted-foreground text-xs">Mint Authority</span>
+                          <span className="text-white text-xs font-mono bg-muted px-2 py-1 rounded truncate max-w-[220px]">
                             {fieldValues.mintAuthority}
                           </span>
                         </div>
                         <div className="flex justify-between items-center">
-                          <span className="text-gray-400 text-xs">Freeze Authority</span>
-                          <span className="text-white text-xs font-mono bg-[#1a202c] px-2 py-1 rounded truncate max-w-[220px]">
+                          <span className="text-muted-foreground text-xs">Freeze Authority</span>
+                          <span className="text-white text-xs font-mono bg-muted px-2 py-1 rounded truncate max-w-[220px]">
                             {fieldValues.freezeAuthority}
                           </span>
                         </div>
                         <div className="flex justify-between items-center">
-                          <span className="text-gray-400 text-xs">Update Authority</span>
-                          <span className="text-white text-xs font-mono bg-[#1a202c] px-2 py-1 rounded truncate max-w-[220px]">
+                          <span className="text-muted-foreground text-xs">Update Authority</span>
+                          <span className="text-white text-xs font-mono bg-muted px-2 py-1 rounded truncate max-w-[220px]">
                             {fieldValues.updateAuthority}
                           </span>
                         </div>
@@ -505,12 +505,12 @@ export function OffChainFunctionNode({ data, id, type }: OffChainFunctionNodePro
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-200">IPFS URL</Label>
+                    <Label className="text-sm font-medium text-muted-foreground">IPFS URL</Label>
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 overflow-hidden rounded-md border border-gray-700 bg-gray-800 p-2">
+                      <div className="flex-1 overflow-hidden rounded-md border border-border bg-muted p-2">
                         <div className="flex items-center gap-2">
-                          <Code className="h-4 w-4 text-gray-400" />
-                          <code className="flex-1 overflow-hidden overflow-ellipsis whitespace-nowrap text-xs text-gray-200">
+                          <Code className="h-4 w-4 text-muted-foreground" />
+                          <code className="flex-1 overflow-hidden overflow-ellipsis whitespace-nowrap text-xs text-muted-foreground">
                             {fieldValues.metadataUrl || storageUrl}
                           </code>
                         </div>
@@ -519,7 +519,7 @@ export function OffChainFunctionNode({ data, id, type }: OffChainFunctionNodePro
                         variant="outline"
                         size="icon"
                         onClick={() => copyToClipboard(fieldValues.metadataUrl || storageUrl || '')}
-                        className="h-9 w-9 border-gray-700 bg-gray-800 hover:bg-gray-700"
+                        className="h-9 w-9 border-border bg-muted hover:bg-muted/80"
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
@@ -527,12 +527,12 @@ export function OffChainFunctionNode({ data, id, type }: OffChainFunctionNodePro
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-200">Gateway URL</Label>
+                    <Label className="text-sm font-medium text-muted-foreground">Gateway URL</Label>
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 overflow-hidden rounded-md border border-gray-700 bg-gray-800 p-2">
+                      <div className="flex-1 overflow-hidden rounded-md border border-border bg-muted p-2">
                         <div className="flex items-center gap-2">
-                          <ExternalLink className="h-4 w-4 text-gray-400" />
-                          <code className="flex-1 overflow-hidden overflow-ellipsis whitespace-nowrap text-xs text-gray-200">
+                          <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                          <code className="flex-1 overflow-hidden overflow-ellipsis whitespace-nowrap text-xs text-muted-foreground">
                             {(fieldValues.metadataUrl || storageUrl || '')?.replace('ipfs://', 'https://ipfs.io/ipfs/')}
                           </code>
                         </div>
@@ -541,16 +541,16 @@ export function OffChainFunctionNode({ data, id, type }: OffChainFunctionNodePro
                         variant="outline"
                         size="icon"
                         onClick={() => window.open((fieldValues.metadataUrl || storageUrl || '')?.replace('ipfs://', 'https://ipfs.io/ipfs/'), '_blank')}
-                        className="h-9 w-9 border-gray-700 bg-gray-800 hover:bg-gray-700"
+                        className="h-9 w-9 border-border bg-muted hover:bg-muted/80"
                       >
                         <ExternalLink className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
 
-                  <div className="rounded-md border border-gray-700 bg-gray-800 p-3">
-                    <div className="mb-2 text-xs font-medium text-gray-400">Metadata Preview</div>
-                    <pre className="overflow-x-auto rounded bg-gray-950 p-2 text-xs text-gray-300">
+                  <div className="rounded-md border border-border bg-muted p-3">
+                    <div className="mb-2 text-xs font-medium text-muted-foreground">Metadata Preview</div>
+                    <pre className="overflow-x-auto rounded bg-background p-2 text-xs text-muted-foreground">
                       {JSON.stringify(
                         {
                           name: fieldValues["Name"] || "Untitled NFT",
@@ -565,14 +565,14 @@ export function OffChainFunctionNode({ data, id, type }: OffChainFunctionNodePro
                   </div>
                 </div>
               ) : (
-                <div className="flex h-[200px] flex-col items-center justify-center gap-3 text-center text-gray-400">
+                <div className="flex h-[200px] flex-col items-center justify-center gap-3 text-center text-muted-foreground">
                   <Upload className="h-10 w-10 opacity-40" />
                   <p>{nodeType === "createNftNode" ? "No NFT accounts created yet" : "No upload data available yet"}</p>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setActiveTab("config")}
-                    className="mt-2 border-gray-700"
+                    className="mt-2 border-border"
                   >
                     {nodeType === "createNftNode" ? "Go to Create" : "Go to Upload"}
                   </Button>
@@ -588,7 +588,7 @@ export function OffChainFunctionNode({ data, id, type }: OffChainFunctionNodePro
         id="input-handle-left"
         type="source"
         position={Position.Left}
-        className="!bg-gray-400 !border-gray-600"
+        className="!bg-muted-foreground !border-border"
         style={{
           width: '8px',
           height: '8px',
@@ -600,7 +600,7 @@ export function OffChainFunctionNode({ data, id, type }: OffChainFunctionNodePro
         id="input-handle-right"
         type="source"
         position={Position.Right}
-        className="!bg-gray-400 !border-gray-600"
+        className="!bg-muted-foreground !border-border"
         style={{
           width: '8px',
           height: '8px',

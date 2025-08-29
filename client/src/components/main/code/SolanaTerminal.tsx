@@ -118,20 +118,19 @@ SUBCOMMANDS:
 
   return (
     <div
-      className="font-oxygen-mono text-xs flex flex-col h-full text-white font-mono overflow-hidden"
-      style={{ backgroundColor: terminalBg, borderColor: terminalBorder }}
+      className="font-oxygen-mono text-xs flex flex-col h-full text-foreground font-mono overflow-hidden bg-card border-border"
     >
       {/* Header */}
-      <div className="flex items-center px-4 py-2 border-b border-gray-900">
-        <Terminal className="w-3 h-3 mr-2 text-gray-600" />
-        <span className="font-semibold text-xs text-gray-600">Terminal</span>
+      <div className="flex items-center px-4 py-2 border-b border-border">
+        <Terminal className="w-3 h-3 mr-2 text-muted-foreground" />
+        <span className="font-semibold text-xs text-muted-foreground">Terminal</span>
       </div>
 
       {/* Terminal Body */}
       <div
         ref={terminalRef}
         className="flex-1 p-3 overflow-y-auto"
-        style={{ backgroundColor: terminalBg }}
+        className="bg-card"
       >
         {commandHistory.map((item, idx) => (
           <div key={idx} className="mb-2">
@@ -141,7 +140,7 @@ SUBCOMMANDS:
               <span className="text-[#5A5F73] text-xs mr-2">
                 {formatTimestamp(item.timestamp)}
               </span>
-              <span className="text-white">{item.command}</span>
+              <span className="text-foreground">{item.command}</span>
             </div>
             <div
               className={`ml-6 mt-1 whitespace-pre-wrap ${
@@ -163,21 +162,21 @@ SUBCOMMANDS:
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              className="w-full bg-transparent outline-none text-white"
+              className="w-full bg-transparent outline-none text-foreground"
               autoFocus
             />
             {input === '' && showCursor && (
-              <span className="absolute top-0 left-0 h-full w-2 bg-white opacity-70 animate-blink" />
+              <span className="absolute top-0 left-0 h-full w-2 bg-foreground opacity-70 animate-blink" />
             )}
           </div>
         </form>
       </div>
 
       {/* Footer */}
-      <div className="px-3 py-1.5 border-t flex justify-between items-center text-[10px] text-[#5A5F73] border-gray-900">
+      <div className="px-3 py-1.5 border-t flex justify-between items-center text-[10px] text-muted-foreground border-border">
         <div className="flex items-center">
           <div className="w-1.5 h-1.5 rounded-full bg-[#14F195] mr-2" />
-          <span className="text-gray-600">ONLINE</span>
+          <span className="text-muted-foreground">ONLINE</span>
         </div>
         <div>v1.0.0</div>
         <div>solana-cli</div>

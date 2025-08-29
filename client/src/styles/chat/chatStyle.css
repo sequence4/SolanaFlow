@@ -3,8 +3,8 @@
     --chat-bg-light: #fafafa;
     --chat-bg-dark: #0d1117;
 
-    --message-ai-bg-light: #ebebeb;
-    --message-ai-bg-dark: #151a28;
+    --message-ai-bg-light: transparent;
+    --message-ai-bg-dark: transparent;
     --message-ai-text-light: #2d2d2d;
     --message-ai-text-dark: #b8becd;
 
@@ -19,7 +19,7 @@
     --message-user-source-text-dark: #ffffff;
 
     --message-ai-source-bg-light: #ebebeb;
-    --message-ai-source-bg-dark: #151a28;
+    --message-ai-source-bg-dark: oklch(0.245 0 0);
     --message-ai-source-text-light: #252525;
     --message-ai-source-text-dark: #b8becd;
 
@@ -32,19 +32,19 @@
     --send-button-text-dark: #181818;
 
     --message-box-bg-light: #f3f3f3;
-    --message-box-bg-dark: #101520;
+    --message-box-bg-dark: oklch(0.185 0 0);
     --message-box-text-light: #212121;
     --message-box-text-dark: #8c9ac6;   
     --message-box-border-light: #5a5a5a;
-    --message-box-border-dark: #272a46;
+    --message-box-border-dark: oklch(0.309 0 0);
 
     --add-file-button-color-light: #0b0b0b;
     --add-file-button-color-dark: #ffffff;
 
     --selected-file-context-bg-light: #ffffff;
-    --selected-file-context-bg-dark: #161924;
+    --selected-file-context-bg-dark: oklch(0.245 0 0);
     --selected-file-context-border-color-light: #5a5a5a;
-    --selected-file-context-border-color-dark: #1c1d32;
+    --selected-file-context-border-color-dark: oklch(0.309 0 0);
 
     --selected-file-context-text-color-light: #000000;
     --selected-file-context-text-color-dark: #b4bacb;
@@ -88,7 +88,7 @@
     margin-right: auto;
     padding: 10px;
     border-radius: 10px;
-    background-color: var(--bubbleColor);
+    background-color: transparent !important;
 }
 .ai-message::after {
     content: "";
@@ -133,7 +133,7 @@
 }
 
 .message-bubble.ai {
-    background-color: var(--message-ai-bg-dark);
+    background-color: transparent !important;
     color: var(--message-ai-text-dark);
 }
 

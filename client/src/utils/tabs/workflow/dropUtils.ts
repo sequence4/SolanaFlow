@@ -5,6 +5,10 @@ export function duplicateFlowNodesAndEdges(
   dropX: number,
   dropY: number
 ) {
+  console.log("🔄 duplicateFlowNodesAndEdges called with:", { draggedData, dropX, dropY });
+  console.log("📊 Input nodes:", draggedData.nodes);
+  console.log("🔗 Input edges:", draggedData.edges);
+  
   const nodeIdMap: Record<string, string> = {};
   draggedData.nodes.forEach((node: any) => {
     nodeIdMap[node.id] = `${node.type}-${nanoid(6)}`;
@@ -17,11 +21,16 @@ export function duplicateFlowNodesAndEdges(
       y: node.position.y + dropY,
     };
 
-    return {
+    const newNode = {
       ...node,
       id: newNodeId,
       position: newPosition,
     };
+    
+    console.log(`🎯 Generated node: ${newNode.id} at position (${newPosition.x}, ${newPosition.y})`);
+    console.log("📋 Node data:", newNode.data);
+    
+    return newNode;
   });
 
   const newEdges = (draggedData.edges || []).map((edge: any) => ({
@@ -30,6 +39,9 @@ export function duplicateFlowNodesAndEdges(
     source: nodeIdMap[edge.source] || edge.source,
     target: nodeIdMap[edge.target] || edge.target,
   }));
+
+  console.log("✅ Final generated nodes:", newNodes);
+  console.log("✅ Final generated edges:", newEdges);
 
   return { newNodes, newEdges, nodeIdMap };
 }

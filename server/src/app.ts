@@ -18,7 +18,7 @@ import artifactRoute from '@/routes/artifactRoute';
 import ephemeralRoutes from '@/routes/ephemeral';
 import deployRelayRoutes from '@/routes/deploy';
 import { startCleanupWorker } from "./workers/cleanupWorker";
-import { awsSecretsEnabled } from './utils/awsSecrets';
+import { awsSecretsEnabled } from './utils/aws/awsSecrets';
 
 if (!awsSecretsEnabled()) {
   console.warn('[boot] AWS Secrets disabled (SKIP_AWS_SECRETS=1 or missing creds). Using on‑disk keypairs.');

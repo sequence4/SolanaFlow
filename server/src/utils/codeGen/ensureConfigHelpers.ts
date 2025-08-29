@@ -1,4 +1,4 @@
-import type { WorkspaceHandle } from '../deploy/prepEnv';
+import type { WorkspaceHandle } from '../container/prepEnv';
 import { parse as parseToml, stringify as iarnaTomlStringify } from '@iarna/toml';
 import { startGetFileContentTask, startUpdateFileTask } from '../fileUtils'; // Assuming these are the actual helpers
 import { pollTaskStatus } from '../taskUtils'; // For waiting on file tasks

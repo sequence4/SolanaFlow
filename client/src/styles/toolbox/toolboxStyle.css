@@ -1,29 +1,29 @@
 :root {
 /* Light Mode */
     --toolbox-bg-light: #ffffff;
-    --toolbox-bg-dark: #0d1117;
+    --toolbox-bg-dark: oklch(0.245 0 0);
 
     --toolbox-border-light: #d8d8d8;
-    --toolbox-border-dark: #24263a;
+    --toolbox-border-dark: oklch(0.309 0 0);
 
     --toolbox-fg-light: #292929;
-    --toolbox-fg-dark: #6a6a6a;
+    --toolbox-fg-dark: oklch(0.708 0 0);
 
     --toolbox-item-bg-light: #ebebeb;
-    --toolbox-item-bg-dark: #2b2f42;
+    --toolbox-item-bg-dark: oklch(0.309 0 0);
 
     --toolbox-item-border-light: #d8d8d8;
-    --toolbox-item-border-dark: #23293a;
+    --toolbox-item-border-dark: oklch(0.309 0 0);
 
     --tabs-color-light: #292929;
-    --tabs-color-dark: #bbbbbb;    
+    --tabs-color-dark: oklch(0.985 0 0);    
 
     --tabs-divider-light: #d8d8d8;
-    --tabs-divider-dark: #272e3f;   
+    --tabs-divider-dark: oklch(0.309 0 0);   
 
     --accordion-item-bg-light: #ebebeb;
-    --accordion-item-bg-dark: #0f0f0f;  
+    --accordion-item-bg-dark: oklch(0.245 0 0);  
 
     --accordion-item-border-light: #d8d8d8;
-    --accordion-item-border-dark: #1e2339;
+    --accordion-item-border-dark: oklch(0.309 0 0);
 }

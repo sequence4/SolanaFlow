@@ -1,0 +1,262 @@
+/* Modern Glassmorphic Toolbox Styling */
+
+/* Ensure styles are applied with high specificity */
+body .app-sidebar,
+.app-sidebar {
+  background: rgba(20, 20, 35, 0.85) !important;
+  backdrop-filter: blur(20px) !important;
+  border-right: 1px solid rgba(139, 92, 246, 0.15) !important;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.02) !important;
+}
+
+/* Project controls section */
+.app-sidebar .border-b {
+  background: rgba(139, 92, 246, 0.03) !important;
+  border-bottom: 1px solid rgba(139, 92, 246, 0.1) !important;
+  backdrop-filter: blur(10px);
+}
+
+/* Project name input styling */
+.app-sidebar .bg-muted {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(8px);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.app-sidebar .bg-muted:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(139, 92, 246, 0.2) !important;
+}
+
+/* Button styling - compact modern look */
+.app-sidebar button {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #e0e0e0 !important;
+  backdrop-filter: blur(8px);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-weight: 500;
+  font-size: 11px;
+}
+
+.app-sidebar button:hover {
+  background: rgba(139, 92, 246, 0.08) !important;
+  border-color: rgba(139, 92, 246, 0.2) !important;
+  color: #ffffff !important;
+  transform: translateY(-1px);
+  box-shadow: 
+    0 4px 12px rgba(139, 92, 246, 0.1),
+    0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.app-sidebar button:disabled {
+  background: rgba(255, 255, 255, 0.01) !important;
+  border-color: rgba(255, 255, 255, 0.03) !important;
+  color: #6b7280 !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Program ID display */
+.app-sidebar .bg-muted.border {
+  background: rgba(139, 92, 246, 0.05) !important;
+  border: 1px solid rgba(139, 92, 246, 0.15) !important;
+  backdrop-filter: blur(12px);
+}
+
+/* Search section */
+.app-sidebar .border-t.border-b {
+  background: rgba(0, 0, 0, 0.1) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Search input */
+.app-sidebar input[type="text"] {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #e0e0e0 !important;
+  backdrop-filter: blur(8px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.app-sidebar input[type="text"]:focus {
+  background: rgba(139, 92, 246, 0.03) !important;
+  border-color: rgba(139, 92, 246, 0.3) !important;
+  box-shadow: 
+    0 0 0 1px rgba(139, 92, 246, 0.1),
+    0 4px 12px rgba(139, 92, 246, 0.05) !important;
+}
+
+.app-sidebar input[type="text"]::placeholder {
+  color: #9ca3af;
+  opacity: 0.8;
+}
+
+/* Quick filter pills */
+.app-sidebar .bg-muted.border-border {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  color: #9ca3af !important;
+  backdrop-filter: blur(4px);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.app-sidebar .bg-muted.border-border:hover {
+  background: rgba(139, 92, 246, 0.05) !important;
+  border-color: rgba(139, 92, 246, 0.15) !important;
+  color: #a78bfa !important;
+  transform: translateY(-1px);
+}
+
+/* Icons styling */
+.app-sidebar .text-muted-foreground {
+  color: #9ca3af !important;
+  transition: color 0.2s ease;
+}
+
+.app-sidebar button:hover .text-muted-foreground {
+  color: #a78bfa !important;
+}
+
+/* Enhanced glow effects */
+.app-sidebar .group-focus-within\\:opacity-50 {
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.1), rgba(236, 72, 153, 0.1)) !important;
+  filter: blur(20px);
+}
+
+/* Status indicators */
+.app-sidebar .animate-pulse {
+  animation: ai-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes ai-pulse {
+  0%, 100% { 
+    opacity: 1;
+    box-shadow: 0 0 8px rgba(139, 92, 246, 0.6);
+  }
+  50% { 
+    opacity: 0.7;
+    box-shadow: 0 0 12px rgba(139, 92, 246, 0.8);
+  }
+}
+
+/* Node items container - apply similar styling to child components */
+.app-sidebar .overflow-hidden > * {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+/* Enhanced Instruction List Styling - Glassmorphic Design */
+.app-sidebar .bg-card {
+  background: rgba(20, 20, 35, 0.40) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(139, 92, 246, 0.08) !important;
+}
+
+/* Group headers in instruction list */
+.app-sidebar h3.font-semibold {
+  color: #f0f0f0 !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  letter-spacing: -0.01em !important;
+}
+
+/* Group divider line */
+.app-sidebar .h-px.bg-border {
+  background: rgba(139, 92, 246, 0.2) !important;
+}
+
+/* Group count badge */
+.app-sidebar .bg-muted.px-2.py-1.rounded-full {
+  background: rgba(139, 92, 246, 0.1) !important;
+  color: #a78bfa !important;
+  border: 1px solid rgba(139, 92, 246, 0.2) !important;
+  font-weight: 600 !important;
+  font-size: 9px !important;
+}
+
+/* Instruction cards - Enhanced glassmorphic styling */
+.app-sidebar .cursor-grab {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(139, 92, 246, 0.1) !important;
+  backdrop-filter: blur(8px) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.app-sidebar .cursor-grab:hover {
+  background: rgba(139, 92, 246, 0.06) !important;
+  border-color: rgba(139, 92, 246, 0.25) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 
+    0 4px 12px rgba(139, 92, 246, 0.15),
+    0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Instruction card text */
+.app-sidebar .cursor-grab .text-foreground {
+  color: #e0e0e0 !important;
+  font-weight: 500 !important;
+}
+
+/* Instruction card dot indicator */
+.app-sidebar .cursor-grab .bg-muted-foreground {
+  background: rgba(139, 92, 246, 0.6) !important;
+  box-shadow: 0 0 4px rgba(139, 92, 246, 0.4);
+}
+
+/* NEW badge styling */
+.app-sidebar .bg-muted\\/20.text-primary {
+  background: rgba(139, 92, 246, 0.15) !important;
+  color: #a78bfa !important;
+  border-color: rgba(139, 92, 246, 0.3) !important;
+  font-weight: 700 !important;
+}
+
+/* Action buttons (star, plus) */
+.app-sidebar .text-muted-foreground.hover\\:text-primary {
+  color: #9ca3af !important;
+  transition: all 0.2s ease !important;
+}
+
+.app-sidebar .text-muted-foreground.hover\\:text-primary:hover {
+  color: #a78bfa !important;
+  background: rgba(139, 92, 246, 0.1) !important;
+}
+
+/* Description tooltip */
+.app-sidebar .bg-muted\\/10 {
+  background: rgba(139, 92, 246, 0.05) !important;
+  border-left: 2px solid rgba(139, 92, 246, 0.3) !important;
+  backdrop-filter: blur(6px) !important;
+}
+
+/* Group color indicator */
+.app-sidebar .bg-primary.rounded-full {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.9), rgba(168, 85, 247, 0.9)) !important;
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.4) !important;
+}
+
+/* Scrollbar styling for sidebar */
+.app-sidebar ::-webkit-scrollbar {
+  width: 6px;
+}
+
+.app-sidebar ::-webkit-scrollbar-track {
+  background: rgba(139, 92, 246, 0.02);
+  border-radius: 3px;
+}
+
+.app-sidebar ::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.2);
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.app-sidebar ::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.4);
+}

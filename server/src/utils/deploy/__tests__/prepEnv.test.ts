@@ -1,8 +1,6 @@
-import { prepEnv } from '../prepEnv'
+import { prepEnv } from '../../container/prepEnv'
 import poolMock from '../../../../tests/__mocks__/@db'
-import * as projectUtils from '../../projectUtils'
 import * as containerUtils from '../../container'
-import * as containerPool from '../../container/rentContainerFromPool'
 import * as helpers from '../../container/containerHelpers'
 import { mockNextQueryOnce } from '../../../../tests/test-helpers/mockDbQueries'
 

@@ -11,7 +11,6 @@ import { downloadArtifact } from "@/api/projectArtifact";
 import { projectApi } from "@/api/projectApi";
 import { Button } from "@/components/ui/button";
 import { Rocket, AlertTriangle } from "lucide-react";
-// No longer using client-side deployment
 import {
   PublicKey,
   Keypair,
@@ -24,6 +23,7 @@ import {
   TransactionInstruction,
   SYSVAR_RENT_PUBKEY,
   SYSVAR_CLOCK_PUBKEY,
+  Connection,
 } from "@solana/web3.js";
 import ProjectContext from "@/context/project/ProjectContext";
 import {
@@ -35,22 +35,14 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { connection } from "@/utils/connection";
-import { useWalletSigner } from "@/utils/wallet";
+import { connection } from "@/utils/blockchain/connection";
+import { connectionManager } from "@/utils/blockchain/connectionManager";
+import { useWalletSigner } from "@/utils/blockchain/wallet";
 
 import { createEphemeralKey, EphemeralDeployOptions, deployWithEphemeralKey } from "@/api/projectDeploy";
-import { BPF_UPGRADE_LOADER_ID } from "@/utils/constants";
+import { BPF_UPGRADE_LOADER_ID } from "@/utils/helpers/data";
+import { darkTheme } from '@/styles/theme';
 
-// Toggle verbose client-side logs by setting NEXT_PUBLIC_DEBUG_LOGS=true in your
-// environment.  This reduces noisy console output in production.
-// Temporarily enabled by default to debug deployment issues
-
-/* ────────────────────────────────────────────
-   TEMP instrumentation helpers
-   They wrap Buffer.writeXXLE so we can see which
-   value/offset causes "index out of range".
-──────────────────────────────────────────── */
-// Global trap so ANY uncaught error prints a stack (esp. "index out of range")
 if (typeof window !== 'undefined') {
   window.onerror = (msg, src, line, col, err) => {
     console.error('[window.onerror]', msg, 'at', src, line + ':' + col, err);
@@ -82,7 +74,7 @@ function u64LE(n: number): Buffer {
 /** Ensure a legacy Transaction has a recentBlockhash (or durable nonce) */
 async function ensureLegacyTxBlockhash(
   tx: Transaction,
-  conn: typeof connection,
+  conn: Connection,
 ): Promise<void> {
   if (!tx.recentBlockhash) {
     let nonceValue: string | null = null;
@@ -202,7 +194,8 @@ export function ProgramDeployer({
       // (prevents wallet‑side simulation failures)
       // @ts-expect-error - accessing private connection properties
       const walletCluster = wallet.adapter?.network;
-      const rpcUrl = (connection as any)._rpcEndpoint || (connection as any).rpcEndpoint;
+      const conn = connectionManager.getConnection();
+      const rpcUrl = (conn as any)._rpcEndpoint || (conn as any).rpcEndpoint;
       const connCluster = rpcUrl?.includes("devnet") ? "devnet"
         : rpcUrl?.includes("testnet") ? "testnet"
         : "mainnet‑beta";
@@ -239,7 +232,7 @@ export function ProgramDeployer({
 
         if (looksLikePubkey) {
           const candidatePk = new PublicKey(ctxProgramId!);
-          const acctInfo = await connection.getAccountInfo(candidatePk, "confirmed");
+          const acctInfo = await connectionManager.getConnection().getAccountInfo(candidatePk, "confirmed");
 
           // Check if program exists on-chain
 
@@ -357,16 +350,16 @@ export function ProgramDeployer({
         const FEE_PER_TX = 15000; // 15k lamports per transaction (conservative)
         
         const fundingBufferSpace = 37 + programBytes.byteLength;
-        const fundingBufferRent = await connection.getMinimumBalanceForRentExemption(fundingBufferSpace);
+        const fundingBufferRent = await connectionManager.getConnection().getMinimumBalanceForRentExemption(fundingBufferSpace);
         const totalFeesNeeded = totalTxCount * FEE_PER_TX;
-        const SAFETY_CUSHION = 200_000_000; // 0.2 SOL safety
+        const SAFETY_CUSHION = 300_000_000; // 0.3 SOL safety
         
         const totalFunding = fundingBufferRent + totalFeesNeeded + SAFETY_CUSHION;
         
         console.log(`[DEPLOY] Funding calculation:
           - Buffer rent: ${fundingBufferRent} lamports
           - Transactions: ${totalTxCount} × ${FEE_PER_TX} = ${totalFeesNeeded} lamports
-          - Safety cushion: ${SAFETY_CUSHION} lamports
+          - Safety cushion: ${SAFETY_CUSHION} lamports (0.3 SOL)
           - Total funding: ${totalFunding} lamports (${totalFunding / 1_000_000_000} SOL)`);
         
         setDeployStage('Funding ephemeral key...');
@@ -816,7 +809,7 @@ export function ProgramDeployer({
           
           // Set fee payer and blockhash BEFORE compiling message
           tx.feePayer = wallet.publicKey!;
-          await ensureLegacyTxBlockhash(tx, connection);
+          await ensureLegacyTxBlockhash(tx, connectionManager.getConnection());
           
           // Force recompile to ensure fee payer is properly set
           tx.compileMessage();
@@ -941,10 +934,10 @@ export function ProgramDeployer({
             if ('signature' in result) {
               // Wait for transaction confirmation before returning
               try {
-                await connection.confirmTransaction({
+                await connectionManager.getConnection().confirmTransaction({
                   signature: result.signature,
                   blockhash: tx.recentBlockhash!,
-                  lastValidBlockHeight: tx.lastValidBlockHeight || (await connection.getLatestBlockhash()).lastValidBlockHeight
+                  lastValidBlockHeight: tx.lastValidBlockHeight || (await connectionManager.getConnection().getLatestBlockhash()).lastValidBlockHeight
                 }, 'confirmed');
                 return result.signature;
               } catch (confirmError) {
@@ -1039,7 +1032,7 @@ export function ProgramDeployer({
               throw new Error('WALLET_NOT_REQUIRED_SIGNER');
             }
             if (tx instanceof Transaction) {
-              await ensureLegacyTxBlockhash(tx, connection);
+              await ensureLegacyTxBlockhash(tx, connectionManager.getConnection());
               tx.feePayer = wallet.publicKey!;
             }
             const signed = await wallet.signTransaction(tx as any);
@@ -1060,6 +1053,66 @@ export function ProgramDeployer({
           setDeployStage('Transaction confirmed!');
           setProgress(90);
           
+          // Transfer upgrade authority from ephemeral to wallet
+          setDeployStage('Transferring upgrade authority to wallet...');
+          setProgress(92);
+          
+          try {
+            // Create SetAuthority instruction to transfer authority to wallet
+            const setAuthorityIx = new TransactionInstruction({
+              programId: BPF_UPGRADE_LOADER_ID,
+              keys: [
+                { pubkey: programDataPk,         isSigner: false, isWritable: true },  // ProgramData account
+                { pubkey: ephemeralPubkey,       isSigner: true,  isWritable: false }, // current authority (ephemeral)
+                { pubkey: wallet.publicKey!,     isSigner: false, isWritable: false }, // new authority (wallet)
+              ],
+              data: Buffer.concat([
+                Buffer.from([4, 0, 0, 0]),  // SetAuthority instruction tag (4 as LE u32)
+              ]),
+            });
+            
+            const setAuthTx = new Transaction().add(setAuthorityIx);
+            
+            // Get fresh blockhash
+            const { blockhash: authBlockhash, lastValidBlockHeight: authHeight } = 
+              await connection.getLatestBlockhash('confirmed');
+              
+            setAuthTx.recentBlockhash = authBlockhash;
+            setAuthTx.feePayer = ephemeralPubkey; // Ephemeral pays for this final transaction
+            
+            // Send to backend for ephemeral signing
+            const authEncoded = setAuthTx.serialize({ requireAllSignatures: false }).toString('base64');
+            
+            console.log('Sending SetAuthority transaction to backend for signing...');
+            const authResult = await projectApi.relayTx(projectId, {
+              encodedTx: authEncoded,
+              programId: programId.toBase58()
+            });
+            
+            if ('signature' in authResult) {
+              console.log('✅ Upgrade authority transferred to wallet:', authResult.signature);
+              
+              // Wait for confirmation
+              await connection.confirmTransaction({
+                signature: authResult.signature,
+                blockhash: authBlockhash,
+                lastValidBlockHeight: authHeight
+              }, 'confirmed');
+              
+              setDeployStage('Authority transferred successfully!');
+              setProgress(95);
+            } else {
+              console.error('Failed to transfer authority:', authResult);
+              toast.warning('Program deployed but authority transfer failed', {
+                description: 'You may need to manually set authority'
+              });
+            }
+          } catch (authError) {
+            console.error('Authority transfer error:', authError);
+            toast.warning('Program deployed but authority transfer failed', {
+              description: 'The program is deployed but remains under ephemeral key authority'
+            });
+          }
           
           // Update project with new program ID
           onSuccess(programId.toBase58());
@@ -1114,12 +1167,23 @@ export function ProgramDeployer({
   ──────────────────────────────────────────── */
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !isLoading && !open && onClose()}>
-      <DialogContent className="bg-[#121214] border-[#2a2a2d] text-white sm:max-w-md">
+      <DialogContent 
+        className="backdrop-blur-xl sm:max-w-md shadow-2xl"
+        style={{
+          backgroundColor: darkTheme.background.secondary,
+          borderColor: darkTheme.border.default,
+          backdropFilter: `blur(${darkTheme.glass.blur})`,
+          color: darkTheme.text.primary,
+        }}
+      >
         <DialogHeader>
-          <DialogTitle className="text-lg font-medium text-white">
+          <DialogTitle 
+            className="text-lg font-medium"
+            style={{ color: darkTheme.text.primary }}
+          >
             Deploy Program to Devnet
           </DialogTitle>
-          <DialogDescription className="text-[#6e6e76]">
+          <DialogDescription style={{ color: darkTheme.text.secondary }}>
             Your program will be deployed using your connected wallet. Make sure
             you have enough SOL for the transaction fees.
           </DialogDescription>
@@ -1129,7 +1193,10 @@ export function ProgramDeployer({
           {bytesLoaded ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-[#6e6e76]">
+                <span 
+                  className="text-sm font-medium"
+                  style={{ color: darkTheme.text.secondary }}
+                >
                   Program size:
                 </span>
                 <span className="text-sm font-mono">
@@ -1138,7 +1205,10 @@ export function ProgramDeployer({
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-[#6e6e76]">
+                <span 
+                  className="text-sm font-medium"
+                  style={{ color: darkTheme.text.secondary }}
+                >
                   Wallet:
                 </span>
                 <span className="text-sm font-mono truncate max-w-[200px]">
@@ -1147,13 +1217,19 @@ export function ProgramDeployer({
               </div>
 
               {!wallet.publicKey && (
-                <div className="bg-[#2a2a2d] p-4 rounded-md flex items-start space-x-2 mt-2">
+                <div className="bg-muted p-4 rounded-md flex items-start space-x-2 mt-2">
                   <AlertTriangle className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium text-white">
+                    <p 
+                      className="text-sm font-medium"
+                      style={{ color: darkTheme.text.primary }}
+                    >
                       Wallet not connected
                     </p>
-                    <p className="text-xs text-[#6e6e76]">
+                    <p 
+                      className="text-xs"
+                      style={{ color: darkTheme.text.secondary }}
+                    >
                       Please connect your wallet to deploy the program.
                     </p>
                   </div>
@@ -1163,10 +1239,18 @@ export function ProgramDeployer({
               {progress !== null && (
                 <div className="space-y-2 mt-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-[#6e6e76]">
+                    <span 
+                      className="text-sm"
+                      style={{ color: darkTheme.text.secondary }}
+                    >
                       {deployStage || "Preparing…"}
                     </span>
-                    <span className="text-sm text-[#6e6e76]">{progress}%</span>
+                    <span 
+                      className="text-sm"
+                      style={{ color: darkTheme.text.secondary }}
+                    >
+                      {progress}%
+                    </span>
                   </div>
                   <Progress value={progress} aria-label="deployment progress" />
                 </div>
@@ -1174,7 +1258,10 @@ export function ProgramDeployer({
             </div>
           ) : (
             <div className="flex items-center justify-center h-20">
-              <div className="animate-pulse text-[#6e6e76]">
+              <div 
+                className="animate-pulse"
+                style={{ color: darkTheme.text.secondary }}
+              >
                 Loading program data…
               </div>
             </div>
@@ -1186,7 +1273,18 @@ export function ProgramDeployer({
             variant="outline"
             onClick={onClose}
             disabled={isLoading}
-            className="w-full sm:w-auto bg-transparent border-[#2a2a2d] text-white hover:bg-[#2a2a2d]"
+            className="w-full sm:w-auto transition-colors"
+            style={{
+              backgroundColor: 'transparent',
+              borderColor: darkTheme.border.default,
+              color: darkTheme.text.primary,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = darkTheme.background.tertiary;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
           >
             Cancel
           </Button>
@@ -1194,7 +1292,17 @@ export function ProgramDeployer({
             type="button"
             onClick={handleDeploy}
             disabled={isLoading || !bytesLoaded}
-            className="w-full sm:w-auto bg-[#22c55e] hover:bg-[#22c55e]/90 text-white flex items-center"
+            className="w-full sm:w-auto flex items-center transition-colors"
+            style={{
+              backgroundColor: darkTheme.accent.green,
+              color: darkTheme.text.primary,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = `${darkTheme.accent.green}CC`;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = darkTheme.accent.green;
+            }}
           >
             {isLoading ? (
               <span>Deploying…</span>

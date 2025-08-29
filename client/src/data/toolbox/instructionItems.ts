@@ -1,14 +1,20 @@
+// Import all available SPL Token Program flows
 import { initMintFlow } from "../nodes/onChain/instructions/spl-token-program/initializeMint/initMintFlow";
 import { mintToFlow } from "../nodes/onChain/instructions/spl-token-program/mintTo/mintToFlow";
-import { initAccountFlow } from "../nodes/onChain/instructions/spl-token-program/initializeAccount/initAccountFlow";
+
+
+import { transferFlow } from "../nodes/onChain/instructions/spl-token-program/transfer/transferFlow";
 import { burnFlow } from "../nodes/onChain/instructions/spl-token-program/burn/burnFlow";
-import { transferFlow } from "../nodes/onChain/instructions/spl-token-program/transfer/transferFlow"; 
-import { amountToUiAmountFlow } from "../nodes/onChain/instructions/spl-token-program/amountToUiAmount/amountToUiAmountFlow";
 import { approveFlow } from "../nodes/onChain/instructions/spl-token-program/approve/approveFlow";
+import { revokeFlow } from "../nodes/onChain/instructions/spl-token-program/revoke/revokeFlow";
+import { setAuthorityFlow } from "../nodes/onChain/instructions/spl-token-program/setAuthority/setAuthorityFlow";
+import { closeAccountFlow } from "../nodes/onChain/instructions/spl-token-program/closeAccount/closeAccountFlow";
+import { freezeAccountFlow } from "../nodes/onChain/instructions/spl-token-program/freezeAccount/freezeAccountFlow";
+import { thawAccountFlow } from "../nodes/onChain/instructions/spl-token-program/thawAccount/thawAccountFlow";
+import { initAccountFlow } from "../nodes/onChain/instructions/spl-token-program/initializeAccount/initAccountFlow";
+import { amountToUiAmountFlow } from "../nodes/onChain/instructions/spl-token-program/amountToUiAmount/amountToUiAmountFlow";
 import { approveCheckedFlow } from "../nodes/onChain/instructions/spl-token-program/approvedChecked/approveCheckedFlow";
 import { burnCheckedFlow } from "../nodes/onChain/instructions/spl-token-program/burnChecked/burnCheckedFlow";
-import { closeAccountFlow } from "../nodes/onChain/instructions/spl-token-program/closeAccount/closeAccountFlow";   
-import { freezeAccountFlow } from "../nodes/onChain/instructions/spl-token-program/freezeAccount/freezeAccountFlow";
 import { getAccountDataSizeFlow } from "../nodes/onChain/instructions/spl-token-program/getAccountDataSize/getAccountDataSizeFlow";
 import { initializeAccount2Flow } from "../nodes/onChain/instructions/spl-token-program/initializeAccount2/initAccount2Flow";
 import { initializeAccount3Flow } from "../nodes/onChain/instructions/spl-token-program/initializeAccount3/initializeAccount3Flow";
@@ -17,45 +23,81 @@ import { initializeMint2Flow } from "../nodes/onChain/instructions/spl-token-pro
 import { initializeMultisigFlow } from "../nodes/onChain/instructions/spl-token-program/initializeMultisig/initializeMultisigFlow";
 import { initializeMultisig2Flow } from "../nodes/onChain/instructions/spl-token-program/initializeMultisig2/initializeMultisig2Flow";
 import { isValidSignerIndexFlow } from "../nodes/onChain/instructions/spl-token-program/isValidSignerIndex/isValidSignerIndexFlow";
-import { revokeFlow } from "../nodes/onChain/instructions/spl-token-program/revoke/revokeFlow";
-import { setAuthorityFlow } from "../nodes/onChain/instructions/spl-token-program/setAuthority/setAuthorityFlow";
 import { mintToCheckedFlow } from "../nodes/onChain/instructions/spl-token-program/mintToChecked/mintToCheckedFlow";
 import { syncNativeFlow } from "../nodes/onChain/instructions/spl-token-program/syncNative/syncNativeFlow";
-import { thawAccountFlow } from "../nodes/onChain/instructions/spl-token-program/thawAccount/thawAccountFlow";
 import { transferCheckedFlow } from "../nodes/onChain/instructions/spl-token-program/transferChecked/transferCheckedFlow";
 import { uiAmountToAmountFlow } from "../nodes/onChain/instructions/spl-token-program/uiAmountToAmount/uiAmountToAmountFlow"; 
+
+// NFT/Metaplex instructions
 import { createMetadataFlow } from "../nodes/onChain/instructions/metaplex-token-metadata/createMetadata/createMetadataFlow";
+
+// Debug: Verify flows are loaded correctly - only in development
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  console.log("🔍 SPL Token Flows Verification:");
+  [
+    { name: "Initialize Mint", flow: initMintFlow },
+    { name: "Mint Tokens", flow: mintToFlow },
+    { name: "Transfer Tokens", flow: transferFlow },
+    { name: "Burn Tokens", flow: burnFlow },
+    { name: "Approve Delegate", flow: approveFlow },
+  ].forEach(({ name, flow }) => {
+    console.log(`${name}:`, {
+      exists: !!flow,
+      hasNodes: !!flow?.nodes,
+      nodesCount: flow?.nodes?.length,
+      firstNodeLabel: flow?.nodes?.[0]?.data?.label,
+      accountsCount: flow?.nodes?.[0]?.data?.accounts?.length,
+      parametersCount: flow?.nodes?.[0]?.data?.parameters?.length,
+      errorCodesCount: flow?.nodes?.[0]?.data?.errorCodes?.length,
+      eventsCount: flow?.nodes?.[0]?.data?.events?.length
+    });
+  });
+}
+
 
 export const groupedInstructions = [
     {
       label: "SPL Token Instructions",
       items: [
-        {name: "amount_to_ui_amount", flow: amountToUiAmountFlow},
-        {name: "approve", flow: approveFlow},
-        {name: "approve_checked", flow: approveCheckedFlow},
-        { name: "burn", flow: burnFlow },
-        { name: "burn_checked", flow: burnCheckedFlow },
-        { name: "close_account", flow: closeAccountFlow },
-        {name: "freeze_account", flow: freezeAccountFlow},
-        { name: "get_account_data_size", flow: getAccountDataSizeFlow },
-        { name: "initialize_account", flow: initAccountFlow },
-        { name: "initialize_account2", flow: initializeAccount2Flow },
-        { name: "initialize_account3", flow: initializeAccount3Flow },
-        { name: "initialize_immutable_owner", flow: initializeImmutableOwnerFlow },
-        { name: "initialize_mint", flow: initMintFlow },
-        { name: "initialize_mint2", flow: initializeMint2Flow },
-        { name: "initialize_multisig", flow: initializeMultisigFlow },
-        { name: "initialize_multisig2", flow: initializeMultisig2Flow },
-        { name: "is_valid_signer_index", flow: isValidSignerIndexFlow },
-        { name: "mint_to", flow: mintToFlow },
-        { name: "mint_to_checked", flow: mintToCheckedFlow },
-        { name: "revoke", flow: revokeFlow },
-        { name: "set_authority", flow: setAuthorityFlow },
-        { name: "sync_native", flow: syncNativeFlow },
-        { name: "thaw_account", flow: thawAccountFlow },
-        { name: "transfer", flow: transferFlow },
-        { name: "transfer_checked", flow: transferCheckedFlow },
-        { name: "ui_amount_to_amount", flow: uiAmountToAmountFlow },
+        // Core Token Operations
+        { name: "Initialize Mint", flow: initMintFlow },
+        { name: "Mint Tokens", flow: mintToFlow },
+        { name: "Transfer Tokens", flow: transferFlow },
+        { name: "Burn Tokens", flow: burnFlow },
+        
+        // Account Management
+        { name: "Initialize Account", flow: initAccountFlow },
+        { name: "Close Account", flow: closeAccountFlow },
+        { name: "Initialize Account V2", flow: initializeAccount2Flow },
+        { name: "Initialize Account V3", flow: initializeAccount3Flow },
+        
+        // Authorization & Approval
+        { name: "Approve Delegate", flow: approveFlow },
+        { name: "Revoke Approval", flow: revokeFlow },
+        { name: "Set Authority", flow: setAuthorityFlow },
+        
+        // Account Control
+        { name: "Freeze Account", flow: freezeAccountFlow },
+        { name: "Thaw Account", flow: thawAccountFlow },
+        
+        // Multisig Operations
+        { name: "Initialize Multisig", flow: initializeMultisigFlow },
+        { name: "Initialize Multisig V2", flow: initializeMultisig2Flow },
+        
+        // Advanced Operations
+        { name: "Initialize Mint V2", flow: initializeMint2Flow },
+        { name: "Mint Tokens (Checked)", flow: mintToCheckedFlow },
+        { name: "Transfer (Checked)", flow: transferCheckedFlow },
+        { name: "Burn (Checked)", flow: burnCheckedFlow },
+        { name: "Approve (Checked)", flow: approveCheckedFlow },
+        
+        // Utility Operations
+        { name: "Amount to UI Amount", flow: amountToUiAmountFlow },
+        { name: "UI Amount to Amount", flow: uiAmountToAmountFlow },
+        { name: "Get Account Data Size", flow: getAccountDataSizeFlow },
+        { name: "Sync Native", flow: syncNativeFlow },
+        { name: "Initialize Immutable Owner", flow: initializeImmutableOwnerFlow },
+        { name: "Is Valid Signer Index", flow: isValidSignerIndexFlow },
       ],
     },
     {

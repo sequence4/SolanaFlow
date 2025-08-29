@@ -21,7 +21,6 @@ export const toolboxWrapperStyleWorkflow = {
     minWidth: "20%",
     maxWidth: "20%",
     border: "none",
-    background: "#151926",
 }
 
 export const toolboxWrapperStyleCode = {
@@ -31,7 +30,6 @@ export const toolboxWrapperStyleCode = {
     height: "100%",
     width: "25%",
     border: "none",
-    background: "#151926",
 }
 
 export const tabRootStyleToolbox = {
@@ -51,14 +49,12 @@ export const tabsListStyleToolbox = {
     fontSize: '13px',
     padding: '5px 10px',
     margin: '10px 0px',
-    background: "#151926",
 }
 
 export const tabsTriggerStyleToolbox = {
     width: '100%',
     paddingBottom: '10px',
     fontSize: '14px',
-    color: "#A0AEC0",
 }
 
 export const tabsContentStyleToolbox = {
@@ -72,7 +68,6 @@ export const programCardStyle = {
     cursor: "pointer",
     whileHover: {scale: 1.1 },
     transition: { duration: 0.1, ease: "easeInOut" },
-    background: "#1A1F2E",
 }
 
 export const itemStyle = {
@@ -81,8 +76,5 @@ export const itemStyle = {
     width: "100%",
     cursor: "pointer",
     overflow: "hidden",
-    color: "#E9ECEF",
-    background: "#151926",
-    borderBottom: "1px solid #2A3347",
 }
 

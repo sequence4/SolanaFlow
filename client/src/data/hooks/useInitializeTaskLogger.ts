@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from 'react';
-import { useTaskLogMonitoring } from '@/utils/logIntegration';
+import { useTaskLogMonitoring } from '@/utils/helpers/logIntegration';
 
 // This hook initializes the global task logger
 export default function useInitializeTaskLogger() {

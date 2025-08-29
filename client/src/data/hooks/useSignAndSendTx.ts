@@ -1,7 +1,7 @@
 import { useWallet } from '@solana/wallet-adapter-react';
 import { Transaction } from '@solana/web3.js';
 import { debugAndSendTransaction } from '../../utils/deploy/debugAndSendTx';
-import { connection } from "@/utils/connection";
+import { connection } from "@/utils/blockchain/connection";
 
 export function useSignAndSendTx() {
   const { publicKey, sendTransaction } = useWallet();

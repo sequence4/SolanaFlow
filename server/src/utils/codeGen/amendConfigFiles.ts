@@ -2,7 +2,7 @@ import { startGetFileContentTask } from '../fileUtils';          // helper that 
 import { startUpdateFileTask } from '../fileUtils';
 import { pollTaskStatus } from '../taskUtils';
 import { createTask, updateTaskStatus } from '../taskUtils';
-import { runCommand } from '../projectUtils';
+import { runCommand } from '../command-execution/runCommand';
 import pool from '../../config/database';
 
 /**

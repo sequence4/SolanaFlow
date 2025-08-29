@@ -2,8 +2,6 @@ import { NextFunction, Request, Response } from 'express';
 import { AppError } from '../middleware/errorHandler';
 import { runDeployPipeline } from '../utils/deploy/runDeployPipeline';
 import { Graph } from '../types/graph'; 
-import { deriveProgramId } from "../utils/deriveProgramId";
-import { markContainerForCleanup } from "../utils/container/cleanupQueue";
 
 /**
  * POST /api/deploy/:id/deploy-pipeline
@@ -20,8 +18,7 @@ export async function deployPipeline(
   const userId = (req.user as { id?: string } | undefined)?.id; // keep optional-chaining safe
   const walletSigned = requestWalletSigned === true;
 
-  console.log(`[DEPLOY] Starting deployment pipeline for project: ${id}`);
-  console.log(`[DEPLOY] Wallet-signed deployment: ${walletSigned ? 'Yes' : 'No'}`);
+  //console.log(`🚀 Deploy pipeline starting: ${id}${walletSigned ? ' (wallet-signed)' : ''}`);
 
   /* ------------------------------------------------------------------ *
    * Guards – bail out fast on bad input
@@ -39,7 +36,9 @@ export async function deployPipeline(
   res.writeHead(200, {
     'Content-Type': 'text/event-stream', // official MIME type for SSE
     'Cache-Control': 'no-cache',
-    Connection: 'keep-alive',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Cache-Control',
   });
 
   // Generic helper keeps TypeScript happy for every event payload
@@ -49,6 +48,12 @@ export async function deployPipeline(
    * short placeholder so the console stays readable.
    */
   const send = <T = unknown>(data: T): void => {
+    // Handle keep-alive ping messages as SSE comments instead of data
+    if (typeof data === 'object' && data !== null && (data as any).type === 'ping') {
+      res.write(': ping\n\n');
+      return;
+    }
+    
     // Clean up the data for logging
     let safeForLog: unknown;
     
@@ -84,20 +89,12 @@ export async function deployPipeline(
       safeForLog = data;
     }
 
-    // Log a clean, human-readable version of the event
+    // Minimal logging for key pipeline stages only
     if (typeof data === 'object' && data !== null) {
       const eventObj = data as any;
-      if (eventObj.stage && eventObj.message) {
-        console.log(`[SSE] ${eventObj.stage}: ${eventObj.message}`);
-      } else if (eventObj.stage) {
-        console.log(`[SSE] ${eventObj.stage}`);
-      } else if (eventObj.event) {
-        console.log(`[SSE] Event: ${eventObj.event}`);
-      } else {
-        console.log('[SSE] Sending event:', safeForLog);
+      if (eventObj.stage === 'completed' || eventObj.stage === 'error') {
+       // console.log(`📡 ${eventObj.stage}: ${eventObj.message}`);
       }
-    } else {
-      console.log('[SSE] Sending event:', safeForLog);
     }
     
     // Allow custom SSE event names (MDN pattern)
@@ -123,13 +120,11 @@ export async function deployPipeline(
       devMode: !!devMode
     });
 
-    // let the client know we're done, then close the SSE stream
     send({ stage: 'completed', message: 'Pipeline finished' });
-    console.log(`[DEPLOY] Pipeline completed successfully for project: ${id}`);
     res.end();
   } catch (err) {
     const errorMessage = (err as Error).message;
-    console.error(`[DEPLOY] Pipeline failed: ${errorMessage}`);
+    console.error(`❌ Pipeline failed: ${errorMessage}`);
     send({ stage: 'error', message: errorMessage });
     res.end();
     if (!res.headersSent) next(err);

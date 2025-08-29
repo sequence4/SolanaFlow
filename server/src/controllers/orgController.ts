@@ -1,6 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
 import pool from '../config/database';
-import { AppError } from '../middleware/errorHandler';
 import { PaginatedResponse } from '../types';
 
 export const listOrganizationProjects = async (
@@ -8,7 +7,7 @@ export const listOrganizationProjects = async (
   res: Response,
   next: NextFunction
 ) => {
-  const userId = req.user?.id ?? 'mock-user';
+//  const userId = req.user?.id ?? 'mock-user';
   // org_id checks temporarily disabled until auth lands
 
   const {

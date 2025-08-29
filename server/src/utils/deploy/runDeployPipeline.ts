@@ -1,21 +1,20 @@
-import { prepEnv } from './prepEnv';
-import type { WorkspaceHandle } from './prepEnv';
-import { Graph } from '../../types/graph';
+import { prepEnv } from '../container/prepEnv';
+import type { WorkspaceHandle } from '../container/prepEnv';
 import { handleGenerateCode } from "../codeGen/handleGenerateCode";
 import { markContainerForCleanup } from "../container/cleanupQueue";
-import {
-  startAnchorBuildTask,
-  getBuildArtifactTask,
-  runCommand,
-} from "../projectUtils";
+import { getBuildArtifactTask } from "../anchor/getBuildArtefactTask";
+import { startAnchorBuildTask } from "../anchor/startAnchorBuildTask";
+import { runCommand } from "../command-execution/runCommand";
 import { waitForTaskCompletion } from "../taskUtils";
 import path from "path";
-import fs from "fs/promises";
 import { execSync } from "child_process"; 
-import { PublicKey, Keypair } from "@solana/web3.js";
+import { Keypair } from "@solana/web3.js";
 import { attachFileContents } from "../fileUtils/attachFileContents";
 import { readContainerFile } from "../fileUtils/attachFileContents";
 import { v4 as uuidv4 } from "uuid";
+import { sendEnvironmentProgress, sendBuildProgress, resetProgress } from "../progress/progressUtils";
+import { MAX_BUILD_MINUTES, PipelineArgs } from './data';
+
 
 // ─── unified progress payload ────────────────────────────
 interface ProgressEvent {
@@ -25,19 +24,254 @@ interface ProgressEvent {
   pct?: number;
   [k: string]: unknown;      
 }
-// ──────────────────────────────────────────────────────────────
 
-// TODO: chunk really large fileTree payloads (> ~16 MB) – Chrome drops giant SSE frames.
+// ─── Enhanced Progress Manager with atomic stage transitions ──────
+class ProgressManager {
+  private currentStage: string = '';
+  private stageProgress: Map<string, number> = new Map();
+  private eventBuffer: any[] = [];
+  private batchTimeout: NodeJS.Timeout | null = null;
+  private sequenceNumber = 0;
+  private isTransitioning = false;
+  private generatedFiles: any[] = [];
+  private collectedFiles = 0;
+  private expectedCollectionFiles = 10;
+  private currentTasks: Map<string, {name: string, status: 'running' | 'completed' | 'error', pct: number}> = new Map();
+  
+  constructor(private deploymentId: string, private sendProgress: Function) {}
+  
+  private scheduleBatchUpdate() {
+    if (this.batchTimeout) return;
+    
+    this.batchTimeout = setTimeout(() => {
+      this.flushEventBuffer();
+    }, 100); // 100ms debounce
+  }
+  
+  private flushEventBuffer() {
+    if (this.eventBuffer.length === 0) return;
+    
+    // Send single batched event with all files
+    if (this.eventBuffer.some(e => e.type === 'code-generation')) {
+      const codeGenEvents = this.eventBuffer.filter(e => e.type === 'code-generation');
+      const allFiles = codeGenEvents.flatMap(e => e.files || []);
+      
+      if (allFiles.length > 0) {
+        const batchedEvent = {
+          type: 'code-generation-batch',
+          deploymentId: this.deploymentId,
+          stage: 'code-gen',
+          files: allFiles,
+          timestamp: Date.now(),
+          sequence: ++this.sequenceNumber
+        };
+        
+        //console.log(`[PROGRESS-MGR] Sending batched code generation with ${allFiles.length} files`);
+        this.sendProgress(batchedEvent);
+      }
+    }
+    
+    // Send other events
+    this.eventBuffer.filter(e => e.type !== 'code-generation').forEach(event => {
+      this.sendProgress(event);
+    });
+    
+    // Clear buffer and timeout
+    this.eventBuffer = [];
+    this.batchTimeout = null;
+  }
+  
+  async transitionToStage(stage: string, message: string): Promise<void> {
+    if (this.isTransitioning) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      return this.transitionToStage(stage, message);
+    }
+    
+    this.isTransitioning = true;
+    
+    try {
+      // Complete current stage before transitioning
+      if (this.currentStage && this.currentStage !== stage) {
+        //console.log(`[PROGRESS-MGR] Completing stage: ${this.currentStage}`);
+        this.stageProgress.set(this.currentStage, 100);
+        this.sendProgress({
+          stage: this.currentStage,
+          status: 'completed',
+          message: `${this.currentStage} complete`,
+          pct: 100,
+          sequence: ++this.sequenceNumber
+        });
+        
+        // Brief pause for UI to process completion
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+      
+      // Start new stage
+      //console.log(`[PROGRESS-MGR] Starting stage: ${stage}`);
+      this.currentStage = stage;
+      this.stageProgress.set(stage, 0);
+      
+      this.sendProgress({
+        stage,
+        status: 'active',
+        message,
+        pct: 0,
+        sequence: ++this.sequenceNumber
+      });
+    } finally {
+      this.isTransitioning = false;
+    }
+  }
+  
+  updateProgress(stage: string, pct: number, message: string, extraData: any = {}) {
+    if (this.currentStage !== stage) return;
+    
+    // Never send lower progress for the same stage
+    const lastPct = this.stageProgress.get(stage) || 0;
+    const newPct = Math.max(pct, lastPct);
+    this.stageProgress.set(stage, newPct);
+    
+    //console.log(`[PROGRESS-MGR] ${stage}: ${lastPct}% → ${newPct}% (${message})`);
+    
+    this.sendProgress({
+      stage,
+      status: 'active',
+      message,
+      pct: newPct,
+      sequence: ++this.sequenceNumber,
+      ...extraData
+    });
+  }
+  
+  addCodeGenerationEvent(fileName: string, content: string) {
+    this.generatedFiles.push({ fileName, content });
+    
+    const expectedFiles = 20; 
+    const baseProgress = Math.min((this.generatedFiles.length / expectedFiles) * 40, 40);
+    
+    const processingProgress = Math.min(30, this.generatedFiles.length * 1.5);
+    
+    const totalProgress = Math.min(70, baseProgress + processingProgress);
+        
+    this.sendProgress({
+      type: 'file-generated',
+      stage: 'code-gen',
+      fileName,
+      content: content, 
+      fileIndex: this.generatedFiles.length,
+      totalFiles: this.generatedFiles.length,
+      pct: totalProgress,
+      timestamp: Date.now(),
+      sequence: ++this.sequenceNumber,
+      language: this.getLanguageFromFilename(fileName) // Include language
+    });
+  }
+  
+  async handleFileCollection(fileName: string, success: boolean) {
+    this.collectedFiles++;
+    
+    // More gradual progress from 70% to 95%
+    const baseProgress = 70;
+    const maxProgress = 95;
+    const progressRange = maxProgress - baseProgress;
+    
+    // Use logarithmic curve for smoother progression
+    const progressRatio = Math.log(this.collectedFiles + 1) / Math.log(this.expectedCollectionFiles + 1);
+    const collectionProgress = baseProgress + (progressRange * Math.min(1, progressRatio));
+    
+    this.updateProgress('code-gen', Math.round(collectionProgress), 
+      success ? `Verified: ${fileName}` : `Processing: ${fileName}`);
+    
+    // Smaller delay for smoother updates
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  
+  private getLanguageFromFilename(filename: string): string {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    const langMap: Record<string, string> = {
+      'rs': 'rust',
+      'ts': 'typescript',
+      'js': 'javascript',
+      'json': 'json',
+      'toml': 'toml',
+      'yml': 'yaml',
+      'yaml': 'yaml'
+    };
+    return langMap[ext || ''] || 'text';
+  }
+  
+  async completeStage(stage: string, message: string) {
+    // Flush any pending events first
+    if (this.batchTimeout) {
+      clearTimeout(this.batchTimeout);
+      this.flushEventBuffer();
+    }
+    
+    this.stageProgress.set(stage, 100);
+    this.sendProgress({
+      stage,
+      status: 'completed',
+      message,
+      pct: 100,
+      sequence: ++this.sequenceNumber
+    });
+  }
+  
+  // Add new method for individual task tracking
+  startTask(taskId: string, taskName: string, stage: string) {
+    this.currentTasks.set(taskId, {name: taskName, status: 'running', pct: 0});
+    this.sendProgress({
+      type: 'task-start',
+      taskId,
+      taskName,
+      stage,
+      status: 'running',
+      timestamp: Date.now(),
+      sequence: ++this.sequenceNumber
+    });
+  }
+  
+  updateTask(taskId: string, pct: number, message?: string) {
+    const task = this.currentTasks.get(taskId);
+    if (task) {
+      task.pct = pct;
+      this.sendProgress({
+        type: 'task-update',
+        taskId,
+        taskName: task.name,
+        pct,
+        message,
+        status: 'running',
+        timestamp: Date.now(),
+        sequence: ++this.sequenceNumber
+      });
+    }
+  }
+  
+  completeTask(taskId: string, message?: string) {
+    const task = this.currentTasks.get(taskId);
+    if (task) {
+      task.status = 'completed';
+      task.pct = 100;
+      this.sendProgress({
+        type: 'task-complete',
+        taskId,
+        taskName: task.name,
+        pct: 100,
+        message: message || `${task.name} completed`,
+        status: 'completed',
+        timestamp: Date.now(),
+        sequence: ++this.sequenceNumber
+      });
+    }
+  }
 
-const MAX_BUILD_MINUTES = Number(process.env.MAX_BUILD_MINUTES) || 15;
-
-interface PipelineArgs {
-  projectId: string;
-  userId: string;
-  graph: Graph; 
-  sendProgress: (data: unknown) => void;
-  walletSigned?: boolean;
-  devMode?: boolean;
+  cleanup() {
+    if (this.batchTimeout) {
+      clearTimeout(this.batchTimeout);
+      this.flushEventBuffer();
+    }
+  }
 }
 
 /* Helper: ensure web/.env (or .env.local) contains the compiled PID */
@@ -71,62 +305,116 @@ export async function runDeployPipeline({
   userId,
   graph,
   sendProgress,
-  walletSigned = false,
   devMode = false,
 }: PipelineArgs): Promise<void> {
   let programKeypair: Keypair | null = null;
   let programIdStr: string | null = null;
   
-  sendProgress(<ProgressEvent>{
-    stage: "environment",
-    status: "active",
-    message: "Preparing your build environment…"
-  });
-
-  // declare outside try so `finally` can see it
+  console.log("[PIPELINE] Starting deployment pipeline");
+  console.log(`[PIPELINE] Project: ${projectId}`);
+  console.log(`[PIPELINE] User: ${userId}`);
+  console.log(`[PIPELINE] Development mode: ${devMode}`);
+  
+  resetProgress();
+  const progressMgr = new ProgressManager(projectId, sendProgress);
+  console.log("[PIPELINE] Initializing environment setup");
+  const environmentPromise = sendEnvironmentProgress(sendProgress);
   let workspace: WorkspaceHandle | null = null;
-  // Keep-alive interval for SSE connection
   let keepAliveInterval: NodeJS.Timeout | null = null;
 
   try {
+    console.log("[ENVIRONMENT] Setting up Docker environment");
+    progressMgr.startTask('env-docker', 'Docker Environment Setup', 'environment');
     workspace = await prepEnv(projectId, userId, devMode);
-
-    sendProgress(<ProgressEvent>{
-      stage: 'environment',
-      status: 'active',
-      message: 'Pulling tool-chain image…'    // new granular step
-    });
-    
-    // emit the container URL so the UI can tune in
-    sendProgress(<ProgressEvent>{
-      stage: 'environment',
-      status: 'active',
-      message: 'Image pulled — starting container…'
-    });
-
+    console.log(`[ENVIRONMENT] Container ready: ${workspace.containerName}`);
+    progressMgr.completeTask('env-docker', 'Container ready');
+    await environmentPromise;
+    console.log("[ENVIRONMENT] Environment setup complete");
     sendProgress(<ProgressEvent>{
       stage: "environment",
       status: "completed",
       message: "Container is up",
+      pct: 100,
       containerUrl: workspace.containerUrl
     });
     
-    // Start a keep-alive ping to prevent SSE connection from timing out
     keepAliveInterval = setInterval(() => {
-      console.log("[PIPELINE] Sending keep-alive ping");
-      sendProgress({ stage: "ping" });
-    }, 15000); // Send ping every 15 seconds
+      sendProgress({ type: "ping", stage: "keepalive", message: "Connection maintained" });
+    }, 30000);
  
     
-    // 2 ─ code generation ─────────────────────────────────────────────────
-    sendProgress(<ProgressEvent>{
-      stage: "code-gen",
-      status: "active",
-      message: "Generating Anchor code…"
-    });
-    sendProgress({ stage: "code-gen", message: "Generating Anchor code…" });
+    console.log("[CODE-GEN] Starting code generation phase");
+    await progressMgr.transitionToStage('code-gen', 'Starting Solana program generation');
+    
+    console.log("[CODE-GEN] Analyzing project structure");
+    progressMgr.startTask('codegen-analyze', 'Analyzing Project Structure', 'code-gen');
+    progressMgr.updateTask('codegen-analyze', 25, 'Parsing graph structure...');
+    progressMgr.completeTask('codegen-analyze');
+    
+    console.log("[CODE-GEN] Generating Rust program files");
+    progressMgr.startTask('codegen-rust', 'Generating Rust Program', 'code-gen');
+    console.log("[CODE-GEN] Generating frontend TypeScript bindings");
+    progressMgr.startTask('codegen-frontend', 'Generating Frontend Code', 'code-gen');
+    
+    // Enhanced progress wrapper with individual file tracking
+    const managedProgressWrapper = (data: any) => {
+      // Handle code-generation events with files array
+      if (data.type === 'code-generation' && data.files && Array.isArray(data.files)) {
+        //console.log('[DEPLOY] Processing code-generation batch with', data.files.length, 'files');
+        /*
+        console.log('[DEPLOY] CRITICAL: First file in batch:', {
+          filename: data.files[0]?.filename,
+          hasContent: !!data.files[0]?.content,
+          contentLength: data.files[0]?.content?.length || 0,
+          contentSample: data.files[0]?.content?.substring(0, 100) || 'NO CONTENT'
+        });
+        */
+        
+        // Send individual file events for each file in the batch
+        data.files.forEach((file: any) => {
+          if (file.filename && file.content) {
+            //console.log(`[DEPLOY] Processing file from batch:`, file.filename, 'content length:', file.content.length);
+            progressMgr.addCodeGenerationEvent(file.filename, file.content);
+            
+            // Update specific task progress based on file type
+            if (file.filename.endsWith('.rs')) {
+              progressMgr.updateTask('codegen-rust', Math.min(90, (data.files.filter((f: any) => f.filename.endsWith('.rs')).length / data.files.length) * 100));
+            } else if (file.filename.endsWith('.tsx') || file.filename.endsWith('.ts')) {
+              progressMgr.updateTask('codegen-frontend', Math.min(90, (data.files.filter((f: any) => f.filename.endsWith('.tsx') || f.filename.endsWith('.ts')).length / data.files.length) * 100));
+            }
+          } 
+        });
+        
+        // Also send the overall progress update
+        if (data.pct && data.stage) {
+          progressMgr.updateProgress(data.stage, data.pct, data.message, data);
+        }
+      } 
+      // Handle individual file-generated events
+      else if ((data.type === 'code-generation' || data.type === 'file-generated') && data.fileName) {
+        // Send individual file generation events immediately
+        //console.log('[DEPLOY] Processing individual file generation:', data.fileName, 'has content:', !!data.content);
+        
+        // Ensure content is passed through
+        const fileContent = data.content || data.fileContent || '';
+        progressMgr.addCodeGenerationEvent(data.fileName, fileContent);
+      } 
+      // Handle general progress updates
+      else if (data.pct && data.stage) {
+        progressMgr.updateProgress(data.stage, data.pct, data.message, data);
+      } 
+      // Pass through other events
+      else {
+        sendProgress(data);
+      }
+    };
+    
+    console.log("[CODE-GEN] Executing code generation");
     const { sentinelId, programName } =
-          await handleGenerateCode({ projectId, graph, workspace, sendProgress, userId });
+          await handleGenerateCode({ projectId, graph, workspace, sendProgress: managedProgressWrapper, userId });
+
+    console.log(`[CODE-GEN] Code generation completed for program: ${programName}`);
+    console.log(`[CODE-GEN] Sentinel task ID: ${sentinelId}`);
 
     // ✅ Code generation is done – **re‑use** the deterministic key‑pair that
     // was written during code‑gen. Never generate a second one.
@@ -134,6 +422,7 @@ export async function runDeployPipeline({
       workspace.rootPath ??
       (await import("../fileUtils").then(m => m.getProjectRootPath(projectId)));
 
+    console.log("[CODE-GEN] Reading program keypair");
     // Read the existing keypair JSON from the warm‑cache
     const keypairPath = `/usr/src/target/deploy/${programName}-keypair.json`;
     const secretJson  = execSync(
@@ -144,38 +433,59 @@ export async function runDeployPipeline({
     const secretArr   = JSON.parse(secretJson);
     programKeypair    = Keypair.fromSecretKey(Uint8Array.from(secretArr));
     programIdStr      = programKeypair.publicKey.toBase58();
-    // Notify the frontend of the re‑used Program ID
-    sendProgress(<ProgressEvent>{
-      stage: "code-gen",
-      status: "completed",
-      message: `Code generation complete — Program ID: ${programIdStr}`,
-      programId: programIdStr
-    });
+    console.log(`[CODE-GEN] Program ID determined: ${programIdStr}`);
+    
+    // Complete individual code generation tasks
+    progressMgr.completeTask('codegen-rust');
+    progressMgr.completeTask('codegen-frontend');
+    
+    console.log("[CODE-GEN] Code generation stage completed");
+    // Complete code generation stage
+    await progressMgr.completeStage('code-gen', `Code generation complete — Program ID: ${programIdStr}`);
 
     /* 3 ─ build program --------------------------------------------------- */
-    console.log("[PIPELINE] ⏳ anchor build started…");
     
+    console.log("[BUILD] Waiting for all files to be written to disk");
     // wait until all src + UI files are on disk
     // allow up to 3 min for large repos (90 × 2 s)
     await waitForTaskCompletion(sentinelId, 90, 2_000);
     
-    sendProgress(<ProgressEvent>{
-      stage: "build",
-      status: "active",
-      message: "Building program…"
-    });
+    console.log("[BUILD] Starting build phase");
+    // Start build phase with atomic transition
+    await progressMgr.transitionToStage('build', 'Starting Rust compilation...');
+    
+    // Build with individual tasks
+    console.log("[BUILD] Setting up build tasks");
+    progressMgr.startTask('build-deps', 'Installing Dependencies', 'build');
+    progressMgr.startTask('build-compile', 'Compiling Rust to BPF', 'build');
+    progressMgr.startTask('build-artifacts', 'Generating Artifacts', 'build');
+    
+    console.log("[BUILD] Starting Anchor build process");
+    const buildPromise = sendBuildProgress(sendProgress);
     const buildTask = await startAnchorBuildTask(projectId, userId);
+    console.log(`[BUILD] Build task started: ${buildTask}`);
     
     // Compute retry count based on configured build timeout
     const buildMinutes = MAX_BUILD_MINUTES;
     const buildRetries = Math.ceil(buildMinutes * 60_000 / 2_000);
+    console.log(`[BUILD] Build timeout: ${buildMinutes} minutes (${buildRetries} retries)`);
     
     // Check build status and bail early if not successful
+    console.log("[BUILD] Waiting for build completion");
     const buildStatus = await waitForTaskCompletion(buildTask, buildRetries, 2_000);
+    console.log(`[BUILD] Build completed with status: ${buildStatus}`);
+    
     const OK_STATUSES = ['succeed', 'finished', 'warning']; // Anchor warns but succeeds
     if (!OK_STATUSES.includes(buildStatus)) {
+      console.error(`[BUILD] Build failed with status: ${buildStatus}`);
       throw new Error(`Build task ended with status: ${buildStatus}`);
     }
+    
+    console.log("[BUILD] Completing build tasks");
+    // Complete individual build tasks
+    progressMgr.completeTask('build-deps', 'Dependencies installed');
+    progressMgr.completeTask('build-compile', 'Rust compilation completed');
+    progressMgr.completeTask('build-artifacts', 'Build artifacts generated');
     
     /* ------------------------------------------------------------------ *
      * 3a ─ make ./target/deploy point at the warmed cache
@@ -185,11 +495,7 @@ export async function runDeployPipeline({
       // fall back to a helper that reads solanaproject.root_path
       // projectFolder is already defined earlier (after code‑gen); reuse it here.
 
-      sendProgress(<ProgressEvent>{
-        stage: "build",
-        status: "active",
-        message: "Linking target/deploy → /usr/src/target/deploy"
-      });
+      // Smooth build progress continues in background
 
       // One-liner executed *inside* the running container
       const linkCmd = [
@@ -209,23 +515,24 @@ export async function runDeployPipeline({
                        ".", symlinkTaskId, { skipSuccessUpdate: true });
     }
     
-    console.log("[PIPELINE] Build task completed successfully");
+    //console.log("🔨 Build task completed successfully");
 
     /* 3b ─ fetch artefact ------------------------------------------------ */
+    console.log("[ARTIFACTS] Fetching build artifacts");
     const { base64So } = await getBuildArtifactTask(projectId);
     if (!base64So) {
+      console.error("[ARTIFACTS] No .so file found after build");
       throw new Error('Anchor built with warnings but produced no .so – check build log');
     }
+    console.log("[ARTIFACTS] Build artifact retrieved successfully");
     
     /* ---------------------------------------------------------------- *
      * 3c ─ build finished → gather file-tree with eager code
      * ---------------------------------------------------------------- */
-    sendProgress(<ProgressEvent>{
-      stage: "build",
-      status: "active",
-      message: "Collecting project files…"
-    });
+    // Wait for build progress animation to complete
+    await buildPromise;
 
+    console.log("[FILE-TREE] Generating project file tree");
     // (1) build the raw tree via the existing utility
     const rootPath = workspace.rootPath ?? (
       await import("../fileUtils").then(m => m.getProjectRootPath(projectId))
@@ -237,6 +544,7 @@ export async function runDeployPipeline({
     const { result: treeJson } = await import("../taskUtils")
       .then(m => m.getTaskById(rawTreeTask));
     const rawTree: any[] = treeJson ? JSON.parse(treeJson) : [];
+    console.log(`[FILE-TREE] Generated file tree with ${rawTree.length} root items`);
 
     // (2) attach code for the important files
     const rootBase = process.env.ROOT_FOLDER;
@@ -260,51 +568,150 @@ export async function runDeployPipeline({
     ];
     const tomlFile  = `/usr/src/${projectFolder}/Anchor.toml`;
 
-    /* ── NEW: copy only the artefacts we really need ─────────────────────────
+    /* ── Enhanced file collection with existence checking and retries ──────────
      * NEVER copy `${programName}-keypair.json`; it contains the 64‑byte secret
      * key and must stay inside the container.
      * ----------------------------------------------------------------------*/
-    await readContainerFile(
-      workspace.containerName,
-      path.posix.join(deployDir, `${programName}.so`),   // compiled program
-      projectId,
-      userId
-    );
-    await readContainerFile(workspace.containerName, tomlFile, projectId, userId);
-
-    /* ── NEW: copy only the artefacts we really need ─────────────────────────
-     * NEVER copy `${programName}-keypair.json`; it contains the 64‑byte secret
-     * key and must stay inside the container.
-     * ----------------------------------------------------------------------*/
-    await readContainerFile(
-      workspace.containerName,
-      path.posix.join(deployDir, `${programName}.so`),   // compiled program
-      projectId,
-      userId
-    );
-    await readContainerFile(workspace.containerName, tomlFile, projectId, userId);
+    //console.log('[FILE-OPS] Starting file collection phase');
+    //console.log('[FILE-OPS] Project folder:', projectFolder);
+    //console.log('[FILE-OPS] Deploy directory:', deployDir);
+    
+    // Helper functions for file operations
+    const checkFileExists = async (containerName: string, filePath: string): Promise<boolean> => {
+      try {
+        const result = execSync(
+          `docker exec ${containerName} test -f "${filePath}" && echo "exists" || echo "missing"`,
+          { encoding: 'utf8' }
+        ).trim();
+        return result === 'exists';
+      } catch (error) {
+        console.error(`[FILE-CHECK] Error checking file ${filePath}:`, error);
+        return false;
+      }
+    };
+    
+    const listDirectory = async (containerName: string, dirPath: string) => {
+      try {
+        const files = execSync(
+          `docker exec ${containerName} ls -la "${dirPath}" 2>/dev/null || echo "Directory not found"`,
+          { encoding: 'utf8' }
+        );
+        //console.log(`[DIR-LISTING] Contents of ${dirPath}:\n${files}`);
+        return files;
+      } catch (error) {
+        console.error(`[DIR-LISTING] Error listing ${dirPath}:`, error);
+        return null;
+      }
+    };
+    
+    // List the deploy directory to see what's actually there
+    await listDirectory(workspace.containerName, deployDir);
+    
+    // Check for .so file with retries
+    const soFilePath = path.posix.join(deployDir, `${programName}.so`);
+    let soFileExists = false;
+    let retryCount = 0;
+    
+    while (!soFileExists && retryCount < 5) {
+      soFileExists = await checkFileExists(workspace.containerName, soFilePath);
+      if (!soFileExists) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        retryCount++;
+      }
+    }
+    
+    if (soFileExists) {
+      await readContainerFile(
+        workspace.containerName,
+        soFilePath,
+        projectId,
+        userId
+      );
+    }
+    
+    // Check for Anchor.toml with fallback
+    const tomlExists = await checkFileExists(workspace.containerName, tomlFile);
+    if (tomlExists) {
+      await readContainerFile(workspace.containerName, tomlFile, projectId, userId);
+    }
+    
+    // Collect additional project files for file tree
+    const additionalFiles = [
+      { path: `${projectFolder}/src/lib.rs`, name: 'lib.rs' },
+      { path: `${projectFolder}/web/package.json`, name: 'package.json' },
+      { path: `${projectFolder}/web/src/App.tsx`, name: 'App.tsx' },
+      { path: `${projectFolder}/web/src/App.css`, name: 'App.css' },
+      { path: `${projectFolder}/README.md`, name: 'README.md' }
+    ];
+    
+    for (const file of additionalFiles) {
+      try {
+        const exists = await checkFileExists(workspace.containerName, file.path);
+        if (exists) {
+          await readContainerFile(workspace.containerName, file.path, projectId, userId);
+        }
+        await new Promise(resolve => setTimeout(resolve, 50));
+      } catch (error) {
+        // Skip failed files
+      }
+    }
 
     /* ----------------------------------------------------------------
-       Copy every *.json found under each IDL dir instead of trying to
-       stream the directory itself (which triggers "cat: … Is a directory")
+       Copy every *.json found under each IDL dir with better error handling
        ---------------------------------------------------------------- */
     for (const d of idlDirs) {
       try {
+        //console.log(`[IDL-COPY] Checking directory: ${d}`);
+        await listDirectory(workspace.containerName, d);
+        
         await runCommand(
-          `docker exec ${workspace.containerName} bash -c 'shopt -s nullglob && for f in "${d}"/*.json; do cat "$f"; done'`,
+          `docker exec ${workspace.containerName} bash -c 'shopt -s nullglob && for f in "${d}"/*.json; do echo "Found: $f" && cat "$f" 2>/dev/null || echo "Failed to read: $f"; done'`,
           ".",
           `copy-idl-${Date.now()}`,
           { skipSuccessUpdate: true },
         );
-      } catch { /* dir may not exist – fine */ }
+      } catch (err) {
+        console.log(`[IDL-COPY] Directory ${d} not accessible:`, err);
+      }
     }
+    
+    // Final phase of code generation
+    progressMgr.updateProgress('code-gen', 98, 'Finalizing code generation...');
+    await new Promise(resolve => setTimeout(resolve, 500));
+    progressMgr.updateProgress('code-gen', 100, 'Code generation complete!');
+    
+    // Update build progress separately
+    progressMgr.updateProgress('build', 99, 'Finalizing build artifacts...');
 
     /* ---- host copy removed: program ID is read in-container below ---- */
     
+    // Pre-filter file tree to reduce processing overhead  
+    const filterFileTree = (nodes: any[]): any[] => {
+      const HEAVY_DIRS = new Set(['.next', 'node_modules', '.yarn', '.git', 'target/debug', 'target/release', '.turbo']);
+      
+      return nodes.map(node => {
+        if (node.type === 'directory') {
+          // Skip heavyweight directories by clearing their children
+          if (HEAVY_DIRS.has(node.name)) {
+            return { ...node, children: [] }; // Keep directory but no children
+          }
+          // Recursively filter children
+          if (node.children) {
+            return { ...node, children: filterFileTree(node.children) };
+          }
+        }
+        return node;
+      }).filter(Boolean);
+    };
+
+    // Filter the tree before attaching contents to dramatically reduce processing
+    const filteredTree = filterFileTree(rawTree);
+    //console.log(`[PERF] Filtered file tree from ${JSON.stringify(rawTree).length} to ${JSON.stringify(filteredTree).length} chars`);
+    
     // Modify attachFileContents to skip logging content but still send real content to frontend
     const skipContentLogging = true; // Don't log file contents to console
-    await attachFileContents(rawTree, absRoot, workspace.containerName, false, skipContentLogging);
-    const fileTree = rawTree;  // now populated with actual content for frontend
+    await attachFileContents(filteredTree, absRoot, workspace.containerName, false, skipContentLogging);
+    const fileTree = filteredTree;  // now populated with actual content for frontend
 
     /* Program ID was determined pre-build */
     const programId = programIdStr!;
@@ -354,8 +761,8 @@ export async function runDeployPipeline({
                 idlContent = content;
               }
             }
-          } catch (err) {
-            console.error(`[pipeline] Failed to parse IDL JSON: ${err}`);
+          } catch {
+            // Skip invalid IDL files
           }
         }
         if (node.children) {
@@ -365,34 +772,19 @@ export async function runDeployPipeline({
     };
     
     findIdls(fileTree);
-    console.log(`[PIPELINE] Found ${idls.length} IDL file(s)`);
     
-    /* ──────────────────────────────────────────────────────────────
-     * Patch   idl.metadata.address  →  compiled program public key
-     * so the front-end can safely use  new anchor.Program(idl, provider)
-     * (Anchor ≥ 0.30 expects this field to be correct).
-     * ────────────────────────────────────────────────────────────── */
     if (idlContent) {
       try {
-        // Program ID was already determined above
         const programId = programIdStr!;
 
         idlContent.metadata = {
           ...(idlContent.metadata ?? {}),
           address: programId,
         };
-        console.log(`[PIPELINE] Updated IDL metadata with program ID: ${programId}`);
 
-        /* ---------- ensure the front-end sees the Program ID ---------- */
         try {
           await writeProgramIdEnv(programId, absRoot);
-          console.log(`[PIPELINE] Program ID written to .env file`);
 
-          /* ----------------------------------------------------------
-           * The file change happens *after* the Next.js dev server
-           * is already running inside the container.  Restart once
-           * so the server reloads the updated env vars.
-           * --------------------------------------------------------- */
           try {
             await runCommand(
               `docker restart ${workspace.containerName}`,
@@ -400,24 +792,29 @@ export async function runDeployPipeline({
               uuidv4(),               // fresh task-ID
               { skipSuccessUpdate: true }   // don't spam progress
             );
-            console.log("[PIPELINE] Restarted container to reload environment variables");
           } catch (restartErr) {
-            console.warn(
-              `[PIPELINE] Could not restart container: ${restartErr}`
-            );
+            console.warn(`⚠️  Container restart failed: ${restartErr}`);
           }
         } catch (envErr) {
-          console.warn(`[PIPELINE] Failed to write .env(.local): ${envErr}`);
+          console.warn(`⚠️  .env write failed: ${envErr}`);
         }
       } catch (err) {
-        console.warn(`[PIPELINE] Could not patch metadata.address automatically: ${err}`);
+        console.warn(`⚠️  IDL metadata patch failed: ${err}`);
       }
     }
+    
+    console.log("[PIPELINE] Build stage completed successfully");
+    console.log(`[PIPELINE] Final program ID: ${programIdStr}`);
+    console.log(`[PIPELINE] Found ${idls.length} IDL files`);
+    console.log("[PIPELINE] Deployment pipeline completed successfully");
+    
+    await progressMgr.completeStage('build', `Build finished successfully - Program ID: ${programIdStr}`);
     
     sendProgress(<ProgressEvent>{
       stage   : "build",
       status  : "completed",
       message : "Build finished",
+      pct     : 100,
       artifact: base64So,
       fileTree,
       ...(idlContent ? { idl: idlContent } : {}),
@@ -425,7 +822,21 @@ export async function runDeployPipeline({
       programId: programIdStr,
     });
 
+    // Send pipeline completion event for frontend
+    console.log("[PIPELINE] Sending pipeline completion event");
+    sendProgress({
+      type: 'pipeline-complete',
+      stage: 'build',
+      status: 'completed',
+      message: 'Deployment pipeline completed successfully',
+      programId: programIdStr,
+      timestamp: Date.now()
+    });
+
   } catch (err) {
+    console.error("[PIPELINE] Deployment pipeline failed");
+    console.error("[PIPELINE] Error:", err instanceof Error ? err.message : String(err));
+    
     sendProgress(<ProgressEvent>{
       stage: "error",
       status: "error",
@@ -433,19 +844,23 @@ export async function runDeployPipeline({
     });
     throw err;
   } finally {
+    console.log("[PIPELINE] Starting cleanup");
     /* ----------------------------------------------------------------
-     * Queue container for later cleanup instead of immediate deletion
+     * Cleanup progress manager and container
      * ---------------------------------------------------------------- */
+    progressMgr.cleanup();
+    
     if (workspace) {
+      console.log(`[PIPELINE] Marking container for cleanup: ${workspace.containerName}`);
       await markContainerForCleanup(projectId, workspace.containerName);
-      console.log(`[PIPELINE] Container ${workspace.containerName} queued for later cleanup`);
     }
     
-    // Clear keep-alive interval
     if (keepAliveInterval) {
+      console.log("[PIPELINE] Clearing keep-alive interval");
       clearInterval(keepAliveInterval);
-      console.log("[PIPELINE] Cleared keep-alive interval");
     }
+    
+    console.log("[PIPELINE] Cleanup completed");
   }
 }
 

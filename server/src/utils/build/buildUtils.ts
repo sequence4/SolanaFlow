@@ -1,5 +1,5 @@
 import pool from "src/config/database";
-import { getBuildArtifactTask } from "../projectUtils";
+import { getBuildArtifactTask } from "../anchor/getBuildArtefactTask";
 
 export async function needsBuild(projectId: string): Promise<boolean> {
   const artifact = await getBuildArtifactTask(projectId);

@@ -1,11 +1,11 @@
-import { NextFunction, Request, Response, RequestHandler } from 'express';
+import { RequestHandler } from 'express';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/database';
-import { generateToken } from '../utils/jwt';
+import { generateToken } from '../utils/auth/jwt';
 import { APP_CONFIG } from '../config/appConfig';
 import { AppError } from '../middleware/errorHandler';
-import { getValidBetaCodes } from '../utils/betaCodes';
+import { getValidBetaCodes } from '../utils/DEPRECIATED/betaCodes';
 
 export const register: RequestHandler = async (req, res) => {
   const { username, password, organisation, description, code, openAiApiKey } = req.body;
@@ -16,7 +16,7 @@ export const register: RequestHandler = async (req, res) => {
   }
   
   const validCodes = getValidBetaCodes();
-  console.log("validCodes", validCodes);
+  //console.log("validCodes", validCodes);
   if (!validCodes.has(code)) {
     res.status(200).json({ success: false, message: 'Invalid registration code' });
     return;

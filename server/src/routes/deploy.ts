@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
-import { signDeployTxAndBroadcast } from '../utils/projectUtils';
-import { catchAsync } from '../utils/catchAsync';
+import { signDeployTxAndBroadcast } from '../utils/blockchain/signDeployTxAndBroadcast';
+import { catchAsync } from '../utils/middleware/catchAsync';
 
 const router = express.Router();
 

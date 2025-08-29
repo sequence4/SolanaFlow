@@ -1,148 +1,37 @@
 import { refreshWorkspaceTree } from './refreshWorkspaceTree';
 import { Graph } from '../../types/graph';
-import type { WorkspaceHandle } from '../deploy/prepEnv';
+import type { WorkspaceHandle } from '../container/prepEnv';
 import { amendConfigFiles } from './amendConfigFiles';
 import { pollTaskStatus, createTask, updateTaskStatus, waitForTaskCompletion } from '../taskUtils';
 import { markWriteDone } from '../taskUtils/index';
 import { genSrcFiles } from './genSrcFiles';
-import { insertSrcFiles, InsertSrcProgressFn } from './insertSrcFiles';
-import { debugDumpContainerTree, debugPrintFiles } from '../containerUtils';
+import { insertSrcFiles } from './insertSrcFiles';
+import { debugDumpContainerTree, debugPrintFiles } from '../container';
 import { ensureAnchorTomlProgram, ensureRootWorkspaceMembers } from './ensureConfigHelpers';
 import { parseNodeDetails } from './parseNodeDetails';
 import { lintWorkspaceManifests } from './cargoManifestLint';
 import { FileTreeItem } from '../../types/FileTreeItem';
-import { runCommand, runCommandDetached } from "../projectUtils";
+import { runCommand } from "../command-execution/runCommand";
 import { randomUUID } from 'crypto';
 import path from "path";
-import { execSync } from 'child_process';
-import { attachFileContents } from "../fileUtils/attachFileContents";
-import fs from 'fs/promises';            // promise-based FS API
-import fsSync from 'fs';                 // for existsSync in helper
+import fs from 'fs/promises';           
+import fsSync from 'fs';            
 import { APP_CONFIG } from '../../config/appConfig';
 import { Keypair } from '@solana/web3.js';
 import pool from '../../config/database';
-import { normalizeProjectName } from '../stringUtils';
-import { saveProgramSecret, awsSecretsEnabled } from '../awsSecrets';
+import { normalizeProjectName } from '../helpers/stringUtils';
+import { saveProgramSecret, awsSecretsEnabled } from '../aws/awsSecrets';
+import { 
+  Args,
+  allGeneratedFiles
+ } from './data';
+import {
+  flattenPaths,
+  dirToFileTree,
+  findWebDir,
+  emitFileWritten
+} from './helpers';
 
-/** Extract all file paths from a file tree recursively. */
-function flattenPaths(tree: any[]): string[] {
-  const out: string[] = [];
-  for (const n of tree ?? []) {
-    if (n?.path) out.push(n.path);
-    if (Array.isArray(n?.children)) out.push(...flattenPaths(n.children));
-  }
-  return out;
-}
-
-/**
- * Recursively build a FileTreeItem from `webRoot`, always computing
- * paths **relative to that same root**, no matter how deep we recurse.
- */
-async function dirToFileTree(current: string, webRoot: string): Promise<FileTreeItem> {
-  const entries = await fs.readdir(current, { withFileTypes: true });
-
-  const children: (FileTreeItem | undefined)[] = await Promise.all(
-    entries.map(async entry => {
-      const abs = path.join(current, entry.name);
-      
-      /* Skip heavyweight or build-generated directories.
-         NOTE: keep .yarn/, but drop its cache sub-folder. */
-      const SKIP_TOP = new Set([
-        'node_modules', '.next', '.turbo',
-        'out', 'dist', '.vercel', 'coverage',
-        '.git', '.vscode', '.idea', '.DS_Store',
-        '.pnpm-store'
-      ]);
-      if (SKIP_TOP.has(entry.name)) return undefined;
-      if (
-        entry.isDirectory() &&
-        path.basename(current) === '.yarn' &&
-        entry.name === 'cache'
-      ) {
-        return undefined;                    // skip .yarn/cache only
-      }
-
-      if (entry.isDirectory()) return dirToFileTree(abs, webRoot);   // recurse
-
-      const code = await fs.readFile(abs, 'utf8');
-      return {
-        name: entry.name,
-        path: `./web/${path.relative(webRoot, abs)}`,                // ← correct base
-        type: 'file',
-        code,
-      };
-    })
-  );
-
-  const relDir = path.relative(webRoot, current);
-  return {
-    name: path.basename(current),
-    path: relDir ? `./web/${relDir}` : './web',                      // root dir path
-    type: 'directory',
-    children: children.filter(Boolean) as FileTreeItem[],            // drop undefined entries
-  };
-}
-
-/**
- * Walk up from cwd until we find a sibling `web/` directory.
- * Guarantees we pass the *real* path, no matter where the server was launched.
- */
-function findWebDir(): string {
-  let dir = process.cwd();
-  while (true) {
-    const candidate = path.join(dir, 'web');
-    if (fsSync.existsSync(candidate) && fsSync.statSync(candidate).isDirectory()) {
-      return candidate;
-    }
-    const parent = path.dirname(dir);
-    if (parent === dir) {
-      throw new Error("Cannot locate top-level 'web' directory");
-    }
-    dir = parent;
-  }
-}
-
-/** Block until every task-id is in a final state. */
-async function waitForAll(taskIds: string[]): Promise<{
-  succeeded: string[];
-  failed: string[];
-}> {
-  const succeeded: string[] = [];
-  const failed: string[] = [];
-
-  for (const id of taskIds) {
-    if (!id) continue;
-    try {
-      const { task } = await pollTaskStatus(id);
-      (task.status === 'succeed' || task.status === 'finished'
-        ? succeeded
-        : failed
-      ).push(id);
-    } catch (err) {
-      console.error(`[GEN] pollTaskStatus error for ${id}:`, err);
-      failed.push(id);
-    }
-  }
-  return { succeeded, failed };
-}
-
-/** Helper to emit progress event when each file is written */
-const emitFileWritten = (sendProgress: (data: unknown) => void): ((path: string, content: string) => void) => (path, content) => {
-  // Include content for frontend but avoid logging it to console
-  sendProgress({
-    event: 'file-written',
-    path,
-    content, // Include actual content for frontend
-  });
-};
-
-interface Args {
-  projectId: string;
-  graph: Graph;
-  workspace: WorkspaceHandle;
-  sendProgress: (data: unknown) => void;
-  userId: string;
-}
 
 export const handleGenerateCode = async ({
   projectId,
@@ -151,72 +40,40 @@ export const handleGenerateCode = async ({
   sendProgress,
   userId,
 }: Args): Promise<{ sentinelId: string; programName: string }> => {   
-    /* Dev-mode flag set by dev.sh or CI: container already runs `next dev` */
     const isDevServer = process.env.SF_DEV_SERVER === '1';
-
-    console.log('[GEN] Starting code generation for project:', projectId);
+    allGeneratedFiles.length = 0; 
     
     try {
-        // --------------------------------------------------------------------
-        // All container-side UI work must happen in the SAME bind-mounted tree
-        // that startProjectContainer exposes at /usr/src/<rootPath>/web.
-        // --------------------------------------------------------------------
         const containerWebDir = `/usr/src/${workspace.rootPath}/web`;
-
         if (graph.nodes.length === 0) throw new Error('No nodes found');
-        let functionCode = null;
 
-        // ───────────────── collect code blocks ───────────────────────────
+        /*
         const functionParts = graph.nodes
           .map(n => {
             const maybeCode =
-              // new schema
               (n as any).config?.code ??
-              // old/basic schema
               (n as any).data?.code ??
               null;
 
             return typeof maybeCode === 'string' ? maybeCode : null;
           })
           .filter(Boolean) as string[];
-
-        console.log(`[GEN] Processing ${functionParts.length} code snippets from graph nodes`);
-
-        if (functionParts.length > 0) functionCode = functionParts.join('\n\n');
-        else console.log('[GEN] No valid function code found in nodes');
+        */
         
-        sendProgress({ stage: 'file-tree', message: 'Refreshing file tree…' });
+        
         const fileTreeTaskIds = await refreshWorkspaceTree(projectId, userId);
-        console.log('[GEN] File tree refresh initiated');
-        sendProgress({ stage: 'file-tree', message: 'Waiting for file-tree refresh…' });
+        
+        sendProgress({ message: 'Starting code generation...' });
 
-        const { succeeded, failed } = await waitForAll(fileTreeTaskIds);
-
-        console.log(`[GEN] File tree tasks completed: ${succeeded.length} succeeded, ${failed.length} failed`);
-        sendProgress({
-          stage: failed.length ? 'file-tree-failed' : 'file-tree-done',
-          message: failed.length
-            ? `File-tree refresh: ${failed.length} task(s) failed`
-            : 'File-tree refresh complete'
-        });
-
-        if (failed.length) {
-          throw new Error(`File-tree task(s) failed: ${failed.join(', ')}`);
-        }
-
-        // Get the file tree result to check for existing program directory
         const treeTaskId = fileTreeTaskIds[0];
         const treeResult = await pollTaskStatus(treeTaskId);
         const initialTree = JSON.parse(treeResult.task.result ?? '[]');
         
-        // Gather existing paths so insertSrcFiles can decide create vs update
         const existingFilePaths = new Set<string>(flattenPaths(initialTree));
         
-        // --- force-overwrite critical config files (handles "./" prefix) ----
         for (const f of [
           "web/package.json",               "./web/package.json",
           "web/tsconfig.json",              "./web/tsconfig.json",
-          // always refresh Tailwind + toast hooks so local fixes reach the container
           "web/tailwind.config.js",         "./web/tailwind.config.js",
           "web/src/components/ui/use-toast.ts",
           "./web/src/components/ui/use-toast.ts",
@@ -226,123 +83,99 @@ export const handleGenerateCode = async ({
           existingFilePaths.delete(f);
         }
 
-        /* ─────────────────────  A)  stream *existing* web/ directory  ───────────────────── */
-        sendProgress({ stage: 'ui-gen', message: 'Streaming existing web/ files…' });
+        sendProgress({ message: 'Processing existing web files...' });
 
         const webRootDir = findWebDir();
         const creatorId   = userId;
-        const uiTree      = await dirToFileTree(webRootDir, webRootDir);     // dynamic tree
+        const uiTree      = await dirToFileTree(webRootDir, webRootDir); 
 
-        // Tell FE we're starting incremental UI push
-        sendProgress({ stage: 'ui-stream', message: 'Streaming UI files…' });
+        sendProgress({ message: 'Processing UI files...' });
 
-        // ─── write UI files and WAIT until every task finishes ────────────────
         const uiWriteTaskIds = await insertSrcFiles(
           uiTree,
           projectId,
           existingFilePaths,
           creatorId,
-          (path, code) => {
-            sendProgress({ 
-              event: 'file-written', 
-              path,
-              content: code, // Include actual content for frontend
-            });
-            if (path.endsWith('tsconfig.json'))
-              console.log('[GEN] Wrote tsconfig.json file');
-          },
+          emitFileWritten(sendProgress, false) 
         );
-
-        // block until every UI-write task is complete
-        for (const id of uiWriteTaskIds) {
-          await waitForTaskCompletion(id, 90, 2_000);
+        
+        sendProgress({ message: `Writing ${uiWriteTaskIds.length} UI files...` });
+        
+        for (let i = 0; i < uiWriteTaskIds.length; i++) {
+          await waitForTaskCompletion(uiWriteTaskIds[i], 90, 2_000);
         }
 
-        sendProgress({ event: 'ui-complete', message: 'UI streaming finished' });
-
-        /* ──────────────────────  Install JS deps inside the container  ────────────────────── */
+        sendProgress({ message: 'UI files processed' });
 
         const containerRootDir = `/usr/src/${workspace.rootPath}`;   // <── NEW
+        
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        sendProgress({ message: 'Setting up dependencies...' });
 
-        /* ── One-time Yarn bootstrap inside the running container ── */
         await runCommand(
-          // run *inside* the container -- single-quoted so the whole command is
-          // evaluated by bash there, and `${containerRootDir}` expands correctly
           `docker exec ${workspace.containerName} bash -lc 'rm -f ${containerRootDir}/web/.yarnrc'`,
           '.',
           projectId,
         );
 
-        {
-          // STEP 0  ➜ regenerate yarn.lock so the upcoming frozen install never bails
-          sendProgress({ stage: 'deps', message: 'Creating/refreshing yarn.lock in container…' });
+        try {
+          sendProgress({ message: 'Linking pre-installed dependencies...' });
+          
+          const symlinkCmd = `docker exec ${workspace.containerName} bash -c "
+            rm -rf ${containerRootDir}/web/node_modules && 
+            ln -s /usr/share/solanaflow/web/node_modules ${containerRootDir}/web/node_modules &&
+            cd ${containerRootDir}/web && npx next --version > /dev/null 2>&1"`;
+          
+          await runCommand(symlinkCmd, '.', projectId, { skipSuccessUpdate: true });
+          
+          sendProgress({ message: 'Dependencies linked successfully!' });
+        } catch (symlinkError) {
+          console.warn('[GEN] Symlink failed, falling back to copy:', symlinkError);
+          sendProgress({ message: 'Installing dependencies (fallback mode)...' });
+          
+          try {
+            await runCommand(
+              `docker exec ${workspace.containerName} bash -c "cp -r /usr/share/solanaflow/web/node_modules ${containerRootDir}/web/"`,
+              '.', 
+              projectId
+            );
+            sendProgress({ message: 'Dependencies copied successfully!' });
+          } catch (copyError) {
+            console.error('[GEN] Copy failed, falling back to fresh install:', copyError);
+            sendProgress({ message: 'Installing dependencies (fresh install)...' });
+            
+            const installCmd = [
+              'docker exec',
+              '-e', 'YARN_CACHE_FOLDER=/tmp/yarn-cache',
+              '-w', containerRootDir,
+              workspace.containerName,
+              'bash -lc "mkdir -p \\$YARN_CACHE_FOLDER && ' +
+                'yarn --cwd web install --prefer-offline --network-timeout 600000"'
+            ].join(' ');
 
-          const lockfileCmd = [
-            'docker exec',
-            // isolate Yarn's cache just like the main install
-            '-e', 'YARN_CACHE_FOLDER=/tmp/yarn-cache',
-            '-w', containerRootDir,                              // run from repo root
-            workspace.containerName,
-            'bash -lc "rm -rf \\$YARN_CACHE_FOLDER && mkdir -p \\$YARN_CACHE_FOLDER && ' +
-              'yarn --cwd web install --lockfile-only --network-timeout 600000"' // ⬅ --cwd web
-          ].join(' ');
-
-          await runCommand(lockfileCmd, '.', projectId);
-
-          sendProgress({ stage: 'deps', message: 'yarn.lock updated; installing deps…' });
-
-          // second pass – real install but tolerant to the fresh lock-file
-          const installCmd = [
-            'docker exec',
-            // isolate Yarn's cache so every dApp build starts clean
-            '-e', 'YARN_CACHE_FOLDER=/tmp/yarn-cache',
-            '-w', containerRootDir,
-            workspace.containerName,
-            'bash -lc "mkdir -p \\$YARN_CACHE_FOLDER && ' +
-              'yarn --cwd web install --prefer-offline --network-timeout 600000"'
-          ].join(' ');
-
-          await runCommand(installCmd, '.', projectId);
-
-          /* shadcn-ui CLI init REMOVED
-             Reason: `npx shadcn-ui init` overwrites tailwind.config.js and
-             globals.css every run, re-introducing the
-             `tailwindcss-shadcn-ui/preset` import that crashes Tailwind
-             (see GitHub issues #878, #2030, #1086). The preset is already
-             provided via package.json, so nothing else is required. */
-
-          sendProgress({ stage: 'deps', message: 'JS dependencies installed' });
+            await runCommand(installCmd, '.', projectId);
+            sendProgress({ message: 'Dependencies installed' });
+          }
         }
 
-        // ─── Restart Next.js dev server so it picks up next-themes, toast, etc.
-        sendProgress({ stage: 'deps', message: 'Restarting Next.js server…' });
+        sendProgress({ message: 'Restarting Next.js server...' });
 
-        /* 1️⃣  Kill ONLY the stand-alone server; keep `next dev` alive.      */
         await runCommand(
           `docker exec ${workspace.containerName} pkill -f '.next/standalone/server.js' || true`,
           '.',
           projectId,
         );
 
-        /* 2️⃣  If we are *not* in dev mode, container CMD will start server.js
-                once the build finishes.  When in dev mode no restart needed. */
-        sendProgress({
-          stage: 'deps',
-          message: isDevServer
-            ? 'Dev server detected – no restart needed'
-            : 'Dev server will start via CMD'
+        sendProgress({ message: isDevServer 
+          ? 'Dev server detected – no restart needed' 
+          : 'Dev server will start via CMD'
         });
 
-        /* ──────────────────────────────────────────────────────────────────────── */
 
-        /* ────────────────── 3️⃣  Build *only* in standalone mode ──────────── */
         if (!isDevServer) {
-          sendProgress({
-            stage: 'next-build',
-            message: 'Running Next.js build to process Tailwind CSS…'
-          });
+          sendProgress({ message: 'Building Next.js application...' });
           try {
-            // Force-write the tsconfig.json file to ensure it has the correct configuration
             await runCommand(
               `docker exec ${workspace.containerName} bash -lc 'cat > ${containerWebDir}/tsconfig.json <<EOF
 {
@@ -374,7 +207,6 @@ EOF'`,
             );
             
             await runCommand(
-              // force standalone output _inside_ the running container
               `docker exec \
  -e NEXT_PRIVATE_STANDALONE=true \
  -e APP_BASE_PATH=/dapp/$APP_ID \
@@ -383,32 +215,17 @@ EOF'`,
               '.',
               projectId
             );
-            sendProgress({
-              stage: 'next-build-done',
-              message: 'Next.js build completed'
-            });
+            sendProgress({ message: 'Next.js build completed' });
           } catch (error) {
             console.error('Error during Next.js build:', error);
-            sendProgress({
-              stage: 'next-build-failed',
-              message: 'Next.js build failed'
-            });
+            sendProgress({ message: '⚠️ Next.js build failed (non-critical)' });
           }
-        } // ← closes "if (!isDevServer)"
-        /* ── dev-mode skip: build/restart not required ── */
+        } 
 
-        /* runtime server already started by docker run → nothing to do */
-
-        // ───────────────────────── write graph-derived Rust sources ──────────────
-        // Derive program name from project context (fallback to 'my_program' if not found)
-        /* -----------------------------------------------------------
-         * Derive the **crate name** from the workspace's root folder:
-         *   untitled-project-<uid>  →  untitled_project
-         * This keeps the name identical to programs/<crate>/ and
-         * prevents "<name> is not part of the workspace" errors.
-         * ----------------------------------------------------------- */
+        sendProgress({ message: 'Building source tree...' });
+        
         const rootStem   = workspace.rootPath.replace(/-[a-f0-9]{8}$/, '');
-        let programName  = rootStem.replace(/-/g, '_');       // ⇒ snake_case
+        let programName  = rootStem.replace(/-/g, '_');
         if (/^[0-9]/.test(programName)) programName = 'p' + programName;
         try {
           const nameRes = await pool.query('SELECT name FROM solanaproject WHERE id = $1', [projectId]);
@@ -416,33 +233,24 @@ EOF'`,
           if (projName) {
             programName = normalizeProjectName(projName);
           }
-
-          // 🔧 Anchor treats every crate as *snake_case*; a dash here makes
-          // it regenerate a fresh keypair and triggers DeclaredProgramIdMismatch.
           programName = programName.replace(/-/g, '_');
         } catch (e) {
           console.warn('Could not fetch project name, using default:', e);
         }
-        // Generate a fresh, random keypair so every dApp has a unique program ID
+        
+        sendProgress({ message: 'Generating program keypair...' });
         const programKeypair = Keypair.generate();
         const programId = programKeypair.publicKey.toBase58();
 
-        // Persist the secret key in AWS Secrets Manager for secure storage
         if (awsSecretsEnabled()) {
           await saveProgramSecret(programId, programKeypair.secretKey);
         } else {
           console.warn('[GEN] AWS secrets disabled – keypair kept only on disk');
         }
 
-        // Save the keypair to a file for later use (e.g. Anchor deploy or upgrades)
         const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${programId}.json`);
         fsSync.writeFileSync(walletPath, JSON.stringify(Array.from(programKeypair.secretKey)));
 
-        /** -----------------------------------------------------------------
-         * Ensure the keypair exists inside the container *before* we call any
-         * `anchor keys sync` commands.  This prevents missing‑file errors for
-         * crates whose kebab/snake stems differ from `programName`.
-         * ----------------------------------------------------------------- */
         const initialKeyJson = JSON.stringify(Array.from(programKeypair.secretKey));
         await runCommand(
           `docker exec ${workspace.containerName} bash -lc 'mkdir -p /usr/src/target/deploy && echo ${initialKeyJson.replace(/'/g, "'\\''")} > /usr/src/target/deploy/${programName}-keypair.json'`,
@@ -451,29 +259,11 @@ EOF'`,
           { skipSuccessUpdate: true },
         );
 
-        /* ────────────────────────────────────────────────────────────────
-         * NEW ✨  Keep every Anchor source‑of‑truth in sync *before* build
-         * ────────────────────────────────────────────────────────────────
-         * 1.  Ensure the keypair file stem exactly matches the crate name
-         *     (Anchor looks for target/deploy/<crate>-keypair.json).
-         * 2.  Run `anchor keys sync` to copy that pubkey into
-         *        • programs/<crate>/src/lib.rs   (declare_id!)
-         *        • Anchor.toml [programs.devnet] (and other clusters)
-         *     so the subsequent `anchor build` bakes the correct ID.
-         */
-        const crateSnake = programName.replace(/-/g, "_");      // Anchor crate dirs are snake_case
-        const crateKebab = programName.replace(/_/g, "-");      // Anchor crate dirs are kebab-case
-        /**
-         * Copy the deterministic keypair under **both** possible stems so that
-         * `anchor keys sync` finds whichever variant it expects.
-         *
-         * ⚠️  When `crateStem === programName` the two filenames are identical, and
-         * `cp` aborts with "are the same file".  Wrap the second copy in a guard to
-         * make the command idempotent.
-         */
+        const crateSnake = programName.replace(/-/g, "_");
+        const crateKebab = programName.replace(/_/g, "-");
         const copyKeypairCmd =
           programName === crateSnake
-            ? "true"       // nothing to do – stems already match
+            ? "true"
             : `cp -f /usr/src/target/deploy/${programName}-keypair.json /usr/src/target/deploy/${crateSnake}-keypair.json`;
 
         await runCommand(
@@ -483,10 +273,9 @@ EOF'`,
           { skipSuccessUpdate: true }
         );
         
-        // Also copy for kebab-case variant if it differs from the program name
         const copyKebabKeypairCmd =
           programName === crateKebab
-            ? "true"       // nothing to do – stems already match
+            ? "true"
             : `cp -f /usr/src/target/deploy/${programName}-keypair.json /usr/src/target/deploy/${crateKebab}-keypair.json`;
             
         await runCommand(
@@ -496,7 +285,6 @@ EOF'`,
           { skipSuccessUpdate: true }
         );
 
-        // ⚠️  Must be executed from the workspace root *inside* the container.
         await runCommand(
           `docker exec ${workspace.containerName} bash -lc 'cd /usr/src/${workspace.rootPath} && anchor keys sync'`,
           ".",
@@ -504,17 +292,11 @@ EOF'`,
           { skipSuccessUpdate: true }
         );
 
-        // Self-verify the keypair generation
         const derivedPubkey = Keypair.fromSecretKey(programKeypair.secretKey).publicKey.toBase58();
         if (derivedPubkey !== programId) {
           throw new Error('Keypair self-verification failed');
         }
-        console.log('[GEN] Generated program ID:', programId);
 
-        /* ──────────────────────────────────────────────────────────────
-         * Persist programId inside solanaproject.details.projectState
-         * so the FE can read it before the first deploy attempt.
-         * ────────────────────────────────────────────────────────────── */
         try {
           await pool.query(
             `
@@ -531,10 +313,6 @@ EOF'`,
             [programId, projectId],
           );
 
-          /* ─────────────────────────────────────────────────────────────
-           * NEW: also save the deterministic ID under details.lastProgramId
-           * so startAnchorBuildTask can locate the correct key‑pair.
-           * ──────────────────────────────────────────────────────────── */
           await pool.query(
             "UPDATE solanaproject \
                SET details = COALESCE(details, '{}'::jsonb) \
@@ -543,53 +321,33 @@ EOF'`,
             [JSON.stringify({ lastProgramId: programId }), projectId],
           );
  
-          console.log('[GEN] Program ID saved to database');
-          
-          // Notify frontend that the programId is now available
           sendProgress({ stage: 'programIdPersisted', programId });
         } catch (e) {
           console.error('[GEN] Failed to persist program ID to DB:', e);
         }
         
-        /**
-         * Write the key-pair **directly to the global warm-cache**
-         * (/usr/src/target/deploy) so the file survives the later
-         *   rm -rf target/deploy && ln -sfnT /usr/src/target/deploy target/deploy
-         * step.  This guarantees Anchor re-uses the same key-pair it sees
-         * during code-gen, eliminating the phantom "second" Program ID.
-         */
         const keypairJson = JSON.stringify(Array.from(programKeypair.secretKey));
         const snakeKeyFile = `${crateSnake}-keypair.json`;
         const kebabKeyFile = `${crateKebab}-keypair.json`;
         await runCommand(
           `docker exec ${workspace.containerName} bash -lc 'mkdir -p /usr/src/target/deploy && ` +
-          // tee writes the same bytes to both stems in a single pass
           `echo ${JSON.stringify(keypairJson)} | tee /usr/src/target/deploy/${snakeKeyFile} > /usr/src/target/deploy/${kebabKeyFile}'`,
           ".",
           randomUUID(),
           { skipSuccessUpdate: true }
         );
-
-        /*───────────────────────────────────────────────────────────────
-         * 🧹  **NEW:** Immediately remove any leftover *template* keys so
-         *      Anchor can never confuse them with the real program.
-         *      – `anchor_template‑keypair.json`
-         *      – `my_program‑keypair.json`   (old boiler‑plate crate)
-         *───────────────────────────────────────────────────────────────*/
         await runCommand(
           `docker exec ${workspace.containerName} bash -lc ` +
           `'find /usr/src/target/deploy -maxdepth 1 -type f \\( ` +
             `-name "anchor_template-*-keypair.json" -o ` +
             `-name "my_program-*-keypair.json"    -o ` +
             `-name "my-program-*-keypair.json" \\) -delete'`,
-          "." /* cwd (unused) */,
+          ".",
           randomUUID(),
           { skipSuccessUpdate: true },
         );
         
-        // Inform client about the program ID for early access
         sendProgress({ stage: 'ephemeralKey', pubkey: programId });
-        // Include the env var so local dev server can pick it up instantly
         await runCommand(
           `docker exec ${workspace.containerName} bash -lc 'echo NEXT_PUBLIC_PROGRAM_ID=${programId} >> /usr/src/${workspace.rootPath}/web/.env'`,
           '.',
@@ -597,147 +355,181 @@ EOF'`,
           { skipSuccessUpdate: true },
         );
         
-        // Call ensure config helpers BEFORE refreshing the tree
         await ensureAnchorTomlProgram(
           workspace,
           programName,
           programId,
           projectId,
-          /* creatorId */ null
+          null
         );
 
         await ensureRootWorkspaceMembers(
           workspace,
           projectId,
-          /* creatorId */ null
+          null
         );
 
-        // Build in-memory src/ tree
         const projectState = { nodes: graph.nodes, edges: graph.edges || [] };
         const srcTree = genSrcFiles(projectState, programName, programId);
         if (!srcTree) throw new Error('genSrcFiles returned null');
         
-        // Parse details again to get canonical instruction names for debug logging
         const { instructions: canonicalInstructions, state: canonicalState } = parseNodeDetails(projectState);
-        // The canonicalization of inst.name based on fnMatch happens *inside* genSrcFiles
-        // and also inside parseNodeDetails if we were to enhance it.
-        // For now, assume parseNodeDetails provides the names needed for paths,
-        // and genSrcFiles internally uses the fnMatch for generation.
-        // To be perfectly correct, we might need genSrcFiles to return canonicalInstructions
-        // or re-run the fnMatch logic here. For debugPrintFiles, this should be sufficient.
-
-        /* --------------------------------------------------------------- *
-         * write the src tree into the workspace
-         * --------------------------------------------------------------- */
-        sendProgress({ stage: 'src-gen', message: 'Generating Rust sources…' });
-        console.log('[GEN] Generating Rust source files');
+        sendProgress({ message: 'Extracting generated files...' });
+        allGeneratedFiles.length = 0;
         
-        function writeFilesAndEmitTree(
+        const extractAllFiles = (node: FileTreeItem, basePath: string = ''): Array<{path: string, content: string}> => {
+          const files: Array<{path: string, content: string}> = [];
+          
+          const currentPath = basePath ? `${basePath}/${node.name}` : node.name;
+          
+          if (node.type === 'file' && node.code) {
+            files.push({ path: currentPath, content: node.code });
+          }
+          
+          if (node.children) {
+            for (const child of node.children) {
+              files.push(...extractAllFiles(child, currentPath));
+            }
+          }
+          
+          return files;
+        };
+
+        const writeFilesAndEmitTree = (
           rootNode: FileTreeItem,
           projectId: string,
-          existing: Set<string>,
           creatorId: string | null,
-          workspace: WorkspaceHandle,
+          _workspace: WorkspaceHandle,
           sendProgress: (d: unknown) => void,
-        ): Promise<string> {
+        ): Promise<string> => {
           return (async () => {
-            const writeTaskIds = await insertSrcFiles(rootNode, projectId, existingFilePaths, creatorId, emitFileWritten(sendProgress));
-            
-            // 🟢 NEW – wait until every write-file task finishes
-            for (const tId of writeTaskIds) {
-              await waitForTaskCompletion(tId, 90, 2_000);
+            const allSrcFiles = extractAllFiles(rootNode);
+            sendProgress({ message: `Writing ${allSrcFiles.length} program files...` });
+            const writeTaskIds = await insertSrcFiles(rootNode, projectId, existingFilePaths, creatorId, emitFileWritten(sendProgress, true));
+            sendProgress({ message: 'Saving files to container...' });
+            for (let i = 0; i < writeTaskIds.length; i++) {
+              await waitForTaskCompletion(writeTaskIds[i], 90, 2_000);
             }
+            /*
+            const displayFiles = allSrcFiles.slice(0, 5).map(file => ({
+              filename: file.path,
+              content: file.content.substring(0, 500),
+              language: file.path.endsWith('.rs') ? 'rust' : 'toml'
+            }));
+            */
+            sendProgress({ message: `Generated ${allSrcFiles.length} Solana program files` });
 
-            const rootBase = process.env.ROOT_FOLDER!;
-            const absRoot  = path.join(rootBase, workspace.rootPath);
-            const tinyTree = [rootNode];
-            // Include real content for frontend but skip logging to console
-            const skipContentLogging = true;
-            await attachFileContents(tinyTree, absRoot, workspace.containerName, false, skipContentLogging);
-
-            // now it is safe to raise the sentinel
             const sentinelId = await markWriteDone(projectId);
-            console.log('[GEN] Write operations completed, sentinel ID:', sentinelId);
             return sentinelId;
           })();
-        }
+        };
         
         const sentinelId = await writeFilesAndEmitTree(
           srcTree,
           projectId,
-          existingFilePaths,
-          /* creatorId */ null,
+          null,
           workspace,
           sendProgress,
         );
 
-        sendProgress({ stage: "src-gen-done", message: "Rust sources ready" });
-        sendProgress({ stage: "ui-complete" });
+        sendProgress({ message: 'Validating Cargo manifests...' });
 
-
-        // ─────────── Run static lint on Cargo manifests before amending ───────────
-        console.log('[GEN] Running Cargo.toml linter');
         lintWorkspaceManifests({ projectId, userId, workspace })
           .then(() =>
-            sendProgress({ stage: "lint-done", message: "Cargo manifests validated" }),
+            sendProgress({ message: "Cargo manifests validated" })
           )
           .catch(err =>
-            sendProgress({ stage: "lint-failed", message: `Manifest validation failed: ${String(err)}` }),
+            sendProgress({ message: `Manifest validation failed: ${String(err)}` })
           );
 
-        // Amend config files **first** so IDL changes are in place for the build.
-        const { anchorTaskId } = await amendConfigFiles(projectId, userId);
-        await sendProgress({
-          stage: "amend-done",
-          anchorTaskId,
-          message: "[handleGenerateCode] Amend done",
-        });
+        sendProgress({ message: 'Updating configuration files...' });
 
-        /* --------------------------------------------------------------
-         * ensureAnchorTomlProgram / amendConfigFiles may have just
-         * touched Anchor.toml – run a second keys sync so
-         * Anchor.toml, declare_id!(), and the JSON keypair stay equal
-         * -------------------------------------------------------------- */
-        /* --------------------------------------------------------------
-         * Re‑sync keys, purge old artefacts, then force a *clean* build.
-         * `cargo-build-sbf` (called by `anchor build`) does **not**
-         * understand "--force" → use `anchor clean` instead.
-         * -------------------------------------------------------------- */
-        /* --------------------------------------------------------------
-         * Final, deterministic rebuild sequence:
-         *   1. anchor clean            – remove all artefacts **and** keypairs
-         *   2. restore keypair JSON    – copy deterministic pair back
-         *   3. anchor keys sync        – update Anchor.toml + declare_id!
-         *   4. anchor build            – produce fresh .so that embeds our ID
-         * -------------------------------------------------------------- */
+        await amendConfigFiles(projectId, userId);
+        sendProgress({ message: 'Code generation complete' });
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        sendProgress({ message: 'Starting build process...' });
+        
+        sendProgress({ message: 'Cleaning previous builds...' });
+        
         const WORKDIR   = `/usr/src/${workspace.rootPath}`;
         const KEYS_DIR  = `target/deploy`;
         const snakeKey  = `${crateSnake}-keypair.json`;  // anchor_template-keypair.json
         const kebabKey  = `${crateKebab}-keypair.json`;  // anchor-template-keypair.json
 
-        // escape once for safe bash literal
         const keyJsonEsc = keypairJson.replace(/'/g, `'\\''`);
 
         const script = [
           `cd ${WORKDIR}`,
           'anchor clean',
           `mkdir -p ${KEYS_DIR}`,
-          // always restore under **both** stems so Anchor never regenerates
           `echo '${keyJsonEsc}' | tee ${KEYS_DIR}/${snakeKey} > ${KEYS_DIR}/${kebabKey}`,
           `anchor keys sync`,
-          // Build normally; cargo‑build‑sbf only *compiles* test targets,
-          // it doesn't execute them, so no extra flag is required.
           `anchor build -p ${programName}`
         ].join(' && ');
 
+        sendProgress({ message: 'Syncing program keys...' });
+        sendProgress({ message: 'Compiling Rust program...' });
+        
         await runCommand(
           `docker exec ${workspace.containerName} bash -lc "${script}"`,
           '.',
-          randomUUID(),
-          { skipSuccessUpdate: true }
+          projectId
         );
+        
+        sendProgress({ message: 'Program built successfully' });
+        
+        // Extract and save IDL after successful build
+        try {
+          sendProgress({ message: 'Extracting IDL...' });
+          
+          const idlPath = `${WORKDIR}/target/idl/${programName}.json`;
+          const extractIdlCmd = `docker exec ${workspace.containerName} bash -lc 'cat ${idlPath}'`;
+          
+          const idlContent = await runCommand(extractIdlCmd, '.', projectId, { skipSuccessUpdate: true, silent: true });
+          
+          if (idlContent && idlContent.trim()) {
+            const idl = JSON.parse(idlContent);
+            
+            // Ensure IDL has the program address
+            if (!idl.metadata?.address) {
+              idl.metadata = { 
+                ...idl.metadata, 
+                address: programId 
+              };
+            }
+            
+            // Save IDL to project details
+            await pool.query(
+              `UPDATE solanaproject 
+               SET details = jsonb_set(
+                 jsonb_set(
+                   COALESCE(details, '{}'::jsonb),
+                   '{projectState,idl}',
+                   $1::jsonb,
+                   true
+                 ),
+                 '{projectState,idls}',
+                 COALESCE(details->'projectState'->'idls', '[]'::jsonb) || $1::jsonb,
+                 true
+               )
+               WHERE id = $2`,
+              [JSON.stringify(idl), projectId]
+            );
+            
+            sendProgress({ 
+              message: 'IDL extracted and saved',
+              idl: idl 
+            });
+            
+            console.log(`[BUILD] IDL extracted successfully for program ${programId}`);
+          }
+        } catch (idlError) {
+          console.warn('[BUILD] IDL extraction failed (non-critical):', idlError);
+          sendProgress({ message: 'Warning: IDL extraction failed (program will still work)' });
+        }
 
-        // ─────────── Debug: dump container tree ───────────
         const dumpTaskId = await createTask(
             'Dump Container Tree', null, projectId);
         try {
@@ -747,17 +539,14 @@ EOF'`,
             dumpTaskId,
           );
         } finally {
-          // --- Print key files (always run) ---
           try {
             const important = [
               "Anchor.toml",
               "Cargo.toml",
-              // generated program files
               `programs/${programName}/src/lib.rs`,
               `programs/${programName}/src/instructions/mod.rs`,
               ...canonicalInstructions.map(i => `programs/${programName}/src/instructions/${i.name}.rs`),
             ];
-            // Add state.rs to important files if state exists
             if (canonicalState.length > 0) {
               important.push(`programs/${programName}/src/state.rs`);
             }
@@ -773,11 +562,11 @@ EOF'`,
           }
           await updateTaskStatus(dumpTaskId, 'succeed', 'Tree dumped and files printed');
         }
-        
-        // ─── end of function ────────────────────────────────
+                
         return { sentinelId, programName };
     } catch (err) {
         console.error('Error in handleGenerateCode:', err);
+        sendProgress({ message: `Error: ${err instanceof Error ? err.message : String(err)}` });
         throw err;
     }
 };

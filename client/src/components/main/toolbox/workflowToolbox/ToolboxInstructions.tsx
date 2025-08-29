@@ -1,5 +1,4 @@
 import React, { useRef, useState } from 'react';
-import { useColorModeValue } from '../../../ui/color-mode';
 import { motion } from 'framer-motion';
 import { groupedInstructions } from '../../../../data/toolbox/instructionItems'; 
 import { Star, PlusCircle } from 'lucide-react';
@@ -7,7 +6,6 @@ import { Star, PlusCircle } from 'lucide-react';
 const MotionDiv = motion.div;
 
 interface InstructionCardProps {
-  key: string;
   name: string;
   icon?: React.ElementType;
   flow?: any;
@@ -29,23 +27,67 @@ export function InstructionCard({
   const IconComponent = icon || null;
   const divRef = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   
   const handleDragStart = (event: React.DragEvent<HTMLDivElement>) => {
+    setIsDragging(true);
+    
+    
     if (flow) {
       const isOffChainFlow = typeof flow === 'string' && flow === 'off-chain';
+      
+      // SPL Token instructions should NEVER be off-chain
+      const isSPLTokenInstruction = name.includes('Token') || 
+                                    name.includes('Mint') || 
+                                    name.includes('Initialize') ||
+                                    name.includes('Burn') ||
+                                    name.includes('Transfer') ||
+                                    name.includes('Approve') ||
+                                    name.includes('Freeze') ||
+                                    name.includes('Thaw') ||
+                                    name.includes('Close') ||
+                                    name.includes('Revoke') ||
+                                    name.includes('Authority');
+      
+      // Override: Force SPL token instructions to be onChain
+      const actuallyOffChain = isOffChainFlow && !isSPLTokenInstruction;
+      
+      // CRITICAL FIX: Properly structure the drag data with actual flow nodes
       const draggedData = {
-        category: isOffChainFlow ? 'offChain' : 'onChain',
-        nodes: isOffChainFlow && nodeDefinition ? [nodeDefinition] : (flow.nodes || []),
-        edges: isOffChainFlow ? [] : (flow.edges || []),
-        code: isOffChainFlow ? undefined : flow.code
+        category: actuallyOffChain ? 'offChain' : 'onChain',
+        nodes: !actuallyOffChain && flow?.nodes ? flow.nodes : (actuallyOffChain && nodeDefinition ? [nodeDefinition] : []),
+        edges: !actuallyOffChain && flow?.edges ? flow.edges : [],
+        flowName: flow?.name || name,
+        instructionName: name,
+        code: actuallyOffChain ? undefined : flow?.code
       };
+      
+      // Debug log to verify data is being sent correctly
+      console.log("🚀 Dragging instruction:", {
+        name,
+        category: draggedData.category,
+        nodesCount: draggedData.nodes?.length || 0,
+        hasFlowNodes: !!flow?.nodes,
+        flowNodesLength: flow?.nodes?.length,
+        firstNodeData: draggedData.nodes?.[0]?.data,
+        actuallyOffChain,
+        isSPLTokenInstruction
+      });
+      
+      
       
       event.dataTransfer.setData(
         "application/reactflow",
         JSON.stringify(draggedData)
       );
       event.dataTransfer.effectAllowed = "move";
+    } else {
+      console.error("❌ No flow data available for:", name);
     }
+  };
+
+  const handleDragEnd = () => {
+    setIsDragging(false);
   };
 
   const toggleFavorite = (e: React.MouseEvent) => {
@@ -76,69 +118,131 @@ export function InstructionCard({
   }, [flow, nodeDefinition]);
 
   return (
-    <div
+    <MotionDiv
       ref={divRef}
       draggable
-      className={`w-full px-4 py-2 text-sm transition-all duration-200 border-l-2 ${
-        isHovered ? "bg-gray-800/30 border-blue-500" : "bg-transparent border-transparent"
-      } cursor-pointer group`}
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      whileHover={{ 
+        scale: 1.02,
+        backgroundColor: "var(--sidebar-accent)"
+      }}
+      whileDrag={{ 
+        scale: 1.05,
+        opacity: 0.8,
+        zIndex: 1000
+      }}
+      className="w-full mx-1 my-0.5 px-3 py-1.5 text-sm transition-all duration-200 rounded-lg cursor-grab active:cursor-grabbing group backdrop-blur-sm border border-border hover:border-primary"
+      style={{
+        backgroundColor: isDragging 
+          ? 'var(--muted)'
+          : 'transparent',
+      }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onDragStart={handleDragStart as any}
+      onDragEnd={handleDragEnd}
     >
       <div className="flex items-center justify-between w-full">
         <div className="flex items-center">
-          <div className="w-1.5 h-1.5 rounded-full bg-[#4d7cfe] mr-2"></div>
-          <span className={`font-medium ${isHovered ? "text-white" : "text-gray-300"}`}>{name}</span>
+          <div 
+            className="w-1 h-1 rounded-full mr-2 bg-muted-foreground"
+          />
+          <span 
+            className="text-xs font-medium transition-colors duration-200 text-foreground"
+          >
+            {name}
+          </span>
           {isNew && (
-            <span className="ml-2 text-xs px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
-              New
-            </span>
+            <MotionDiv
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              whileHover={{ scale: 1.1 }}
+              className="ml-2 text-[9px] px-1.5 py-0.5 rounded-full border bg-muted/20 text-primary border-border"
+            >
+              NEW
+            </MotionDiv>
           )}
         </div>
-        <div
-          className={`flex items-center space-x-1 ${isHovered ? "opacity-100" : "opacity-0"} transition-opacity duration-200`}
+        <MotionDiv
+          initial={{ opacity: 0, x: 10 }}
+          animate={{ opacity: isHovered ? 1 : 0, x: isHovered ? 0 : 10 }}
+          className="flex items-center space-x-1"
         >
-          <button
+          <motion.button
+            whileHover={{ scale: 1.2 }}
+            whileTap={{ scale: 0.9 }}
             onClick={toggleFavorite}
-            className={`p-1 rounded-full hover:bg-gray-700/50 ${isFavorite ? "text-amber-400" : "text-gray-400 hover:text-amber-400"}`}
+            className="p-0.5 rounded transition-all duration-200 text-muted-foreground hover:text-primary hover:bg-muted/10"
           >
-            <Star className="h-3.5 w-3.5" />
-          </button>
-          <button
+            <Star className={`h-2.5 w-2.5 ${isFavorite ? "fill-current" : ""}`} />
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.2 }}
+            whileTap={{ scale: 0.9 }}
             onClick={handleAdd}
-            className="p-1 rounded-full hover:bg-gray-700/50 text-gray-400 hover:text-blue-400"
+            className="p-0.5 rounded transition-all duration-200 text-muted-foreground hover:text-primary hover:bg-muted/10"
           >
-            <PlusCircle className="h-3.5 w-3.5" />
-          </button>
-        </div>
+            <PlusCircle className="h-2.5 w-2.5" />
+          </motion.button>
+        </MotionDiv>
       </div>
 
       {description && isHovered && (
-        <div className="mt-1 text-xs text-gray-400 pl-4 border-l border-gray-700/50">{description}</div>
+        <MotionDiv
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+          className="mt-2 text-xs text-muted-foreground pl-4 border-l border-border bg-muted/10 rounded-r-lg p-2"
+        >
+          {description}
+        </MotionDiv>
       )}
-    </div>
+    </MotionDiv>
   );
 }
 
 export const ToolboxInstructions = () => {
   return (
-    <div className="p-2">
-      {groupedInstructions.map((group) => (
-        <div key={group.label} className="mb-4">
-          <span className="font-bold block mb-2" style={{ color: "#E5E7EB" }}>
-            {group.label}
-          </span>
+    <div className="p-4 space-y-6 bg-card">
+      {groupedInstructions.map((group, groupIndex) => (
+        <MotionDiv
+          key={group.label}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: groupIndex * 0.1 }}
+          className="space-y-3"
+        >
+          <div className="flex items-center space-x-2 mb-4">
+            <div className="w-1 h-6 bg-primary rounded-full" />
+            <h3 className="font-semibold text-foreground text-sm tracking-wide">
+              {group.label}
+            </h3>
+            <div className="flex-1 h-px bg-border" />
+            <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full border border-border">
+              {group.items.length}
+            </span>
+          </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            {group.items.map((item) => (
-              <InstructionCard
+          <div className="space-y-1">
+            {group.items.map((item, itemIndex) => (
+              <MotionDiv
                 key={item.name}
-                name={item.name}
-                flow={item.flow}
-              />
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.2, delay: (groupIndex * 0.1) + (itemIndex * 0.05) }}
+              >
+                <InstructionCard
+                  key={item.name}
+                  name={item.name}
+                  flow={item.flow}
+                  isNew={itemIndex < 2} // Mark first 2 items as new for demo
+                  isFavorite={itemIndex === 0} // Mark first item as favorite for demo
+                />
+              </MotionDiv>
             ))}
           </div>
-        </div>
+        </MotionDiv>
       ))}
     </div>
   );

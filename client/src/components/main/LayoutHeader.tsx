@@ -30,7 +30,7 @@ export default function LayoutHeader() {
   };
 
   return (
-    <div className="flex items-center justify-between px-4 py-2 bg-[var(--foreground-dark)] border-b border-[var(--border-2-dark)]">
+    <div className="flex items-center justify-between px-4 py-2 bg-card border-b border-border">
       {/* Left side*/}
       <div className="flex items-center gap-2">
       <Image 
@@ -40,7 +40,7 @@ export default function LayoutHeader() {
         height={40} 
         className="rounded-md" 
       />
-        <p className="text-white font-bold">SolanaFlow</p>
+        <p className="text-foreground font-bold">SolanaFlow</p>
       </div>
 
       {/* Right side: wallet connect + chat toggle */}
@@ -48,7 +48,7 @@ export default function LayoutHeader() {
         {connected && publicKey ? (
           <Button
             variant="outline"
-            className="h-8 rounded-full border-none px-2 flex items-center gap-2 bg-[var(--wallet-connected-bg-dark)] text-[var(--wallet-connected-color-dark)]"
+            className="h-8 rounded-full border-none px-2 flex items-center gap-2 bg-muted text-foreground"
             onClick={handleWalletClick}
           >
             <FaCircle size={8} color="#02DF3A" />
@@ -57,7 +57,7 @@ export default function LayoutHeader() {
         ) : (
           <Button
             variant="outline"
-            className="h-8 rounded-full border px-2 flex items-center gap-2 bg-[rgba(0,0,0,0.1)] text-[var(--header-fg-dark)]"
+            className="h-8 rounded-full border px-2 flex items-center gap-2 bg-muted text-foreground border-border"
             onClick={handleWalletClick}
           >
             <LuWallet size={12} />
@@ -67,7 +67,7 @@ export default function LayoutHeader() {
 
         <Button
           variant="outline"
-          className="h-8 rounded-full border-none px-2 flex items-center"
+          className="h-8 rounded-full border-none px-2 flex items-center bg-muted text-foreground"
           onClick={() => setIsChatOpen(!isChatOpen)}
         >
           <MessageSquare size={18} />

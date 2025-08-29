@@ -46,22 +46,11 @@ const Code = () => {
         return null;
     };
 
-    // Effect to set default file when code tab is active and no file is selected
     useEffect(() => {
         if (activeTab === 'code' && !selectedFile && fileTree) {
-            // First try to find Anchor.toml
             let defaultFile = findFileByName(fileTree as FileTreeItemType, 'Anchor.toml');
-            
-            // If not found, just pick the first file in the tree
-            if (!defaultFile) {
-                defaultFile = findFirstFile(fileTree as FileTreeItemType);
-            }
-            
-            // Set the selected file if we found one
-            if (defaultFile) {
-                setSelectedFile(defaultFile);
-                console.log('Auto-selected file:', defaultFile.name);
-            }
+            if (!defaultFile) defaultFile = findFirstFile(fileTree as FileTreeItemType);
+            if (defaultFile) setSelectedFile(defaultFile);
         }
     }, [activeTab, selectedFile, setSelectedFile, fileTree]);
 
@@ -71,16 +60,13 @@ const Code = () => {
         if (ext === "toml") return "toml";
         return "typescript";
     };
-
-    const terminalBg = useColorModeValue('var(--terminal-bg-light)', 'var(--terminal-bg-dark)');
-    const terminalBorder = useColorModeValue('var(--border-2-light)', 'var(--border-2-dark)');
     
     return (
-      <div className="flex flex-col w-full h-full" style={{ background: codeBg }}>
+      <div className="flex flex-col w-full h-full bg-card">
         <div className="flex-1 min-h-0">
           <CodeEditor language={getLanguage(selectedFile?.ext)} />
         </div>
-        <div style={{ height: "32%" }} className="border-t border-[#2a2a2d]">
+        <div style={{ height: "32%" }} className="border-t border-border">
           <SolanaTerminal />
         </div>
       </div>

@@ -129,7 +129,6 @@ export const fileApi = {
     newDirName: string
   ): Promise<TaskResponse> => {
     try {
-      console.log('calling rename directory');
       const response = await api.post(`/files/rename-directory`, {rootPath, newDirName});
       return response.data;
     } catch (error) {

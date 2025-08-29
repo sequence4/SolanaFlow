@@ -106,7 +106,7 @@ const TabsContent = React.forwardRef<
     <div
       ref={ref}
       className={cn(
-        "mt-0 p-0 m-0 data-[state=active]:flex focus-visible:outline-none bg-[#121620]",
+        "mt-0 p-0 m-0 data-[state=active]:flex focus-visible:outline-none bg-transparent",
         className
       )}
       data-state={activeTab === value ? "active" : "inactive"}

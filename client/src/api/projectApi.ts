@@ -1,8 +1,7 @@
 import { api } from './apiHelper';
 import { 
   SaveProjectResponse, 
-  ProjectContextToSave, 
-  ListProjectsResponse,
+  ProjectContextToSave,
   ProjectContextType,
 } from '../context/project/ProjectContextTypes';
 import { TaskResponse } from './interfaces/Task';
@@ -294,6 +293,87 @@ export const projectApi = {
     }
   },
 
+  // Local validator functions
+  startLocalValidator: async (projectId: string, data: { walletPubkey?: string; reset?: boolean }) => {
+    try {
+      const response = await api.post(`/projects/${projectId}/local-validator/start`, data);
+      return response.data;
+    } catch (error) {
+      console.error('Error starting local validator:', error);
+      throw error;
+    }
+  },
+
+  stopLocalValidator: async (projectId: string) => {
+    try {
+      const response = await api.post(`/projects/${projectId}/local-validator/stop`);
+      return response.data;
+    } catch (error) {
+      console.error('Error stopping local validator:', error);
+      throw error;
+    }
+  },
+
+  getLocalValidatorStatus: async (projectId: string) => {
+    try {
+      const response = await api.get(`/projects/${projectId}/local-validator/status`);
+      return response.data;
+    } catch (error) {
+      console.error('Error getting local validator status:', error);
+      throw error;
+    }
+  },
+
+  getLocalValidatorHealth: async (projectId: string) => {
+    try {
+      const response = await api.get(`/projects/${projectId}/local-validator/health`);
+      return response.data;
+    } catch (error) {
+      console.error('Error getting local validator health:', error);
+      throw error;
+    }
+  },
+
+  deployToLocalValidator: async (projectId: string, data: { forceRebuild?: boolean; walletPubkey?: string }) => {
+    try {
+      const response = await api.post(`/projects/${projectId}/local-validator/deploy`, data);
+      return response.data;
+    } catch (error) {
+      console.error('Error deploying to local validator:', error);
+      throw error;
+    }
+  },
+
+  quickDeployLocal: async (projectId: string, data: { walletPubkey?: string; resetValidator?: boolean }) => {
+    try {
+      const response = await api.post(`/projects/${projectId}/local-validator/quick-deploy`, data);
+      return response.data;
+    } catch (error) {
+      console.error('Error quick deploying to local:', error);
+      throw error;
+    }
+  },
+
+  getClusterInfo: async (projectId: string, preferLocal?: boolean) => {
+    try {
+      const response = await api.get(`/projects/${projectId}/cluster-info${preferLocal ? '?preferLocal=true' : ''}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error getting cluster info:', error);
+      throw error;
+    }
+  },
+
+  switchCluster: async (projectId: string, data: { cluster: string; customUrl?: string }) => {
+    try {
+      const response = await api.post(`/projects/${projectId}/switch-cluster`, data);
+      return response.data;
+    } catch (error) {
+      console.error('Error switching cluster:', error);
+      throw error;
+    }
+  },
+
   installPackages: async (projectId: string): Promise<TaskResponse> => {
     try {
       const response = await api.post(`/projects/${projectId}/install-packages`);
@@ -309,15 +389,15 @@ export const projectApi = {
     packages: string[]
   ): Promise<TaskResponse> => {
     try {
-      console.log(`Installing dependencies for project ${projectId}:`);
-      console.log(`Packages to install: ${JSON.stringify(packages)}`);
+      //console.log(`Installing dependencies for project ${projectId}:`);
+      //console.log(`Packages to install: ${JSON.stringify(packages)}`);
       
       const response = await api.post(
         `/projects/${projectId}/install-node-dependencies`,
         { packages }
       );
       
-      console.log(`Install dependencies API response:`, response.data);
+     // console.log(`Install dependencies API response:`, response.data);
       return response.data;
     } catch (error) {
       console.error('Error installing node dependencies:', error);
@@ -426,6 +506,16 @@ export const projectApi = {
        * `error.response.status`.  Converting to a plain Error removes
        * that field and breaks the fallback that creates the nonce. */
       throw error;                // propagate anything else
+    }
+  },
+  
+  getProjectPorts: async (projectId: string): Promise<{ data: { rpc: number; ws: number; faucet: number } }> => {
+    try {
+      const response = await api.get(`/projects/${projectId}/ports`);
+      return response;
+    } catch (error) {
+      console.error('Error getting project ports:', error);
+      throw error;
     }
   },
 

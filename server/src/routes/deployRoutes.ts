@@ -1,9 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { signDeployTxAndBroadcast } from '../utils/projectUtils';
-import { catchAsync } from '../utils/catchAsync';
+import { signDeployTxAndBroadcast } from '../utils/blockchain/signDeployTxAndBroadcast';
+import { catchAsync } from '../utils/middleware/catchAsync';
 import { deployPipeline } from '../controllers/deployController';
-import { authMiddleware } from '../middleware/authMiddleware';
-import { v4 as uuidv4 } from 'uuid';
 
 const router = express.Router();
 
@@ -28,17 +26,17 @@ router.post('/:id/deploy-pipeline', guard, deployPipeline);
 router.post('/:projectId/relayDeployTx', catchAsync(async (req: Request, res: Response) => {
   const { encodedTx, programId } = req.body as { encodedTx?: string; programId?: string };
   
-  console.log(`[RELAY_DEPLOY_TX] Received request for project ${req.params.projectId}`);
-  console.log(`[RELAY_DEPLOY_TX] Program ID: ${programId}`);
-  console.log(`[RELAY_DEPLOY_TX] Encoded TX length: ${encodedTx?.length || 0} characters`);
+  //console.log(`[RELAY_DEPLOY_TX] Received request for project ${req.params.projectId}`);
+  //console.log(`[RELAY_DEPLOY_TX] Program ID: ${programId}`);
+  //console.log(`[RELAY_DEPLOY_TX] Encoded TX length: ${encodedTx?.length || 0} characters`);
   
   if (!encodedTx || !programId) {
-    console.log('[RELAY_DEPLOY_TX] Missing required parameters');
+    //console.log('[RELAY_DEPLOY_TX] Missing required parameters');
     return res.status(400).json({ error: 'encodedTx and programId required' });
   }
   
   try {
-    console.log(`[RELAY_DEPLOY_TX] Calling signDeployTxAndBroadcast for project ${req.params.projectId}`);
+    //console.log(`[RELAY_DEPLOY_TX] Calling signDeployTxAndBroadcast for project ${req.params.projectId}`);
     const out = await signDeployTxAndBroadcast(
       req.params.projectId,
       encodedTx,
@@ -51,7 +49,7 @@ router.post('/:projectId/relayDeployTx', catchAsync(async (req: Request, res: Re
         txBase64: out.txForWallet,
       });
     }
-    console.log(`[RELAY_DEPLOY_TX] Transaction signed and broadcast successfully, signature: ${out.signature}`);
+    //console.log(`[RELAY_DEPLOY_TX] Transaction signed and broadcast successfully, signature: ${out.signature}`);
     res.json({ signature: out.signature });
   } catch (e: any) {
     console.error('[relayDeployTx] failed', e);

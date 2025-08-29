@@ -19,7 +19,6 @@ export const mintToFlow = {
       type: "instructionGroupNode",
       position: { x: 0, y: 0 },
       data: {
-        ...mintTo.data,
         label: "Mint To",
         description: "Mint a new token to a specified address",
         accounts: contextData,
@@ -27,6 +26,8 @@ export const mintToFlow = {
         errorCodes: errorCodesData,
         events: eventsData,
         ui: mintToUi,
+        // Include additional data from the mintTo node if needed
+        ...mintTo.data,
       },
     },
   ],

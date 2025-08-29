@@ -175,6 +175,14 @@ export default function TaskLogsProvider({
         if (payload.programId) {
           addSystemLog(`🔑 Program ID: ${payload.programId}`);
         }
+        if (payload.event === 'file-written' && payload.path && payload.content) {
+          // Forward file-written events to the file generation queue
+          eventBus.emit('file-written', {
+            event: 'file-written',
+            path: payload.path,
+            content: payload.content
+          });
+        }
         if (['deploy-done', 'done', 'completed'].includes(payload.stage)) {
           addSystemLog("✅ Deployment complete!");
           setTimeout(() => setIsVisible(false), 3000);
@@ -182,6 +190,14 @@ export default function TaskLogsProvider({
           addSystemLog("✅ Wallet-signed deploy detected – backend deploy step skipped");
         } else if (payload.stage === 'error') {
           addSystemLog(`❌ Error: ${payload.message || 'Unknown error'}`);
+        } else if (payload.type === 'code-generation' && payload.files) {
+          // Handle code generation messages with files - send as JSON for Chat to parse
+          const jsonMessage = JSON.stringify(payload);
+          addSystemLog(jsonMessage);
+        } else if (payload.type === 'progress' && payload.message && payload.pct !== undefined) {
+          // Handle progress-only messages - send as JSON for Chat to parse
+          const jsonMessage = JSON.stringify(payload);
+          addSystemLog(jsonMessage);
         } else if (payload.message && !payload.stage) {
           addSystemLog(payload.message);
         }

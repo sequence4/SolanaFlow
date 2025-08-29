@@ -20,7 +20,6 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-md">
           <div className="relative bg-gray-900 border border-gray-800 rounded-xl p-8 backdrop-blur-sm">
-            {/* Background effect */}
             <div className="absolute inset-0 overflow-hidden rounded-xl">
               <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500 rounded-full blur-3xl opacity-10 -translate-y-1/2 translate-x-1/2"></div>
               <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500 rounded-full blur-3xl opacity-10 translate-y-1/2 -translate-x-1/2"></div>

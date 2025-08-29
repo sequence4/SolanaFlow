@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogD
 import { Input } from "./input"
 import { Label } from "./label"
 import { Textarea } from "./textarea"
+import { darkTheme } from '@/styles/theme'
 
 interface NewProjectModalProps {
   open: boolean
@@ -33,17 +34,17 @@ export function NewProjectModal({ open, onOpenChange, onSubmit }: NewProjectModa
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         aria-describedby="new-project-desc"
-        className="sm:max-w-[550px] bg-gradient-to-b from-[#111827] to-[#0f1623] border-[#1f2937] text-slate-100 p-0 overflow-hidden shadow-xl shadow-black/40 rounded-xl"
+        className="sm:max-w-[550px] text-foreground bg-card border-border p-0 overflow-hidden shadow-xl rounded-xl"
       >
         <form onSubmit={handleSubmit}>
           <DialogHeader className="px-7 pt-7 pb-3">
             <div className="flex items-center space-x-2">
               <div className="h-3 w-3 rounded-full bg-blue-500"></div>
-              <DialogTitle className="text-lg text-gray-200 font-normal tracking-tight">
+              <DialogTitle className="text-lg text-foreground font-normal tracking-tight">
                 Create a New Project
               </DialogTitle>
             </div>
-            <p className="text-slate-400 text-sm mt-2 ml-5">Configure your project settings and repository details</p>
+            <p className="text-muted-foreground text-sm mt-2 ml-5">Configure your project settings and repository details</p>
             <DialogDescription id="new-project-desc" className="sr-only">
               Create a SolanaFlow project by entering a name and description.
             </DialogDescription>
@@ -54,9 +55,9 @@ export function NewProjectModal({ open, onOpenChange, onSubmit }: NewProjectModa
               <div className="space-y-2.5">
                 <div className="flex items-center">
                   <div className="h-2 w-2 rounded-full bg-blue-500 mr-2.5"></div>
-                  <Label htmlFor="name" className="text-sm font-medium text-slate-300 flex items-center">
+                  <Label htmlFor="name" className="text-sm font-medium text-foreground flex items-center">
                     Name
-                    <Info className="h-3.5 w-3.5 text-slate-500 ml-1.5 hover:text-blue-400 transition-colors" />
+                    <Info className="h-3.5 w-3.5 text-muted-foreground ml-1.5 hover:text-primary transition-colors" />
                   </Label>
                 </div>
                 <div className="relative">
@@ -65,7 +66,7 @@ export function NewProjectModal({ open, onOpenChange, onSubmit }: NewProjectModa
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Enter project name"
-                    className="bg-[#1a2236] border-[#2d3748] focus-visible:ring-blue-500/50 focus-visible:ring-offset-0 focus-visible:border-blue-500 text-slate-100 h-11 pl-4 shadow-sm shadow-black/10"
+                    className="bg-background border-border focus-visible:ring-primary/50 focus-visible:ring-offset-0 focus-visible:border-primary text-foreground h-11 pl-4 shadow-sm"
                     required
                   />
                   <div className="absolute inset-0 rounded-md pointer-events-none border border-blue-500/0 focus-within:border-blue-500/20"></div>
@@ -75,9 +76,9 @@ export function NewProjectModal({ open, onOpenChange, onSubmit }: NewProjectModa
               <div className="space-y-2.5">
                 <div className="flex items-center">
                   <div className="h-2 w-2 rounded-full bg-blue-500 mr-2.5"></div>
-                  <Label htmlFor="description" className="text-sm font-medium text-slate-300 flex items-center">
+                  <Label htmlFor="description" className="text-sm font-medium text-foreground flex items-center">
                     Description
-                    <Info className="h-3.5 w-3.5 text-slate-500 ml-1.5 hover:text-blue-400 transition-colors" />
+                    <Info className="h-3.5 w-3.5 text-muted-foreground ml-1.5 hover:text-primary transition-colors" />
                   </Label>
                 </div>
                 <div className="relative">
@@ -86,7 +87,7 @@ export function NewProjectModal({ open, onOpenChange, onSubmit }: NewProjectModa
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="Enter description"
-                    className="bg-[#1a2236] border-[#2d3748] focus-visible:ring-blue-500/50 focus-visible:ring-offset-0 focus-visible:border-blue-500 text-slate-100 min-h-[110px] resize-none shadow-sm shadow-black/10"
+                    className="bg-background border-border focus-visible:ring-primary/50 focus-visible:ring-offset-0 focus-visible:border-primary text-foreground min-h-[110px] resize-none shadow-sm"
                     required
                   />
                   <div className="absolute inset-0 rounded-md pointer-events-none border border-blue-500/0 focus-within:border-blue-500/20"></div>
@@ -121,19 +122,19 @@ export function NewProjectModal({ open, onOpenChange, onSubmit }: NewProjectModa
             </div>
           </div>
 
-          <DialogFooter className="bg-[#0c111d] border-t border-[#1f2937] px-8 py-6 flex items-center justify-between">
+          <DialogFooter className="bg-muted border-t border-border px-8 py-6 flex items-center justify-between">
             <div className="flex items-center justify-between gap-3 w-full">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                className="cursor-pointer border-[#2d3748] text-slate-300 hover:bg-[#1a2236] hover:text-slate-100 h-10 px-4 transition-all duration-200"
+                className="cursor-pointer border-border text-muted-foreground hover:bg-background hover:text-foreground h-10 px-4 transition-all duration-200"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
-                className="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white h-10 px-5 flex items-center gap-2 shadow-md shadow-blue-900/30 transition-all duration-200"
+                className="cursor-pointer bg-primary hover:bg-primary/90 text-primary-foreground h-10 px-5 flex items-center gap-2 shadow-md transition-all duration-200"
               >
                 <Upload className="h-4 w-4" />
                 Create Project

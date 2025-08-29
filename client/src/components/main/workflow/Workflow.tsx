@@ -1,4 +1,4 @@
-import React, {  useCallback, useMemo, useEffect, useContext } from 'react';
+import React, { useCallback, useMemo, useEffect, useContext } from 'react';
 
 import {
     ReactFlow,
@@ -20,15 +20,16 @@ import '@/styles/reactflow/reactflow-style.css';
 
 import ProjectContext from "@/context/project/ProjectContext";
 import UxContext from "@/context/ux/UxContext";
+import { ProjectStateUpdater } from "@/context/project/ProjectContextTypes";
 
 import { handleDrop } from '@/utils/tabs/workflow/onDrop';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { PlusIcon } from 'lucide-react';
+import { PlusIcon, Trash2, Layers } from 'lucide-react';
 
 // Separate component that uses the useReactFlow hook
 interface ReactFlowContentProps {
     projectState: any;
-    setProjectState: React.Dispatch<React.SetStateAction<any>>;
+    setProjectState: ((updater: ProjectStateUpdater) => void) | undefined;
     nodeTypes: any;
     uxOpenPanel: any;
     setUxOpenPanel: React.Dispatch<React.SetStateAction<any>>;
@@ -51,6 +52,7 @@ const ReactFlowContent = ({
     
     const onNodesChange = useCallback(
         (changes: any) => {
+          if (!setProjectState) return;
           setProjectState((prev: any) => ({
             ...prev,
             nodes: applyNodeChanges(changes, prev.nodes),
@@ -61,6 +63,7 @@ const ReactFlowContent = ({
       
     const onEdgesChange = useCallback(
         (changes: any) => {
+          if (!setProjectState) return;
           setProjectState((prev: any) => ({
             ...prev,
             edges: applyEdgeChanges(changes, prev.edges),
@@ -70,23 +73,22 @@ const ReactFlowContent = ({
     );
 
     const onConnect = useCallback(
-      (connection: any) =>
+      (connection: any) => {
+        if (!setProjectState) return;
         setProjectState((prev: any) => ({
           ...prev,
           edges: addEdge(connection, prev.edges),
-        })),
+        }));
+      },
       [setProjectState]
     );
 
     const onDrop = useCallback(
         async (event: React.DragEvent<HTMLDivElement>) => {
           if (!setProjectState) {
-            console.log("setProjectState is not defined");
             return;
           }
-
           const pubkeyString = publicKey?.toBase58() || undefined;
-          console.log("Handling drop in Workflow with projectId:", projectId);
 
           try {
             await handleDrop(
@@ -99,7 +101,6 @@ const ReactFlowContent = ({
               setProjectContext,
               reactFlow
             );
-            console.log("Node drop completed with code injection");
           } catch (error) {
             console.error("Error during node drop:", error);
           }
@@ -107,13 +108,12 @@ const ReactFlowContent = ({
         [setUxOpenPanel, setProjectState, publicKey, projectId, setProjectContext, reactFlow]
     );
 
-    const onNodeClick = useCallback((event: any, node: any) => {
-        if (node.type === 'instructionGroupNode') {
-            // setActiveInstructionId((prevId) => (prevId === node.id ? null : node.id));
-        }
+    const onNodeClick = useCallback((_event: any, node: any) => {
+        if (node.type === 'instructionGroupNode') {        }
     }, []);
 
     function handleClearCanvas() {
+        if (!setProjectState) return;
         setProjectState((prev: any) => ({
             ...prev,
             nodes: [],
@@ -127,14 +127,25 @@ const ReactFlowContent = ({
     }, [uxOpenPanel, setUxOpenPanel]);
     
     return (
-        <ReactFlow 
-            nodes={projectState.nodes} 
-            edges={projectState.edges} 
-            style={{
-                background: '#121214', 
-                border: 'none!important',
-                position: 'relative',
-            }}
+        <div className="workflow-container relative w-full h-full overflow-hidden">
+            <ReactFlow 
+                nodes={projectState.nodes} 
+                edges={projectState.edges} 
+                style={{
+                    background: '#0a0a0b',
+                    backgroundImage: `
+                        linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+                        radial-gradient(circle at 20% 50%, rgba(77, 124, 254, 0.02) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.02) 0%, transparent 50%),
+                        radial-gradient(circle at 40% 20%, rgba(34, 197, 94, 0.02) 0%, transparent 50%)
+                    `,
+                    backgroundSize: '20px 20px, 20px 20px, 100% 100%, 100% 100%, 100% 100%',
+                    border: 'none',
+                    position: 'relative',
+                }}
+                snapToGrid={true}
+                snapGrid={[15, 15]}
             nodeTypes={nodeTypes}
             fitView
             nodesDraggable={true}
@@ -145,43 +156,36 @@ const ReactFlowContent = ({
             onEdgesChange={onEdgesChange}
             onNodeClick={onNodeClick}
             defaultEdgeOptions={{ 
-                style: { stroke: '#98b5ff', strokeWidth: 2 },
-                type: 'default'
+                style: { 
+                    stroke: 'rgba(77, 124, 254, 0.3)',
+                    strokeWidth: 2,
+                    strokeDasharray: '5 5',
+                    animation: 'dashdraw 0.5s linear infinite',
+                },
+                animated: true,
+                type: 'smoothstep',
             }}
         >
             <Controls 
-                className="reactflow-dark-controls"
+                className="react-flow-controls-custom"
                 position="top-left" 
                 orientation="horizontal"
-                style={{ 
-                    backgroundColor: '#2A3347',
-                    color: '#A0AEC0', 
-                    zIndex: 9999,
-                    border: '1px solid #2A3347',
-                    padding: '10px',
-                    gap: '10px',
-                    borderRadius: '4px',    
-                }} 
             >
                 <ControlButton 
                     onClick={handleClearCanvas} 
                     title="Clear Canvas"
-                    style={{ backgroundColor: '#2A3347',
-                        color: '#A0AEC0', 
-                    }}
                 >
-                    🗑
+                    <Trash2 size={16} />
                 </ControlButton>
                 <ControlButton 
                     onClick={toggleAccountsBox}
                     title="Toggle Accounts"
-                    style={{  backgroundColor: '#2A3347',
-                        color: '#A0AEC0', }}
                 >
-                    🗃
+                    <Layers size={16} />
                 </ControlButton>
             </Controls>
         </ReactFlow>
+        </div>
     );
 };
 
@@ -203,10 +207,6 @@ const Workflow = () => {
     const { publicKey } = useWallet();
     const nodeTypes = useMemo(() => workflowNodeTypes, []);
 
-    useEffect(() => {
-        console.log("Project Context in Workflow:", projectContext);
-        console.log("Project ID in Workflow:", projectId);
-    }, [projectContext, projectId]);
 
     return (
         <div className="relative w-full h-full border-none">
@@ -224,16 +224,13 @@ const Workflow = () => {
             </ReactFlowProvider>
 
             {/* Empty Canvas Message */}
-            {projectState.nodes.length === 0 && (
+            {(projectState?.nodes?.length || 0) === 0 && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="text-center">
-                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#2A3347] mb-4">
-                            <PlusIcon className="w-6 h-6 text-[#4d7cfe]" />
+                    <div className="text-center px-2 py-4 rounded-2xl bg-white/[0.02] backdrop-blur-sm border border-white/[0.06]">
+                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/5 to-purple-500/5 border border-white/5 mb-4">
+                            <PlusIcon className="w-4 h-4 text-blue-400/40" />
                         </div>
-                        <h3 className="text-lg font-medium mb-2 text-gray-400">Start Building Your Workflow</h3>
-                        <p className="text-gray-600 max-w-md text-sm">
-                            Drag instructions from the sidebar to create your Solana workflow. Connect components to define your program logic.
-                        </p>
+                        <h3 className="text-xmd font-semibold mb-2 text-white/30">Drag and drop nodes to start building your dApp</h3>
                     </div>
                 </div>
             )}
@@ -241,7 +238,11 @@ const Workflow = () => {
             {/* AccountsBox Panel */}
             {uxOpenPanel === 'accountsBox' && (
                 <div className="absolute top-14 right-6 z-50">
-                    <AccountsBox />
+                    <div 
+                        className="backdrop-blur-xl rounded-xl shadow-2xl bg-card border-border"
+                    >
+                        <AccountsBox />
+                    </div>
                 </div>
             )}
         </div>

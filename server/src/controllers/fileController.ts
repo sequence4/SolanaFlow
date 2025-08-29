@@ -17,12 +17,14 @@ import { execSync } from 'child_process';
 
 dotenv.config();
 
+/*
 interface FileStructure {
   name: string;
   isDirectory: boolean;
   path: string;
   children?: FileStructure[];
 }
+*/
 
 interface FileTreeItemType {
   name: string;
@@ -34,8 +36,8 @@ interface FileTreeItemType {
 
 export const getFilePath = async (req: Request, res: Response, next: NextFunction) => {
   const { projectId, fileName } = req.params;
-  console.log('getFilePath projectId', projectId);
-  console.log('getFilePath fileName', fileName);
+ // console.log('getFilePath projectId', projectId);
+ // console.log('getFilePath fileName', fileName);
   const userId = req.user?.id;
   const orgId = req.user?.org_id;
   if (!userId || !orgId) return next(new AppError('User information not found', 400));
@@ -391,7 +393,7 @@ export const deleteDirectory = async (
   if (!rootFolder) { return next(new AppError('Root folder not configured', 500)); }
 
   const directoryPath = path.join(rootFolder, rootPath);
-  console.log("[controller] directoryPath", directoryPath);
+  //console.log("[controller] directoryPath", directoryPath);
 
   try {
     await fs.access(directoryPath);
@@ -431,7 +433,7 @@ export const renameDirectory = async (
     try {
       await fs.access(newPath);
       await fs.rm(newPath, { recursive: true, force: true });
-      console.log(`Removed existing directory: ${newPath}`);
+     // console.log(`Removed existing directory: ${newPath}`);
     } catch (err) {
       if (err instanceof Error && 'code' in err && err.code !== 'ENOENT') {
         throw err;
@@ -439,7 +441,7 @@ export const renameDirectory = async (
     }
 
     await fs.rename(oldPath, newPath);
-    console.log(`Renamed directory from ${oldPath} to ${newPath}`);
+    //console.log(`Renamed directory from ${oldPath} to ${newPath}`);
 
     res.status(200).json({
       message: 'Directory renamed successfully',

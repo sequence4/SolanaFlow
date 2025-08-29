@@ -1,10 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../middleware/errorHandler';
-import { logMessages } from '../utils/aiLog';
-import { openai } from '../utils/openaiClient';
+import { openai } from '../utils/ai/openaiClient';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat';
-import { getWalletBalanceSol, functionDefs } from '../utils/getWalletBalanceSol';
-const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+import { getWalletBalanceSol, functionDefs } from '../utils/blockchain/getWalletBalanceSol';
 
 export const generateAIResponse = async (
   req: Request,
@@ -14,9 +12,9 @@ export const generateAIResponse = async (
   const { messages, model, _schema } = req.body;
   const _schema_name = 'function_logic_schema';
 
-  console.log('messages', messages);
-  console.log('model', model);
-  console.log('_schema', _schema);
+  //console.log('messages', messages);
+  //console.log('model', model);
+  //console.log('_schema', _schema);
 
   if (model !== 'gpt-4o') {
     console.error(`Unsupported model: ${model}`);
@@ -41,7 +39,7 @@ export const generateAIResponse = async (
   }));
 
   try {
-    console.log('Calling OpenAI with:', { model, requestBody: transformMessages });
+    //console.log('Calling OpenAI with:', { model, requestBody: transformMessages });
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
@@ -51,7 +49,7 @@ export const generateAIResponse = async (
     });
 
     const responseData = completion.choices[0]?.message?.content || '';
-    console.log('OpenAI response:', responseData);
+   // console.log('OpenAI response:', responseData);
 
     res.status(200).json({
       message: 'AI response generated successfully',
@@ -70,8 +68,8 @@ export const handleAIChat = async (
 ): Promise<void> => {
   const { messages, fileContext, userPublicKey } = req.body;
 
-  console.log("Request received - messages:", messages);
-  console.log("Request received - fileContext exists:", !!fileContext, "length:", fileContext?.length || 0);
+  //console.log("Request received - messages:", messages);
+ // console.log("Request received - fileContext exists:", !!fileContext, "length:", fileContext?.length || 0);
   
   if (!Array.isArray(messages) || messages.length === 0) {
     next(new AppError('Invalid messages format', 400));
@@ -83,7 +81,7 @@ export const handleAIChat = async (
     
     if (fileContext && fileContext.length > 0) {
       const fileContextText = fileContext.map((fc: { path: string; content: string }) => {
-        console.log(`Processing file: ${fc.path}, content length: ${fc.content.length}`);
+       // console.log(`Processing file: ${fc.path}, content length: ${fc.content.length}`);
         return `File: ${fc.path}\n\`\`\`\n${fc.content}\n\`\`\``
       }).join('\n\n');
       
@@ -92,12 +90,14 @@ export const handleAIChat = async (
         content: `Here are the file contents for context:\n\n${fileContextText}`
       });
 
-      console.log("System message with file context added, total messages:", chatMessages.length);
+     // console.log("System message with file context added, total messages:", chatMessages.length);
     }
 
+    /*
     console.log("Final messages structure:", JSON.stringify(chatMessages.map(msg => 
       ({ role: msg.role, contentPreview: typeof msg.content === 'string' ? msg.content.substring(0, 100) + '...' : '[Content is not a string]' })
     ), null, 2));
+    */
 
     // Add system instruction to guide the model
     chatMessages.unshift({
@@ -114,7 +114,7 @@ export const handleAIChat = async (
       });
     }
 
-    console.log("Calling OpenAI with functionDefs:", JSON.stringify(functionDefs.map(def => def.function)));
+    //console.log("Calling OpenAI with functionDefs:", JSON.stringify(functionDefs.map(def => def.function)));
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4-0613',  // Model that supports function calling
@@ -129,21 +129,21 @@ export const handleAIChat = async (
     });
 
     const msg = response.choices[0].message;
-    console.log("OpenAI response:", JSON.stringify(msg));
+    //console.log("OpenAI response:", JSON.stringify(msg));
 
     if (msg?.function_call) {
-      console.log("Function call detected:", JSON.stringify(msg.function_call));
+     // console.log("Function call detected:", JSON.stringify(msg.function_call));
       const name = msg.function_call.name;
       const argsStr = msg.function_call.arguments;
 
       if (name === 'getWalletBalance') {
         const args = JSON.parse(argsStr || '{}');
-        console.log("Function args:", args);
-        console.log("User public key:", userPublicKey);
+       // console.log("Function args:", args);
+       // console.log("User public key:", userPublicKey);
         args.address = userPublicKey || args.address;
         
         const solBalance = await getWalletBalanceSol(args.address);
-        console.log("SOL balance:", solBalance);
+       // console.log("SOL balance:", solBalance);
         
         res.status(200).json({
           response: `Your wallet at address ${args.address} has a balance of ${solBalance} SOL.`,

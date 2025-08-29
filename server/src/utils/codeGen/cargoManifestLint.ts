@@ -1,7 +1,7 @@
 import { startGetFileContentTask } from '../fileUtils';
 import { pollTaskStatus } from '../taskUtils';
-import { runCommand } from '../projectUtils';
-import type { WorkspaceHandle } from '../deploy/prepEnv';
+import { runCommand } from '../command-execution/runCommand';
+import type { WorkspaceHandle } from '../container/prepEnv';
 
 interface LintContext {
   projectId: string;
@@ -347,7 +347,7 @@ export async function lintWorkspaceManifests(
     workspace: WorkspaceHandle;
   }
 ): Promise<void> {
-  console.log('[LINT] Starting Cargo.toml validation');
+  //console.log('[LINT] Starting Cargo.toml validation');
   
   const issues: string[] = [];
   

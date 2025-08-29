@@ -1,7 +1,41 @@
 // @ts-nocheck - Disable TypeScript checking for this file due to markdown-to-jsx typing issues
 import React from 'react';
 import Markdown from 'markdown-to-jsx';
-import CodeSnippet from '@/components/main/code/markdown/CodeSnippet';
+
+// Transparent code component to replace CodeSnippet
+const TransparentCode = ({ children, className }: any) => {
+  const isBlock = className?.includes('language-') || (typeof children === 'string' && children.includes('\n'));
+  
+  if (isBlock) {
+    return (
+      <pre style={{
+        backgroundColor: 'transparent',
+        padding: '0.75rem',
+        borderRadius: '0.375rem',
+        overflow: 'auto',
+        margin: '0.5rem 0',
+        fontSize: '0.875rem',
+        fontFamily: 'monospace',
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word'
+      }}>
+        <code>{children}</code>
+      </pre>
+    );
+  }
+  
+  return (
+    <code style={{
+      backgroundColor: 'transparent',
+      padding: '0.125rem 0.25rem',
+      borderRadius: '0.25rem',
+      fontSize: '0.875rem',
+      fontFamily: 'monospace'
+    }}>
+      {children}
+    </code>
+  );
+};
 
 // @ts-ignore - Ignoring type errors for markdown-to-jsx options
 const markdownOptions = {
@@ -18,6 +52,11 @@ const markdownOptions = {
       component: (props: any) => (
         <pre
           style={{
+            backgroundColor: 'transparent',
+            padding: '0.75rem',
+            borderRadius: '0.375rem',
+            overflow: 'auto',
+            margin: '0.5rem 0',
             whiteSpace: 'pre-wrap',
             wordBreak: 'break-word',
             overflowWrap: 'anywhere',
@@ -29,7 +68,7 @@ const markdownOptions = {
       )
     },
     code: {
-      component: CodeSnippet
+      component: TransparentCode
     },
     h1: {
       component: (props: any) => (
