@@ -93,9 +93,9 @@ export const deployToLocalValidator = async (
       
       // Get the actual program name and root path from the database
       const programQuery = await db.query(
-        `SELECT p.name, p.program_name, p.root_path 
-         FROM projects p 
-         WHERE p.id = $1`,
+        `SELECT name, root_path 
+         FROM solanaproject 
+         WHERE id = $1`,
         [projectId]
       );
       
@@ -103,10 +103,9 @@ export const deployToLocalValidator = async (
         throw new Error('Project not found');
       }
       
-      // Use program_name if set, otherwise derive from project name
+      // Derive program name from project name (solanaproject doesn't have program_name field)
       const projectData = programQuery.rows[0];
-      const programName = projectData.program_name || 
-                         projectData.name?.toLowerCase().replace(/[^a-z0-9]/g, '_') || 
+      const programName = projectData.name?.toLowerCase().replace(/[^a-z0-9]/g, '_') || 
                          'untitled_project';
       
       // Get the actual root path from the database or use the one from getProjectRootPath
