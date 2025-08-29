@@ -10,117 +10,54 @@ import pool from "src/config/database";
  * Helper function to ensure validator is running and accessible
  */
 async function ensureValidatorRunning(containerName: string): Promise<void> {
-  console.log('[LOCAL_DEPLOY] Starting validator...');
+  console.log('[LOCAL_DEPLOY] Checking validator status...');
   
-  // Kill any existing validator
-  await runCommand(
-    `docker exec ${containerName} pkill -f solana-test-validator || true`,
-    '.', uuidv4(), { skipSuccessUpdate: true }
-  );
+  // Check if validator is already running using the script
+  try {
+    const statusCmd = `docker exec ${containerName} /tmp/start-validator.sh status`;
+    const status = await runCommand(statusCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    
+    if (status.includes('Validator is running')) {
+      console.log('[LOCAL_DEPLOY] Validator already running');
+      return;
+    }
+  } catch {
+    // Validator not running, proceed to start it
+  }
   
-  await new Promise(resolve => setTimeout(resolve, 2000));
+  console.log('[LOCAL_DEPLOY] Starting validator using script...');
   
-  // Start validator using sh -c to ensure it runs in background
-  const startCmd = `docker exec ${containerName} sh -c "solana-test-validator --reset --quiet > /dev/null 2>&1 & echo 'Started'"`;
+  // Start validator using the script
+  const startCmd = `docker exec ${containerName} /tmp/start-validator.sh`;
   
   try {
     const output = await runCommand(startCmd, '.', uuidv4(), { skipSuccessUpdate: true });
     console.log('[LOCAL_DEPLOY] Start output:', output);
   } catch (err) {
     console.error('[LOCAL_DEPLOY] Start failed:', err);
-    // Try alternative method
-    try {
-      const altCmd = `docker exec ${containerName} sh -c "nohup solana-test-validator --reset --quiet > /tmp/validator.log 2>&1 & echo $!"`;
-      const pid = await runCommand(altCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-      console.log('[LOCAL_DEPLOY] Started validator with PID:', pid);
-    } catch (altErr) {
-      throw new Error(`Failed to start validator: ${err}`);
-    }
-  }
-  
-  // Give validator time to initialize
-  await new Promise(resolve => setTimeout(resolve, 5000));
-  
-  // Check if validator is actually running
-  const psCmd = `docker exec ${containerName} ps aux | grep solana-test-validator | grep -v grep`;
-  try {
-    const psOutput = await runCommand(psCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-    console.log('[LOCAL_DEPLOY] Validator process:', psOutput.substring(0, 200));
-  } catch {
-    console.error('[LOCAL_DEPLOY] No validator process found');
-    throw new Error('Validator failed to start - no process found');
+    throw new Error(`Failed to start validator: ${err}`);
   }
   
   // Wait for validator to be ready
   console.log('[LOCAL_DEPLOY] Waiting for validator to be ready...');
   for (let i = 1; i <= 30; i++) {
     try {
-      // Try direct curl to health endpoint
-      const curlCmd = `docker exec ${containerName} curl -s http://127.0.0.1:8899/health`;
-      const result = await runCommand(curlCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+      const healthCmd = `docker exec ${containerName} curl -s http://127.0.0.1:8899/health`;
+      const result = await runCommand(healthCmd, '.', uuidv4(), { skipSuccessUpdate: true });
       
       if (result && result.includes('ok')) {
         console.log('[LOCAL_DEPLOY] Validator is ready!');
         return;
       }
     } catch {
-      // Try JSON-RPC health check
-      try {
-        const rpcCmd = `docker exec ${containerName} curl -s -X POST http://127.0.0.1:8899 -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}'`;
-        const rpcResult = await runCommand(rpcCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-        if (rpcResult && rpcResult.includes('result')) {
-          console.log('[LOCAL_DEPLOY] Validator is ready (via RPC)!');
-          return;
-        }
-      } catch {
-        // Try solana CLI as last resort
-        try {
-          const checkCmd = `docker exec ${containerName} solana --url http://127.0.0.1:8899 balance 11111111111111111111111111111111`;
-          await runCommand(checkCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-          console.log('[LOCAL_DEPLOY] Validator is ready (via CLI)!');
-          return;
-        } catch {
-          // Not ready yet
-        }
-      }
+      // Not ready yet
     }
     
     if (i % 5 === 0) {
       console.log(`[LOCAL_DEPLOY] Still waiting... (${i}/30)`);
-      
-      // Check if process is still alive
-      const aliveCheck = `docker exec ${containerName} pgrep -f solana-test-validator || echo "dead"`;
-      const aliveResult = await runCommand(aliveCheck, '.', uuidv4(), { skipSuccessUpdate: true });
-      if (aliveResult.trim() === "dead") {
-        console.error('[LOCAL_DEPLOY] Validator process died, attempting restart...');
-        const restartCmd = `docker exec ${containerName} sh -c "solana-test-validator --reset --quiet > /dev/null 2>&1 & echo 'Restarted'"`;
-        try {
-          await runCommand(restartCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-        } catch {
-          // Continue waiting
-        }
-      }
     }
     
     await new Promise(resolve => setTimeout(resolve, 1000));
-  }
-  
-  // Debug: check what's listening on port 8899
-  try {
-    const netstatCmd = `docker exec ${containerName} netstat -tlnp 2>/dev/null | grep 8899 || echo "Nothing on 8899"`;
-    const netstatOutput = await runCommand(netstatCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-    console.error('[LOCAL_DEPLOY] Port 8899 status:', netstatOutput);
-  } catch {
-    // Netstat might not be available
-  }
-  
-  // Check validator log if it exists
-  try {
-    const logCmd = `docker exec ${containerName} tail -20 /tmp/validator.log 2>/dev/null || echo "No log"`;
-    const logOutput = await runCommand(logCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-    console.error('[LOCAL_DEPLOY] Validator log tail:', logOutput);
-  } catch {
-    // Ignore
   }
   
   throw new Error('Validator failed to become accessible after 30 seconds');
@@ -171,10 +108,46 @@ export const deployToLocalValidator = async (
       const soExists = await runCommand(soExistsCmd, '.', uuidv4(), { skipSuccessUpdate: true });
       
       if (soExists.trim() === 'missing') {
-        throw new Error('Program artifact not found. Please build the project first.');
+        // Try to copy from the project's target directory
+        const hostRoot = process.env.ROOT_FOLDER;
+        if (hostRoot) {
+          const hostArtifactPath = `${hostRoot}/${rootPath}/target/deploy/${programName}.so`;
+          const hostKeypairPath = `${hostRoot}/${rootPath}/target/deploy/${programName}-keypair.json`;
+          
+          // Check if artifacts exist on host
+          const fs = require('fs');
+          if (fs.existsSync(hostArtifactPath) && fs.existsSync(hostKeypairPath)) {
+            console.log('[LOCAL_DEPLOY] Copying artifacts from host to container...');
+            
+            // Create target directory if it doesn't exist
+            const mkdirCmd = `docker exec ${containerName} mkdir -p /usr/src/target/deploy`;
+            await runCommand(mkdirCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+            
+            // Copy artifacts to container
+            const copySoCmd = `docker cp "${hostArtifactPath}" "${containerName}:${soFile}"`;
+            const copyKeypairCmd = `docker cp "${hostKeypairPath}" "${containerName}:${keypairFile}"`;
+            
+            await runCommand(copySoCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+            await runCommand(copyKeypairCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+            
+            // Verify copy succeeded
+            const verifyCopyCmd = `docker exec ${containerName} test -f ${soFile} && echo "exists" || echo "missing"`;
+            const copyVerify = await runCommand(verifyCopyCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+            
+            if (copyVerify.trim() === 'missing') {
+              throw new Error('Failed to copy program artifacts to container');
+            }
+            
+            console.log('[LOCAL_DEPLOY] Artifacts copied successfully');
+          } else {
+            throw new Error('Program artifact not found. Please build the project first.');
+          }
+        } else {
+          throw new Error('ROOT_FOLDER not set, cannot locate artifacts');
+        }
+      } else {
+        console.log('[LOCAL_DEPLOY] Using existing build artifact from pipeline');
       }
-      
-      console.log('[LOCAL_DEPLOY] Using existing build artifact from pipeline');
       
       // Step 3: Get program ID from database or keypair
       let programId: string;

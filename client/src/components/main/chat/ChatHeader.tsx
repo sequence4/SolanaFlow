@@ -312,22 +312,33 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
     setIsLocalDeploying(true);
     
     try {
+      // First ensure the validator is running
+      await projectApi.startLocalValidator(projectContext.id, {
+        reset: false
+      });
+      
+      // Give validator time to fully initialize
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
       const response = await projectApi.quickDeployLocal(projectContext.id, {
-        walletPubkey: undefined, // Removed wallet dependency
+        walletPubkey: undefined,
         resetValidator: false
       });
       
-      if (response.data.programId) {
+      if (response.programId) {
         toast.success('Program deployed to local validator!', {
-          description: `Program ID: ${response.data.programId.slice(0, 16)}...`,
+          description: `Program ID: ${response.programId.slice(0, 16)}...`,
         });
         
-        handleDeploySuccess(response.data.programId);
+        handleDeploySuccess(response.programId);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Local deployment error:', error);
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : error?.response?.data?.message || 'Unknown error';
       toast.error('Local deployment failed', {
-        description: error instanceof Error ? error.message : 'Unknown error'
+        description: errorMessage
       });
     } finally {
       setIsLocalDeploying(false);

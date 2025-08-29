@@ -58,7 +58,7 @@ export const startLocalValidator = async (
       
       const ports = await getProjectPorts(projectId);
       
-      const statusCmd = `docker exec ${containerName} /usr/local/bin/start-validator.sh status`;
+      const statusCmd = `docker exec ${containerName} /tmp/start-validator.sh status`;
       const currentStatus = await runCommand(statusCmd, '.', uuidv4(), { skipSuccessUpdate: true })
         .catch(() => 'not-running');
       
@@ -77,8 +77,8 @@ export const startLocalValidator = async (
       
       const command = reset ? 'reset' : '';
       const startCmd = walletPubkey 
-        ? `docker exec -e WALLET_PUBKEY=${walletPubkey} ${containerName} /usr/local/bin/start-validator.sh ${command}`
-        : `docker exec ${containerName} /usr/local/bin/start-validator.sh ${command}`;
+        ? `docker exec -e WALLET_PUBKEY=${walletPubkey} ${containerName} /tmp/start-validator.sh ${command}`
+        : `docker exec ${containerName} /tmp/start-validator.sh ${command}`;
       
       console.log(`[VALIDATOR_START] Executing: ${startCmd}`);
       
