@@ -845,14 +845,26 @@ export async function runDeployPipeline({
     throw err;
   } finally {
     console.log("[PIPELINE] Starting cleanup");
+    
+    // Add delay to allow validator to stabilize
+    if (workspace && programIdStr) {
+      console.log("[PIPELINE] Deployment succeeded, delaying cleanup for validator stability");
+      await new Promise(resolve => setTimeout(resolve, 5000)); // 5 second delay
+    }
+    
     /* ----------------------------------------------------------------
      * Cleanup progress manager and container
      * ---------------------------------------------------------------- */
     progressMgr.cleanup();
     
     if (workspace) {
-      console.log(`[PIPELINE] Marking container for cleanup: ${workspace.containerName}`);
-      await markContainerForCleanup(projectId, workspace.containerName);
+      // Only mark for cleanup if deployment failed
+      if (!programIdStr) {
+        console.log(`[PIPELINE] Marking container for cleanup: ${workspace.containerName}`);
+        await markContainerForCleanup(projectId, workspace.containerName);
+      } else {
+        console.log(`[PIPELINE] Keeping container alive for deployed program: ${programIdStr}`);
+      }
     }
     
     if (keepAliveInterval) {

@@ -131,6 +131,27 @@ export const startLocalValidator = async (
       
       console.log('[VALIDATOR_START] Validator started successfully');
       
+      // Set up keep-alive mechanism to ensure validator stays running
+      const keepAliveCmd = `docker exec ${containerName} bash -c "
+        while true; do
+          if [ -f /usr/local/validator-logs/validator.pid ]; then
+            PID=\\$(cat /usr/local/validator-logs/validator.pid)
+            if ! ps -p \\$PID > /dev/null 2>&1; then
+              echo 'Validator stopped, restarting...'
+              /tmp/start-validator.sh
+            fi
+          fi
+          sleep 30
+        done > /dev/null 2>&1 &
+      "`;
+      
+      try {
+        await runCommand(keepAliveCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+        console.log('[VALIDATOR_START] Keep-alive process started');
+      } catch (e) {
+        console.warn('[VALIDATOR_START] Could not start keep-alive:', e);
+      }
+      
       res.json({
         message: reset ? 'Local validator reset and started' : 'Local validator started',
         status: 'started',

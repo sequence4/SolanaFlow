@@ -299,9 +299,13 @@ const Interface = () => {
         
         if (deployNetwork === 'local') {
             params.set('cluster', 'local');
-            // Use standard local validator port
-            const rpcPort = 28899;
+            // Get the actual RPC port from project details
+            const containerPorts = projectContext.details?.containerPorts as any;
+            const rpcPort = containerPorts?.rpc || 
+                          (projectContext.details as any)?.localValidatorPort || 
+                          28899;
             params.set('rpcUrl', `http://localhost:${rpcPort}`);
+            console.log('[Interface] Setting local RPC URL with port:', rpcPort);
         } else {
             params.set('cluster', deployNetwork);
         }

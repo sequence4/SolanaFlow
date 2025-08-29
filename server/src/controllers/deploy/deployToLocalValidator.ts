@@ -7,6 +7,24 @@ import { getProjectRootPath } from '../../utils/fileUtils';
 import pool from "src/config/database";
 
 /**
+ * Helper function to ensure container is running
+ */
+async function ensureContainerRunning(containerName: string): Promise<void> {
+  const checkCmd = `docker ps --filter "name=${containerName}" --filter "status=running" -q`;
+  const result = await runCommand(checkCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+  
+  if (!result.trim()) {
+    // Container not running, try to start it
+    console.log('[LOCAL_DEPLOY] Container not running, attempting to start...');
+    const startCmd = `docker start ${containerName}`;
+    await runCommand(startCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    
+    // Wait for container to be ready
+    await new Promise(resolve => setTimeout(resolve, 3000));
+  }
+}
+
+/**
  * Helper function to ensure validator is running and accessible
  */
 async function ensureValidatorRunning(containerName: string): Promise<void> {
@@ -127,6 +145,9 @@ export const deployToLocalValidator = async (
       if (!containerName) {
         return next(new AppError('Container not found', 404));
       }
+      
+      // Step 0: Ensure container is running
+      await ensureContainerRunning(containerName);
       
       // Step 1: Ensure validator is running and accessible
       await ensureValidatorRunning(containerName);
@@ -465,40 +486,23 @@ export const deployToLocalValidator = async (
       
       console.log(`[LOCAL_DEPLOY] Deployment successful! Program ID: ${programId}`);
       
-      // Step 11: Final validator health check to ensure it's still running
-      console.log('[LOCAL_DEPLOY] Performing final validator health check...');
-      const finalHealthCmd = `docker exec ${containerName} bash -c "
-        # Check if validator process is still running
-        if [ -f /usr/local/validator-logs/validator.pid ]; then
-          PID=\\$(cat /usr/local/validator-logs/validator.pid)
-          if ps -p \\$PID > /dev/null 2>&1; then
-            # Also verify RPC is responsive
-            curl -s http://127.0.0.1:8899/health | grep -q 'ok' && echo 'validator-healthy' || echo 'validator-unresponsive'
-          else
-            echo 'validator-stopped'
-          fi
-        else
-          echo 'validator-not-found'
-        fi
-      "`;
-      
-      const finalHealth = await runCommand(finalHealthCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-      const validatorHealthy = finalHealth.includes('validator-healthy');
-      
-      if (!validatorHealthy) {
-        console.warn('[LOCAL_DEPLOY] Validator may have stopped after deployment:', finalHealth);
-        // Try to restart it one more time
-        console.log('[LOCAL_DEPLOY] Attempting to restart validator...');
-        const restartCmd = `docker exec ${containerName} bash -c "
-          nohup solana-test-validator \
-            --bind-address 0.0.0.0 \
-            --rpc-port 8899 \
-            --ws-port 8900 \
-            --faucet-port 9900 \
-            --quiet > /usr/local/validator-logs/validator.log 2>&1 &
-          echo \\$! > /usr/local/validator-logs/validator.pid
-        "`;
-        await runCommand(restartCmd, '.', uuidv4(), { skipSuccessUpdate: true }).catch(() => {});
+      // Step 11: Simple health check - don't stop container if it fails
+      console.log('[LOCAL_DEPLOY] Performing quick health check...');
+      let validatorHealthy = true;
+      try {
+        const healthCmd = `docker exec ${containerName} curl -s http://127.0.0.1:8899/health 2>/dev/null || echo 'not-ok'`;
+        const health = await runCommand(healthCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+        validatorHealthy = health.includes('ok');
+        
+        if (validatorHealthy) {
+          console.log('[LOCAL_DEPLOY] Validator is healthy');
+        } else {
+          console.warn('[LOCAL_DEPLOY] Validator health check failed, but deployment succeeded');
+          // Don't fail the deployment, just warn
+        }
+      } catch (err) {
+        console.warn('[LOCAL_DEPLOY] Health check failed:', err);
+        // Continue anyway since deployment succeeded
       }
       
       res.json({
