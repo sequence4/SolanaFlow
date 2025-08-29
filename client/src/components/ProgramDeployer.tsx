@@ -352,14 +352,14 @@ export function ProgramDeployer({
         const fundingBufferSpace = 37 + programBytes.byteLength;
         const fundingBufferRent = await connectionManager.getConnection().getMinimumBalanceForRentExemption(fundingBufferSpace);
         const totalFeesNeeded = totalTxCount * FEE_PER_TX;
-        const SAFETY_CUSHION = 200_000_000; // 0.2 SOL safety
+        const SAFETY_CUSHION = 300_000_000; // 0.3 SOL safety
         
         const totalFunding = fundingBufferRent + totalFeesNeeded + SAFETY_CUSHION;
         
         console.log(`[DEPLOY] Funding calculation:
           - Buffer rent: ${fundingBufferRent} lamports
           - Transactions: ${totalTxCount} × ${FEE_PER_TX} = ${totalFeesNeeded} lamports
-          - Safety cushion: ${SAFETY_CUSHION} lamports
+          - Safety cushion: ${SAFETY_CUSHION} lamports (0.3 SOL)
           - Total funding: ${totalFunding} lamports (${totalFunding / 1_000_000_000} SOL)`);
         
         setDeployStage('Funding ephemeral key...');
@@ -1053,6 +1053,66 @@ export function ProgramDeployer({
           setDeployStage('Transaction confirmed!');
           setProgress(90);
           
+          // Transfer upgrade authority from ephemeral to wallet
+          setDeployStage('Transferring upgrade authority to wallet...');
+          setProgress(92);
+          
+          try {
+            // Create SetAuthority instruction to transfer authority to wallet
+            const setAuthorityIx = new TransactionInstruction({
+              programId: BPF_UPGRADE_LOADER_ID,
+              keys: [
+                { pubkey: programDataPk,         isSigner: false, isWritable: true },  // ProgramData account
+                { pubkey: ephemeralPubkey,       isSigner: true,  isWritable: false }, // current authority (ephemeral)
+                { pubkey: wallet.publicKey!,     isSigner: false, isWritable: false }, // new authority (wallet)
+              ],
+              data: Buffer.concat([
+                Buffer.from([4, 0, 0, 0]),  // SetAuthority instruction tag (4 as LE u32)
+              ]),
+            });
+            
+            const setAuthTx = new Transaction().add(setAuthorityIx);
+            
+            // Get fresh blockhash
+            const { blockhash: authBlockhash, lastValidBlockHeight: authHeight } = 
+              await connection.getLatestBlockhash('confirmed');
+              
+            setAuthTx.recentBlockhash = authBlockhash;
+            setAuthTx.feePayer = ephemeralPubkey; // Ephemeral pays for this final transaction
+            
+            // Send to backend for ephemeral signing
+            const authEncoded = setAuthTx.serialize({ requireAllSignatures: false }).toString('base64');
+            
+            console.log('Sending SetAuthority transaction to backend for signing...');
+            const authResult = await projectApi.relayTx(projectId, {
+              encodedTx: authEncoded,
+              programId: programId.toBase58()
+            });
+            
+            if ('signature' in authResult) {
+              console.log('✅ Upgrade authority transferred to wallet:', authResult.signature);
+              
+              // Wait for confirmation
+              await connection.confirmTransaction({
+                signature: authResult.signature,
+                blockhash: authBlockhash,
+                lastValidBlockHeight: authHeight
+              }, 'confirmed');
+              
+              setDeployStage('Authority transferred successfully!');
+              setProgress(95);
+            } else {
+              console.error('Failed to transfer authority:', authResult);
+              toast.warning('Program deployed but authority transfer failed', {
+                description: 'You may need to manually set authority'
+              });
+            }
+          } catch (authError) {
+            console.error('Authority transfer error:', authError);
+            toast.warning('Program deployed but authority transfer failed', {
+              description: 'The program is deployed but remains under ephemeral key authority'
+            });
+          }
           
           // Update project with new program ID
           onSuccess(programId.toBase58());
