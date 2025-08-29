@@ -10,7 +10,9 @@ import {
   Edit2,
   Trash2,
   Check,
-  Network
+  Network,
+  Copy,
+  Code2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -77,6 +79,7 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
   const projectDeployed = !!projectContext?.details?.projectState?.deployed;
   const built = !!projectContext.details?.projectState?.built;
   const currentNetwork = projectContext.deployNetwork || 'devnet';
+  const programId = projectContext.details?.projectState?.programId;
 
   useEffect(() => {
     setProjectName(projectContext.name || "My Token Project");
@@ -427,6 +430,13 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
     }
   };
 
+  const handleCopyProgramId = () => {
+    if (programId) {
+      navigator.clipboard.writeText(programId);
+      toast.success('Program ID copied to clipboard');
+    }
+  };
+
 
   useEffect(() => {
     const run = () => {
@@ -472,8 +482,8 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
   return (
     <>
       <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card">
-        {/* Left side - Project name */}
-        <div className="flex items-center gap-2">
+        {/* Left side - Project name and Program ID */}
+        <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             {isEditing ? (
               <input
@@ -525,6 +535,36 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
               </Tooltip>
             </TooltipProvider>
           </div>
+
+          {/* Program ID display */}
+          {programId && (
+            <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20">
+              <Code2 className="h-3.5 w-3.5 text-primary/70" />
+              <div className="flex flex-col">
+                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Program ID</span>
+                <span className="text-xs font-mono text-foreground/90">
+                  {programId.slice(0, 8)}...{programId.slice(-6)}
+                </span>
+              </div>
+              <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6 ml-1 hover:bg-primary/10 cursor-pointer"
+                      onClick={handleCopyProgramId}
+                    >
+                      <Copy className="h-3 w-3 text-primary/70" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" sideOffset={8}>
+                    <span>Copy full Program ID</span>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          )}
         </div>
 
         {/* Center - Project action buttons */}
