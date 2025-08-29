@@ -157,6 +157,18 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
         projectId,
         graph,
         (msg: any) => {
+          // Handle error messages
+          if (msg.error || msg.stage === "error") {
+            pollingCancelledRef.current = true;
+            setIsBuilding(false);
+            taskLogs.setSuppressToast(false);
+            esRef.current?.close();
+            toast.error("Build failed", { 
+              description: msg.error || msg.message || "An error occurred during build" 
+            });
+            return;
+          }
+
           if (msg.fileTree) {
             setFileTree(structuredClone(msg.fileTree));
             setActiveTab('code');
@@ -215,6 +227,7 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
           if (msg.stage === "done" || msg.stage === "build-done") {
             pollingCancelledRef.current = true;
             setIsBuilding(false);
+            taskLogs.setSuppressToast(false);
             esRef.current?.close();
             eventBus.emit("build-complete");
           }
@@ -238,6 +251,8 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
       console.error("[build] SSE error:", err);
       toast.error("Build error", { description: String(err) });
       setIsBuilding(false);
+      taskLogs.setSuppressToast(false);
+      esRef.current?.close();
     }
   }, [isBuilding, projectContext, setProjectContext, setFileTree, setActiveTab, taskLogs]);
 
@@ -420,7 +435,7 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
   const handleWalletClick = async () => {
     try {
       if (!connected) {
-        await select(PhantomWalletName);
+        select(PhantomWalletName);
         await connect();
       } else {
         await disconnect();
@@ -450,7 +465,14 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
 
   useEffect(() => {
     return () => {
-      esRef.current?.close();
+      // Cleanup on unmount
+      if (esRef.current) {
+        esRef.current.close();
+      }
+      if (isBuilding) {
+        setIsBuilding(false);
+        taskLogs.setSuppressToast(false);
+      }
     };
   }, []);
   
@@ -539,9 +561,7 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
           {/* Program ID display */}
           {programId && (
             <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20">
-              <Code2 className="h-3.5 w-3.5 text-primary/70" />
               <div className="flex flex-col">
-                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Program ID</span>
                 <span className="text-xs font-mono text-foreground/90">
                   {programId.slice(0, 8)}...{programId.slice(-6)}
                 </span>
