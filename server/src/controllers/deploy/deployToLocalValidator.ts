@@ -416,15 +416,20 @@ export const deployToLocalValidator = async (
       }
       
       // Step 9: Update project details with local deployment info
+      // Store program ID in both localProgramId and programId fields for compatibility
       await pool.query(
         `UPDATE solanaproject 
          SET details = jsonb_set(
            jsonb_set(
-             COALESCE(details, '{}'::jsonb),
-             '{localDeployment}',
-             $1::jsonb
+             jsonb_set(
+               COALESCE(details, '{}'::jsonb),
+               '{localDeployment}',
+               $1::jsonb
+             ),
+             '{localProgramId}',
+             to_jsonb($2::text)
            ),
-           '{localProgramId}',
+           '{programId}',
            to_jsonb($2::text)
          )
          WHERE id = $3`,
@@ -439,6 +444,8 @@ export const deployToLocalValidator = async (
           projectId
         ]
       );
+      
+      console.log(`[LOCAL_DEPLOY] Stored program ID ${programId} for project ${projectId}`);
       
       // Step 10: Write program ID to .env for frontend
       const envCmd = `docker exec ${containerName} bash -c "

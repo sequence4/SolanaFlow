@@ -312,6 +312,13 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
     setIsLocalDeploying(true);
     
     try {
+      // Ensure we're on local network
+      if (projectContext.deployNetwork !== 'local') {
+        await handleNetworkChange('local');
+        // Wait for network switch to complete
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      
       // First ensure the validator is running
       await projectApi.startLocalValidator(projectContext.id, {
         reset: false
@@ -330,7 +337,16 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
           description: `Program ID: ${response.programId.slice(0, 16)}...`,
         });
         
+        // Update context with new program ID and force refresh
         handleDeploySuccess(response.programId);
+        
+        // Force iframe refresh by updating container URL with timestamp
+        if (projectContext.containerUrl) {
+          const timestamp = Date.now();
+          const sep = projectContext.containerUrl.includes('?') ? '&' : '?';
+          const updatedUrl = `${projectContext.containerUrl}${sep}t=${timestamp}`;
+          setProjectContext(prev => ({ ...prev, containerUrl: updatedUrl }));
+        }
       }
     } catch (error: any) {
       console.error('Local deployment error:', error);
@@ -346,40 +362,40 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
   };
 
   const handleDeploySuccess = useCallback((programId: string) => {
-    if (projectContext.details?.projectState) {
-      const updatedContext = {
-        ...projectContext,
+    const updatedContext = {
+      ...projectContext,
+      details: {
+        ...projectContext.details,
+        programId: programId, // Store at details level for Interface.tsx
+        projectState: {
+          ...projectContext.details?.projectState,
+          deployed: true,
+          built: false,
+          programId: programId
+        }
+      }
+    };
+
+    if (projectContext.containerUrl) {
+      const sep = projectContext.containerUrl.includes('?') ? '&' : '?';
+      updatedContext.containerUrl = `${projectContext.containerUrl}${sep}programId=${programId}`;
+    }
+
+    setProjectContext(updatedContext);
+
+    if (projectContext.id) {
+      projectApi.updateProject(projectContext.id, {
         details: {
-          ...projectContext.details,
+          programId: programId, // Store at details level
           projectState: {
-            ...projectContext.details.projectState,
             deployed: true,
             built: false,
             programId: programId
           }
         }
-      };
-
-      if (projectContext.containerUrl) {
-        const sep = projectContext.containerUrl.includes('?') ? '&' : '?';
-        updatedContext.containerUrl = `${projectContext.containerUrl}${sep}programId=${programId}`;
-      }
-
-      setProjectContext(updatedContext);
-
-      if (projectContext.id) {
-        projectApi.updateProject(projectContext.id, {
-          details: {
-            projectState: {
-              deployed: true,
-              built: false,
-              programId: programId
-            }
-          }
-        }).catch(err => {
-          console.error("Failed to persist deployment state:", err);
-        });
-      }
+      }).catch(err => {
+        console.error("Failed to persist deployment state:", err);
+      });
     }
 
     setIsDeployModalOpen(false);

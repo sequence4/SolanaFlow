@@ -159,6 +159,7 @@ nohup solana-test-validator \
     --bind-address 0.0.0.0 \
     --rpc-bind-address 0.0.0.0 \
     --faucet-host 0.0.0.0 \
+    --rpc-cors all \
     --quiet \
     --reset \
     --log \

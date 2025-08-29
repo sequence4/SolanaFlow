@@ -283,9 +283,32 @@ const Interface = () => {
 
     const iframeSrc = React.useMemo(() => {
         if (!activeUrl) return "";
+        
+        // Get program ID and cluster info from context
+        const programId = projectContext.details?.programId || 
+                         projectContext.details?.projectState?.programId;
+        const deployNetwork = projectContext.deployNetwork || 'devnet';
+        
+        // Build query params
+        const params = new URLSearchParams();
+        params.set('v', String(iframeKey)); // version key for refresh
+        
+        if (programId) {
+            params.set('programId', programId);
+        }
+        
+        if (deployNetwork === 'local') {
+            params.set('cluster', 'local');
+            // Use standard local validator port
+            const rpcPort = 28899;
+            params.set('rpcUrl', `http://localhost:${rpcPort}`);
+        } else {
+            params.set('cluster', deployNetwork);
+        }
+        
         const delim = activeUrl.includes('?') ? '&' : '?';
-        return `${activeUrl}${delim}v=${iframeKey}`;
-    }, [activeUrl, iframeKey]);
+        return `${activeUrl}${delim}${params.toString()}`;
+    }, [activeUrl, iframeKey, projectContext.details, projectContext.deployNetwork]);
 
     const openInNewTab = () => activeUrl && window.open(activeUrl, "_blank");
 

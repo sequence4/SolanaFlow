@@ -174,15 +174,51 @@ export default function SolMintApp() {
   
   const [programId, setProgramId] = useState(INITIAL_PROGRAM_ID)
 
-  /* shared Connection (devnet) – created once */
-  const connection = useMemo(
-    () =>
-      new anchor.web3.Connection(
-        anchor.web3.clusterApiUrl("devnet"),
-        "confirmed",
-      ),
-    [],
-  )
+  /* Dynamic connection based on URL params or environment */
+  const connection = useMemo(() => {
+    // Check URL params for cluster info
+    const urlParams = new URLSearchParams(window.location.search);
+    const cluster = urlParams.get('cluster');
+    const rpcUrl = urlParams.get('rpcUrl');
+    
+    // Determine endpoint
+    let endpoint = anchor.web3.clusterApiUrl("devnet"); // default
+    
+    if (cluster === 'local' && rpcUrl) {
+      // Use the provided local RPC URL
+      endpoint = rpcUrl;
+      console.log('[SolMint] Connecting to local validator:', endpoint);
+    } else if (cluster === 'local') {
+      // Fallback to standard local port
+      endpoint = "http://localhost:28899";
+      console.log('[SolMint] Connecting to local validator (fallback):', endpoint);
+    } else if (cluster && ['devnet', 'testnet', 'mainnet-beta'].includes(cluster)) {
+      endpoint = anchor.web3.clusterApiUrl(cluster as any);
+      console.log(`[SolMint] Connecting to ${cluster}:`, endpoint);
+    }
+    
+    return new anchor.web3.Connection(endpoint, "confirmed");
+  }, [])
+
+  // Read program ID and cluster from URL params
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlProgramId = urlParams.get('programId');
+    const cluster = urlParams.get('cluster');
+    
+    if (urlProgramId && urlProgramId !== programId) {
+      setProgramId(urlProgramId);
+      localStorage.setItem('programId', urlProgramId);
+      console.log('[SolMint] Program ID from URL:', urlProgramId);
+    }
+    
+    // Store cluster info for connection
+    if (cluster) {
+      localStorage.setItem('cluster', cluster);
+    }
+  }, []);
 
   // Update program ID if the parent window sends a PROGRAM_ID message or if the
   // value in localStorage changes.  This helps keep the iframe in sync with the

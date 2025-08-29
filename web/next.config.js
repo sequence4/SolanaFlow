@@ -18,6 +18,20 @@ const nextConfig = {
   basePath:   APP_BASE_PATH,
   assetPrefix: APP_BASE_PATH,
 
+  /** Proxy configuration for local RPC */
+  async rewrites() {
+    return [
+      {
+        source: '/rpc',
+        destination: 'http://localhost:28899',
+      },
+      {
+        source: '/rpc/:path*',
+        destination: 'http://localhost:28899/:path*',
+      },
+    ];
+  },
+
   /** Allow the app to be embedded in SolanaFlow's iframe (different port). */
   async headers() {
     return [
@@ -27,6 +41,9 @@ const nextConfig = {
           { key: 'X-Frame-Options', value: 'ALLOWALL' },
           { key: 'Content-Security-Policy',
             value: "frame-ancestors 'self' http://localhost:*" },
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Access-Control-Allow-Methods', value: 'GET, POST, OPTIONS' },
+          { key: 'Access-Control-Allow-Headers', value: 'Content-Type' },
         ],
       },
     ];
