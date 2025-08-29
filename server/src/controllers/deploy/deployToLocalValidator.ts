@@ -25,17 +25,36 @@ async function ensureValidatorRunning(containerName: string): Promise<void> {
     // Validator not running, proceed to start it
   }
   
-  console.log('[LOCAL_DEPLOY] Starting validator using script...');
+  console.log('[LOCAL_DEPLOY] Starting validator with proper network binding...');
   
-  // Start validator using the script
-  const startCmd = `docker exec ${containerName} /tmp/start-validator.sh`;
+  // First kill any existing validator processes
+  const killCmd = `docker exec ${containerName} pkill -f solana-test-validator || true`;
+  await runCommand(killCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
+  // Start validator with explicit bind address for external access
+  const startCmd = `docker exec -d ${containerName} solana-test-validator \
+    --bind-address 0.0.0.0 \
+    --rpc-port 8899 \
+    --ws-port 8900 \
+    --faucet-port 9900 \
+    --reset \
+    --quiet`;
   
   try {
-    const output = await runCommand(startCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-    console.log('[LOCAL_DEPLOY] Start output:', output);
+    await runCommand(startCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    console.log('[LOCAL_DEPLOY] Validator start command issued');
   } catch (err) {
-    console.error('[LOCAL_DEPLOY] Start failed:', err);
-    throw new Error(`Failed to start validator: ${err}`);
+    // Try alternative start method using the script
+    console.log('[LOCAL_DEPLOY] Trying alternative start method...');
+    const scriptCmd = `docker exec ${containerName} /tmp/start-validator.sh reset`;
+    try {
+      const output = await runCommand(scriptCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+      console.log('[LOCAL_DEPLOY] Script output:', output);
+    } catch (scriptErr) {
+      console.error('[LOCAL_DEPLOY] Both start methods failed:', err, scriptErr);
+      throw new Error(`Failed to start validator: ${err}`);
+    }
   }
   
   // Wait for validator to be ready
