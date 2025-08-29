@@ -255,6 +255,37 @@ export const deployToLocalValidator = async (
         throw new Error(`Failed to configure Solana CLI: ${err}`);
       }
       
+      // Step 4a: Ensure default signer exists
+      const checkSignerCmd = `docker exec ${containerName} test -f /root/.config/solana/id.json && echo "exists" || echo "missing"`;
+      const signerExists = await runCommand(checkSignerCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+      
+      if (signerExists.trim() === 'missing') {
+        console.log('[LOCAL_DEPLOY] Creating default signer keypair...');
+        const createSignerCmd = `docker exec ${containerName} solana-keygen new --no-bip39-passphrase -o /root/.config/solana/id.json --force`;
+        await runCommand(createSignerCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+      }
+      
+      // Step 4b: Airdrop SOL to the default signer
+      const getSignerPubkeyCmd = `docker exec ${containerName} solana address`;
+      const signerPubkey = (await runCommand(getSignerPubkeyCmd, '.', uuidv4(), { skipSuccessUpdate: true })).trim();
+      console.log('[LOCAL_DEPLOY] Default signer pubkey:', signerPubkey);
+      
+      // Airdrop with retry logic
+      for (let i = 0; i < 3; i++) {
+        try {
+          const airdropCmd = `docker exec ${containerName} solana airdrop 10 ${signerPubkey} --url http://127.0.0.1:8899`;
+          await runCommand(airdropCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+          console.log('[LOCAL_DEPLOY] Airdropped 10 SOL to signer');
+          break;
+        } catch (err) {
+          if (i === 2) {
+            console.warn('[LOCAL_DEPLOY] Airdrop failed, but continuing (may already have balance)');
+          } else {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        }
+      }
+      
       // Step 5: Check if program is already deployed
       const checkDeployedCmd = `docker exec ${containerName} bash -c "
         solana program show ${programId} --url http://127.0.0.1:8899 2>&1 || echo 'not-found'
