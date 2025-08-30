@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(cp:*)",
-      "Bash(docker ps:*)"
+      "Bash(docker ps:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(pnpm run:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": [],

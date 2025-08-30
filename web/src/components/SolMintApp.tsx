@@ -188,12 +188,14 @@ export default function SolMintApp() {
       // Use proxy to avoid CORS issues when in iframe
       // The proxy in next.config.js forwards /rpc to localhost:28899
       const basePath = window.location.pathname.split('/').slice(0, 3).join('/');
-      endpoint = `${basePath}/rpc`;
+      // IMPORTANT: Must use absolute URL with protocol for Connection constructor
+      endpoint = `${window.location.origin}${basePath}/rpc`;
       console.log('[SolMint] Connecting to local validator via proxy:', endpoint);
     } else if (cluster === 'local') {
       // Fallback to proxy path
       const basePath = window.location.pathname.split('/').slice(0, 3).join('/');
-      endpoint = `${basePath}/rpc`;
+      // IMPORTANT: Must use absolute URL with protocol for Connection constructor
+      endpoint = `${window.location.origin}${basePath}/rpc`;
       console.log('[SolMint] Connecting to local validator via proxy (fallback):', endpoint);
     } else if (cluster && ['devnet', 'testnet', 'mainnet-beta'].includes(cluster)) {
       endpoint = anchor.web3.clusterApiUrl(cluster as any);
