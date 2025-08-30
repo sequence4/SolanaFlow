@@ -275,29 +275,57 @@ class ProgressManager {
 }
 
 /* Helper: ensure web/.env (or .env.local) contains the compiled PID */
-async function writeProgramIdEnv(programId: string, absRoot: string) {
-  const fs = await import("fs/promises");
+async function writeProgramIdEnv(programId: string, absRoot: string, containerName: string) {
   const path = await import("path");
+  
+  // Define relative paths for the container
+  const rootPath = absRoot.split('/').slice(-1)[0]; // Get just the project folder name
   const candidates = [
-    path.join(absRoot, "web", ".env"),
-    path.join(absRoot, ".env"),
-    path.join(absRoot, "web", ".env.local"),
-    path.join(absRoot, ".env.local"),
+    `web/.env`,
+    `.env`,
+    `web/.env.local`,
+    `.env.local`,
   ];
+  
+  // Check which env file exists in the container
   let target: string | null = null;
   for (const p of candidates) {
-    try { await fs.access(p); target = p; break; } catch { /* not there */ }
+    try {
+      const checkCmd = `docker exec ${containerName} test -f /usr/src/${rootPath}/${p} && echo "exists" || echo "missing"`;
+      const result = execSync(checkCmd, { encoding: 'utf8' }).trim();
+      if (result === 'exists') {
+        target = p;
+        break;
+      }
+    } catch { /* file doesn't exist */ }
   }
+  
+  // If no env file exists, create web/.env
   if (!target) {
-    target = path.join(absRoot, "web", ".env");
-    await fs.writeFile(target, "");
+    target = `web/.env`;
+    const createCmd = `docker exec ${containerName} touch /usr/src/${rootPath}/${target}`;
+    await runCommand(createCmd, '.', uuidv4(), { skipSuccessUpdate: true });
   }
-  let envText = await fs.readFile(target!, "utf8");
-  envText = envText
-    .replace(/^NEXT_PUBLIC_PROGRAM_ID=.*/m, "")
-    .replace(/\n{2,}/g, "\n")
-    .trimEnd() + `\nNEXT_PUBLIC_PROGRAM_ID=${programId}\n`;
-  await fs.writeFile(target!, envText);
+  
+  // Read existing content, update/add NEXT_PUBLIC_PROGRAM_ID, and write back
+  const updateEnvCmd = `docker exec ${containerName} bash -c "
+    # Read existing content and filter out old NEXT_PUBLIC_PROGRAM_ID
+    if [ -f /usr/src/${rootPath}/${target} ]; then
+      grep -v '^NEXT_PUBLIC_PROGRAM_ID=' /usr/src/${rootPath}/${target} > /tmp/env_tmp || true
+      mv /tmp/env_tmp /usr/src/${rootPath}/${target}
+    fi
+    
+    # Remove multiple empty lines
+    sed -i '/^$/N;/^\\n$/d' /usr/src/${rootPath}/${target} 2>/dev/null || true
+    
+    # Append new program ID
+    echo 'NEXT_PUBLIC_PROGRAM_ID=${programId}' >> /usr/src/${rootPath}/${target}
+    
+    # Set proper permissions (if running as root in container)
+    chown 1000:1000 /usr/src/${rootPath}/${target} 2>/dev/null || true
+  "`;
+  
+  await runCommand(updateEnvCmd, '.', uuidv4(), { skipSuccessUpdate: true });
 }
 
 export async function runDeployPipeline({
@@ -721,7 +749,7 @@ export async function runDeployPipeline({
        did this when an IDL was detected.  Extracted into a helper so it
        runs before we emit build-done.
        ------------------------------------------------------------------ */
-    await writeProgramIdEnv(programId, absRoot);
+    await writeProgramIdEnv(programId, absRoot, workspace.containerName);
 
     // 📌  Make the env file visible to the Next.js dev server
     await runCommand(
@@ -783,7 +811,7 @@ export async function runDeployPipeline({
         };
 
         try {
-          await writeProgramIdEnv(programId, absRoot);
+          await writeProgramIdEnv(programId, absRoot, workspace.containerName);
 
           try {
             await runCommand(

@@ -39,6 +39,31 @@ export async function getProjectRootPath(projectId: string): Promise<string> {
   }
 }
 
+export async function ensureFilePermissions(
+  containerName: string,
+  filePath: string,
+  projectId: string
+): Promise<void> {
+  try {
+    // Get current user's UID/GID
+    const uid = process.getuid();
+    const gid = process.getgid();
+    
+    // Fix permissions inside container
+    const fixPermCmd = `docker exec ${containerName} bash -c "
+      chown ${uid}:${gid} ${filePath} 2>/dev/null || 
+      chown 1000:1000 ${filePath} 2>/dev/null || 
+      true
+    "`;
+    
+    await runCommand(fixPermCmd, '.', uuidv4(), { 
+      skipSuccessUpdate: true 
+    });
+  } catch (error) {
+    console.warn(`[PERMISSIONS] Could not fix permissions for ${filePath}:`, error);
+  }
+}
+
 export const deleteProjectFolder = async (
   rootPath: string,
   taskId: string
