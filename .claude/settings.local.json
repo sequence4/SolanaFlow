@@ -37,7 +37,9 @@
       "Bash(curl:*)",
       "Bash(docker logs:*)",
       "Bash(docker exec:*)",
-      "Bash(docker inspect:*)"
+      "Bash(docker inspect:*)",
+      "Bash(kill:*)",
+      "Bash(docker ps:*)"
     ],
     "deny": [],
     "ask": [],

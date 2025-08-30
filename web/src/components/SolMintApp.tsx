@@ -185,13 +185,16 @@ export default function SolMintApp() {
     let endpoint = anchor.web3.clusterApiUrl("devnet"); // default
     
     if (cluster === 'local' && rpcUrl) {
-      // Use the provided local RPC URL
-      endpoint = rpcUrl;
-      console.log('[SolMint] Connecting to local validator:', endpoint);
+      // Use proxy to avoid CORS issues when in iframe
+      // The proxy in next.config.js forwards /rpc to localhost:28899
+      const basePath = window.location.pathname.split('/').slice(0, 3).join('/');
+      endpoint = `${basePath}/rpc`;
+      console.log('[SolMint] Connecting to local validator via proxy:', endpoint);
     } else if (cluster === 'local') {
-      // Fallback to standard local port
-      endpoint = "http://localhost:28899";
-      console.log('[SolMint] Connecting to local validator (fallback):', endpoint);
+      // Fallback to proxy path
+      const basePath = window.location.pathname.split('/').slice(0, 3).join('/');
+      endpoint = `${basePath}/rpc`;
+      console.log('[SolMint] Connecting to local validator via proxy (fallback):', endpoint);
     } else if (cluster && ['devnet', 'testnet', 'mainnet-beta'].includes(cluster)) {
       endpoint = anchor.web3.clusterApiUrl(cluster as any);
       console.log(`[SolMint] Connecting to ${cluster}:`, endpoint);
