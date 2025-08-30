@@ -45,9 +45,9 @@ export async function ensureFilePermissions(
   projectId: string
 ): Promise<void> {
   try {
-    // Get current user's UID/GID
-    const uid = process.getuid();
-    const gid = process.getgid();
+    // Get current user's UID/GID with fallback to default values
+    const uid = process.getuid ? process.getuid() : 1000;
+    const gid = process.getgid ? process.getgid() : 1000;
     
     // Fix permissions inside container
     const fixPermCmd = `docker exec ${containerName} bash -c "
