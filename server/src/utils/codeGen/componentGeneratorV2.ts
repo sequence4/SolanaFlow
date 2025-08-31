@@ -7,10 +7,17 @@ import { FileTreeItem } from "../../types/FileTreeItem";
 import { Graph } from "../../types/graph";
 import { TemplateRegistry, selectTemplate } from './templates/templateRegistry';
 import { TokenMintTemplate } from './templates/tokenMintTemplate';
+import { NFTMintTemplate } from './templates/nftMintTemplate';
+import { DefiSwapTemplate } from './templates/defiSwapTemplate';
+import { StakingTemplate } from './templates/stakingTemplate';
 import { idlAnalyzer } from './analysis/idlAnalyzer';
+import { patternDetector } from './analysis/patternDetector';
 
-// Register templates on module load
+// Register all templates on module load
 TemplateRegistry.register(TokenMintTemplate);
+TemplateRegistry.register(NFTMintTemplate);
+TemplateRegistry.register(DefiSwapTemplate);
+TemplateRegistry.register(StakingTemplate);
 
 export interface GenerateUIOptions {
   projectId: string;
@@ -40,6 +47,15 @@ export async function generateUIComponents(options: GenerateUIOptions): Promise<
     try {
       analysis = idlAnalyzer.analyzeIDL(idl);
       console.log(`[ComponentGeneratorV2] IDL Analysis: type=${analysis.programType}, features=${analysis.features.join(',')}`);
+      
+      // Use pattern detector for additional insights
+      const patterns = patternDetector.detectPatterns(analysis.instructions, analysis.accounts);
+      console.log(`[ComponentGeneratorV2] Pattern Detection: primary=${patterns.type}, confidence=${patterns.patterns[0]?.confidence || 0}`);
+      
+      // Log template suggestions
+      if (patterns.suggestedTemplates.length > 0) {
+        console.log(`[ComponentGeneratorV2] Suggested templates: ${patterns.suggestedTemplates.join(', ')}`);
+      }
     } catch (error) {
       console.warn('[ComponentGeneratorV2] IDL analysis failed, falling back to graph analysis', error);
     }
