@@ -266,6 +266,23 @@ RUN --mount=type=cache,target=/usr/local/share/.cache/yarn/v6,sharing=locked \
     yarn --cwd /usr/share/solanaflow/web install --frozen-lockfile --prefer-offline
 COPY web/ /usr/share/solanaflow/web
 
+# Prepare directories for dynamic component loading
+RUN mkdir -p /usr/share/solanaflow/web/src/components/generated && \
+    mkdir -p /usr/share/solanaflow/web/src/components/defaults && \
+    mkdir -p /usr/share/solanaflow/web/public/config && \
+    # Copy SolMintApp to defaults as fallback (if it exists)
+    if [ -f /usr/share/solanaflow/web/src/components/SolMintApp.tsx ]; then \
+      cp -f /usr/share/solanaflow/web/src/components/SolMintApp.tsx \
+            /usr/share/solanaflow/web/src/components/defaults/SolMintApp.tsx; \
+    fi && \
+    # Create placeholder for generated components directory
+    echo "export default function Placeholder() { return null; }" > \
+         /usr/share/solanaflow/web/src/components/generated/.gitkeep.tsx && \
+    # Set proper permissions for runtime component loading
+    chmod -R 755 /usr/share/solanaflow/web/src/components/generated && \
+    chmod -R 755 /usr/share/solanaflow/web/src/components/defaults && \
+    chmod -R 755 /usr/share/solanaflow/web/public/config
+
 ###############################################################################
 # 4.  Runtime – slim image with CLI + built app
 # NOTE: Hard-pin to amd64 so the base layer always matches the Node binary

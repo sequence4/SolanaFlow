@@ -365,6 +365,17 @@ export async function startProjectContainer(
     fs.mkdirSync(hostWebDir, { recursive: true });
   }
   
+  // Ensure directories for dynamic components exist
+  const hostGeneratedDir = path.join(hostProjectDir, 'web', 'src', 'components', 'generated');
+  if (!fs.existsSync(hostGeneratedDir)) {
+    fs.mkdirSync(hostGeneratedDir, { recursive: true });
+  }
+  
+  const hostConfigDir = path.join(hostProjectDir, 'web', 'public', 'config');
+  if (!fs.existsSync(hostConfigDir)) {
+    fs.mkdirSync(hostConfigDir, { recursive: true });
+  }
+  
   // Inject Program ID into container environment if it exists for this project
   let programIdEnv: string[] = [];
   try {
@@ -597,7 +608,17 @@ export async function startProjectContainer(
       '-v', `${vNextCache}:/usr/src/${rootPath}/web/.next`,
       // Mount host project directory into the container at the correct path
       '-v', `${hostProjectDir}:/usr/src/${rootPath}`,
+      // Dynamic component directories - specific mounts for generated components
+      '-v', `${hostProjectDir}/web/src/components/generated:/usr/src/${rootPath}/web/src/components/generated`,
+      '-v', `${hostProjectDir}/web/public/config:/usr/src/${rootPath}/web/public/config`,
       '-e', 'CARGO_TARGET_DIR=/usr/src/target',
+      // Enable file watching for hot reload in Docker
+      '-e', 'WATCHPACK_POLLING=true',
+      '-e', 'CHOKIDAR_USEPOLLING=true',
+      '-e', 'CHOKIDAR_INTERVAL=1000',
+      // Component system environment variables
+      '-e', 'NEXT_PUBLIC_COMPONENT_MODE=dynamic',
+      '-e', 'NEXT_PUBLIC_FALLBACK_ENABLED=true',
       '-e', 'HOSTNAME=0.0.0.0',
       '-e', 'CARGO_BUILD_JOBS=1',
       '-e', 'RUSTC_WRAPPER=sccache',

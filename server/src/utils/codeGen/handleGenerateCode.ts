@@ -21,6 +21,7 @@ import { Keypair } from '@solana/web3.js';
 import pool from '../../config/database';
 import { normalizeProjectName } from '../helpers/stringUtils';
 import { saveProgramSecret, awsSecretsEnabled } from '../aws/awsSecrets';
+import { generateUIComponents } from './componentGenerator';
 import { 
   Args,
   allGeneratedFiles
@@ -374,6 +375,51 @@ EOF'`,
         if (!srcTree) throw new Error('genSrcFiles returned null');
         
         const { instructions: canonicalInstructions, state: canonicalState } = parseNodeDetails(projectState);
+        
+        // Generate UI components based on program structure
+        sendProgress({ message: 'Generating UI components...' });
+        try {
+          const uiComponentTree = await generateUIComponents(
+            graph,
+            programName,
+            programId
+          );
+          
+          // Write UI component files
+          const componentTaskIds = await insertSrcFiles(
+            uiComponentTree,
+            projectId,
+            existingFilePaths,
+            creatorId,
+            emitFileWritten(sendProgress, false)
+          );
+          
+          sendProgress({ message: `Writing ${componentTaskIds.length} UI component files...` });
+          
+          // Wait for component files to be written
+          for (const taskId of componentTaskIds) {
+            await waitForTaskCompletion(taskId, 90, 2_000);
+          }
+          
+          sendProgress({ message: 'UI components generated successfully' });
+          
+          // Store component generation status in database
+          await pool.query(
+            `UPDATE solanaproject 
+             SET details = jsonb_set(
+               COALESCE(details, '{}'::jsonb),
+               '{uiComponentGenerated}',
+               'true'::jsonb
+             )
+             WHERE id = $1`,
+            [projectId]
+          );
+          
+        } catch (uiError) {
+          console.warn('[GEN] UI component generation failed (non-critical):', uiError);
+          sendProgress({ message: 'Warning: UI generation skipped, using default component' });
+        }
+        
         sendProgress({ message: 'Extracting generated files...' });
         allGeneratedFiles.length = 0;
         

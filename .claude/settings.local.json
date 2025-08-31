@@ -8,7 +8,9 @@
       "Bash(pnpm run:*)",
       "Bash(git add:*)",
       "Bash(npm run dev:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": [],
