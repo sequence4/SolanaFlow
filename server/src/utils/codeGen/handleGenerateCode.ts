@@ -22,6 +22,7 @@ import pool from '../../config/database';
 import { normalizeProjectName } from '../helpers/stringUtils';
 import { saveProgramSecret, awsSecretsEnabled } from '../aws/awsSecrets';
 import { generateUIComponents } from './componentGenerator';
+import { generateUIComponents as generateUIComponentsV2 } from './componentGeneratorV2';
 import { 
   Args,
   allGeneratedFiles
@@ -379,11 +380,45 @@ EOF'`,
         // Generate UI components based on program structure
         sendProgress({ message: 'Generating UI components...' });
         try {
-          const uiComponentTree = await generateUIComponents(
-            graph,
-            programName,
-            programId
-          );
+          // Use V2 generator if enabled (can be controlled via env var)
+          const useV2Generator = process.env.USE_TEMPLATE_SYSTEM === 'true' || true; // Default to V2
+          
+          let uiComponentTree;
+          if (useV2Generator) {
+            // Try to get IDL from the build output
+            let idl = null;
+            try {
+              const idlPath = `/usr/src/${workspace.rootPath}/target/idl/${programName}.json`;
+              const idlCmd = `docker exec ${workspace.containerName} cat ${idlPath} 2>/dev/null || echo '{}'`;
+              const idlContent = await runCommand(idlCmd, '.', projectId, { skipSuccessUpdate: true, silent: true });
+              if (idlContent && idlContent.trim() && idlContent.trim() !== '{}') {
+                idl = JSON.parse(idlContent);
+              }
+            } catch (e) {
+              console.log('[GEN] No IDL available yet, using graph-based generation');
+            }
+            
+            uiComponentTree = await generateUIComponentsV2({
+              projectId,
+              graph,
+              programName,
+              programId,
+              idl,
+              customization: {
+                theme: 'auto',
+                title: programName.replace(/_/g, ' '),
+                description: 'Solana Program Interface'
+              }
+            });
+            sendProgress({ message: 'Using template-based UI generation (V2)' });
+          } else {
+            uiComponentTree = await generateUIComponents(
+              graph,
+              programName,
+              programId
+            );
+            sendProgress({ message: 'Using basic UI generation (V1)' });
+          }
           
           // Write UI component files
           const componentTaskIds = await insertSrcFiles(
