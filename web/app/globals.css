@@ -1,12 +1,12 @@
 @config "../tailwind.config.js";
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 /* --------------------------------------------------------------------
    Solana wallet‑adapter base styles
    ------------------------------------------------------------------ */
 @import "@solana/wallet-adapter-react-ui/styles.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 /* --- shadcn-ui semantic colour tokens (needed by border-border etc.) --- */
 @layer base {
