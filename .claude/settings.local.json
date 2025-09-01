@@ -10,7 +10,13 @@
       "Bash(npm run dev:*)",
       "Bash(curl:*)",
       "Bash(npm run build:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npm install:*)",
+      "Bash(npm cache clean:*)",
+      "Bash(npm:*)",
+      "Bash(node:*)",
+      "Bash(yarn add:*)",
+      "Bash(pnpm add:*)"
     ],
     "deny": [],
     "ask": [],

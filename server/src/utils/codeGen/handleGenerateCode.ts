@@ -23,6 +23,7 @@ import { normalizeProjectName } from '../helpers/stringUtils';
 import { saveProgramSecret, awsSecretsEnabled } from '../aws/awsSecrets';
 import { generateUIComponents } from './componentGenerator';
 import { generateUIComponents as generateUIComponentsV2 } from './componentGeneratorV2';
+import { componentReloadServer } from '../websocket/componentReloadServer';
 import { 
   Args,
   allGeneratedFiles
@@ -437,6 +438,14 @@ EOF'`,
           }
           
           sendProgress({ message: 'UI components generated successfully' });
+          
+          // Trigger hot reload for connected clients
+          try {
+            componentReloadServer.forceReload(projectId, 'UI components updated');
+            sendProgress({ message: 'Hot reload triggered for UI components' });
+          } catch (error) {
+            console.log('[GEN] Hot reload notification failed (WebSocket may not be connected):', error);
+          }
           
           // Store component generation status in database
           await pool.query(
