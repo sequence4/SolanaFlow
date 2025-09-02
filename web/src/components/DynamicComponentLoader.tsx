@@ -74,20 +74,18 @@ function ErrorFallback({ error, resetErrorBoundary }: any) {
 }
 
 // Fallback to existing SolMintApp
-const SolMintApp = dynamic(() => import('./SolMintApp').catch(() => {
-  console.warn('[DynamicComponentLoader] SolMintApp not found, trying defaults');
-  return import('./defaults/SolMintApp').catch(() => {
-    // If defaults also fail, return a simple fallback component
-    return Promise.resolve({
-      default: () => (
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center p-8">
-            <h1 className="text-2xl font-bold mb-4">Welcome to SolanaFlow</h1>
-            <p className="text-gray-600">No component configured yet.</p>
-          </div>
+const SolMintApp = dynamic(() => import('./defaults/SolMintApp').catch(() => {
+  console.warn('[DynamicComponentLoader] SolMintApp not found in defaults');
+  // If defaults fail, return a simple fallback component
+  return Promise.resolve({
+    default: () => (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center p-8">
+          <h1 className="text-2xl font-bold mb-4">Welcome to SolanaFlow</h1>
+          <p className="text-gray-600">No component configured yet.</p>
         </div>
-      )
-    });
+      </div>
+    )
   });
 }), {
   ssr: false,
