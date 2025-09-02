@@ -12,7 +12,7 @@ import { parseNodeDetails } from './parseNodeDetails';
 import { lintWorkspaceManifests } from './cargoManifestLint';
 import { FileTreeItem } from '../../types/FileTreeItem';
 import { runCommand } from "../command-execution/runCommand";
-import { randomUUID } from 'crypto';
+import crypto, { randomUUID } from 'crypto';
 import path from "path";
 import fs from 'fs/promises';           
 import fsSync from 'fs';            
@@ -25,6 +25,8 @@ import { generateUIComponents } from './componentGenerator';
 import { generateUIComponents as generateUIComponentsV2 } from './componentGeneratorV2';
 import { componentReloadServer } from '../websocket/componentReloadServer';
 // import { componentWatcher } from '../container/componentWatcher'; // Will be created in Step 3
+import { componentVersionManager } from '../versioning/componentVersionManager';
+import { aiComponentGenerator } from '../ai/aiComponentGenerator';
 import { 
   Args,
   allGeneratedFiles
@@ -379,14 +381,51 @@ EOF'`,
         
         const { instructions: canonicalInstructions, state: canonicalState } = parseNodeDetails(projectState);
         
-        // Generate UI components based on program structure with Phase 3 enhancements
+        // Generate UI components based on program structure with Phase 3 & 4 enhancements
         sendProgress({ message: 'Generating intelligent UI components...' });
         try {
-          // Use V2 generator if enabled (can be controlled via env var)
+          // Check if AI generation is enabled and available
+          let useAI = process.env.ENABLE_AI_GENERATION === 'true' && aiComponentGenerator.isEnabled();
           const useV2Generator = process.env.USE_TEMPLATE_SYSTEM === 'true' || true; // Default to V2
           
           let uiComponentTree;
-          if (useV2Generator) {
+          let generationMethod = 'unknown';
+          
+          if (useAI) {
+            // Use AI generation if available
+            sendProgress({ 
+              message: 'Using AI to generate components...', 
+              stage: 'ai-generation' 
+            });
+            
+            try {
+              const description = buildComponentDescription(graph, programName);
+              const aiComponent = await aiComponentGenerator.generateFromDescription(
+                description,
+                {
+                  projectId,
+                  programId,
+                  idl: null, // Will be populated below
+                  existingComponents: []
+                }
+              );
+              
+              uiComponentTree = convertAIComponentToFileTree(aiComponent);
+              generationMethod = 'ai-generated';
+              
+              sendProgress({ 
+                message: 'AI component generation complete', 
+                stage: 'ai-generation',
+                confidence: aiComponent.metadata.confidence
+              });
+            } catch (aiError) {
+              console.error('[GEN] AI generation failed, falling back to template:', aiError);
+              // Fall back to V2 generator
+              useAI = false;
+            }
+          }
+          
+          if (!useAI && useV2Generator) {
             // Try to get IDL from the build output
             let idl = null;
             try {
@@ -413,6 +452,7 @@ EOF'`,
                 primaryColor: '#3B82F6'
               }
             });
+            generationMethod = 'v2-template';
             sendProgress({ message: 'Using template-based UI generation (V2)', stage: 'component-generation' });
           } else {
             uiComponentTree = await generateUIComponents(
@@ -420,6 +460,7 @@ EOF'`,
               programName,
               programId
             );
+            generationMethod = 'v1-basic';
             sendProgress({ message: 'Using basic UI generation (V1)', stage: 'component-generation' });
           }
           
@@ -440,6 +481,34 @@ EOF'`,
           // Wait for component files to be written
           for (const taskId of componentTaskIds) {
             await waitForTaskCompletion(taskId, 90, 2_000);
+          }
+          
+          // Create version after successful generation
+          try {
+            const componentFiles = extractComponentFiles(uiComponentTree);
+            const version = await componentVersionManager.createVersion(
+              projectId,
+              componentFiles,
+              {
+                templateUsed: generationMethod,
+                programId,
+                description: `Generated from ${programName}`,
+                breaking: false,
+                dependencies: extractDependencies(uiComponentTree)
+              }
+            );
+            
+            sendProgress({
+              message: `Component version ${version.version} created`,
+              stage: 'versioning',
+              version: version.version
+            });
+            
+            // Activate the version
+            await componentVersionManager.activateVersion(projectId, version.id);
+          } catch (versionError) {
+            console.error('[GEN] Failed to create component version:', versionError);
+            // Non-critical error, continue
           }
           
           // Start component watching for hot reload
@@ -695,3 +764,88 @@ EOF'`,
         throw err;
     }
 };
+
+// Helper functions for AI and versioning integration
+function buildComponentDescription(graph: any, programName: string): string {
+  const instructions = graph.nodes
+    ?.filter((n: any) => n.type === 'instruction')
+    .map((n: any) => n.config?.name || n.data?.name)
+    .filter(Boolean) || [];
+  
+  return `
+    Create a React component for a Solana program called "${programName}".
+    The program has the following instructions: ${instructions.join(', ')}.
+    The component should provide a user-friendly interface to interact with all instructions.
+    Include proper wallet connection, transaction handling, and error management.
+  `;
+}
+
+function convertAIComponentToFileTree(aiComponent: any): FileTreeItem {
+  return {
+    name: 'generated',
+    path: 'web/src/components/generated',
+    type: 'directory',
+    children: [
+      {
+        name: 'AIGeneratedApp.tsx',
+        path: 'web/src/components/generated/AIGeneratedApp.tsx',
+        type: 'file',
+        code: aiComponent.code
+      },
+      {
+        name: 'index.ts',
+        path: 'web/src/components/generated/index.ts',
+        type: 'file',
+        code: `export { default } from './AIGeneratedApp';`
+      }
+    ]
+  };
+}
+
+function extractComponentFiles(tree: FileTreeItem): any[] {
+  const files: any[] = [];
+  
+  function traverse(node: FileTreeItem, basePath = '') {
+    const currentPath = basePath ? `${basePath}/${node.name}` : node.name;
+    
+    if (node.type === 'file' && node.code) {
+      files.push({
+        path: currentPath,
+        content: node.code,
+        hash: crypto.createHash('sha256').update(node.code).digest('hex'),
+        size: Buffer.byteLength(node.code, 'utf8')
+      });
+    }
+    
+    if (node.children) {
+      node.children.forEach(child => traverse(child, currentPath));
+    }
+  }
+  
+  traverse(tree);
+  return files;
+}
+
+function extractDependencies(tree: FileTreeItem): Record<string, string> {
+  const deps: Record<string, string> = {};
+  
+  function traverse(node: FileTreeItem) {
+    if (node.type === 'file' && node.code) {
+      const imports = node.code.match(/import .+ from ['"](.+?)['"]/g) || [];
+      imports.forEach(imp => {
+        const match = imp.match(/from ['"](.+?)['"]/);
+        if (match && !match[1].startsWith('.') && !match[1].startsWith('@/')) {
+          // External dependency
+          deps[match[1]] = 'latest';
+        }
+      });
+    }
+    
+    if (node.children) {
+      node.children.forEach(traverse);
+    }
+  }
+  
+  traverse(tree);
+  return deps;
+}
