@@ -17,6 +17,58 @@ const nextConfig = {
 
   basePath:   APP_BASE_PATH,
   assetPrefix: APP_BASE_PATH,
+  
+  // Enable React Strict Mode for better development experience
+  reactStrictMode: true,
+  
+  // Webpack configuration for hot reload
+  webpack: (config, { dev, isServer }) => {
+    if (dev && !isServer) {
+      // Enable hot module replacement
+      config.watchOptions = {
+        poll: 1000, // Check for changes every second
+        aggregateTimeout: 300,
+        ignored: ['**/node_modules', '**/.next'],
+      };
+      
+      // Add custom loader for generated components
+      config.module.rules.push({
+        test: /generated\/.*\.(jsx?|tsx?)$/,
+        use: [
+          {
+            loader: 'babel-loader',
+            options: {
+              presets: ['next/babel'],
+              plugins: [
+                ['react-refresh/babel', { skipEnvCheck: true }]
+              ],
+            },
+          },
+        ],
+      });
+      
+      // Add alias for generated components
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        '@generated': '/usr/src/*/web/src/components/generated',
+      };
+      
+      // Enable WebSocket for hot reload
+      config.infrastructureLogging = {
+        level: 'info',
+      };
+    }
+    
+    return config;
+  },
+  
+  // Environment variables accessible in the browser
+  env: {
+    NEXT_PUBLIC_HOT_RELOAD: process.env.NODE_ENV === 'development' ? 'true' : 'false',
+    NEXT_PUBLIC_WS_URL: process.env.WS_URL || 'ws://localhost:3001/ws',
+    NEXT_PUBLIC_APP_ID: APP_ID,
+    NEXT_PUBLIC_BASE_PATH: APP_BASE_PATH,
+  },
 
   /** Proxy configuration for local RPC */
   async rewrites() {
@@ -39,14 +91,32 @@ const nextConfig = {
         source: '/:path*',
         headers: [
           { key: 'X-Frame-Options', value: 'ALLOWALL' },
-          { key: 'Content-Security-Policy',
-            value: "frame-ancestors 'self' http://localhost:*" },
+          { 
+            key: 'Content-Security-Policy',
+            value: "frame-ancestors 'self' http://localhost:* ws://localhost:*" 
+          },
           { key: 'Access-Control-Allow-Origin', value: '*' },
           { key: 'Access-Control-Allow-Methods', value: 'GET, POST, OPTIONS' },
           { key: 'Access-Control-Allow-Headers', value: 'Content-Type' },
         ],
       },
     ];
+  },
+  
+  // Development server configuration
+  devIndicators: {
+    buildActivity: true,
+    buildActivityPosition: 'bottom-right',
+  },
+  
+  // Component optimization
+  modularizeImports: {
+    '@mui/icons-material': {
+      transform: '@mui/icons-material/{{member}}',
+    },
+    'lucide-react': {
+      transform: 'lucide-react/dist/esm/icons/{{kebabCase member}}',
+    },
   },
 };
 

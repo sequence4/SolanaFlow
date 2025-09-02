@@ -11,7 +11,7 @@ interface AirdropButtonProps {
   amount?: number;
   className?: string;
   variant?: 'default' | 'outline' | 'secondary' | 'ghost';
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'default' | 'sm' | 'lg' | 'icon';
 }
 
 export const AirdropButton: React.FC<AirdropButtonProps> = ({
