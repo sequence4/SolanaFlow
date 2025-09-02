@@ -8,6 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import { getProjectRootPath } from 'src/utils/fileUtils';
 import eventBus from '../../lib/eventBus';
+// import { componentWatcher } from './componentWatcher'; // Will be created in Step 3
 
 // Progress tracking function for container setup operations
 function sendContainerSetupProgress(taskId: string, taskName: string, message: string, pct: number, thoughts: string[] = []) {
@@ -612,12 +613,20 @@ export async function startProjectContainer(
       '-v', `${hostProjectDir}/web/src/components/generated:/usr/src/${rootPath}/web/src/components/generated`,
       '-v', `${hostProjectDir}/web/public/config:/usr/src/${rootPath}/web/public/config`,
       '-e', 'CARGO_TARGET_DIR=/usr/src/target',
-      // Enable file watching for hot reload in Docker
+      // Phase 3: Enhanced file watching for hot reload
       '-e', 'WATCHPACK_POLLING=true',
       '-e', 'CHOKIDAR_USEPOLLING=true',
-      '-e', 'CHOKIDAR_INTERVAL=1000',
-      // Component system environment variables
+      '-e', 'CHOKIDAR_INTERVAL=500', // Faster polling for better hot reload
+      '-e', 'WATCHPACK_POLL_INTERVAL=500',
+      // Enable React Fast Refresh
+      '-e', 'FAST_REFRESH=true',
+      '-e', 'NEXT_WEBPACK_USEPOLLING=1',
+      // WebSocket configuration for hot reload
+      '-e', `WS_URL=ws://host.docker.internal:3001/ws`,
+      '-e', `PROJECT_ID=${projId}`,
+      // Component mode
       '-e', 'NEXT_PUBLIC_COMPONENT_MODE=dynamic',
+      '-e', 'NEXT_PUBLIC_HOT_RELOAD=true',
       '-e', 'NEXT_PUBLIC_FALLBACK_ENABLED=true',
       '-e', 'HOSTNAME=0.0.0.0',
       '-e', 'CARGO_BUILD_JOBS=1',
@@ -814,6 +823,19 @@ export async function startProjectContainer(
     
     completeContainerTask('env-tools-setup', 'Development tools ready');
     completeContainerTask('env-container-config', 'Container fully configured');
+
+    // After container starts, initialize hot reload monitoring
+    try {
+      // Create a marker file to indicate hot reload is available
+      execSync(`docker exec ${name} touch /usr/src/${rootPath}/web/.hotreload`);
+      
+      // Start watching this project
+      // await componentWatcher.watchProject(projId); // Will be enabled when componentWatcher is created
+      
+      console.log(`[CONTAINER] Hot reload enabled for project ${projId}`);
+    } catch (error) {
+      console.warn('[CONTAINER] Failed to enable hot reload:', error);
+    }
 
     const containerUrl = resolveContainerUrl(String(hostPort));
 

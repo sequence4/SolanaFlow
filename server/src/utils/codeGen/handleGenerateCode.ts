@@ -24,6 +24,7 @@ import { saveProgramSecret, awsSecretsEnabled } from '../aws/awsSecrets';
 import { generateUIComponents } from './componentGenerator';
 import { generateUIComponents as generateUIComponentsV2 } from './componentGeneratorV2';
 import { componentReloadServer } from '../websocket/componentReloadServer';
+// import { componentWatcher } from '../container/componentWatcher'; // Will be created in Step 3
 import { 
   Args,
   allGeneratedFiles
@@ -378,8 +379,8 @@ EOF'`,
         
         const { instructions: canonicalInstructions, state: canonicalState } = parseNodeDetails(projectState);
         
-        // Generate UI components based on program structure
-        sendProgress({ message: 'Generating UI components...' });
+        // Generate UI components based on program structure with Phase 3 enhancements
+        sendProgress({ message: 'Generating intelligent UI components...' });
         try {
           // Use V2 generator if enabled (can be controlled via env var)
           const useV2Generator = process.env.USE_TEMPLATE_SYSTEM === 'true' || true; // Default to V2
@@ -408,17 +409,18 @@ EOF'`,
               customization: {
                 theme: 'auto',
                 title: programName.replace(/_/g, ' '),
-                description: 'Solana Program Interface'
+                description: 'Solana Program Interface',
+                primaryColor: '#3B82F6'
               }
             });
-            sendProgress({ message: 'Using template-based UI generation (V2)' });
+            sendProgress({ message: 'Using template-based UI generation (V2)', stage: 'component-generation' });
           } else {
             uiComponentTree = await generateUIComponents(
               graph,
               programName,
               programId
             );
-            sendProgress({ message: 'Using basic UI generation (V1)' });
+            sendProgress({ message: 'Using basic UI generation (V1)', stage: 'component-generation' });
           }
           
           // Write UI component files
@@ -430,14 +432,43 @@ EOF'`,
             emitFileWritten(sendProgress, false)
           );
           
-          sendProgress({ message: `Writing ${componentTaskIds.length} UI component files...` });
+          sendProgress({ 
+            message: `Writing ${componentTaskIds.length} UI component files...`,
+            stage: 'component-generation'
+          });
           
           // Wait for component files to be written
           for (const taskId of componentTaskIds) {
             await waitForTaskCompletion(taskId, 90, 2_000);
           }
           
-          sendProgress({ message: 'UI components generated successfully' });
+          // Start component watching for hot reload
+          // await componentWatcher.watchProject(projectId); // Will be enabled when componentWatcher is created
+          
+          // Notify WebSocket clients about new components
+          componentReloadServer.forceReload(projectId, 'components-generated');
+          
+          sendProgress({ 
+            message: 'UI components generated with hot reload enabled',
+            stage: 'component-generation',
+            hotReloadEnabled: true
+          });
+          
+          // Store generation metadata
+          await pool.query(
+            `UPDATE solanaproject 
+             SET details = jsonb_set(
+               jsonb_set(
+                 COALESCE(details, '{}'::jsonb),
+                 '{uiComponentGenerated}',
+                 'true'::jsonb
+               ),
+               '{hotReloadEnabled}',
+               'true'::jsonb
+             )
+             WHERE id = $1`,
+            [projectId]
+          );
           
           // Trigger hot reload for connected clients
           try {
@@ -459,9 +490,13 @@ EOF'`,
             [projectId]
           );
           
-        } catch (uiError) {
-          console.warn('[GEN] UI component generation failed (non-critical):', uiError);
-          sendProgress({ message: 'Warning: UI generation skipped, using default component' });
+        } catch (uiError: any) {
+          console.error('[GEN] UI component generation failed:', uiError);
+          sendProgress({ 
+            message: 'Warning: UI generation failed, using default component',
+            stage: 'component-generation',
+            error: uiError?.message || 'Unknown error'
+          });
         }
         
         sendProgress({ message: 'Extracting generated files...' });

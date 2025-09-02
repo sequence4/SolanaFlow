@@ -16,7 +16,8 @@
       "Bash(npm:*)",
       "Bash(node:*)",
       "Bash(yarn add:*)",
-      "Bash(pnpm add:*)"
+      "Bash(pnpm add:*)",
+      "Bash(chmod:*)"
     ],
     "deny": [],
     "ask": [],
