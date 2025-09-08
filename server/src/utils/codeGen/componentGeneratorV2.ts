@@ -80,7 +80,7 @@ export async function generateUIComponents(options: GenerateUIOptions): Promise<
   } else {
     // Fallback to basic generation
     console.log('[ComponentGeneratorV2] No matching template, using fallback generation');
-    componentCode = generateFallbackComponent(programName, programId, config);
+    componentCode = generateFallbackComponent(programName, programId, config, idl);
     templateUsed = 'fallback';
   }
   
@@ -150,58 +150,93 @@ export async function generateUIComponents(options: GenerateUIOptions): Promise<
 function generateFallbackComponent(
   programName: string,
   programId: string,
-  config: any
+  config: any,
+  idl?: any
 ): string {
   const componentName = programName.replace(/[-_]/g, '');
+  const instructions = config.instructions || [];
   
-  return `"use client"
+  return `"use client";
 
-import { useState } from 'react'
-import { useWallet } from '@solana/wallet-adapter-react'
-import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
-import { useToast } from '@/hooks/use-toast'
-import { AlertCircle, Wallet } from 'lucide-react'
+import { useState, useEffect } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import { Connection, PublicKey, Transaction, SystemProgram } from '@solana/web3.js';
+import { Program, AnchorProvider, web3, BN } from '@coral-xyz/anchor';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+import { Loader2, Wallet, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 
-const PROGRAM_ID = "${programId}"
+// Embedded IDL
+const idl = ${idl ? JSON.stringify(idl, null, 2) : 'null'};
+
+const PROGRAM_ID = new PublicKey('${programId}');
 
 export default function ${componentName}App() {
-  const { publicKey, connected } = useWallet()
-  const { toast } = useToast()
-  
-  const handleAction = async () => {
-    if (!connected || !publicKey) {
+  const { publicKey, signTransaction, connected } = useWallet();
+  const { toast } = useToast();
+  const [program, setProgram] = useState<Program | null>(null);
+  const [connection, setConnection] = useState<Connection | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const conn = new Connection(process.env.NEXT_PUBLIC_RPC_URL || 'http://localhost:8899', 'confirmed');
+    setConnection(conn);
+
+    if (connected && publicKey && signTransaction && idl) {
+      const provider = new AnchorProvider(
+        conn,
+        { publicKey, signTransaction } as any,
+        { commitment: 'confirmed' }
+      );
+      const prog = new Program(idl as any, PROGRAM_ID, provider);
+      setProgram(prog);
+    }
+  }, [connected, publicKey, signTransaction]);
+
+  const handleInstruction = async (instructionName: string, ...args: any[]) => {
+    if (!program || !publicKey) {
       toast({
         title: "Wallet not connected",
         description: "Please connect your wallet first",
         variant: "destructive"
-      })
-      return
+      });
+      return;
     }
-    
+
+    setLoading(true);
     try {
-      // TODO: Implement program interaction
+      const tx = await program.methods[instructionName](...args)
+        .accounts({
+          // Add accounts as needed
+        })
+        .rpc();
+      
       toast({
-        title: "Success",
-        description: "Transaction completed successfully"
-      })
+        title: "Transaction successful",
+        description: \`Transaction ID: \${tx}\`
+      });
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Transaction failed",
+        title: "Transaction failed",
+        description: error.message,
         variant: "destructive"
-      })
+      });
+    } finally {
+      setLoading(false);
     }
-  }
-  
+  };
+
   return (
     <div className="container mx-auto p-8 max-w-4xl">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold">${config.customization?.title || programName}</h1>
+          <h1 className="text-3xl font-bold">${config.customization?.title || programName.replace(/_/g, ' ')}</h1>
           <p className="text-muted-foreground mt-2">
             ${config.customization?.description || 'Solana Program Interface'}
           </p>
@@ -231,7 +266,7 @@ export default function ${componentName}App() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">Program ID:</span>
-                  <code className="text-xs bg-muted px-2 py-1 rounded">{PROGRAM_ID}</code>
+                  <code className="text-xs bg-muted px-2 py-1 rounded">${programId}</code>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">Wallet:</span>
@@ -241,7 +276,7 @@ export default function ${componentName}App() {
                 </div>
                 <div className="flex gap-2 mt-4">
                   <Badge variant="outline">Devnet</Badge>
-                  ${config.features.map((f: string) => `<Badge variant="outline">${f}</Badge>`).join('\\n                  ')}
+                  ${config.features?.map((f: string) => `<Badge variant="outline">${f}</Badge>`).join('\\n                  ') || ''}
                 </div>
               </div>
             </CardContent>
@@ -253,30 +288,43 @@ export default function ${componentName}App() {
               <CardDescription>Interact with the program</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              ${config.instructions.map((ix: any) => `
-              <div>
-                <Button 
-                  onClick={handleAction}
-                  className="w-full"
-                >
-                  Execute ${ix.name}
-                </Button>
-              </div>`).join('')}
-              
-              {config.instructions.length === 0 && (
+              {!idl ? (
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
-                    No instructions detected. Please check your program configuration.
+                    No IDL found. Please build your program first.
                   </AlertDescription>
                 </Alert>
+              ) : (
+                <>
+                  ${instructions.map((inst: any) => `
+                  <div className="p-4 border rounded-lg">
+                    <h3 className="font-semibold mb-4">${inst.name}</h3>
+                    <Button 
+                      onClick={() => handleInstruction('${inst.name}')}
+                      disabled={loading}
+                      className="w-full"
+                    >
+                      {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Execute ${inst.name}
+                    </Button>
+                  </div>`).join('')}
+                  
+                  ${instructions.length === 0 ? `
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      No instructions detected. Please check your program configuration.
+                    </AlertDescription>
+                  </Alert>` : ''}
+                </>
               )}
             </CardContent>
           </Card>
         </div>
       )}
     </div>
-  )
+  );
 }`;
 }
 

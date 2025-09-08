@@ -240,13 +240,29 @@ export default function DynamicComponentLoader() {
                 try {
                   // @ts-ignore - Dynamic import with variable
                   loadedModule = await import(`./generated/${componentName}`);
-                } catch {
+                } catch (err1) {
+                  console.warn(`[DynamicComponentLoader] Failed to load ./generated/${componentName}:`, err1);
                   try {
+                    // Try with .tsx extension
                     // @ts-ignore - Dynamic import with variable
                     loadedModule = await import(`./generated/${componentName}.tsx`);
-                  } catch {
-                    // @ts-ignore - Dynamic import with variable
-                    loadedModule = await import(`./generated/index`);
+                  } catch (err2) {
+                    console.warn(`[DynamicComponentLoader] Failed to load ./generated/${componentName}.tsx:`, err2);
+                    try {
+                      // Try defaults folder as fallback
+                      // @ts-ignore - Dynamic import with variable
+                      loadedModule = await import(`./defaults/${componentName}`);
+                    } catch (err3) {
+                      console.warn(`[DynamicComponentLoader] Failed to load ./defaults/${componentName}:`, err3);
+                      // Last resort - try FallbackApp
+                      try {
+                        // @ts-ignore - Dynamic import with variable
+                        loadedModule = await import(`./defaults/FallbackApp`);
+                      } catch (err4) {
+                        console.error('[DynamicComponentLoader] All component loading attempts failed');
+                        throw new Error(`Component ${componentName} not found in any location`);
+                      }
+                    }
                   }
                 }
                 

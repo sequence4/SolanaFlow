@@ -712,6 +712,19 @@ EOF'`,
               [JSON.stringify(idl), projectId]
             );
             
+            // Save IDL to web directory for component access
+            const webIdlPath = `${containerWebDir}/src/idl`;
+            const idlFileName = `${programName}.json`;
+            
+            await runCommand(
+              `docker exec ${workspace.containerName} bash -c "mkdir -p ${webIdlPath} && echo '${JSON.stringify(idl).replace(/'/g, "'\\''")}' > ${webIdlPath}/${idlFileName}"`,
+              '.',
+              projectId,
+              { skipSuccessUpdate: true }
+            );
+            
+            console.log(`[BUILD] IDL saved to web directory: ${webIdlPath}/${idlFileName}`);
+            
             sendProgress({ 
               message: 'IDL extracted and saved',
               idl: idl 
