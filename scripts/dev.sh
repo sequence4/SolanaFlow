@@ -105,14 +105,19 @@ if ! DOCKER info >/dev/null 2>&1; then
 fi
 
 # ─── Auth to private registry BEFORE any pull ────────────────────────────────
-# Require GHCR credentials when images are private.
+# Use embedded credentials to avoid GPG issues
 if [ -n "${GHCR_PAT:-}" ] && [ "${GHCR_PAT}" != "unset" ]; then
-  echo "🔐 Logging in to ${REGISTRY_DOMAIN} (scoped to repo config)…"
-  if ! echo "${GHCR_PAT}" | DOCKER login "${REGISTRY_DOMAIN}" \
-        -u "${GHCR_USER:-github}" --password-stdin 1>/dev/null ; then
-    echo "❌  Login to ${REGISTRY_DOMAIN} failed. Check GHCR_USER / GHCR_PAT."
-    exit 1
-  fi
+  echo "🔐 Using embedded credentials for ${REGISTRY_DOMAIN} (scoped to repo config)…"
+  cat > "$DOCKER_CONFIG/config.json" << AUTHEOF
+{
+  "auths": {
+    "${REGISTRY_DOMAIN}": {
+      "auth": "$(echo -n "${GHCR_USER:-github}:${GHCR_PAT}" | base64)"
+    }
+  },
+  "credsStore": ""
+}
+AUTHEOF
 else
   echo "❗ Private images expected but GHCR_PAT is not set."
   echo "   Export GHCR_USER and GHCR_PAT (classic PAT with 'read:packages') and re-run:"
