@@ -73,9 +73,9 @@ function ErrorFallback({ error, resetErrorBoundary }: any) {
   );
 }
 
-// Fallback to existing SolMintApp
-const SolMintApp = dynamic(() => import('./defaults/SolMintApp').catch(() => {
-  console.warn('[DynamicComponentLoader] SolMintApp not found in defaults');
+// Fallback to FallbackApp when no component is configured
+const FallbackAppComponent = dynamic(() => import('./defaults/FallbackApp').catch(() => {
+  console.warn('[DynamicComponentLoader] FallbackApp not found in defaults');
   // If defaults fail, return a simple fallback component
   return Promise.resolve({
     default: () => (
@@ -306,11 +306,11 @@ export default function DynamicComponentLoader() {
         }
       }
       
-      // Fallback to default SolMintApp
-      console.log('[DynamicComponentLoader] Using default SolMintApp');
+      // Fallback to default FallbackApp
+      console.log('[DynamicComponentLoader] Using default FallbackApp');
       setState({
         status: 'loaded',
-        component: SolMintApp,
+        component: FallbackAppComponent,
         config: null,
         error: null,
         lastLoadTime: Date.now(),
@@ -338,7 +338,7 @@ export default function DynamicComponentLoader() {
         // Max retries reached, load fallback
         setState({
           status: 'loaded',
-          component: SolMintApp,
+          component: FallbackAppComponent,
           config: null,
           error,
           lastLoadTime: Date.now(),
