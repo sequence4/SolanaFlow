@@ -377,6 +377,13 @@ export async function startProjectContainer(
     fs.mkdirSync(hostConfigDir, { recursive: true });
   }
   
+  // Ensure .next directory exists for cache mounting
+  const hostNextDir = path.join(hostProjectDir, 'web', '.next');
+  if (!fs.existsSync(hostNextDir)) {
+    fs.mkdirSync(hostNextDir, { recursive: true });
+    console.log(`[CONTAINER] Created .next directory: ${hostNextDir}`);
+  }
+  
   // Inject Program ID into container environment if it exists for this project
   let programIdEnv: string[] = [];
   try {
@@ -671,7 +678,7 @@ export async function startProjectContainer(
         'React Fast Refresh will update code instantly',
         'Perfect for iterative development workflow'
       ]);
-      // Development mode with Next.js dev server - working syntax from develop branch
+      // Development mode with Next.js dev server - enhanced with restart on component changes
       runArgs.push(
         '-c',
         `if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
@@ -679,7 +686,17 @@ export async function startProjectContainer(
         `fi && ` +
         `cd /usr/src/${rootPath}/web && ` +
         `export NEXT_DISABLE_REACT_REFRESH=\${NEXT_DISABLE_REACT_REFRESH:-0} && ` +
-        `npx next dev -H 0.0.0.0 -p ${INTERNAL_PORT}`
+        `# Watch for component changes and restart if needed ` +
+        `while true; do ` +
+        `  npx next dev -H 0.0.0.0 -p ${INTERNAL_PORT}; ` +
+        `  if [ -f src/components/generated/.rebuild ]; then ` +
+        `    rm -f src/components/generated/.rebuild; ` +
+        `    echo "Restarting due to component change..."; ` +
+        `    sleep 2; ` +
+        `  else ` +
+        `    break; ` +
+        `  fi; ` +
+        `done`
       );
     } else {
       sendContainerSetupProgress('env-container-config', 'Container Configuration', 'Configuring production mode...', 65, [

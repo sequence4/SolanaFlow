@@ -7,6 +7,15 @@ import { Loader2, AlertCircle, RefreshCw, CheckCircle } from 'lucide-react';
 // Component cache to prevent unnecessary reloads
 const componentCache = new Map<string, any>();
 
+// Component registry for pre-registered components
+const ComponentRegistry: Record<string, any> = {};
+
+// Pre-register generated components (this will be populated by build process)
+if (typeof window !== 'undefined') {
+  // @ts-ignore
+  window.__COMPONENT_REGISTRY__ = ComponentRegistry;
+}
+
 // WebSocket for hot reload notifications
 let ws: WebSocket | null = null;
 
@@ -229,44 +238,59 @@ export default function DynamicComponentLoader() {
             // Attempt to load generated component with retry logic
             const loadGeneratedComponent = async (attempt = 1): Promise<any> => {
               try {
-                // Since dynamic imports with variables aren't supported in Next.js,
-                // we'll use a component registry approach
                 const componentName = config.componentName;
                 
-                // Try to load from generated folder
-                // Note: These imports will fail at build time but work at runtime
-                // when the files are actually generated
+                // First check registry for pre-registered components
+                if (componentName && ComponentRegistry[componentName]) {
+                  console.log(`[DynamicComponentLoader] Found ${componentName} in registry`);
+                  return ComponentRegistry[componentName];
+                }
+                
+                // Try to dynamically import from component map
+                if (componentName) {
+                  try {
+                    const { default: componentMap } = await import('./componentMap');
+                    if (componentMap[componentName]) {
+                      const module = await componentMap[componentName]();
+                      ComponentRegistry[componentName] = module.default || module;
+                      return ComponentRegistry[componentName];
+                    }
+                  } catch (mapErr) {
+                    console.warn('[DynamicComponentLoader] Component map not available:', mapErr);
+                  }
+                }
+                
+                // Fallback to attempting direct imports with known paths
                 let loadedModule;
                 try {
+                  // Try without extension first
                   // @ts-ignore - Dynamic import with variable
                   loadedModule = await import(`./generated/${componentName}`);
                 } catch (err1) {
                   console.warn(`[DynamicComponentLoader] Failed to load ./generated/${componentName}:`, err1);
                   try {
-                    // Try with .tsx extension
+                    // Try defaults folder as fallback
                     // @ts-ignore - Dynamic import with variable
-                    loadedModule = await import(`./generated/${componentName}.tsx`);
+                    loadedModule = await import(`./defaults/${componentName}`);
                   } catch (err2) {
-                    console.warn(`[DynamicComponentLoader] Failed to load ./generated/${componentName}.tsx:`, err2);
+                    console.warn(`[DynamicComponentLoader] Failed to load ./defaults/${componentName}:`, err2);
+                    // Last resort - try FallbackApp
                     try {
-                      // Try defaults folder as fallback
                       // @ts-ignore - Dynamic import with variable
-                      loadedModule = await import(`./defaults/${componentName}`);
+                      loadedModule = await import(`./defaults/FallbackApp`);
                     } catch (err3) {
-                      console.warn(`[DynamicComponentLoader] Failed to load ./defaults/${componentName}:`, err3);
-                      // Last resort - try FallbackApp
-                      try {
-                        // @ts-ignore - Dynamic import with variable
-                        loadedModule = await import(`./defaults/FallbackApp`);
-                      } catch (err4) {
-                        console.error('[DynamicComponentLoader] All component loading attempts failed');
-                        throw new Error(`Component ${componentName} not found in any location`);
-                      }
+                      console.error('[DynamicComponentLoader] All component loading attempts failed');
+                      throw new Error(`Component ${componentName} not found in any location`);
                     }
                   }
                 }
                 
-                return loadedModule?.default || loadedModule;
+                if (loadedModule && componentName) {
+                  ComponentRegistry[componentName] = loadedModule.default || loadedModule;
+                  return ComponentRegistry[componentName];
+                }
+                
+                throw new Error(`Component ${componentName} could not be loaded`);
               } catch (error) {
                 if (attempt < 3) {
                   console.log(`[DynamicComponentLoader] Retry attempt ${attempt + 1}`);

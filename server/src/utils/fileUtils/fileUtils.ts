@@ -534,6 +534,17 @@ export const startCreateFileTask = async (
             const chownCmd = `docker exec ${containerName} chown 1000:1000 "/usr/src/${projectRootPath}/${filePath}"`;
             await runCommand(chownCmd, '.', taskId, { skipSuccessUpdate: true, silent: true });
             
+            // Clear Next.js cache to trigger rebuild for component changes
+            if (filePath.includes('web/src/components/generated') || filePath.includes('web/public/config')) {
+              try {
+                await runCommand(`docker exec ${containerName} rm -rf /usr/src/${projectRootPath}/web/.next/cache`, '.', taskId, { skipSuccessUpdate: true, silent: true });
+                await runCommand(`docker exec ${containerName} touch /usr/src/${projectRootPath}/web/src/components/generated/.rebuild`, '.', taskId, { skipSuccessUpdate: true, silent: true });
+                console.log('[FileUtils] Triggered Next.js rebuild for component changes');
+              } catch (e) {
+                console.warn('[FileUtils] Could not clear Next.js cache:', e);
+              }
+            }
+            
             //console.log(`Successfully created file in container: ${filePath}`);
             await updateTaskStatus(taskId, 'succeed', 'File created successfully in container');
           } finally {
@@ -599,6 +610,18 @@ export const startUpdateFileTask = async (
 ${content}
 EOF`;
           await runCommand(writeCmd, '.', taskId);
+          
+          // Clear Next.js cache to trigger rebuild for component changes
+          if (filePath.includes('web/src/components/generated') || filePath.includes('web/public/config')) {
+            try {
+              await runCommand(`docker exec ${containerName} rm -rf /usr/src/${projectRootPath}/web/.next/cache`, '.', taskId, { skipSuccessUpdate: true, silent: true });
+              await runCommand(`docker exec ${containerName} touch /usr/src/${projectRootPath}/web/src/components/generated/.rebuild`, '.', taskId, { skipSuccessUpdate: true, silent: true });
+              console.log('[FileUtils] Triggered Next.js rebuild for component changes');
+            } catch (e) {
+              console.warn('[FileUtils] Could not clear Next.js cache:', e);
+            }
+          }
+          
           //console.log(`Successfully updated file in container: ${filePath}`);
           await updateTaskStatus(taskId, 'succeed', 'File updated successfully in container');
         } catch (containerError) {

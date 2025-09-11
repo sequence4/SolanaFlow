@@ -16,6 +16,26 @@ export async function GET() {
         console.log('[component-config API] Found config at:', configPath);
         const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
         
+        // Generate import map for found components
+        if (config.componentName && config.customComponent) {
+          const componentPath = path.join(
+            process.cwd(), 
+            'src', 
+            'components', 
+            'generated',
+            `${config.componentName}.tsx`
+          );
+          
+          if (fs.existsSync(componentPath)) {
+            config.componentExists = true;
+            config.componentPath = `/components/generated/${config.componentName}`;
+            console.log('[component-config API] Component file verified at:', componentPath);
+          } else {
+            console.warn(`[component-config API] Component file not found: ${componentPath}`);
+            config.componentExists = false;
+          }
+        }
+        
         // Add runtime information
         const enrichedConfig = {
           ...config,
