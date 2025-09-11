@@ -284,6 +284,21 @@ const Interface = () => {
     const iframeSrc = React.useMemo(() => {
         if (!activeUrl) return "";
         
+        // Fix: Extract clean project ID from container URL if needed
+        let cleanUrl = activeUrl;
+        const containerMatch = activeUrl.match(/\/dapp\/(userproj-[a-f0-9-]+)-\d+/);
+        if (containerMatch) {
+            // Extract the actual project ID from container name format
+            const fullContainerName = containerMatch[1];
+            // The project ID is between 'userproj-' and the timestamp
+            const projectIdMatch = fullContainerName.match(/userproj-([a-f0-9-]{36})/);
+            if (projectIdMatch) {
+                const cleanProjectId = projectIdMatch[1];
+                cleanUrl = activeUrl.replace(/\/dapp\/userproj-[^\/]+/, `/dapp/${cleanProjectId}`);
+                console.log('[Interface] Fixed URL from container format:', { original: activeUrl, fixed: cleanUrl });
+            }
+        }
+        
         // Get program ID and cluster info from context
         const programId = projectContext.details?.programId || 
                          projectContext.details?.projectState?.programId;
@@ -310,8 +325,8 @@ const Interface = () => {
             params.set('cluster', deployNetwork);
         }
         
-        const delim = activeUrl.includes('?') ? '&' : '?';
-        return `${activeUrl}${delim}${params.toString()}`;
+        const delim = cleanUrl.includes('?') ? '&' : '?';
+        return `${cleanUrl}${delim}${params.toString()}`;
     }, [activeUrl, iframeKey, projectContext.details, projectContext.deployNetwork]);
 
     const openInNewTab = () => activeUrl && window.open(activeUrl, "_blank");

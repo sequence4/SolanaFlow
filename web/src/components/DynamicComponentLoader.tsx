@@ -22,6 +22,7 @@ let ws: WebSocket | null = null;
 interface ComponentConfig {
   componentType?: string;
   componentName?: string;
+  actualComponentName?: string;  // The actual file name if different from componentName
   customComponent?: boolean;
   baseType?: string;
   programId?: string;
@@ -29,6 +30,8 @@ interface ComponentConfig {
   generatedAt?: string;
   version?: string;
   checksum?: string;
+  componentExists?: boolean;
+  componentPath?: string;
 }
 
 interface LoaderState {
@@ -239,6 +242,8 @@ export default function DynamicComponentLoader() {
             const loadGeneratedComponent = async (attempt = 1): Promise<any> => {
               try {
                 const componentName = config.componentName;
+                // Use actual component name if provided by API
+                const actualComponentName = config.actualComponentName || componentName;
                 
                 // First check registry for pre-registered components
                 if (componentName && ComponentRegistry[componentName]) {
@@ -260,25 +265,38 @@ export default function DynamicComponentLoader() {
                   }
                 }
                 
-                // Fallback to attempting direct imports with known paths
+                // For generated components, try multiple naming conventions
+                const namesToTry = actualComponentName ? [actualComponentName] : [
+                  componentName,
+                  componentName?.replace(/-/g, '_'), // Convert hyphens to underscores
+                  componentName?.replace(/_/g, '-')  // Convert underscores to hyphens
+                ].filter(Boolean);
+                
                 let loadedModule;
-                try {
-                  // Try without extension first
-                  // @ts-ignore - Dynamic import with variable
-                  loadedModule = await import(`./generated/${componentName}`);
-                } catch (err1) {
-                  console.warn(`[DynamicComponentLoader] Failed to load ./generated/${componentName}:`, err1);
+                for (const name of namesToTry) {
                   try {
-                    // Try defaults folder as fallback
+                    // @ts-ignore - Dynamic import with variable
+                    loadedModule = await import(`./generated/${name}`);
+                    console.log(`[DynamicComponentLoader] Successfully loaded: ./generated/${name}`);
+                    break;
+                  } catch (err) {
+                    console.warn(`[DynamicComponentLoader] Failed to load ./generated/${name}`);
+                  }
+                }
+                
+                // If not found in generated, try defaults
+                if (!loadedModule) {
+                  try {
                     // @ts-ignore - Dynamic import with variable
                     loadedModule = await import(`./defaults/${componentName}`);
-                  } catch (err2) {
-                    console.warn(`[DynamicComponentLoader] Failed to load ./defaults/${componentName}:`, err2);
+                  } catch (err) {
+                    console.warn(`[DynamicComponentLoader] Failed to load ./defaults/${componentName}`);
                     // Last resort - try FallbackApp
                     try {
                       // @ts-ignore - Dynamic import with variable
                       loadedModule = await import(`./defaults/FallbackApp`);
-                    } catch (err3) {
+                      console.log('[DynamicComponentLoader] Using FallbackApp as last resort');
+                    } catch (err2) {
                       console.error('[DynamicComponentLoader] All component loading attempts failed');
                       throw new Error(`Component ${componentName} not found in any location`);
                     }

@@ -4,11 +4,16 @@ import path from 'path';
 
 export async function GET() {
   try {
+    // Get the actual working directory (should be /usr/src/PROJECT_NAME/web)
+    const cwd = process.cwd();
+    console.log('[component-config API] Current working directory:', cwd);
+    
     // Check multiple possible locations for the config file
     const configPaths = [
-      path.join(process.cwd(), 'public', 'config', 'component-manifest.json'),
-      path.join(process.cwd(), 'component-manifest.json'),
-      path.join(process.cwd(), '.next', 'component-manifest.json'),
+      path.join(cwd, 'public', 'config', 'component-manifest.json'),
+      path.join(cwd, '..', 'web', 'public', 'config', 'component-manifest.json'),
+      path.join(cwd, 'component-manifest.json'),
+      path.join(cwd, '.next', 'component-manifest.json'),
     ];
     
     for (const configPath of configPaths) {
@@ -16,22 +21,37 @@ export async function GET() {
         console.log('[component-config API] Found config at:', configPath);
         const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
         
-        // Generate import map for found components
+        // Check if the component file actually exists
         if (config.componentName && config.customComponent) {
-          const componentPath = path.join(
-            process.cwd(), 
-            'src', 
-            'components', 
-            'generated',
-            `${config.componentName}.tsx`
-          );
+          // Try both with underscores and without
+          const possibleNames = [
+            config.componentName,
+            config.componentName.replace(/-/g, '_'),
+            config.componentName.replace(/_/g, '-')
+          ];
           
-          if (fs.existsSync(componentPath)) {
-            config.componentExists = true;
-            config.componentPath = `/components/generated/${config.componentName}`;
-            console.log('[component-config API] Component file verified at:', componentPath);
-          } else {
-            console.warn(`[component-config API] Component file not found: ${componentPath}`);
+          let componentFound = false;
+          for (const name of possibleNames) {
+            const componentPath = path.join(
+              cwd, 
+              'src', 
+              'components', 
+              'generated',
+              `${name}.tsx`
+            );
+            
+            if (fs.existsSync(componentPath)) {
+              config.componentExists = true;
+              config.componentPath = `/components/generated/${name}`;
+              config.actualComponentName = name; // Store the actual file name
+              console.log('[component-config API] Component file verified at:', componentPath);
+              componentFound = true;
+              break;
+            }
+          }
+          
+          if (!componentFound) {
+            console.warn(`[component-config API] Component file not found for: ${config.componentName}`);
             config.componentExists = false;
           }
         }
@@ -66,12 +86,12 @@ export async function GET() {
       }
     }
     
-    // Default response when no config or generated component exists
+    // Return proper JSON for fallback case
     console.log('[component-config API] No config found, using defaults');
     return NextResponse.json({
       componentType: 'default',
       customComponent: false,
-      baseType: 'token-mint',
+      baseType: 'fallback',
       message: 'No custom component configuration found'
     });
     

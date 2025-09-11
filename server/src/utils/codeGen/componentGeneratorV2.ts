@@ -109,8 +109,8 @@ export async function generateUIComponents(options: GenerateUIOptions): Promise<
                 type: "directory",
                 children: [
                   {
-                    name: `${programName}App.tsx`,
-                    path: `web/src/components/generated/${programName}App.tsx`,
+                    name: `${programName.replace(/[-\s]/g, '_')}App.tsx`,
+                    path: `web/src/components/generated/${programName.replace(/[-\s]/g, '_')}App.tsx`,
                     type: "file",
                     code: componentCode
                   }
@@ -128,7 +128,7 @@ export async function generateUIComponents(options: GenerateUIOptions): Promise<
 
 export const componentMap: Record<string, () => Promise<any>> = {
   // Generated components
-  '${programName}App': () => import('./generated/${programName}App'),
+  '${programName.replace(/[-\s]/g, '_')}App': () => import('./generated/${programName.replace(/[-\s]/g, '_')}App'),
   
   // Default fallback component
   'FallbackApp': () => import('./defaults/FallbackApp'),
@@ -357,9 +357,12 @@ function generateConfigFile(
   templateUsed: string,
   analysis: any
 ): string {
+  // Ensure consistent naming with underscores to match actual file names
+  const componentName = `${programName.replace(/[-\s]/g, '_')}App`;
+  
   return JSON.stringify({
     componentType: analysis?.programType || 'custom',
-    componentName: `${programName}App`,
+    componentName: componentName,
     customComponent: true,
     templateUsed,
     programId,
