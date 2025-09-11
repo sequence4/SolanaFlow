@@ -608,6 +608,10 @@ export async function startProjectContainer(
       '--name', name,
       '--label', `solanaflow.project=${projId}`,
       '--restart', 'unless-stopped',
+      '--health-cmd', 'echo "healthy"',
+      '--health-interval', '5s',
+      '--health-retries', '3',
+      '--health-start-period', '10s',
       ...(sizeOptSupported() ? ['--storage-opt', 'size=20G'] : []),  // guard FS quota
       '-v', `${vCargo}:/root/.cargo`,
       '-v', `${vSccache}:/opt/sccache`,
@@ -678,7 +682,7 @@ export async function startProjectContainer(
         'React Fast Refresh will update code instantly',
         'Perfect for iterative development workflow'
       ]);
-      // Development mode with Next.js dev server - enhanced with restart on component changes
+      // Development mode with Next.js dev server - simplified without restart loop
       runArgs.push(
         '-c',
         `if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
@@ -686,17 +690,7 @@ export async function startProjectContainer(
         `fi && ` +
         `cd /usr/src/${rootPath}/web && ` +
         `export NEXT_DISABLE_REACT_REFRESH=\${NEXT_DISABLE_REACT_REFRESH:-0} && ` +
-        `# Watch for component changes and restart if needed ` +
-        `while true; do ` +
-        `  npx next dev -H 0.0.0.0 -p ${INTERNAL_PORT}; ` +
-        `  if [ -f src/components/generated/.rebuild ]; then ` +
-        `    rm -f src/components/generated/.rebuild; ` +
-        `    echo "Restarting due to component change..."; ` +
-        `    sleep 2; ` +
-        `  else ` +
-        `    break; ` +
-        `  fi; ` +
-        `done`
+        `npx next dev -H 0.0.0.0 -p ${INTERNAL_PORT}`
       );
     } else {
       sendContainerSetupProgress('env-container-config', 'Container Configuration', 'Configuring production mode...', 65, [
@@ -728,7 +722,33 @@ export async function startProjectContainer(
     console.timeEnd('[docker-run]');
     if (result.status !== 0) throw new Error(`Docker run failed with status ${result.status}`);
 
-    sendContainerSetupProgress('env-container-config', 'Container Configuration', 'Container started, setting up tools...', 80, [
+    sendContainerSetupProgress('env-container-config', 'Container Configuration', 'Container started, waiting for readiness...', 75, [
+      'Container is now running',
+      'Waiting for container to be ready',
+      'This may take a few seconds'
+    ]);
+
+    // Wait for container to be ready before executing commands
+    const waitForContainer = async (containerName: string, maxAttempts = 30) => {
+      for (let i = 0; i < maxAttempts; i++) {
+        try {
+          execSync(`docker exec ${containerName} echo "ready"`, { stdio: 'ignore' });
+          return true;
+        } catch (e) {
+          if (i === maxAttempts - 1) {
+            throw new Error(`Container ${containerName} failed to become ready`);
+          }
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+      return false;
+    };
+
+    // Wait for container to be ready
+    await waitForContainer(name);
+    console.log('[Container setup] Container is ready');
+
+    sendContainerSetupProgress('env-container-config', 'Container Configuration', 'Container ready, setting up tools...', 80, [
       'Container is now running successfully',
       'Setting up Yarn package manager via Corepack',
       'Preparing development environment'
@@ -736,79 +756,42 @@ export async function startProjectContainer(
 
     // Post-start configuration: Create validator script and directories
     try {
-      console.log('[Container setup] Creating validator script and directories...');
+      // Wait a moment for container to fully initialize
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Create directories
-      execSync(`docker exec ${name} sh -c 'mkdir -p /usr/local/validator-logs'`);
-      execSync(`docker exec ${name} sh -c 'mkdir -p /usr/src/${rootPath}/web'`);
+      console.log('[Container setup] Creating validator script...');
       
-      // Create a complete validator script in /tmp first (writable by any user)
-      const validatorScript = [
-        '#!/bin/sh',
-        'case "$1" in',
-        '  status)',
-        '    if [ -f /usr/local/validator-logs/validator.pid ]; then',
-        '      PID=$(cat /usr/local/validator-logs/validator.pid)',
-        '      if ps -p $PID > /dev/null 2>&1; then',
-        '        echo "Validator is running with PID $PID"',
-        '        echo "RPC endpoint is responsive"',
-        '        exit 0',
-        '      fi',
-        '    fi',
-        '    echo "Validator is not running"',
-        '    exit 1',
-        '    ;;',
-        '  reset)',
-        '    if [ -f /usr/local/validator-logs/validator.pid ]; then',
-        '      PID=$(cat /usr/local/validator-logs/validator.pid)',
-        '      kill $PID 2>/dev/null || true',
-        '    fi',
-        '    rm -rf /usr/local/validator-logs/*',
-        '    mkdir -p /usr/local/validator-logs',
-        '    solana-test-validator --reset --bind-address 0.0.0.0 --rpc-port 8899 --faucet-port 9900 > /usr/local/validator-logs/validator.log 2>&1 &',
-        '    echo $! > /usr/local/validator-logs/validator.pid',
-        '    sleep 2',
-        '    echo "Validator reset and started successfully"',
-        '    echo "Validator is ready"',
-        '    ;;',
-        '  *)',
-        '    if [ -f /usr/local/validator-logs/validator.pid ]; then',
-        '      PID=$(cat /usr/local/validator-logs/validator.pid)',
-        '      if ps -p $PID > /dev/null 2>&1; then',
-        '        echo "Validator already running with PID $PID"',
-        '        echo "Validator is ready"',
-        '        exit 0',
-        '      fi',
-        '    fi',
-        '    mkdir -p /usr/local/validator-logs',
-        '    solana-test-validator --bind-address 0.0.0.0 --rpc-port 8899 --faucet-port 9900 > /usr/local/validator-logs/validator.log 2>&1 &',
-        '    echo $! > /usr/local/validator-logs/validator.pid',
-        '    sleep 2',
-        '    echo "Validator started successfully"',
-        '    echo "Validator is ready"',
-        '    ;;',
-        'esac'
-      ];
+      // Create validator script directly
+      const validatorScript = `#!/bin/sh
+case "$1" in
+  status)
+    if [ -f /tmp/validator.pid ]; then
+      PID=$(cat /tmp/validator.pid)
+      if ps -p $PID > /dev/null 2>&1; then
+        echo "Validator running (PID $PID)"
+        exit 0
+      fi
+    fi
+    echo "Validator not running"
+    exit 1
+    ;;
+  reset|start|*)
+    pkill -f solana-test-validator 2>/dev/null || true
+    rm -rf /tmp/test-ledger
+    solana-test-validator --reset --bind-address 0.0.0.0 --rpc-port 8899 --faucet-port 9900 > /tmp/validator.log 2>&1 &
+    echo $! > /tmp/validator.pid
+    sleep 2
+    echo "Validator started"
+    ;;
+esac`;
+
+      // Write script using echo with base64 to avoid quote issues
+      const scriptBase64 = Buffer.from(validatorScript).toString('base64');
+      execSync(`docker exec ${name} sh -c "echo '${scriptBase64}' | base64 -d > /tmp/start-validator.sh && chmod +x /tmp/start-validator.sh"`);
       
-      // Write the script line by line
-      for (let i = 0; i < validatorScript.length; i++) {
-        const line = validatorScript[i].replace(/'/g, "'\\''"); // Escape single quotes
-        const redirect = i === 0 ? '>' : '>>';
-        execSync(`docker exec ${name} sh -c 'echo '"'"'${line}'"'"' ${redirect} /tmp/start-validator.sh'`);
-      }
-      execSync(`docker exec ${name} sh -c 'chmod +x /tmp/start-validator.sh'`);
-      
-      // Try to copy to /usr/local/bin (may fail if no permissions)
-      try {
-        execSync(`docker exec ${name} sh -c 'cp /tmp/start-validator.sh /usr/local/bin/'`);
-        console.log('[Container setup] Validator script created in /usr/local/bin');
-      } catch {
-        console.log('[Container setup] Could not copy to /usr/local/bin, script available in /tmp');
-      }
-      
-      console.log('[Container setup] Post-start configuration completed');
+      console.log('[Container setup] Validator script created');
     } catch (e) {
-      console.warn('[Container setup] Post-start configuration failed:', e);
+      console.warn('[Container setup] Post-start configuration failed (non-critical):', e);
     }
 
     // ─── ensure Yarn 1.x binary is available via Corepack ──────────────────
