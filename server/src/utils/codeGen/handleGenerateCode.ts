@@ -291,12 +291,35 @@ EOF'`,
           { skipSuccessUpdate: true }
         );
 
-        await runCommand(
-          `docker exec ${workspace.containerName} bash -lc 'cd /usr/src/${workspace.rootPath} && anchor keys sync'`,
-          ".",
-          randomUUID(),
-          { skipSuccessUpdate: true }
-        );
+        // Check if Anchor.toml exists before running anchor keys sync
+        try {
+          const anchorTomlCheck = await runCommand(
+            `docker exec ${workspace.containerName} bash -lc 'cd /usr/src/${workspace.rootPath} && [ -f Anchor.toml ] && echo "exists" || echo "missing"'`,
+            '.',
+            randomUUID(),
+            { skipSuccessUpdate: true, silent: true }
+          );
+          
+          if (anchorTomlCheck && anchorTomlCheck.trim() === 'exists') {
+            await runCommand(
+              `docker exec ${workspace.containerName} bash -lc 'cd /usr/src/${workspace.rootPath} && anchor keys sync'`,
+              ".",
+              randomUUID(),
+              { skipSuccessUpdate: true }
+            );
+          } else {
+            console.log('[GEN] Skipping anchor keys sync - no Anchor.toml found at project root');
+            // Generate keys manually if needed
+            await runCommand(
+              `docker exec ${workspace.containerName} bash -lc 'cd /usr/src/${workspace.rootPath} && solana-keygen new --no-bip39-passphrase -o keypair.json --force'`,
+              ".",
+              randomUUID(),
+              { skipSuccessUpdate: true }
+            );
+          }
+        } catch (e) {
+          console.warn('[GEN] Error checking/syncing anchor keys:', e);
+        }
 
         const derivedPubkey = Keypair.fromSecretKey(programKeypair.secretKey).publicKey.toBase58();
         if (derivedPubkey !== programId) {
@@ -656,10 +679,11 @@ EOF'`,
 
         const script = [
           `cd ${WORKDIR}`,
-          'anchor clean',
+          '[ -f Anchor.toml ] || echo "[WARNING] No Anchor.toml found"',
+          'anchor clean || true',  // Don't fail if clean fails
           `mkdir -p ${KEYS_DIR}`,
           `echo '${keyJsonEsc}' | tee ${KEYS_DIR}/${snakeKey} > ${KEYS_DIR}/${kebabKey}`,
-          `anchor keys sync`,
+          `[ -f Anchor.toml ] && anchor keys sync || echo "[WARNING] Skipping anchor keys sync - no Anchor.toml"`,
           `anchor build -p ${programName}`
         ].join(' && ');
 

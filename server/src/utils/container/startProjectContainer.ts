@@ -686,7 +686,9 @@ export async function startProjectContainer(
       runArgs.push(
         '-c',
         `if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
-        `cp -af /usr/share/solanaflow/web/. /usr/src/${rootPath}/web/ 2>/dev/null || true; ` +
+        `cp -anf /usr/share/solanaflow/web/. /usr/src/${rootPath}/web/ 2>/dev/null || true; ` +  // Use -n flag to not overwrite
+        `elif [ ! -d /usr/src/${rootPath}/web/node_modules ]; then ` +
+        `cp -rf /usr/share/solanaflow/web/node_modules /usr/src/${rootPath}/web/ 2>/dev/null || true; ` +
         `fi && ` +
         `cd /usr/src/${rootPath}/web && ` +
         `export NEXT_DISABLE_REACT_REFRESH=\${NEXT_DISABLE_REACT_REFRESH:-0} && ` +
@@ -702,7 +704,9 @@ export async function startProjectContainer(
       runArgs.push(
         '-c',
         `if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
-        `cp -af /usr/share/solanaflow/web/. /usr/src/${rootPath}/web/ 2>/dev/null || true; ` +
+        `cp -anf /usr/share/solanaflow/web/. /usr/src/${rootPath}/web/ 2>/dev/null || true; ` +  // Use -n flag to not overwrite
+        `elif [ ! -d /usr/src/${rootPath}/web/node_modules ]; then ` +
+        `cp -rf /usr/share/solanaflow/web/node_modules /usr/src/${rootPath}/web/ 2>/dev/null || true; ` +
         `fi && ` +
         `cd /usr/src/${rootPath}/web && ` +
         `until [ -d .next ]; do sleep 1; done && ` +
