@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json.schemastore.org/package.json",
   "name": "solanaflow-web",
   "version": "0.1.0",
   "private": true,
@@ -43,6 +44,11 @@
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
+    "@babel/core": "^7.24.0",
+    "@babel/preset-react": "^7.23.3",
+    "@babel/preset-typescript": "^7.23.3",
+    "babel-loader": "^9.1.3",
+    "react-refresh": "^0.14.0",
     "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^20.19.0",
     "@types/react": "18.3.4",

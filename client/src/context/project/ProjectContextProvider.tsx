@@ -12,16 +12,14 @@ const defaultContext: ProjectContextType = {
   containerUrl: '',
   injectingNodeTypes: [],
   details: {
-    programId: null, // Add programId at details level
+    programId: undefined, // Add programId at details level
     setProjectState: () => {},
     projectState: {
-      mode: 'basic',
       nodes: [],
       edges: [],
       config: {},
       instructions: [],
       projectFiles: { lib: '', mod: '', state: '' },
-      fileTree: undefined,
       deployed: false,
       built: false,
     },
@@ -53,13 +51,11 @@ const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
             programId: parsed.details?.programId || null,
             setProjectState: () => {}, // Will be replaced in the next useEffect
             projectState: {
-              mode: parsed?.details?.projectState?.mode || 'basic',
               nodes: parsed?.details?.projectState?.nodes || [],
               edges: parsed?.details?.projectState?.edges || [],
               config: parsed?.details?.projectState?.config || {},
               instructions: parsed?.details?.projectState?.instructions || [],
               projectFiles: parsed?.details?.projectState?.projectFiles || { lib: '', mod: '', state: '' },
-              fileTree: parsed?.details?.projectState?.fileTree || null,
               programId: parsed?.details?.projectState?.programId || null,
               deployed: parsed?.details?.projectState?.deployed || false,
               built: parsed?.details?.projectState?.built || false,
@@ -77,7 +73,6 @@ const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const handleSetProjectState = (newStateOrUpdater: ProjectStateUpdater) => {
     setProjectContext((prev) => {
       const oldState = prev.details?.projectState || {
-        mode: 'basic',
         nodes: [],
         edges: [],
         config: {},
@@ -97,7 +92,7 @@ const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
         details: {
           ...prev.details!,
           projectState: newState,
-          programId: prev.details?.programId || null, // Preserve programId
+          programId: prev.details?.programId || undefined, // Preserve programId
         },
       };
     });
@@ -107,7 +102,6 @@ const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
     setProjectContext((prev) => {
       // Create a default projectState if prev.details is undefined
       const defaultProjectState: ProjectStateType = {
-        mode: 'basic',
         nodes: [],
         edges: [],
         config: {},
@@ -120,7 +114,7 @@ const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
       // Ensure details is not undefined with proper projectState
       const details = prev.details || { 
         projectState: defaultProjectState,
-        programId: null 
+        programId: undefined 
       };
 
       return {
@@ -129,7 +123,7 @@ const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
           ...details,
           setProjectState: handleSetProjectState,
           projectState: details.projectState,
-          programId: details.programId || null,
+          programId: details.programId || undefined,
         },
       };
     });
