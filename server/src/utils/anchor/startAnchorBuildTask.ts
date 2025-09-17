@@ -126,8 +126,14 @@ set -euo pipefail
 
 cd /usr/src/${rootPath}
 
-# build the Anchor workspace
-anchor build -p ${programName} -- --jobs 1
+# build the Anchor workspace with IDL generation
+anchor build -p ${programName} --idl all -- --jobs 1
+
+# Try to generate IDL if not created by build
+if [ ! -f "target/idl/${programName}.json" ]; then
+  echo "IDL not found after build, attempting to parse from .so file..."
+  anchor idl parse -f "target/deploy/${programName}.so" -o "target/idl/${programName}.json" || true
+fi
 
 # ── determine the correct target directory and find the first .so file ──
 SO_DIR="\${CARGO_TARGET_DIR:-target}/deploy"

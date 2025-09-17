@@ -810,6 +810,46 @@ export async function runDeployPipeline({
       timestamp: new Date().toISOString()
     });
     
+    // Fallback: If no IDL found, try to extract from .so file
+    if (idls.length === 0 && programName) {
+      console.log("[IDL] No IDL found in target/idl, attempting extraction from .so file");
+      try {
+        // Create IDL directory if it doesn't exist
+        await runCommand(
+          `docker exec ${workspace.containerName} bash -c "mkdir -p /usr/src/${projectFolder}/target/idl"`,
+          ".",
+          uuidv4(),
+          { skipSuccessUpdate: true }
+        );
+        
+        // Try to extract IDL from the .so file
+        const extractCmd = `docker exec ${workspace.containerName} bash -c "cd /usr/src/${projectFolder} && anchor idl parse -f target/deploy/${programName}.so -o target/idl/${programName}.json 2>&1"`;
+        const extractResult = await runCommand(extractCmd, ".", uuidv4(), { skipSuccessUpdate: true });
+        console.log("[IDL] Extraction result:", extractResult);
+        
+        // Try reading the extracted IDL
+        const idlPath = `/usr/src/${projectFolder}/target/idl/${programName}.json`;
+        try {
+          const idlContentStr = execSync(
+            `docker exec ${workspace.containerName} cat '${idlPath}' 2>/dev/null`,
+            { encoding: 'utf8' }
+          ).trim();
+          if (idlContentStr) {
+            const parsedIdl = JSON.parse(idlContentStr);
+            if (parsedIdl) {
+              idls.push(parsedIdl);
+              idlContent = parsedIdl;
+              console.log("[IDL] Successfully extracted IDL from .so file");
+            }
+          }
+        } catch (readErr) {
+          console.log("[IDL] Could not read extracted IDL:", readErr);
+        }
+      } catch (e) {
+        console.error("[IDL] Failed to extract IDL from .so file:", e);
+      }
+    }
+    
     if (idlContent) {
       try {
         const programId = programIdStr!;

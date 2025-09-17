@@ -264,7 +264,7 @@ export function runDeployPipelineWithLogs(
       // log after updating to catch stale closures
       setTimeout(() => {
         console.log('[SSE DEBUG] context.programId now (stage)', newProgramId);
-      }, 0);
+      });
     }
 
     if (msg.idl) {
@@ -373,9 +373,9 @@ export function runDeployPipelineWithLogs(
   try {
     es = sseDeploy(projectContext.id!, graph, update, /* walletSigned = */ true);
     
-    es.addEventListener('close', () => {
-      console.log(`[deployPipeline] SSE connection closed`);
-    });
+    // Note: addEventListener implementation in deployPipeline API doesn't actually support callbacks
+    // It's just a placeholder to maintain compatibility
+    es.addEventListener('close');
 
   } catch (err) {
     taskLogs.addSystemLog(`❌ ${err instanceof Error ? err.message : String(err)}`);

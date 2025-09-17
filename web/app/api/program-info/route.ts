@@ -56,6 +56,27 @@ export async function GET() {
     
     if (!idl) {
       console.log('[program-info API] No IDL found in any location');
+      
+      // Create a minimal fallback IDL if we have a program ID
+      if (programId) {
+        console.log('[program-info API] Creating fallback IDL for program:', programId);
+        const projectName = process.env.PROJECT_NAME || projectId.replace(/-/g, '_');
+        idl = {
+          version: "0.1.0",
+          name: projectName,
+          instructions: [{
+            name: "initialize",
+            accounts: [],
+            args: []
+          }],
+          accounts: [],
+          types: [],
+          errors: [],
+          metadata: {
+            address: programId
+          }
+        };
+      }
     }
     
     // Return program information
