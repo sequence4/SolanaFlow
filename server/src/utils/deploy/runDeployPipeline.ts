@@ -801,6 +801,15 @@ export async function runDeployPipeline({
     
     findIdls(fileTree);
     
+    // DEBUG: Log IDL collection results
+    console.log('[DEBUG][PIPELINE] IDL Collection Results:', {
+      idlCount: idls.length,
+      hasIdlContent: !!idlContent,
+      idlNames: idls.map((i: any) => i.name || 'unnamed'),
+      idlMetadata: idlContent?.metadata,
+      timestamp: new Date().toISOString()
+    });
+    
     if (idlContent) {
       try {
         const programId = programIdStr!;
@@ -836,9 +845,23 @@ export async function runDeployPipeline({
     console.log(`[PIPELINE] Found ${idls.length} IDL files`);
     console.log("[PIPELINE] Deployment pipeline completed successfully");
     
+    // DEBUG: Log what we're about to send in the final event
+    console.log('[DEBUG][PIPELINE] Final build completion event data:', {
+      hasArtifact: !!base64So,
+      artifactSize: base64So ? base64So.length : 0,
+      hasFileTree: !!fileTree,
+      fileTreeSize: fileTree ? fileTree.length : 0,
+      hasIdl: !!idlContent,
+      idlType: idlContent ? typeof idlContent : 'none',
+      idlsCount: idls.length,
+      programId: programIdStr,
+      timestamp: new Date().toISOString()
+    });
+    
     await progressMgr.completeStage('build', `Build finished successfully - Program ID: ${programIdStr}`);
     
-    sendProgress(<ProgressEvent>{
+    // DEBUG: Log the actual event being sent
+    const finalEvent = <ProgressEvent>{
       stage   : "build",
       status  : "completed",
       message : "Build finished",
@@ -848,7 +871,16 @@ export async function runDeployPipeline({
       ...(idlContent ? { idl: idlContent } : {}),
       ...(idls.length > 0 ? { idls } : {}),
       programId: programIdStr,
+    };
+    
+    console.log('[DEBUG][PIPELINE] Sending final event with IDL:', {
+      hasIdlInEvent: 'idl' in finalEvent,
+      hasIdlsInEvent: 'idls' in finalEvent,
+      eventKeys: Object.keys(finalEvent),
+      timestamp: new Date().toISOString()
     });
+    
+    sendProgress(finalEvent);
 
     // Send pipeline completion event for frontend
     console.log("[PIPELINE] Sending pipeline completion event");

@@ -192,9 +192,6 @@ import { Loader2, Wallet, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 
-// Embedded IDL
-const idl = ${idl ? JSON.stringify(idl, null, 2) : 'null'};
-
 const PROGRAM_ID = new PublicKey('${programId}');
 
 export default function ${componentName}App() {
@@ -203,6 +200,27 @@ export default function ${componentName}App() {
   const [program, setProgram] = useState<Program | null>(null);
   const [connection, setConnection] = useState<Connection | null>(null);
   const [loading, setLoading] = useState(false);
+  
+  // Load IDL dynamically
+  const [idl, setIdl] = useState<any>(null);
+  const [idlLoading, setIdlLoading] = useState(true);
+  
+  useEffect(() => {
+    // Fetch IDL from API
+    fetch('/api/program-info')
+      .then(res => res.json())
+      .then(data => {
+        console.log('[Component] Loaded program info:', data);
+        if (data.idl) {
+          setIdl(data.idl);
+        }
+        setIdlLoading(false);
+      })
+      .catch(err => {
+        console.error('[Component] Failed to load program info:', err);
+        setIdlLoading(false);
+      });
+  }, []);
 
   useEffect(() => {
     const conn = new Connection(process.env.NEXT_PUBLIC_RPC_URL || 'http://localhost:8899', 'confirmed');
@@ -308,7 +326,12 @@ export default function ${componentName}App() {
               <CardDescription>Interact with the program</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {!idl ? (
+              {idlLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                  <span>Loading program interface...</span>
+                </div>
+              ) : !idl ? (
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>

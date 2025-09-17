@@ -122,7 +122,7 @@ RUN set -euo pipefail; \
     apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         git clang lld llvm make pkg-config libssl-dev ca-certificates && \
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
     cargo install --locked sccache && \
     ln -sf /usr/local/cargo/bin/sccache /usr/local/bin/sccache && \
@@ -228,7 +228,7 @@ RUN unset RUSTC_WRAPPER SCCACHE_BUCKET SCCACHE_REGION && \
 # 3.  Application build (native amd64)
 ###############################################################################
 FROM --platform=linux/amd64 solana-toolchain AS builder
-ARG NODE_VERSION=v20.18.0
+ARG NODE_VERSION=v20.19.0
 ARG YARN_LOCK_HASH
 ARG APP_ID=local
 ARG WEB_CACHE_BUSTER             # cache-buster now applies only to web build
@@ -290,7 +290,7 @@ RUN mkdir -p /usr/share/solanaflow/web/src/components/generated && \
 # the build. This prevents "exec format error" at container start-up.
 ###############################################################################
 FROM --platform=linux/amd64 ubuntu:22.04 AS runtime
-ARG NODE_VERSION=v20.18.0
+ARG NODE_VERSION=v20.19.0
 ARG APP_ID=local
 ENV RUSTUP_HOME=/usr/local/rustup
 ENV CARGO_HOME=/usr/local/cargo
