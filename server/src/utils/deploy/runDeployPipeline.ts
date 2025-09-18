@@ -38,7 +38,7 @@ class ProgressManager {
   private expectedCollectionFiles = 10;
   private currentTasks: Map<string, {name: string, status: 'running' | 'completed' | 'error', pct: number}> = new Map();
   
-  constructor(private deploymentId: string, private sendProgress: Function) {}
+  constructor(private deploymentId: string, private sendProgress: (data: any) => void) {}
   
   private scheduleBatchUpdate() {
     if (this.batchTimeout) return;
@@ -687,20 +687,72 @@ export async function runDeployPipeline({
     /* ----------------------------------------------------------------
        Copy every *.json found under each IDL dir with better error handling
        ---------------------------------------------------------------- */
+    let idlFilePath: string | null = null;
+
     for (const d of idlDirs) {
       try {
-        //console.log(`[IDL-COPY] Checking directory: ${d}`);
+        console.log(`[IDL-COPY] Checking directory: ${d}`);
         await listDirectory(workspace.containerName, d);
-        
-        await runCommand(
-          `docker exec ${workspace.containerName} bash -c 'shopt -s nullglob && for f in "${d}"/*.json; do echo "Found: $f" && cat "$f" 2>/dev/null || echo "Failed to read: $f"; done'`,
+
+        // Check if any JSON files exist in this directory
+        const checkResult = await runCommand(
+          `docker exec ${workspace.containerName} bash -c 'ls ${d}/*.json 2>/dev/null | grep -v keypair || echo "NO_FILES"'`,
           ".",
-          `copy-idl-${Date.now()}`,
+          `check-idl-${Date.now()}`,
           { skipSuccessUpdate: true },
         );
+
+        if (!checkResult.includes('NO_FILES')) {
+          // Found JSON files, let's copy them
+          const files = checkResult.trim().split('\n').filter(f => f && !f.includes('keypair'));
+          console.log(`[IDL-COPY] Found IDL files:`, files);
+
+          // Copy the first non-keypair JSON as the main IDL
+          if (files.length > 0) {
+            idlFilePath = files[0];
+            console.log(`[IDL-COPY] Using IDL file: ${idlFilePath}`);
+
+            // Read the IDL file content for the file tree
+            await readContainerFile(
+              workspace.containerName,
+              idlFilePath,
+              projectId,
+              userId
+            );
+          }
+        }
       } catch (err) {
         console.log(`[IDL-COPY] Directory ${d} not accessible:`, err);
       }
+    }
+
+    // Copy IDL to web public directory for Next.js access
+    if (idlFilePath) {
+      try {
+        console.log(`[IDL-COPY] Copying IDL to web public directory`);
+
+        // Create public/idl directory in web
+        await runCommand(
+          `docker exec ${workspace.containerName} bash -c 'mkdir -p /usr/src/${projectFolder}/web/public/idl'`,
+          ".",
+          `mkdir-idl-${Date.now()}`,
+          { skipSuccessUpdate: true }
+        );
+
+        // Copy the IDL file to web/public/idl
+        await runCommand(
+          `docker exec ${workspace.containerName} bash -c 'cp "${idlFilePath}" "/usr/src/${projectFolder}/web/public/idl/${programName}.json"'`,
+          ".",
+          `copy-idl-web-${Date.now()}`,
+          { skipSuccessUpdate: true }
+        );
+
+        console.log(`[IDL-COPY] IDL copied to /usr/src/${projectFolder}/web/public/idl/${programName}.json`);
+      } catch (copyErr) {
+        console.error(`[IDL-COPY] Failed to copy IDL to web directory:`, copyErr);
+      }
+    } else {
+      console.log(`[IDL-COPY] No IDL file found to copy`);
     }
     
     // Final phase of code generation
