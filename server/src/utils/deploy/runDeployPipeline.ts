@@ -688,6 +688,8 @@ export async function runDeployPipeline({
        Copy every *.json found under each IDL dir with better error handling
        ---------------------------------------------------------------- */
     let idlFilePath: string | null = null;
+    let idlContent: any = null;
+    const idls: any[] = [];
 
     for (const d of idlDirs) {
       try {
@@ -748,6 +750,25 @@ export async function runDeployPipeline({
         );
 
         console.log(`[IDL-COPY] IDL copied to /usr/src/${projectFolder}/web/public/idl/${programName}.json`);
+
+        // Also try to read the IDL content immediately for inclusion in the SSE event
+        try {
+          const idlContentStr = execSync(
+            `docker exec ${workspace.containerName} cat '${idlFilePath}' 2>/dev/null`,
+            { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
+          ).trim();
+
+          if (idlContentStr && idlContentStr.startsWith('{')) {
+            const parsedIdl = JSON.parse(idlContentStr);
+            if (parsedIdl && !idlContent) {
+              idlContent = parsedIdl;
+              idls.push(parsedIdl);
+              console.log(`[IDL-COPY] Successfully captured IDL content for SSE event`);
+            }
+          }
+        } catch (readErr) {
+          console.log(`[IDL-COPY] Could not read IDL content for SSE:`, readErr);
+        }
       } catch (copyErr) {
         console.error(`[IDL-COPY] Failed to copy IDL to web directory:`, copyErr);
       }
@@ -813,8 +834,7 @@ export async function runDeployPipeline({
     );
 
     /* finally emit build‑done with artefact + file tree */
-    let idlContent: any = null;
-    const idls: any[] = [];
+    // Note: idlContent and idls are already declared above
     
     const findIdls = (nodes: any[]): void => {
       for (const node of nodes) {
@@ -862,43 +882,49 @@ export async function runDeployPipeline({
       timestamp: new Date().toISOString()
     });
     
-    // Fallback: If no IDL found, try to extract from .so file
+    // Fallback: If no IDL found in file tree, try reading directly from container
     if (idls.length === 0 && programName) {
-      console.log("[IDL] No IDL found in target/idl, attempting extraction from .so file");
-      try {
-        // Create IDL directory if it doesn't exist
-        await runCommand(
-          `docker exec ${workspace.containerName} bash -c "mkdir -p /usr/src/${projectFolder}/target/idl"`,
-          ".",
-          uuidv4(),
-          { skipSuccessUpdate: true }
-        );
-        
-        // Try to extract IDL from the .so file
-        const extractCmd = `docker exec ${workspace.containerName} bash -c "cd /usr/src/${projectFolder} && anchor idl parse -f target/deploy/${programName}.so -o target/idl/${programName}.json 2>&1"`;
-        const extractResult = await runCommand(extractCmd, ".", uuidv4(), { skipSuccessUpdate: true });
-        console.log("[IDL] Extraction result:", extractResult);
-        
-        // Try reading the extracted IDL
-        const idlPath = `/usr/src/${projectFolder}/target/idl/${programName}.json`;
+      console.log("[IDL] No IDL found in file tree, attempting direct read from container");
+
+      // Try multiple possible IDL locations
+      const possibleIdlPaths = [
+        `/usr/src/${projectFolder}/target/idl/${programName}.json`,
+        `/usr/src/${projectFolder}/target/deploy/${programName}.json`,
+        `/usr/src/${projectFolder}/target/idl/${programName.replace(/-/g, '_')}.json`,
+        `/usr/src/${projectFolder}/target/deploy/${programName.replace(/-/g, '_')}.json`,
+      ];
+
+      for (const idlPath of possibleIdlPaths) {
         try {
+          console.log(`[IDL] Trying to read IDL from: ${idlPath}`);
           const idlContentStr = execSync(
             `docker exec ${workspace.containerName} cat '${idlPath}' 2>/dev/null`,
-            { encoding: 'utf8' }
+            { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
           ).trim();
-          if (idlContentStr) {
-            const parsedIdl = JSON.parse(idlContentStr);
-            if (parsedIdl) {
-              idls.push(parsedIdl);
-              idlContent = parsedIdl;
-              console.log("[IDL] Successfully extracted IDL from .so file");
+
+          if (idlContentStr && idlContentStr.startsWith('{')) {
+            try {
+              const parsedIdl = JSON.parse(idlContentStr);
+              if (parsedIdl) {
+                idls.push(parsedIdl);
+                idlContent = parsedIdl;
+                console.log(`[IDL] Successfully read IDL from ${idlPath}`);
+                console.log(`[IDL] IDL size: ${idlContentStr.length} bytes`);
+                console.log(`[IDL] IDL name: ${parsedIdl.name}, version: ${parsedIdl.version}`);
+                break; // Stop after finding first valid IDL
+              }
+            } catch (parseErr) {
+              console.log(`[IDL] Failed to parse IDL from ${idlPath}:`, parseErr);
             }
           }
         } catch (readErr) {
-          console.log("[IDL] Could not read extracted IDL:", readErr);
+          // File doesn't exist, continue to next path
+          continue;
         }
-      } catch (e) {
-        console.error("[IDL] Failed to extract IDL from .so file:", e);
+      }
+
+      if (idls.length === 0) {
+        console.log("[IDL] Could not find IDL in any expected location");
       }
     }
     

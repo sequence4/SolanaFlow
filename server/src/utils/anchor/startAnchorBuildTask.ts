@@ -8,7 +8,7 @@ import { runCommand } from "../command-execution/runCommand";
 import { updateTaskStatus } from "../taskUtils";
 import { APP_CONFIG } from "src/config/appConfig";
 import { Keypair } from "@solana/web3.js";
-import { runSpawn } from "../command-execution/runSpawn";
+// import { runSpawn } from "../command-execution/runSpawn"; // Unused but kept for future reference
 
 export const startAnchorBuildTask = async (
   projectId: string,
