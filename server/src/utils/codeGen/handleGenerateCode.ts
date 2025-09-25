@@ -254,8 +254,7 @@ EOF'`,
           console.warn('[GEN] AWS secrets disabled – keypair kept only on disk');
         }
 
-        const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${programId}.json`);
-        fsSync.writeFileSync(walletPath, JSON.stringify(Array.from(programKeypair.secretKey)));
+        // Removed local wallet file write - keeping keypair only in Docker container
 
         const initialKeyJson = JSON.stringify(Array.from(programKeypair.secretKey));
         await runCommand(

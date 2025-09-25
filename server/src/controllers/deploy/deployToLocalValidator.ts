@@ -205,69 +205,16 @@ export const deployToLocalValidator = async (
           soFile = altSoPath;
           keypairFile = altKeypairPath;
         } else {
-          // Try to copy from the project's target directory on host
-          const hostRoot = process.env.ROOT_FOLDER;
-          if (hostRoot) {
-            // Try multiple possible paths
-            const possiblePaths = [
-              `${hostRoot}/${rootPath}/target/deploy/${programName}.so`,
-              `${hostRoot}/target/deploy/${programName}.so`,
-              `${hostRoot}/projects/${projectId}/target/deploy/${programName}.so`
-            ];
-            
-            const fs = require('fs');
-            let foundPath = null;
-            let foundKeypairPath = null;
-            
-            for (const path of possiblePaths) {
-              const keypairPath = path.replace('.so', '-keypair.json');
-              console.log('[LOCAL_DEPLOY] Checking host path:', path);
-              if (fs.existsSync(path) && fs.existsSync(keypairPath)) {
-                foundPath = path;
-                foundKeypairPath = keypairPath;
-                console.log('[LOCAL_DEPLOY] Found artifacts on host at:', path);
-                break;
-              }
-            }
-            
-            if (foundPath && foundKeypairPath) {
-              console.log('[LOCAL_DEPLOY] Copying artifacts from host to container...');
-              
-              // Create target directory if it doesn't exist
-              const targetDir = `/usr/src/${rootPath}/target/deploy`;
-              const mkdirCmd = `docker exec ${containerName} mkdir -p "${targetDir}"`;
-              await runCommand(mkdirCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-              
-              // Copy artifacts to container
-              const copySoCmd = `docker cp "${foundPath}" "${containerName}:${soFile}"`;
-              const copyKeypairCmd = `docker cp "${foundKeypairPath}" "${containerName}:${keypairFile}"`;
-              
-              await runCommand(copySoCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-              await runCommand(copyKeypairCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-              
-              // Verify copy succeeded
-              const verifyCopyCmd = `docker exec ${containerName} test -f "${soFile}" && echo "exists" || echo "missing"`;
-              const copyVerify = await runCommand(verifyCopyCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-              
-              if (copyVerify.trim() === 'missing') {
-                throw new Error('Failed to copy program artifacts to container');
-              }
-              
-              console.log('[LOCAL_DEPLOY] Artifacts copied successfully');
-            } else {
-              // Last resort: look for any .so file in the container's project directory
-              const findCmd = `docker exec ${containerName} find /usr/src -name "*.so" -type f 2>/dev/null | head -5`;
-              const foundSo = await runCommand(findCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-              
-              if (foundSo && foundSo.trim()) {
-                console.log('[LOCAL_DEPLOY] Found .so files at:', foundSo.trim());
-                throw new Error(`Program artifact not found at expected location. Found .so files at: ${foundSo.trim()}. Please check the program name in Anchor.toml matches the deployment configuration.`);
-              } else {
-                throw new Error('Program artifact not found. Please build the project first.');
-              }
-            }
+          // Artifacts should exist in the container from the build process
+          // Last resort: look for any .so file in the container's project directory
+          const findCmd = `docker exec ${containerName} find /usr/src -name "*.so" -type f 2>/dev/null | head -5`;
+          const foundSo = await runCommand(findCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+
+          if (foundSo && foundSo.trim()) {
+            console.log('[LOCAL_DEPLOY] Found .so files at:', foundSo.trim());
+            throw new Error(`Program artifact not found at expected location. Found .so files at: ${foundSo.trim()}. Please check the program name in Anchor.toml matches the deployment configuration.`);
           } else {
-            throw new Error('ROOT_FOLDER not set, cannot locate artifacts');
+            throw new Error('Program artifact not found. Please build the project first.');
           }
         }
       } else {

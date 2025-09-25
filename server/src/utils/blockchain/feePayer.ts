@@ -1,14 +1,10 @@
-import fs from 'fs';
-import path from 'path';
 import { Keypair } from '@solana/web3.js';
-import { APP_CONFIG } from '../../config/appConfig';
 
 /**
  * Ensures a server fee‑payer keypair is available and returns it.
- * Priority:  
- *   ① `SERVER_FEE_PAYER` env (JSON array of 64 ints)  
- *   ② `<wallets>/server_fee_payer.json` persisted on disk  
- *   ③ Generate → persist → return
+ * Priority:
+ *   ① `SERVER_FEE_PAYER` env (JSON array of 64 ints)
+ *   ② Generate → return (no local persistence)
  */
 export function getServerFeePayer(): Keypair {
   /* ① ENV -------------------------------------------------------------- */
@@ -25,33 +21,11 @@ export function getServerFeePayer(): Keypair {
     }
   }
 
-  /* ② DISK ------------------------------------------------------------- */
-  const walletsDir = APP_CONFIG.WALLETS_FOLDER;
-  const filePath   = path.join(walletsDir, 'server_fee_payer.json');
-  try {
-    if (fs.existsSync(filePath)) {
-      const raw = fs.readFileSync(filePath, 'utf8');
-      const arr = JSON.parse(raw);
-      if (Array.isArray(arr) && arr.length === 64) {
-        return Keypair.fromSecretKey(Uint8Array.from(arr));
-      }
-      console.warn('[FEE_PAYER] server_fee_payer.json invalid – will regenerate.');
-    }
-  } catch (e) {
-    console.warn('[FEE_PAYER] Could not read server_fee_payer.json:', e);
-  }
-
-  /* ③ GENERATE --------------------------------------------------------- */
+  /* ② GENERATE --------------------------------------------------------- */
   const kp = Keypair.generate();
-  try {
-    fs.mkdirSync(walletsDir, { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(Array.from(kp.secretKey)));
-    console.log(
-      `[FEE_PAYER] Generated new fee payer → ${filePath}. ` +
-      'Copy its contents to the SERVER_FEE_PAYER env var for production.',
-    );
-  } catch (e) {
-    console.warn('[FEE_PAYER] Failed to persist new fee payer key:', e);
-  }
+  console.log(
+    '[FEE_PAYER] Generated new ephemeral fee payer. ' +
+    'Set SERVER_FEE_PAYER env var with the keypair JSON for persistence.',
+  );
   return kp;
 }

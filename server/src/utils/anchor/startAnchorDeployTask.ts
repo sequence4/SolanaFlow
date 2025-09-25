@@ -3,8 +3,6 @@ import { runCommand } from "../command-execution/runCommand";
 import { getContainerName } from "../container/getContainerName";
 import { getProjectRootPath } from "../fileUtils";
 import { createTask, updateTaskStatus } from "../taskUtils";
-import { APP_CONFIG } from "src/config/appConfig";
-import fs from 'fs';
 
 export const startAnchorDeployTask = async (
     projectId: string,
@@ -61,37 +59,44 @@ export const startAnchorDeployTask = async (
   
         await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && solana config set --url https://api.devnet.solana.com"`, '.', sanitizedTaskId, { skipSuccessUpdate: true });
         
-        let walletPath;
         let containerWalletPath;
-        
+
         if (ephemeralPubkey) {
-          walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${ephemeralPubkey}.json`);
-          //console.log(`[DEPLOY_DEBUG] Using ephemeral key for deployment: ${ephemeralPubkey}`);
-          //console.log(`[DEPLOY_DEBUG] Ephemeral key file path: ${walletPath}`);
-          
-          if (!fs.existsSync(walletPath)) {
-            console.error(`[DEPLOY_DEBUG] ERROR: Ephemeral key file not found at ${walletPath}`);
-            throw new Error(`Ephemeral key file not found at ${walletPath}`);
+          // Ephemeral key should be in container at /usr/src/target/deploy/
+          const containerKeyPath = `/usr/src/target/deploy/${ephemeralPubkey}.json`;
+
+          // Check if key exists in container
+          const keyExistsCmd = `docker exec ${containerName} test -f ${containerKeyPath} && echo "exists" || echo "missing"`;
+          const keyExists = await runCommand(keyExistsCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
+
+          if (keyExists.trim() !== 'exists') {
+            // Try to find it with the program name pattern
+            const findKeyCmd = `docker exec ${containerName} find /usr/src/target/deploy -name "*-keypair.json" | head -1`;
+            const foundKey = await runCommand(findKeyCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
+
+            if (foundKey.trim()) {
+              containerWalletPath = foundKey.trim();
+              console.log(`[DEPLOY] Found keypair at ${containerWalletPath}`);
+            } else {
+              console.error(`[DEPLOY_DEBUG] ERROR: Ephemeral key file not found in container`);
+              throw new Error(`Ephemeral key file not found in container for ${ephemeralPubkey}`);
+            }
+          } else {
+            containerWalletPath = containerKeyPath;
           }
-          
+
+          // Verify the key content
           try {
-            const fileStats = fs.statSync(walletPath);
-            //console.log(`[DEPLOY] Ephemeral key file verified (${fileStats.size} bytes)`);
-            
-            const keyContent = fs.readFileSync(walletPath, 'utf8');
+            const keyContentCmd = `docker exec ${containerName} cat ${containerWalletPath}`;
+            const keyContent = await runCommand(keyContentCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
             const keyArray = JSON.parse(keyContent);
             if (keyArray.length !== 64) {
-              console.warn(`[DEPLOY] Warning: Ephemeral key file does not contain a 64-byte array`);
+              console.warn(`[DEPLOY] Warning: Key file does not contain a 64-byte array`);
             }
           } catch (err: any) {
-            console.error(`[DEPLOY] Error reading ephemeral key file`);
-            throw new Error(`Error reading ephemeral key file: ${err.message}`);
+            console.error(`[DEPLOY] Error reading key file from container`);
+            throw new Error(`Error reading key file: ${err.message}`);
           }
-          
-          containerWalletPath = `/tmp/${ephemeralPubkey}.json`;
-          //console.log(`[DEPLOY] Copying ephemeral key to container`);
-          
-          await runCommand(`docker cp ${walletPath} ${containerName}:${containerWalletPath}`, '.', sanitizedTaskId, { skipSuccessUpdate: true });
           
           try {
             const fileCheckCmd = `docker exec ${containerName} ls -la ${containerWalletPath}`;
@@ -145,12 +150,15 @@ export const startAnchorDeployTask = async (
           
           await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && solana config set --keypair ${containerWalletPath}"`, '.', sanitizedTaskId, { skipSuccessUpdate: true });
         } else {
-          walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${creatorId}.json`);
-          //console.log(`Using creator key for deployment: ${creatorId}`);
-          
-          containerWalletPath = `/tmp/${creatorId}.json`;
-          await runCommand(`docker cp ${walletPath} ${containerName}:${containerWalletPath}`, '.', sanitizedTaskId, { skipSuccessUpdate: true });
-          
+          // Generate a new ephemeral key in the container for deployment
+          containerWalletPath = `/tmp/deploy-wallet-${Date.now()}.json`;
+          console.log(`[DEPLOY] Generating ephemeral deployment wallet in container`);
+
+          // Generate a new keypair directly in the container
+          const genKeyCmd = `docker exec ${containerName} solana-keygen new --no-bip39-passphrase -o ${containerWalletPath} --force`;
+          await runCommand(genKeyCmd, '.', sanitizedTaskId, { skipSuccessUpdate: true });
+
+          // Set it as the default keypair
           await runCommand(`docker exec ${containerName} bash -c "cd /usr/src/${rootPath} && solana config set --keypair ${containerWalletPath}"`, '.', sanitizedTaskId, { skipSuccessUpdate: true });
         }
         

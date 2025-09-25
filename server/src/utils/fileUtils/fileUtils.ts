@@ -403,14 +403,12 @@ export const startGenerateFileTreeTask = async (
             fileTree = await generateFileTreeInContainer(containerName, rootPath, projectId, creatorId);
           } catch (containerError) {
             console.error('Error generating file tree in container:', containerError);
-           // console.log('Falling back to local file system for file tree generation');
-            const projectPath = path.join(APP_CONFIG.ROOT_FOLDER, rootPath);
-            fileTree = await generateFileTree(projectPath);
+            // No fallback to local filesystem - container only
+            throw new Error(`Failed to generate file tree in container: ${containerError}`);
           }
         } else {
-          //console.log('No container found, using local file system for file tree generation');
-          const projectPath = path.join(APP_CONFIG.ROOT_FOLDER, rootPath);
-          fileTree = await generateFileTree(projectPath);
+          //console.log('No container found, cannot generate file tree');
+          throw new Error('No container found for project - cannot generate file tree');
         }
         
         const treeResult = JSON.stringify(fileTree);
