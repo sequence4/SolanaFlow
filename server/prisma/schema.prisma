@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model cleanup_queue {
+  project_id     String    @db.Uuid
+  queued_at      DateTime? @default(now()) @db.Timestamptz(6)
+  container_name String    @default("")
+
+  @@index([queued_at(sort: Desc)], map: "idx_cleanup_queue_queued")
+  @@ignore
+}
+
+model solanaproject {
+  id             String    @id @db.Uuid
+  name           String
+  description    String?
+  root_path      String?
+  details        Json?
+  container_name String?
+  container_url  String?
+  last_updated   DateTime? @db.Timestamp(6)
+  created_at     DateTime? @default(now()) @db.Timestamp(6)
+  task           task[]
+
+  @@index([name], map: "idx_solana_project_name")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model task {
+  id            String         @id @db.Uuid
+  name          String
+  created_at    DateTime?      @default(now()) @db.Timestamp(6)
+  creator_id    String?        @db.Uuid
+  result        String?
+  task_type     String?
+  last_updated  DateTime?      @db.Timestamp(6)
+  project_id    String?        @db.Uuid
+  status        String?        @db.VarChar(50)
+  solanaproject solanaproject? @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([status], map: "idx_task_status")
+}
+
+model warm_container_pool {
+  name           String    @id
+  image          String
+  last_used      DateTime? @default(now()) @db.Timestamptz(6)
+  busy           Boolean?  @default(false)
+  port           Int
+  last_heartbeat DateTime? @db.Timestamptz(6)
+
+  @@index([busy, last_used(sort: Desc)], map: "idx_warm_pool_busy_lastused")
+  @@index([busy, port], map: "idx_warm_pool_busy_port")
+}

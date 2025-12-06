@@ -3,8 +3,8 @@
  * Manages real-time component updates and file watching
  */
 
-import { Server as HTTPServer } from 'http';
-import { WebSocket, WebSocketServer } from 'ws';
+import { Server as HTTPServer, IncomingMessage } from 'http';
+import WebSocketLib from 'ws';
 import { FSWatcher, watch } from 'chokidar';
 import path from 'path';
 import fs from 'fs';
@@ -21,13 +21,13 @@ interface ComponentUpdate {
 
 interface Client {
   id: string;
-  ws: WebSocket;
+  ws: WebSocketLib.WebSocket;
   projectId: string;
   lastSeen: number;
 }
 
 export class ComponentReloadServer extends EventEmitter {
-  private wss: WebSocketServer | null = null;
+  private wss: WebSocketLib.WebSocketServer | null = null;
   private clients: Map<string, Client> = new Map();
   private watchers: Map<string, FSWatcher> = new Map();
   private checksums: Map<string, string> = new Map();
@@ -41,40 +41,40 @@ export class ComponentReloadServer extends EventEmitter {
    * Initialize WebSocket server
    */
   initialize(server: HTTPServer): void {
-    this.wss = new WebSocketServer({ 
+    this.wss = new WebSocketLib.WebSocketServer({
       server,
       path: '/ws',
       perMessageDeflate: false
     });
-    
-    this.wss.on('connection', (ws: WebSocket, request) => {
+
+    this.wss.on('connection', (socket: WebSocketLib.WebSocket, request: IncomingMessage) => {
       const projectId = this.extractProjectId(request.url);
       const clientId = crypto.randomUUID();
-      
+
       const client: Client = {
         id: clientId,
-        ws,
+        ws: socket,
         projectId,
         lastSeen: Date.now()
       };
-      
+
       this.clients.set(clientId, client);
       console.log(`[ComponentReloadServer] Client connected: ${clientId} for project: ${projectId}`);
-      
+
       // Send initial connection confirmation
-      ws.send(JSON.stringify({
+      socket.send(JSON.stringify({
         type: 'connected',
         clientId,
         projectId
       }));
-      
+
       // Start watching project files if not already watching
       if (!this.watchers.has(projectId)) {
         this.startWatching(projectId);
       }
-      
+
       // Handle client messages
-      ws.on('message', (data) => {
+      socket.on('message', (data: WebSocketLib.RawData) => {
         try {
           const message = JSON.parse(data.toString());
           this.handleClientMessage(clientId, message);
@@ -82,23 +82,23 @@ export class ComponentReloadServer extends EventEmitter {
           console.error('[ComponentReloadServer] Invalid message from client:', error);
         }
       });
-      
+
       // Handle disconnect
-      ws.on('close', () => {
+      socket.on('close', () => {
         console.log(`[ComponentReloadServer] Client disconnected: ${clientId}`);
         this.clients.delete(clientId);
-        
+
         // Stop watching if no more clients for this project
         const hasOtherClients = Array.from(this.clients.values())
           .some(c => c.projectId === projectId);
-        
+
         if (!hasOtherClients && this.watchers.has(projectId)) {
           this.stopWatching(projectId);
         }
       });
-      
+
       // Handle errors
-      ws.on('error', (error) => {
+      socket.on('error', (error: Error) => {
         console.error(`[ComponentReloadServer] WebSocket error for ${clientId}:`, error);
         this.clients.delete(clientId);
       });
@@ -107,7 +107,7 @@ export class ComponentReloadServer extends EventEmitter {
     // Start heartbeat to keep connections alive
     this.startHeartbeat();
     
-    console.log('[ComponentReloadServer] WebSocket server initialized');
+    console.log('[ComponentReloadServer] WebSocket server initialized for hot reload');
   }
   
   /**
@@ -253,9 +253,9 @@ export class ComponentReloadServer extends EventEmitter {
    */
   private broadcastToProject(projectId: string, update: ComponentUpdate): void {
     let clientCount = 0;
-    
+
     this.clients.forEach(client => {
-      if (client.projectId === projectId && client.ws.readyState === WebSocket.OPEN) {
+      if (client.projectId === projectId && client.ws.readyState === WebSocketLib.WebSocket.OPEN) {
         try {
           client.ws.send(JSON.stringify(update));
           clientCount++;
@@ -264,7 +264,7 @@ export class ComponentReloadServer extends EventEmitter {
         }
       }
     });
-    
+
     console.log(`[ComponentReloadServer] Broadcasted update to ${clientCount} clients for project ${projectId}`);
   }
   
@@ -326,13 +326,13 @@ export class ComponentReloadServer extends EventEmitter {
     this.heartbeatInterval = setInterval(() => {
       const now = Date.now();
       const timeout = 60000; // 60 seconds
-      
+
       this.clients.forEach((client, clientId) => {
         if (now - client.lastSeen > timeout) {
           console.log(`[ComponentReloadServer] Removing stale client: ${clientId}`);
           client.ws.terminate();
           this.clients.delete(clientId);
-        } else if (client.ws.readyState === WebSocket.OPEN) {
+        } else if (client.ws.readyState === WebSocketLib.WebSocket.OPEN) {
           try {
             client.ws.send(JSON.stringify({ type: 'heartbeat' }));
           } catch (error) {

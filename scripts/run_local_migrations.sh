@@ -4,7 +4,7 @@ set -euo pipefail
 # --- SETTINGS ---------------------------------------------------------------
 COMPOSE_FILE="docker-compose.db.yaml"   # compose file to target
 SERVICE="db"                            # service name inside the YAML
-DB="solanaflow_pg"                      # database name
+DB="solanaflow_dev"                      # database name
 USER="postgres"                         # DB superuser
 
 FILES=(

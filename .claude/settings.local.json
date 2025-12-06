@@ -20,8 +20,10 @@
       "Bash(chmod:*)",
       "Bash(grep:*)",
       "Bash(./scripts/test-advanced-features.sh:*)",
-      "Bash(PGPASSWORD=uby1qjc7cwh-wzx0aym psql -h localhost -U postgres -d solanaflow_pg -f migrations/004_component_versioning.sql)",
-      "mcp__ide__getDiagnostics"
+      "Bash(PGPASSWORD=123456 psql -h localhost -U postgres -d solanaflow_dev -f migrations/004_component_versioning.sql)",
+      "mcp__ide__getDiagnostics",
+      "Bash(cat:*)",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "ask": [],

@@ -2,7 +2,7 @@
   "compilerOptions": {
     /* ---------- language / emit ---------- */
     "target": "ES2022",
-    "module": "commonjs",
+    "module": "ESNext",
     "lib": ["ES2022"],
     "allowJs": true,
 
