@@ -9,6 +9,7 @@ import UxContextProvider from "@/context/ux/UxContextProvider";
 import TaskLogsProvider from "@/context/logs/TaskLogsProvider";
 import { Provider } from "@/components/ui/provider";
 import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from 'next-themes'
 
 export default function Providers({
   children,
@@ -24,7 +25,9 @@ export default function Providers({
               <ProjectProvider>
                 <TaskLogsProvider>
                   <FileContextProvider>
-                    {children}
+                    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+                      {children}
+                    </ThemeProvider>
                     <Toaster />
                   </FileContextProvider>
                 </TaskLogsProvider>
