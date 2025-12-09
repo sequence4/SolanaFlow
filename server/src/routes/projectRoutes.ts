@@ -33,6 +33,7 @@ import { startContainerController } from '../controllers/container/startContaine
 import { getContainerUrlController } from '../controllers/container/getContainerUrlController';
 import { anchorInitProjectController } from '../controllers/anchorInitProjectController';
 import { relaySignedTx } from '../controllers/blockchain/relaySignedTx';
+import pool from '../config/database';
 
 const router = express.Router();
 
@@ -87,7 +88,7 @@ router.post('/:id/switch-cluster', guard, switchProjectCluster);
 router.get('/:id/ports', guard, async (req, res) => {
   try {
     const { id } = req.params;
-    const pool = require('../config/database').default;
+    //const { default: pool } = await import('../config/database');
     
     const result = await pool.query(
       'SELECT details->>\'containerPorts\' as ports FROM solanaproject WHERE id = $1',
