@@ -312,22 +312,49 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
     setIsLocalDeploying(true);
     
     try {
+      // Ensure we're on local network
+      if (projectContext.deployNetwork !== 'local') {
+        await handleNetworkChange('local');
+        // Wait for network switch to complete
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      
+      // First ensure the validator is running
+      await projectApi.startLocalValidator(projectContext.id, {
+        reset: false
+      });
+      
+      // Give validator time to fully initialize
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
       const response = await projectApi.quickDeployLocal(projectContext.id, {
-        walletPubkey: undefined, // Removed wallet dependency
+        walletPubkey: undefined,
         resetValidator: false
       });
       
-      if (response.data.programId) {
+      if (response.programId) {
         toast.success('Program deployed to local validator!', {
-          description: `Program ID: ${response.data.programId.slice(0, 16)}...`,
+          description: `Program ID: ${response.programId.slice(0, 16)}...`,
         });
         
-        handleDeploySuccess(response.data.programId);
+        // Update context with new program ID and force refresh
+        handleDeploySuccess(response.programId);
+        
+        // Force iframe refresh by updating container URL with timestamp
+        if (projectContext.containerUrl) {
+          const timestamp = Date.now();
+          const sep = projectContext.containerUrl.includes('?') ? '&' : '?';
+          const updatedUrl = `${projectContext.containerUrl}${sep}t=${timestamp}`;
+          setProjectContext(prev => ({ ...prev, containerUrl: updatedUrl }));
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Local deployment error:', error);
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : error?.response?.data?.message || 'Unknown error';
       toast.error('Local deployment failed', {
-        description: error instanceof Error ? error.message : 'Unknown error'
+        description: errorMessage
       });
     } finally {
       setIsLocalDeploying(false);
@@ -335,40 +362,40 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
   };
 
   const handleDeploySuccess = useCallback((programId: string) => {
-    if (projectContext.details?.projectState) {
-      const updatedContext = {
-        ...projectContext,
+    const updatedContext = {
+      ...projectContext,
+      details: {
+        ...projectContext.details,
+        programId: programId, // Store at details level for Interface.tsx
+        projectState: {
+          ...projectContext.details?.projectState,
+          deployed: true,
+          built: false,
+          programId: programId
+        }
+      }
+    };
+
+    if (projectContext.containerUrl) {
+      const sep = projectContext.containerUrl.includes('?') ? '&' : '?';
+      updatedContext.containerUrl = `${projectContext.containerUrl}${sep}programId=${programId}`;
+    }
+
+    setProjectContext(updatedContext);
+
+    if (projectContext.id) {
+      projectApi.updateProject(projectContext.id, {
         details: {
-          ...projectContext.details,
+          programId: programId, // Store at details level
           projectState: {
-            ...projectContext.details.projectState,
             deployed: true,
             built: false,
             programId: programId
           }
         }
-      };
-
-      if (projectContext.containerUrl) {
-        const sep = projectContext.containerUrl.includes('?') ? '&' : '?';
-        updatedContext.containerUrl = `${projectContext.containerUrl}${sep}programId=${programId}`;
-      }
-
-      setProjectContext(updatedContext);
-
-      if (projectContext.id) {
-        projectApi.updateProject(projectContext.id, {
-          details: {
-            projectState: {
-              deployed: true,
-              built: false,
-              programId: programId
-            }
-          }
-        }).catch(err => {
-          console.error("Failed to persist deployment state:", err);
-        });
-      }
+      }).catch(err => {
+        console.error("Failed to persist deployment state:", err);
+      });
     }
 
     setIsDeployModalOpen(false);
@@ -381,24 +408,28 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
       // Handle local network setup
       if (network === 'local' && projectContext.id) {
         // First, try to get existing ports
-        let actualPort = '8899'; // Default fallback
+        let actualPort = 28899; // Default fallback as number
         
         try {
           const portsResponse = await projectApi.getProjectPorts(projectContext.id);
           console.log('[ChatHeader] Ports response:', portsResponse);
           
-          if (portsResponse.data?.rpc) {
-            actualPort = portsResponse.data.rpc.toString();
-            console.log(`[ChatHeader] Using existing port: ${actualPort}`);
-          } else {
-            console.log('[ChatHeader] No custom ports found, will start validator on default');
-          }
+          // Extract port from response data
+          const portsData = portsResponse.data;
+          console.log('[ChatHeader] Ports data:', portsData);
+          
+          // Use RPC port from response, but validate it first
+          const rpcPort = portsData?.rpc || 28899;
+          const validPort = rpcPort >= 28000 && rpcPort <= 30000 ? rpcPort : 28899;
+          
+          actualPort = validPort;
+          console.log('[ChatHeader] Using validated RPC port:', validPort);
         } catch (error) {
-          console.log('[ChatHeader] Could not get ports, will use defaults');
+          console.log('[ChatHeader] Could not get ports, using default 28899');
         }
         
         // Set the port BEFORE starting validator
-        connectionManager.setLocalValidatorPort(actualPort);
+        connectionManager.setLocalValidatorPort(actualPort.toString());
         
         // Start/verify validator
         try {
@@ -416,10 +447,10 @@ export function ChatHeader({ onDeleteChat }: ChatHeaderProps) {
           // Update port if different from response
           if (response.data?.rpcUrl) {
             const url = new URL(response.data.rpcUrl);
-            const rpcPort = url.port || actualPort;
-            if (rpcPort !== actualPort) {
+            const rpcPort = parseInt(url.port || actualPort.toString());
+            if (rpcPort !== actualPort && rpcPort >= 28000 && rpcPort <= 30000) {
               console.log(`[ChatHeader] Updating port from validator response: ${rpcPort}`);
-              connectionManager.setLocalValidatorPort(rpcPort);
+              connectionManager.setLocalValidatorPort(rpcPort.toString());
               actualPort = rpcPort;
             }
           }

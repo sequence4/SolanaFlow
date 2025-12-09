@@ -36,10 +36,34 @@ export async function ensureAnchorTomlProgram(
 ): Promise<void> {
   const anchorTomlPath = 'Anchor.toml';
   try {
-    const anchorTomlContent = await getFileContent(ws, anchorTomlPath, projectId, creatorId);
+    let anchorTomlContent = await getFileContent(ws, anchorTomlPath, projectId, creatorId);
+    
+    // If Anchor.toml doesn't exist, create a default one
     if (anchorTomlContent === null) {
-        console.error(`[ENSURE_CONFIG] Could not read ${anchorTomlPath}. Aborting ensureAnchorTomlProgram.`);
-        return;
+        console.log(`[ENSURE_CONFIG] ${anchorTomlPath} not found. Creating default Anchor.toml...`);
+        const defaultAnchorToml = `[features]
+seeds = false
+skip-lint = false
+
+[programs.localnet]
+${programName.replace(/-/g, '_')} = "${programId}"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "Localnet"
+wallet = "~/.config/solana/id.json"
+
+[test]
+startup_wait = 5000
+`;
+        const created = await updateFile(ws, anchorTomlPath, defaultAnchorToml, projectId, creatorId);
+        if (!created) {
+            console.error(`[ENSURE_CONFIG] Failed to create ${anchorTomlPath}.`);
+            return;
+        }
+        anchorTomlContent = defaultAnchorToml;
     }
 
     const parsedToml: any = parseToml(anchorTomlContent); // Use any for parsedToml as @iarna/toml type might be broad
@@ -104,10 +128,32 @@ export async function ensureRootWorkspaceMembers(
 
   // --- 2. read Cargo.toml --------------------------------------------------
   const cargoTomlPath = 'Cargo.toml';
-  const cargoTomlContent = await getFileContent(ws, cargoTomlPath, projectId, creatorId);
+  let cargoTomlContent = await getFileContent(ws, cargoTomlPath, projectId, creatorId);
+  
+  // If root Cargo.toml doesn't exist, create a default workspace one
   if (cargoTomlContent === null) {
-    //console.error(`[ENSURE_CONFIG] Could not read ${cargoTomlPath}.`);
-    return;
+    console.log(`[ENSURE_CONFIG] ${cargoTomlPath} not found. Creating default workspace Cargo.toml...`);
+    const defaultCargoToml = `[workspace]
+members = [
+    "programs/*"
+]
+resolver = "2"
+
+[profile.release]
+overflow-checks = true
+lto = "fat"
+codegen-units = 1
+[profile.release.build-override]
+opt-level = 3
+incremental = false
+codegen-units = 1
+`;
+    const created = await updateFile(ws, cargoTomlPath, defaultCargoToml, projectId, creatorId);
+    if (!created) {
+      console.error(`[ENSURE_CONFIG] Failed to create ${cargoTomlPath}.`);
+      return;
+    }
+    cargoTomlContent = defaultCargoToml;
   }
   
   let rootLines = cargoTomlContent.split('\n');

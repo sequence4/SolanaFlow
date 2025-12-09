@@ -283,9 +283,51 @@ const Interface = () => {
 
     const iframeSrc = React.useMemo(() => {
         if (!activeUrl) return "";
-        const delim = activeUrl.includes('?') ? '&' : '?';
-        return `${activeUrl}${delim}v=${iframeKey}`;
-    }, [activeUrl, iframeKey]);
+        
+        // Fix: Extract clean project ID from container URL if needed
+        let cleanUrl = activeUrl;
+        const containerMatch = activeUrl.match(/\/dapp\/(userproj-[a-f0-9-]+)-\d+/);
+        if (containerMatch) {
+            // Extract the actual project ID from container name format
+            const fullContainerName = containerMatch[1];
+            // The project ID is between 'userproj-' and the timestamp
+            const projectIdMatch = fullContainerName.match(/userproj-([a-f0-9-]{36})/);
+            if (projectIdMatch) {
+                const cleanProjectId = projectIdMatch[1];
+                cleanUrl = activeUrl.replace(/\/dapp\/userproj-[^\/]+/, `/dapp/${cleanProjectId}`);
+                console.log('[Interface] Fixed URL from container format:', { original: activeUrl, fixed: cleanUrl });
+            }
+        }
+        
+        // Get program ID and cluster info from context
+        const programId = projectContext.details?.programId || 
+                         projectContext.details?.projectState?.programId;
+        const deployNetwork = projectContext.deployNetwork || 'devnet';
+        
+        // Build query params
+        const params = new URLSearchParams();
+        params.set('v', String(iframeKey)); // version key for refresh
+        
+        if (programId) {
+            params.set('programId', programId);
+        }
+        
+        if (deployNetwork === 'local') {
+            params.set('cluster', 'local');
+            // Get the actual RPC port from project details
+            const containerPorts = projectContext.details?.containerPorts as any;
+            const rpcPort = containerPorts?.rpc || 
+                          (projectContext.details as any)?.localValidatorPort || 
+                          28899;
+            params.set('rpcUrl', `http://localhost:${rpcPort}`);
+            console.log('[Interface] Setting local RPC URL with port:', rpcPort);
+        } else {
+            params.set('cluster', deployNetwork);
+        }
+        
+        const delim = cleanUrl.includes('?') ? '&' : '?';
+        return `${cleanUrl}${delim}${params.toString()}`;
+    }, [activeUrl, iframeKey, projectContext.details, projectContext.deployNetwork]);
 
     const openInNewTab = () => activeUrl && window.open(activeUrl, "_blank");
 

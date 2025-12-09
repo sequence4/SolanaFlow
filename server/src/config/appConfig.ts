@@ -28,7 +28,7 @@ export const APP_CONFIG = {
   PORT: process.env.PORT || 9999,
   JWT_SECRET: process.env.JWT_SECRET as string,
   ROOT_FOLDER: process.env.ROOT_FOLDER as string,
-  WALLETS_FOLDER: process.env.WALLETS_FOLDER as string,
+  WALLETS_FOLDER: process.env.WALLETS_FOLDER || '', // Optional - no longer used
   PASSWORD_SALT_ROUNDS: 10,
   TOKEN_EXPIRATION: '7d',
   MAX_FILE_SIZE: 1024 * 1024 * 5,

@@ -84,8 +84,13 @@ class ConnectionManager {
     let testUrl: string;
     
     if (cluster === 'local' && (projectId || this.currentProjectId)) {
-      const ports = await this.getProjectPorts(projectId || this.currentProjectId);
-      testUrl = `http://localhost:${ports.rpc}`;
+      const effectiveProjectId = projectId || this.currentProjectId;
+      if (effectiveProjectId) {
+        const ports = await this.getProjectPorts(effectiveProjectId);
+        testUrl = `http://localhost:${ports.rpc}`;
+      } else {
+        testUrl = 'http://localhost:28899';
+      }
     } else {
       testUrl = cluster === 'local' ? 'http://localhost:28899' : 
                 cluster === 'devnet' ? 'https://api.devnet.solana.com' :

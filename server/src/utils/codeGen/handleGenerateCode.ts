@@ -12,7 +12,7 @@ import { parseNodeDetails } from './parseNodeDetails';
 import { lintWorkspaceManifests } from './cargoManifestLint';
 import { FileTreeItem } from '../../types/FileTreeItem';
 import { runCommand } from "../command-execution/runCommand";
-import { randomUUID } from 'crypto';
+import crypto, { randomUUID } from 'crypto';
 import path from "path";
 import fs from 'fs/promises';           
 import fsSync from 'fs';            
@@ -21,6 +21,12 @@ import { Keypair } from '@solana/web3.js';
 import pool from '../../config/database';
 import { normalizeProjectName } from '../helpers/stringUtils';
 import { saveProgramSecret, awsSecretsEnabled } from '../aws/awsSecrets';
+import { generateUIComponents } from './componentGenerator';
+import { generateUIComponents as generateUIComponentsV2 } from './componentGeneratorV2';
+import { componentReloadServer } from '../websocket/componentReloadServer';
+// import { componentWatcher } from '../container/componentWatcher'; // Will be created in Step 3
+import { componentVersionManager } from '../versioning/componentVersionManager';
+import { aiComponentGenerator } from '../ai/aiComponentGenerator';
 import { 
   Args,
   allGeneratedFiles
@@ -248,8 +254,7 @@ EOF'`,
           console.warn('[GEN] AWS secrets disabled – keypair kept only on disk');
         }
 
-        const walletPath = path.join(APP_CONFIG.WALLETS_FOLDER, `${programId}.json`);
-        fsSync.writeFileSync(walletPath, JSON.stringify(Array.from(programKeypair.secretKey)));
+        // Removed local wallet file write - keeping keypair only in Docker container
 
         const initialKeyJson = JSON.stringify(Array.from(programKeypair.secretKey));
         await runCommand(
@@ -285,12 +290,35 @@ EOF'`,
           { skipSuccessUpdate: true }
         );
 
-        await runCommand(
-          `docker exec ${workspace.containerName} bash -lc 'cd /usr/src/${workspace.rootPath} && anchor keys sync'`,
-          ".",
-          randomUUID(),
-          { skipSuccessUpdate: true }
-        );
+        // Check if Anchor.toml exists before running anchor keys sync
+        try {
+          const anchorTomlCheck = await runCommand(
+            `docker exec ${workspace.containerName} bash -lc 'cd /usr/src/${workspace.rootPath} && [ -f Anchor.toml ] && echo "exists" || echo "missing"'`,
+            '.',
+            randomUUID(),
+            { skipSuccessUpdate: true, silent: true }
+          );
+          
+          if (anchorTomlCheck && anchorTomlCheck.trim() === 'exists') {
+            await runCommand(
+              `docker exec ${workspace.containerName} bash -lc 'cd /usr/src/${workspace.rootPath} && anchor keys sync'`,
+              ".",
+              randomUUID(),
+              { skipSuccessUpdate: true }
+            );
+          } else {
+            console.log('[GEN] Skipping anchor keys sync - no Anchor.toml found at project root');
+            // Generate keys manually if needed
+            await runCommand(
+              `docker exec ${workspace.containerName} bash -lc 'cd /usr/src/${workspace.rootPath} && solana-keygen new --no-bip39-passphrase -o keypair.json --force'`,
+              ".",
+              randomUUID(),
+              { skipSuccessUpdate: true }
+            );
+          }
+        } catch (e) {
+          console.warn('[GEN] Error checking/syncing anchor keys:', e);
+        }
 
         const derivedPubkey = Keypair.fromSecretKey(programKeypair.secretKey).publicKey.toBase58();
         if (derivedPubkey !== programId) {
@@ -374,6 +402,194 @@ EOF'`,
         if (!srcTree) throw new Error('genSrcFiles returned null');
         
         const { instructions: canonicalInstructions, state: canonicalState } = parseNodeDetails(projectState);
+        
+        // Generate UI components based on program structure with Phase 3 & 4 enhancements
+        sendProgress({ message: 'Generating intelligent UI components...' });
+        try {
+          // Check if AI generation is enabled and available
+          let useAI = process.env.ENABLE_AI_GENERATION === 'true' && aiComponentGenerator.isEnabled();
+          const useV2Generator = process.env.USE_TEMPLATE_SYSTEM === 'true' || true; // Default to V2
+          
+          let uiComponentTree;
+          let generationMethod = 'unknown';
+          
+          if (useAI) {
+            // Use AI generation if available
+            sendProgress({ 
+              message: 'Using AI to generate components...', 
+              stage: 'ai-generation' 
+            });
+            
+            try {
+              const description = buildComponentDescription(graph, programName);
+              const aiComponent = await aiComponentGenerator.generateFromDescription(
+                description,
+                {
+                  projectId,
+                  programId,
+                  idl: null, // Will be populated below
+                  existingComponents: []
+                }
+              );
+              
+              uiComponentTree = convertAIComponentToFileTree(aiComponent);
+              generationMethod = 'ai-generated';
+              
+              sendProgress({ 
+                message: 'AI component generation complete', 
+                stage: 'ai-generation',
+                confidence: aiComponent.metadata.confidence
+              });
+            } catch (aiError) {
+              console.error('[GEN] AI generation failed, falling back to template:', aiError);
+              // Fall back to V2 generator
+              useAI = false;
+            }
+          }
+          
+          if (!useAI && useV2Generator) {
+            // Try to get IDL from the build output
+            let idl = null;
+            try {
+              const idlPath = `/usr/src/${workspace.rootPath}/target/idl/${programName}.json`;
+              const idlCmd = `docker exec ${workspace.containerName} cat ${idlPath} 2>/dev/null || echo '{}'`;
+              const idlContent = await runCommand(idlCmd, '.', projectId, { skipSuccessUpdate: true, silent: true });
+              if (idlContent && idlContent.trim() && idlContent.trim() !== '{}') {
+                idl = JSON.parse(idlContent);
+              }
+            } catch (e) {
+              console.log('[GEN] No IDL available yet, using graph-based generation');
+            }
+            
+            uiComponentTree = await generateUIComponentsV2({
+              projectId,
+              graph,
+              programName,
+              programId,
+              idl,
+              customization: {
+                theme: 'auto',
+                title: programName.replace(/_/g, ' '),
+                description: 'Solana Program Interface',
+                primaryColor: '#3B82F6'
+              }
+            });
+            generationMethod = 'v2-template';
+            sendProgress({ message: 'Using template-based UI generation (V2)', stage: 'component-generation' });
+          } else {
+            uiComponentTree = await generateUIComponents(
+              graph,
+              programName,
+              programId
+            );
+            generationMethod = 'v1-basic';
+            sendProgress({ message: 'Using basic UI generation (V1)', stage: 'component-generation' });
+          }
+          
+          // Write UI component files
+          const componentTaskIds = await insertSrcFiles(
+            uiComponentTree,
+            projectId,
+            existingFilePaths,
+            creatorId,
+            emitFileWritten(sendProgress, false)
+          );
+          
+          sendProgress({ 
+            message: `Writing ${componentTaskIds.length} UI component files...`,
+            stage: 'component-generation'
+          });
+          
+          // Wait for component files to be written
+          for (const taskId of componentTaskIds) {
+            await waitForTaskCompletion(taskId, 90, 2_000);
+          }
+          
+          // Create version after successful generation
+          try {
+            const componentFiles = extractComponentFiles(uiComponentTree);
+            const version = await componentVersionManager.createVersion(
+              projectId,
+              componentFiles,
+              {
+                templateUsed: generationMethod,
+                programId,
+                description: `Generated from ${programName}`,
+                breaking: false,
+                dependencies: extractDependencies(uiComponentTree)
+              }
+            );
+            
+            sendProgress({
+              message: `Component version ${version.version} created`,
+              stage: 'versioning',
+              version: version.version
+            });
+            
+            // Activate the version
+            await componentVersionManager.activateVersion(projectId, version.id);
+          } catch (versionError) {
+            console.error('[GEN] Failed to create component version:', versionError);
+            // Non-critical error, continue
+          }
+          
+          // Start component watching for hot reload
+          // await componentWatcher.watchProject(projectId); // Will be enabled when componentWatcher is created
+          
+          // Notify WebSocket clients about new components
+          componentReloadServer.forceReload(projectId, 'components-generated');
+          
+          sendProgress({ 
+            message: 'UI components generated with hot reload enabled',
+            stage: 'component-generation',
+            hotReloadEnabled: true
+          });
+          
+          // Store generation metadata
+          await pool.query(
+            `UPDATE solanaproject 
+             SET details = jsonb_set(
+               jsonb_set(
+                 COALESCE(details, '{}'::jsonb),
+                 '{uiComponentGenerated}',
+                 'true'::jsonb
+               ),
+               '{hotReloadEnabled}',
+               'true'::jsonb
+             )
+             WHERE id = $1`,
+            [projectId]
+          );
+          
+          // Trigger hot reload for connected clients
+          try {
+            componentReloadServer.forceReload(projectId, 'UI components updated');
+            sendProgress({ message: 'Hot reload triggered for UI components' });
+          } catch (error) {
+            console.log('[GEN] Hot reload notification failed (WebSocket may not be connected):', error);
+          }
+          
+          // Store component generation status in database
+          await pool.query(
+            `UPDATE solanaproject 
+             SET details = jsonb_set(
+               COALESCE(details, '{}'::jsonb),
+               '{uiComponentGenerated}',
+               'true'::jsonb
+             )
+             WHERE id = $1`,
+            [projectId]
+          );
+          
+        } catch (uiError: any) {
+          console.error('[GEN] UI component generation failed:', uiError);
+          sendProgress({ 
+            message: 'Warning: UI generation failed, using default component',
+            stage: 'component-generation',
+            error: uiError?.message || 'Unknown error'
+          });
+        }
+        
         sendProgress({ message: 'Extracting generated files...' });
         allGeneratedFiles.length = 0;
         
@@ -462,10 +678,11 @@ EOF'`,
 
         const script = [
           `cd ${WORKDIR}`,
-          'anchor clean',
+          '[ -f Anchor.toml ] || echo "[WARNING] No Anchor.toml found"',
+          'anchor clean || true',  // Don't fail if clean fails
           `mkdir -p ${KEYS_DIR}`,
           `echo '${keyJsonEsc}' | tee ${KEYS_DIR}/${snakeKey} > ${KEYS_DIR}/${kebabKey}`,
-          `anchor keys sync`,
+          `[ -f Anchor.toml ] && anchor keys sync || echo "[WARNING] Skipping anchor keys sync - no Anchor.toml"`,
           `anchor build -p ${programName}`
         ].join(' && ');
 
@@ -517,6 +734,19 @@ EOF'`,
                WHERE id = $2`,
               [JSON.stringify(idl), projectId]
             );
+            
+            // Save IDL to web directory for component access
+            const webIdlPath = `${containerWebDir}/src/idl`;
+            const idlFileName = `${programName}.json`;
+            
+            await runCommand(
+              `docker exec ${workspace.containerName} bash -c "mkdir -p ${webIdlPath} && echo '${JSON.stringify(idl).replace(/'/g, "'\\''")}' > ${webIdlPath}/${idlFileName}"`,
+              '.',
+              projectId,
+              { skipSuccessUpdate: true }
+            );
+            
+            console.log(`[BUILD] IDL saved to web directory: ${webIdlPath}/${idlFileName}`);
             
             sendProgress({ 
               message: 'IDL extracted and saved',
@@ -570,3 +800,88 @@ EOF'`,
         throw err;
     }
 };
+
+// Helper functions for AI and versioning integration
+function buildComponentDescription(graph: any, programName: string): string {
+  const instructions = graph.nodes
+    ?.filter((n: any) => n.type === 'instruction')
+    .map((n: any) => n.config?.name || n.data?.name)
+    .filter(Boolean) || [];
+  
+  return `
+    Create a React component for a Solana program called "${programName}".
+    The program has the following instructions: ${instructions.join(', ')}.
+    The component should provide a user-friendly interface to interact with all instructions.
+    Include proper wallet connection, transaction handling, and error management.
+  `;
+}
+
+function convertAIComponentToFileTree(aiComponent: any): FileTreeItem {
+  return {
+    name: 'generated',
+    path: 'web/src/components/generated',
+    type: 'directory',
+    children: [
+      {
+        name: 'AIGeneratedApp.tsx',
+        path: 'web/src/components/generated/AIGeneratedApp.tsx',
+        type: 'file',
+        code: aiComponent.code
+      },
+      {
+        name: 'index.ts',
+        path: 'web/src/components/generated/index.ts',
+        type: 'file',
+        code: `export { default } from './AIGeneratedApp';`
+      }
+    ]
+  };
+}
+
+function extractComponentFiles(tree: FileTreeItem): any[] {
+  const files: any[] = [];
+  
+  function traverse(node: FileTreeItem, basePath = '') {
+    const currentPath = basePath ? `${basePath}/${node.name}` : node.name;
+    
+    if (node.type === 'file' && node.code) {
+      files.push({
+        path: currentPath,
+        content: node.code,
+        hash: crypto.createHash('sha256').update(node.code).digest('hex'),
+        size: Buffer.byteLength(node.code, 'utf8')
+      });
+    }
+    
+    if (node.children) {
+      node.children.forEach(child => traverse(child, currentPath));
+    }
+  }
+  
+  traverse(tree);
+  return files;
+}
+
+function extractDependencies(tree: FileTreeItem): Record<string, string> {
+  const deps: Record<string, string> = {};
+  
+  function traverse(node: FileTreeItem) {
+    if (node.type === 'file' && node.code) {
+      const imports = node.code.match(/import .+ from ['"](.+?)['"]/g) || [];
+      imports.forEach(imp => {
+        const match = imp.match(/from ['"](.+?)['"]/);
+        if (match && !match[1].startsWith('.') && !match[1].startsWith('@/')) {
+          // External dependency
+          deps[match[1]] = 'latest';
+        }
+      });
+    }
+    
+    if (node.children) {
+      node.children.forEach(traverse);
+    }
+  }
+  
+  traverse(tree);
+  return deps;
+}

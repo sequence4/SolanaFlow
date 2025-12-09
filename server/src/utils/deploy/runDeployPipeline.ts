@@ -38,7 +38,7 @@ class ProgressManager {
   private expectedCollectionFiles = 10;
   private currentTasks: Map<string, {name: string, status: 'running' | 'completed' | 'error', pct: number}> = new Map();
   
-  constructor(private deploymentId: string, private sendProgress: Function) {}
+  constructor(private deploymentId: string, private sendProgress: (data: any) => void) {}
   
   private scheduleBatchUpdate() {
     if (this.batchTimeout) return;
@@ -275,29 +275,57 @@ class ProgressManager {
 }
 
 /* Helper: ensure web/.env (or .env.local) contains the compiled PID */
-async function writeProgramIdEnv(programId: string, absRoot: string) {
-  const fs = await import("fs/promises");
+async function writeProgramIdEnv(programId: string, absRoot: string, containerName: string) {
   const path = await import("path");
+  
+  // Define relative paths for the container
+  const rootPath = absRoot.split('/').slice(-1)[0]; // Get just the project folder name
   const candidates = [
-    path.join(absRoot, "web", ".env"),
-    path.join(absRoot, ".env"),
-    path.join(absRoot, "web", ".env.local"),
-    path.join(absRoot, ".env.local"),
+    `web/.env`,
+    `.env`,
+    `web/.env.local`,
+    `.env.local`,
   ];
+  
+  // Check which env file exists in the container
   let target: string | null = null;
   for (const p of candidates) {
-    try { await fs.access(p); target = p; break; } catch { /* not there */ }
+    try {
+      const checkCmd = `docker exec ${containerName} test -f /usr/src/${rootPath}/${p} && echo "exists" || echo "missing"`;
+      const result = execSync(checkCmd, { encoding: 'utf8' }).trim();
+      if (result === 'exists') {
+        target = p;
+        break;
+      }
+    } catch { /* file doesn't exist */ }
   }
+  
+  // If no env file exists, create web/.env
   if (!target) {
-    target = path.join(absRoot, "web", ".env");
-    await fs.writeFile(target, "");
+    target = `web/.env`;
+    const createCmd = `docker exec ${containerName} touch /usr/src/${rootPath}/${target}`;
+    await runCommand(createCmd, '.', uuidv4(), { skipSuccessUpdate: true });
   }
-  let envText = await fs.readFile(target!, "utf8");
-  envText = envText
-    .replace(/^NEXT_PUBLIC_PROGRAM_ID=.*/m, "")
-    .replace(/\n{2,}/g, "\n")
-    .trimEnd() + `\nNEXT_PUBLIC_PROGRAM_ID=${programId}\n`;
-  await fs.writeFile(target!, envText);
+  
+  // Read existing content, update/add NEXT_PUBLIC_PROGRAM_ID, and write back
+  const updateEnvCmd = `docker exec ${containerName} bash -c "
+    # Read existing content and filter out old NEXT_PUBLIC_PROGRAM_ID
+    if [ -f /usr/src/${rootPath}/${target} ]; then
+      grep -v '^NEXT_PUBLIC_PROGRAM_ID=' /usr/src/${rootPath}/${target} > /tmp/env_tmp || true
+      mv /tmp/env_tmp /usr/src/${rootPath}/${target}
+    fi
+    
+    # Remove multiple empty lines
+    sed -i '/^$/N;/^\\n$/d' /usr/src/${rootPath}/${target} 2>/dev/null || true
+    
+    # Append new program ID
+    echo 'NEXT_PUBLIC_PROGRAM_ID=${programId}' >> /usr/src/${rootPath}/${target}
+    
+    # Set proper permissions (if running as root in container)
+    chown 1000:1000 /usr/src/${rootPath}/${target} 2>/dev/null || true
+  "`;
+  
+  await runCommand(updateEnvCmd, '.', uuidv4(), { skipSuccessUpdate: true });
 }
 
 export async function runDeployPipeline({
@@ -659,20 +687,93 @@ export async function runDeployPipeline({
     /* ----------------------------------------------------------------
        Copy every *.json found under each IDL dir with better error handling
        ---------------------------------------------------------------- */
+    let idlFilePath: string | null = null;
+    let idlContent: any = null;
+    const idls: any[] = [];
+
     for (const d of idlDirs) {
       try {
-        //console.log(`[IDL-COPY] Checking directory: ${d}`);
+        console.log(`[IDL-COPY] Checking directory: ${d}`);
         await listDirectory(workspace.containerName, d);
-        
-        await runCommand(
-          `docker exec ${workspace.containerName} bash -c 'shopt -s nullglob && for f in "${d}"/*.json; do echo "Found: $f" && cat "$f" 2>/dev/null || echo "Failed to read: $f"; done'`,
+
+        // Check if any JSON files exist in this directory
+        const checkResult = await runCommand(
+          `docker exec ${workspace.containerName} bash -c 'ls ${d}/*.json 2>/dev/null | grep -v keypair || echo "NO_FILES"'`,
           ".",
-          `copy-idl-${Date.now()}`,
+          `check-idl-${Date.now()}`,
           { skipSuccessUpdate: true },
         );
+
+        if (!checkResult.includes('NO_FILES')) {
+          // Found JSON files, let's copy them
+          const files = checkResult.trim().split('\n').filter(f => f && !f.includes('keypair'));
+          console.log(`[IDL-COPY] Found IDL files:`, files);
+
+          // Copy the first non-keypair JSON as the main IDL
+          if (files.length > 0) {
+            idlFilePath = files[0];
+            console.log(`[IDL-COPY] Using IDL file: ${idlFilePath}`);
+
+            // Read the IDL file content for the file tree
+            await readContainerFile(
+              workspace.containerName,
+              idlFilePath,
+              projectId,
+              userId
+            );
+          }
+        }
       } catch (err) {
         console.log(`[IDL-COPY] Directory ${d} not accessible:`, err);
       }
+    }
+
+    // Copy IDL to web public directory for Next.js access
+    if (idlFilePath) {
+      try {
+        console.log(`[IDL-COPY] Copying IDL to web public directory`);
+
+        // Create public/idl directory in web
+        await runCommand(
+          `docker exec ${workspace.containerName} bash -c 'mkdir -p /usr/src/${projectFolder}/web/public/idl'`,
+          ".",
+          `mkdir-idl-${Date.now()}`,
+          { skipSuccessUpdate: true }
+        );
+
+        // Copy the IDL file to web/public/idl
+        await runCommand(
+          `docker exec ${workspace.containerName} bash -c 'cp "${idlFilePath}" "/usr/src/${projectFolder}/web/public/idl/${programName}.json"'`,
+          ".",
+          `copy-idl-web-${Date.now()}`,
+          { skipSuccessUpdate: true }
+        );
+
+        console.log(`[IDL-COPY] IDL copied to /usr/src/${projectFolder}/web/public/idl/${programName}.json`);
+
+        // Also try to read the IDL content immediately for inclusion in the SSE event
+        try {
+          const idlContentStr = execSync(
+            `docker exec ${workspace.containerName} cat '${idlFilePath}' 2>/dev/null`,
+            { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
+          ).trim();
+
+          if (idlContentStr && idlContentStr.startsWith('{')) {
+            const parsedIdl = JSON.parse(idlContentStr);
+            if (parsedIdl && !idlContent) {
+              idlContent = parsedIdl;
+              idls.push(parsedIdl);
+              console.log(`[IDL-COPY] Successfully captured IDL content for SSE event`);
+            }
+          }
+        } catch (readErr) {
+          console.log(`[IDL-COPY] Could not read IDL content for SSE:`, readErr);
+        }
+      } catch (copyErr) {
+        console.error(`[IDL-COPY] Failed to copy IDL to web directory:`, copyErr);
+      }
+    } else {
+      console.log(`[IDL-COPY] No IDL file found to copy`);
     }
     
     // Final phase of code generation
@@ -721,7 +822,7 @@ export async function runDeployPipeline({
        did this when an IDL was detected.  Extracted into a helper so it
        runs before we emit build-done.
        ------------------------------------------------------------------ */
-    await writeProgramIdEnv(programId, absRoot);
+    await writeProgramIdEnv(programId, absRoot, workspace.containerName);
 
     // 📌  Make the env file visible to the Next.js dev server
     await runCommand(
@@ -733,8 +834,7 @@ export async function runDeployPipeline({
     );
 
     /* finally emit build‑done with artefact + file tree */
-    let idlContent: any = null;
-    const idls: any[] = [];
+    // Note: idlContent and idls are already declared above
     
     const findIdls = (nodes: any[]): void => {
       for (const node of nodes) {
@@ -773,6 +873,61 @@ export async function runDeployPipeline({
     
     findIdls(fileTree);
     
+    // DEBUG: Log IDL collection results
+    console.log('[DEBUG][PIPELINE] IDL Collection Results:', {
+      idlCount: idls.length,
+      hasIdlContent: !!idlContent,
+      idlNames: idls.map((i: any) => i.name || 'unnamed'),
+      idlMetadata: idlContent?.metadata,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Fallback: If no IDL found in file tree, try reading directly from container
+    if (idls.length === 0 && programName) {
+      console.log("[IDL] No IDL found in file tree, attempting direct read from container");
+
+      // Try multiple possible IDL locations
+      const possibleIdlPaths = [
+        `/usr/src/${projectFolder}/target/idl/${programName}.json`,
+        `/usr/src/${projectFolder}/target/deploy/${programName}.json`,
+        `/usr/src/${projectFolder}/target/idl/${programName.replace(/-/g, '_')}.json`,
+        `/usr/src/${projectFolder}/target/deploy/${programName.replace(/-/g, '_')}.json`,
+      ];
+
+      for (const idlPath of possibleIdlPaths) {
+        try {
+          console.log(`[IDL] Trying to read IDL from: ${idlPath}`);
+          const idlContentStr = execSync(
+            `docker exec ${workspace.containerName} cat '${idlPath}' 2>/dev/null`,
+            { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
+          ).trim();
+
+          if (idlContentStr && idlContentStr.startsWith('{')) {
+            try {
+              const parsedIdl = JSON.parse(idlContentStr);
+              if (parsedIdl) {
+                idls.push(parsedIdl);
+                idlContent = parsedIdl;
+                console.log(`[IDL] Successfully read IDL from ${idlPath}`);
+                console.log(`[IDL] IDL size: ${idlContentStr.length} bytes`);
+                console.log(`[IDL] IDL name: ${parsedIdl.name}, version: ${parsedIdl.version}`);
+                break; // Stop after finding first valid IDL
+              }
+            } catch (parseErr) {
+              console.log(`[IDL] Failed to parse IDL from ${idlPath}:`, parseErr);
+            }
+          }
+        } catch (readErr) {
+          // File doesn't exist, continue to next path
+          continue;
+        }
+      }
+
+      if (idls.length === 0) {
+        console.log("[IDL] Could not find IDL in any expected location");
+      }
+    }
+    
     if (idlContent) {
       try {
         const programId = programIdStr!;
@@ -783,7 +938,7 @@ export async function runDeployPipeline({
         };
 
         try {
-          await writeProgramIdEnv(programId, absRoot);
+          await writeProgramIdEnv(programId, absRoot, workspace.containerName);
 
           try {
             await runCommand(
@@ -808,9 +963,23 @@ export async function runDeployPipeline({
     console.log(`[PIPELINE] Found ${idls.length} IDL files`);
     console.log("[PIPELINE] Deployment pipeline completed successfully");
     
+    // DEBUG: Log what we're about to send in the final event
+    console.log('[DEBUG][PIPELINE] Final build completion event data:', {
+      hasArtifact: !!base64So,
+      artifactSize: base64So ? base64So.length : 0,
+      hasFileTree: !!fileTree,
+      fileTreeSize: fileTree ? fileTree.length : 0,
+      hasIdl: !!idlContent,
+      idlType: idlContent ? typeof idlContent : 'none',
+      idlsCount: idls.length,
+      programId: programIdStr,
+      timestamp: new Date().toISOString()
+    });
+    
     await progressMgr.completeStage('build', `Build finished successfully - Program ID: ${programIdStr}`);
     
-    sendProgress(<ProgressEvent>{
+    // DEBUG: Log the actual event being sent
+    const finalEvent = <ProgressEvent>{
       stage   : "build",
       status  : "completed",
       message : "Build finished",
@@ -820,7 +989,16 @@ export async function runDeployPipeline({
       ...(idlContent ? { idl: idlContent } : {}),
       ...(idls.length > 0 ? { idls } : {}),
       programId: programIdStr,
+    };
+    
+    console.log('[DEBUG][PIPELINE] Sending final event with IDL:', {
+      hasIdlInEvent: 'idl' in finalEvent,
+      hasIdlsInEvent: 'idls' in finalEvent,
+      eventKeys: Object.keys(finalEvent),
+      timestamp: new Date().toISOString()
     });
+    
+    sendProgress(finalEvent);
 
     // Send pipeline completion event for frontend
     console.log("[PIPELINE] Sending pipeline completion event");
@@ -845,14 +1023,26 @@ export async function runDeployPipeline({
     throw err;
   } finally {
     console.log("[PIPELINE] Starting cleanup");
+    
+    // Add delay to allow validator to stabilize
+    if (workspace && programIdStr) {
+      console.log("[PIPELINE] Deployment succeeded, delaying cleanup for validator stability");
+      await new Promise(resolve => setTimeout(resolve, 5000)); // 5 second delay
+    }
+    
     /* ----------------------------------------------------------------
      * Cleanup progress manager and container
      * ---------------------------------------------------------------- */
     progressMgr.cleanup();
     
     if (workspace) {
-      console.log(`[PIPELINE] Marking container for cleanup: ${workspace.containerName}`);
-      await markContainerForCleanup(projectId, workspace.containerName);
+      // Only mark for cleanup if deployment failed
+      if (!programIdStr) {
+        console.log(`[PIPELINE] Marking container for cleanup: ${workspace.containerName}`);
+        await markContainerForCleanup(projectId, workspace.containerName);
+      } else {
+        console.log(`[PIPELINE] Keeping container alive for deployed program: ${programIdStr}`);
+      }
     }
     
     if (keepAliveInterval) {

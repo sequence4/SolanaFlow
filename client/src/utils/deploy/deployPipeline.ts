@@ -107,6 +107,32 @@ export function runDeployPipelineWithLogs(
     // Debug: log every raw SSE message to inspect its fields
     console.log('[SSE DEBUG] raw message', msg);
     console.log(`[deployPipeline] Received update from SSE:`, msg);
+    
+    // DEBUG: Check specifically for IDL in messages
+    if (msg.idl || msg.idls) {
+      console.log('[DEBUG][CLIENT] IDL received in SSE message:', {
+        hasIdl: !!msg.idl,
+        hasIdls: !!msg.idls,
+        idlsCount: msg.idls ? msg.idls.length : 0,
+        stage: msg.stage,
+        status: msg.status,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    // Check if this is the build completion event
+    if (msg.stage === 'build' && msg.status === 'completed') {
+      console.log('[DEBUG][CLIENT] Build completion event received:', {
+        hasIdl: !!msg.idl,
+        hasIdls: !!msg.idls,
+        hasArtifact: !!msg.artifact,
+        hasFileTree: !!msg.fileTree,
+        programId: msg.programId,
+        eventKeys: Object.keys(msg),
+        timestamp: new Date().toISOString()
+      });
+    }
+    
     taskLogs.addSystemLog(JSON.stringify(msg));
 
     if (msg.stage) {
@@ -238,15 +264,23 @@ export function runDeployPipelineWithLogs(
       // log after updating to catch stale closures
       setTimeout(() => {
         console.log('[SSE DEBUG] context.programId now (stage)', newProgramId);
-      }, 0);
+      });
     }
 
     if (msg.idl) {
+      console.log('[DEBUG][CLIENT] Processing IDL in deployPipeline:', {
+        hasIdl: true,
+        idlType: typeof msg.idl,
+        idlName: msg.idl?.name,
+        idlVersion: msg.idl?.version,
+        timestamp: new Date().toISOString()
+      });
       console.log(`[deployPipeline] Received IDL:`, msg.idl);
       taskLogs.addSystemLog(`📜 Received program IDL`);
       
       try {
         localStorage.setItem(`idl-${projectContext.id}`, JSON.stringify(msg.idl));
+        console.log('[DEBUG][CLIENT] IDL saved to localStorage:', `idl-${projectContext.id}`);
       } catch (error) {
         console.error("[deployPipeline] Failed to save IDL to localStorage:", error);
       }
@@ -267,6 +301,11 @@ export function runDeployPipelineWithLogs(
     }
 
     if (msg.idls && Array.isArray(msg.idls) && msg.idls.length > 0) {
+      console.log('[DEBUG][CLIENT] Processing IDLs array:', {
+        idlsCount: msg.idls.length,
+        idlNames: msg.idls.map((i: any) => i.name || 'unnamed'),
+        timestamp: new Date().toISOString()
+      });
       console.log(`[deployPipeline] Received ${msg.idls.length} IDLs`);
       taskLogs.addSystemLog(`📜 Received ${msg.idls.length} program IDLs`);
       
@@ -275,6 +314,7 @@ export function runDeployPipelineWithLogs(
         msg.idls.forEach((idl: any) => {
           if (idl.name) {
             localStorage.setItem(`idl-${projectContext.id}-${idl.name}`, JSON.stringify(idl));
+            console.log('[DEBUG][CLIENT] IDL saved to localStorage:', `idl-${projectContext.id}-${idl.name}`);
           }
         });
       } catch (error) {
@@ -333,9 +373,9 @@ export function runDeployPipelineWithLogs(
   try {
     es = sseDeploy(projectContext.id!, graph, update, /* walletSigned = */ true);
     
-    es.addEventListener('close', () => {
-      console.log(`[deployPipeline] SSE connection closed`);
-    });
+    // Note: addEventListener implementation in deployPipeline API doesn't actually support callbacks
+    // It's just a placeholder to maintain compatibility
+    es.addEventListener('close');
 
   } catch (err) {
     taskLogs.addSystemLog(`❌ ${err instanceof Error ? err.message : String(err)}`);

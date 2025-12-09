@@ -1,6 +1,7 @@
 import { updateOrCreateFile } from '../fileUtils';
 import type { FileTreeItem } from '../../types/FileTreeItem';
 import path from 'path';
+import { componentReloadServer } from '../websocket/componentReloadServer';
 
 // Define the callback type for file write progress
 export type InsertSrcProgressFn = (item: FileTreeItem) => void;
@@ -73,6 +74,17 @@ export async function insertSrcFiles(
         if (onFile) await onFile(projectRelativePath, node.code || '');
         
         fileTaskIds.push(taskId);
+        
+        // Notify WebSocket clients of component update
+        if (projectRelativePath.includes('components/generated') || 
+            projectRelativePath.includes('component-manifest.json')) {
+          try {
+            componentReloadServer.forceReload(projectId, `Component file updated: ${projectRelativePath}`);
+            console.log(`[INSERT] Sent component update notification for ${projectRelativePath}`);
+          } catch (e) {
+            console.warn('[INSERT] Could not send WebSocket notification:', e);
+          }
+        }
       }
     }
   }

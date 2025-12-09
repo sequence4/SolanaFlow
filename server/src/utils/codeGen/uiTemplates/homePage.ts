@@ -1,8 +1,8 @@
 export const homePage = `"use client";
 
-// Single-page entry that shows the fully styled SolMint UI
-import SolMintApp from "@/components/SolMintApp";
+// Entry point that loads the appropriate component dynamically
+import DynamicComponentLoader from "@/components/DynamicComponentLoader";
 
 export default function Home() {
-  return <SolMintApp />;
+  return <DynamicComponentLoader />;
 }`;

@@ -39,6 +39,31 @@ export async function getProjectRootPath(projectId: string): Promise<string> {
   }
 }
 
+export async function ensureFilePermissions(
+  containerName: string,
+  filePath: string,
+  projectId: string
+): Promise<void> {
+  try {
+    // Get current user's UID/GID with fallback to default values
+    const uid = process.getuid ? process.getuid() : 1000;
+    const gid = process.getgid ? process.getgid() : 1000;
+    
+    // Fix permissions inside container
+    const fixPermCmd = `docker exec ${containerName} bash -c "
+      chown ${uid}:${gid} ${filePath} 2>/dev/null || 
+      chown 1000:1000 ${filePath} 2>/dev/null || 
+      true
+    "`;
+    
+    await runCommand(fixPermCmd, '.', uuidv4(), { 
+      skipSuccessUpdate: true 
+    });
+  } catch (error) {
+    console.warn(`[PERMISSIONS] Could not fix permissions for ${filePath}:`, error);
+  }
+}
+
 export const deleteProjectFolder = async (
   rootPath: string,
   taskId: string
@@ -378,14 +403,12 @@ export const startGenerateFileTreeTask = async (
             fileTree = await generateFileTreeInContainer(containerName, rootPath, projectId, creatorId);
           } catch (containerError) {
             console.error('Error generating file tree in container:', containerError);
-           // console.log('Falling back to local file system for file tree generation');
-            const projectPath = path.join(APP_CONFIG.ROOT_FOLDER, rootPath);
-            fileTree = await generateFileTree(projectPath);
+            // No fallback to local filesystem - container only
+            throw new Error(`Failed to generate file tree in container: ${containerError}`);
           }
         } else {
-          //console.log('No container found, using local file system for file tree generation');
-          const projectPath = path.join(APP_CONFIG.ROOT_FOLDER, rootPath);
-          fileTree = await generateFileTree(projectPath);
+          //console.log('No container found, cannot generate file tree');
+          throw new Error('No container found for project - cannot generate file tree');
         }
         
         const treeResult = JSON.stringify(fileTree);
@@ -509,6 +532,9 @@ export const startCreateFileTask = async (
             const chownCmd = `docker exec ${containerName} chown 1000:1000 "/usr/src/${projectRootPath}/${filePath}"`;
             await runCommand(chownCmd, '.', taskId, { skipSuccessUpdate: true, silent: true });
             
+            // Note: Next.js dev server will automatically detect file changes via file watching
+            // No need to manually clear cache or trigger rebuilds
+            
             //console.log(`Successfully created file in container: ${filePath}`);
             await updateTaskStatus(taskId, 'succeed', 'File created successfully in container');
           } finally {
@@ -574,6 +600,10 @@ export const startUpdateFileTask = async (
 ${content}
 EOF`;
           await runCommand(writeCmd, '.', taskId);
+          
+          // Note: Next.js dev server will automatically detect file changes via file watching
+          // No need to manually clear cache or trigger rebuilds
+          
           //console.log(`Successfully updated file in container: ${filePath}`);
           await updateTaskStatus(taskId, 'succeed', 'File updated successfully in container');
         } catch (containerError) {

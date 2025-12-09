@@ -8,6 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import { getProjectRootPath } from 'src/utils/fileUtils';
 import eventBus from '../../lib/eventBus';
+// import { componentWatcher } from './componentWatcher'; // Will be created in Step 3
 
 // Progress tracking function for container setup operations
 function sendContainerSetupProgress(taskId: string, taskName: string, message: string, pct: number, thoughts: string[] = []) {
@@ -365,6 +366,24 @@ export async function startProjectContainer(
     fs.mkdirSync(hostWebDir, { recursive: true });
   }
   
+  // Ensure directories for dynamic components exist
+  const hostGeneratedDir = path.join(hostProjectDir, 'web', 'src', 'components', 'generated');
+  if (!fs.existsSync(hostGeneratedDir)) {
+    fs.mkdirSync(hostGeneratedDir, { recursive: true });
+  }
+  
+  const hostConfigDir = path.join(hostProjectDir, 'web', 'public', 'config');
+  if (!fs.existsSync(hostConfigDir)) {
+    fs.mkdirSync(hostConfigDir, { recursive: true });
+  }
+  
+  // Ensure .next directory exists for cache mounting
+  const hostNextDir = path.join(hostProjectDir, 'web', '.next');
+  if (!fs.existsSync(hostNextDir)) {
+    fs.mkdirSync(hostNextDir, { recursive: true });
+    console.log(`[CONTAINER] Created .next directory: ${hostNextDir}`);
+  }
+  
   // Inject Program ID into container environment if it exists for this project
   let programIdEnv: string[] = [];
   try {
@@ -589,6 +608,10 @@ export async function startProjectContainer(
       '--name', name,
       '--label', `solanaflow.project=${projId}`,
       '--restart', 'unless-stopped',
+      '--health-cmd', 'echo "healthy"',
+      '--health-interval', '5s',
+      '--health-retries', '3',
+      '--health-start-period', '10s',
       ...(sizeOptSupported() ? ['--storage-opt', 'size=20G'] : []),  // guard FS quota
       '-v', `${vCargo}:/root/.cargo`,
       '-v', `${vSccache}:/opt/sccache`,
@@ -597,7 +620,25 @@ export async function startProjectContainer(
       '-v', `${vNextCache}:/usr/src/${rootPath}/web/.next`,
       // Mount host project directory into the container at the correct path
       '-v', `${hostProjectDir}:/usr/src/${rootPath}`,
+      // Dynamic component directories - specific mounts for generated components
+      '-v', `${hostProjectDir}/web/src/components/generated:/usr/src/${rootPath}/web/src/components/generated`,
+      '-v', `${hostProjectDir}/web/public/config:/usr/src/${rootPath}/web/public/config`,
       '-e', 'CARGO_TARGET_DIR=/usr/src/target',
+      // Phase 3: Enhanced file watching for hot reload
+      '-e', 'WATCHPACK_POLLING=true',
+      '-e', 'CHOKIDAR_USEPOLLING=true',
+      '-e', 'CHOKIDAR_INTERVAL=500', // Faster polling for better hot reload
+      '-e', 'WATCHPACK_POLL_INTERVAL=500',
+      // Enable React Fast Refresh
+      '-e', 'FAST_REFRESH=true',
+      '-e', 'NEXT_WEBPACK_USEPOLLING=1',
+      // WebSocket configuration for hot reload
+      '-e', `WS_URL=ws://host.docker.internal:3001/ws`,
+      '-e', `PROJECT_ID=${projId}`,
+      // Component mode
+      '-e', 'NEXT_PUBLIC_COMPONENT_MODE=dynamic',
+      '-e', 'NEXT_PUBLIC_HOT_RELOAD=true',
+      '-e', 'NEXT_PUBLIC_FALLBACK_ENABLED=true',
       '-e', 'HOSTNAME=0.0.0.0',
       '-e', 'CARGO_BUILD_JOBS=1',
       '-e', 'RUSTC_WRAPPER=sccache',
@@ -641,11 +682,13 @@ export async function startProjectContainer(
         'React Fast Refresh will update code instantly',
         'Perfect for iterative development workflow'
       ]);
-      // Development mode with Next.js dev server - working syntax from develop branch
+      // Development mode with Next.js dev server - simplified without restart loop
       runArgs.push(
         '-c',
         `if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
-        `cp -af /usr/share/solanaflow/web/. /usr/src/${rootPath}/web/ 2>/dev/null || true; ` +
+        `cp -anf /usr/share/solanaflow/web/. /usr/src/${rootPath}/web/ 2>/dev/null || true; ` +  // Use -n flag to not overwrite
+        `elif [ ! -d /usr/src/${rootPath}/web/node_modules ]; then ` +
+        `cp -rf /usr/share/solanaflow/web/node_modules /usr/src/${rootPath}/web/ 2>/dev/null || true; ` +
         `fi && ` +
         `cd /usr/src/${rootPath}/web && ` +
         `export NEXT_DISABLE_REACT_REFRESH=\${NEXT_DISABLE_REACT_REFRESH:-0} && ` +
@@ -661,7 +704,9 @@ export async function startProjectContainer(
       runArgs.push(
         '-c',
         `if [ ! -f /usr/src/${rootPath}/web/package.json ]; then ` +
-        `cp -af /usr/share/solanaflow/web/. /usr/src/${rootPath}/web/ 2>/dev/null || true; ` +
+        `cp -anf /usr/share/solanaflow/web/. /usr/src/${rootPath}/web/ 2>/dev/null || true; ` +  // Use -n flag to not overwrite
+        `elif [ ! -d /usr/src/${rootPath}/web/node_modules ]; then ` +
+        `cp -rf /usr/share/solanaflow/web/node_modules /usr/src/${rootPath}/web/ 2>/dev/null || true; ` +
         `fi && ` +
         `cd /usr/src/${rootPath}/web && ` +
         `until [ -d .next ]; do sleep 1; done && ` +
@@ -681,7 +726,33 @@ export async function startProjectContainer(
     console.timeEnd('[docker-run]');
     if (result.status !== 0) throw new Error(`Docker run failed with status ${result.status}`);
 
-    sendContainerSetupProgress('env-container-config', 'Container Configuration', 'Container started, setting up tools...', 80, [
+    sendContainerSetupProgress('env-container-config', 'Container Configuration', 'Container started, waiting for readiness...', 75, [
+      'Container is now running',
+      'Waiting for container to be ready',
+      'This may take a few seconds'
+    ]);
+
+    // Wait for container to be ready before executing commands
+    const waitForContainer = async (containerName: string, maxAttempts = 30) => {
+      for (let i = 0; i < maxAttempts; i++) {
+        try {
+          execSync(`docker exec ${containerName} echo "ready"`, { stdio: 'ignore' });
+          return true;
+        } catch (e) {
+          if (i === maxAttempts - 1) {
+            throw new Error(`Container ${containerName} failed to become ready`);
+          }
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+      return false;
+    };
+
+    // Wait for container to be ready
+    await waitForContainer(name);
+    console.log('[Container setup] Container is ready');
+
+    sendContainerSetupProgress('env-container-config', 'Container Configuration', 'Container ready, setting up tools...', 80, [
       'Container is now running successfully',
       'Setting up Yarn package manager via Corepack',
       'Preparing development environment'
@@ -689,79 +760,42 @@ export async function startProjectContainer(
 
     // Post-start configuration: Create validator script and directories
     try {
-      console.log('[Container setup] Creating validator script and directories...');
+      // Wait a moment for container to fully initialize
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Create directories
-      execSync(`docker exec ${name} sh -c 'mkdir -p /usr/local/validator-logs'`);
-      execSync(`docker exec ${name} sh -c 'mkdir -p /usr/src/${rootPath}/web'`);
+      console.log('[Container setup] Creating validator script...');
       
-      // Create a complete validator script in /tmp first (writable by any user)
-      const validatorScript = [
-        '#!/bin/sh',
-        'case "$1" in',
-        '  status)',
-        '    if [ -f /usr/local/validator-logs/validator.pid ]; then',
-        '      PID=$(cat /usr/local/validator-logs/validator.pid)',
-        '      if ps -p $PID > /dev/null 2>&1; then',
-        '        echo "Validator is running with PID $PID"',
-        '        echo "RPC endpoint is responsive"',
-        '        exit 0',
-        '      fi',
-        '    fi',
-        '    echo "Validator is not running"',
-        '    exit 1',
-        '    ;;',
-        '  reset)',
-        '    if [ -f /usr/local/validator-logs/validator.pid ]; then',
-        '      PID=$(cat /usr/local/validator-logs/validator.pid)',
-        '      kill $PID 2>/dev/null || true',
-        '    fi',
-        '    rm -rf /usr/local/validator-logs/*',
-        '    mkdir -p /usr/local/validator-logs',
-        '    solana-test-validator --reset --bind-address 0.0.0.0 --rpc-port 8899 --faucet-port 9900 > /usr/local/validator-logs/validator.log 2>&1 &',
-        '    echo $! > /usr/local/validator-logs/validator.pid',
-        '    sleep 2',
-        '    echo "Validator reset and started successfully"',
-        '    echo "Validator is ready"',
-        '    ;;',
-        '  *)',
-        '    if [ -f /usr/local/validator-logs/validator.pid ]; then',
-        '      PID=$(cat /usr/local/validator-logs/validator.pid)',
-        '      if ps -p $PID > /dev/null 2>&1; then',
-        '        echo "Validator already running with PID $PID"',
-        '        echo "Validator is ready"',
-        '        exit 0',
-        '      fi',
-        '    fi',
-        '    mkdir -p /usr/local/validator-logs',
-        '    solana-test-validator --bind-address 0.0.0.0 --rpc-port 8899 --faucet-port 9900 > /usr/local/validator-logs/validator.log 2>&1 &',
-        '    echo $! > /usr/local/validator-logs/validator.pid',
-        '    sleep 2',
-        '    echo "Validator started successfully"',
-        '    echo "Validator is ready"',
-        '    ;;',
-        'esac'
-      ];
+      // Create validator script directly
+      const validatorScript = `#!/bin/sh
+case "$1" in
+  status)
+    if [ -f /tmp/validator.pid ]; then
+      PID=$(cat /tmp/validator.pid)
+      if ps -p $PID > /dev/null 2>&1; then
+        echo "Validator running (PID $PID)"
+        exit 0
+      fi
+    fi
+    echo "Validator not running"
+    exit 1
+    ;;
+  reset|start|*)
+    pkill -f solana-test-validator 2>/dev/null || true
+    rm -rf /tmp/test-ledger
+    solana-test-validator --reset --bind-address 0.0.0.0 --rpc-port 8899 --faucet-port 9900 > /tmp/validator.log 2>&1 &
+    echo $! > /tmp/validator.pid
+    sleep 2
+    echo "Validator started"
+    ;;
+esac`;
+
+      // Write script using echo with base64 to avoid quote issues
+      const scriptBase64 = Buffer.from(validatorScript).toString('base64');
+      execSync(`docker exec ${name} sh -c "echo '${scriptBase64}' | base64 -d > /tmp/start-validator.sh && chmod +x /tmp/start-validator.sh"`);
       
-      // Write the script line by line
-      for (let i = 0; i < validatorScript.length; i++) {
-        const line = validatorScript[i].replace(/'/g, "'\\''"); // Escape single quotes
-        const redirect = i === 0 ? '>' : '>>';
-        execSync(`docker exec ${name} sh -c 'echo '"'"'${line}'"'"' ${redirect} /tmp/start-validator.sh'`);
-      }
-      execSync(`docker exec ${name} sh -c 'chmod +x /tmp/start-validator.sh'`);
-      
-      // Try to copy to /usr/local/bin (may fail if no permissions)
-      try {
-        execSync(`docker exec ${name} sh -c 'cp /tmp/start-validator.sh /usr/local/bin/'`);
-        console.log('[Container setup] Validator script created in /usr/local/bin');
-      } catch {
-        console.log('[Container setup] Could not copy to /usr/local/bin, script available in /tmp');
-      }
-      
-      console.log('[Container setup] Post-start configuration completed');
+      console.log('[Container setup] Validator script created');
     } catch (e) {
-      console.warn('[Container setup] Post-start configuration failed:', e);
+      console.warn('[Container setup] Post-start configuration failed (non-critical):', e);
     }
 
     // ─── ensure Yarn 1.x binary is available via Corepack ──────────────────
@@ -793,6 +827,19 @@ export async function startProjectContainer(
     
     completeContainerTask('env-tools-setup', 'Development tools ready');
     completeContainerTask('env-container-config', 'Container fully configured');
+
+    // After container starts, initialize hot reload monitoring
+    try {
+      // Create a marker file to indicate hot reload is available
+      execSync(`docker exec ${name} touch /usr/src/${rootPath}/web/.hotreload`);
+      
+      // Start watching this project
+      // await componentWatcher.watchProject(projId); // Will be enabled when componentWatcher is created
+      
+      console.log(`[CONTAINER] Hot reload enabled for project ${projId}`);
+    } catch (error) {
+      console.warn('[CONTAINER] Failed to enable hot reload:', error);
+    }
 
     const containerUrl = resolveContainerUrl(String(hostPort));
 

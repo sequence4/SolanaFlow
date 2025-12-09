@@ -58,7 +58,7 @@ export const startLocalValidator = async (
       
       const ports = await getProjectPorts(projectId);
       
-      const statusCmd = `docker exec ${containerName} /usr/local/bin/start-validator.sh status`;
+      const statusCmd = `docker exec ${containerName} /tmp/start-validator.sh status`;
       const currentStatus = await runCommand(statusCmd, '.', uuidv4(), { skipSuccessUpdate: true })
         .catch(() => 'not-running');
       
@@ -77,8 +77,8 @@ export const startLocalValidator = async (
       
       const command = reset ? 'reset' : '';
       const startCmd = walletPubkey 
-        ? `docker exec -e WALLET_PUBKEY=${walletPubkey} ${containerName} /usr/local/bin/start-validator.sh ${command}`
-        : `docker exec ${containerName} /usr/local/bin/start-validator.sh ${command}`;
+        ? `docker exec -e WALLET_PUBKEY=${walletPubkey} ${containerName} /tmp/start-validator.sh ${command}`
+        : `docker exec ${containerName} /tmp/start-validator.sh ${command}`;
       
       console.log(`[VALIDATOR_START] Executing: ${startCmd}`);
       
@@ -130,6 +130,27 @@ export const startLocalValidator = async (
       }
       
       console.log('[VALIDATOR_START] Validator started successfully');
+      
+      // Set up keep-alive mechanism to ensure validator stays running
+      const keepAliveCmd = `docker exec ${containerName} bash -c "
+        while true; do
+          if [ -f /usr/local/validator-logs/validator.pid ]; then
+            PID=\\$(cat /usr/local/validator-logs/validator.pid)
+            if ! ps -p \\$PID > /dev/null 2>&1; then
+              echo 'Validator stopped, restarting...'
+              /tmp/start-validator.sh
+            fi
+          fi
+          sleep 30
+        done > /dev/null 2>&1 &
+      "`;
+      
+      try {
+        await runCommand(keepAliveCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+        console.log('[VALIDATOR_START] Keep-alive process started');
+      } catch (e) {
+        console.warn('[VALIDATOR_START] Could not start keep-alive:', e);
+      }
       
       res.json({
         message: reset ? 'Local validator reset and started' : 'Local validator started',

@@ -7,120 +7,118 @@ import { getProjectRootPath } from '../../utils/fileUtils';
 import pool from "src/config/database";
 
 /**
+ * Helper function to ensure container is running
+ */
+async function ensureContainerRunning(containerName: string): Promise<void> {
+  const checkCmd = `docker ps --filter "name=${containerName}" --filter "status=running" -q`;
+  const result = await runCommand(checkCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+  
+  if (!result.trim()) {
+    // Container not running, try to start it
+    console.log('[LOCAL_DEPLOY] Container not running, attempting to start...');
+    const startCmd = `docker start ${containerName}`;
+    await runCommand(startCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    
+    // Wait for container to be ready
+    await new Promise(resolve => setTimeout(resolve, 3000));
+  }
+}
+
+/**
  * Helper function to ensure validator is running and accessible
  */
 async function ensureValidatorRunning(containerName: string): Promise<void> {
-  console.log('[LOCAL_DEPLOY] Starting validator...');
+  console.log('[LOCAL_DEPLOY] Checking validator status...');
   
-  // Kill any existing validator
-  await runCommand(
-    `docker exec ${containerName} pkill -f solana-test-validator || true`,
-    '.', uuidv4(), { skipSuccessUpdate: true }
-  );
+  // Check if validator is already running using the script
+  try {
+    const statusCmd = `docker exec ${containerName} /tmp/start-validator.sh status`;
+    const status = await runCommand(statusCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+    
+    if (status.includes('Validator is running')) {
+      console.log('[LOCAL_DEPLOY] Validator already running');
+      return;
+    }
+  } catch {
+    // Validator not running, proceed to start it
+  }
   
+  console.log('[LOCAL_DEPLOY] Starting validator with proper network binding...');
+  
+  // First kill any existing validator processes
+  const killCmd = `docker exec ${containerName} pkill -f solana-test-validator || true`;
+  await runCommand(killCmd, '.', uuidv4(), { skipSuccessUpdate: true });
   await new Promise(resolve => setTimeout(resolve, 2000));
   
-  // Start validator using sh -c to ensure it runs in background
-  const startCmd = `docker exec ${containerName} sh -c "solana-test-validator --reset --quiet > /dev/null 2>&1 & echo 'Started'"`;
+  // Start validator with nohup to ensure it stays running after deployment
+  const startCmd = `docker exec ${containerName} bash -c "
+    # Create log directory
+    mkdir -p /usr/local/validator-logs
+    
+    # Start validator with nohup to persist after this command exits
+    nohup solana-test-validator \
+      --bind-address 0.0.0.0 \
+      --rpc-port 8899 \
+      --ws-port 8900 \
+      --faucet-port 9900 \
+      --reset \
+      --quiet > /usr/local/validator-logs/validator.log 2>&1 &
+    
+    # Save PID for management
+    echo \\$! > /usr/local/validator-logs/validator.pid
+    
+    # Give it a moment to start
+    sleep 3
+    
+    # Verify it's running
+    if ps -p \\$(cat /usr/local/validator-logs/validator.pid) > /dev/null; then
+      echo 'Validator started successfully'
+    else
+      echo 'Validator failed to start'
+      exit 1
+    fi
+  "`;
   
   try {
     const output = await runCommand(startCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-    console.log('[LOCAL_DEPLOY] Start output:', output);
+    console.log('[LOCAL_DEPLOY] Validator start output:', output);
+    
+    if (!output.includes('Validator started successfully')) {
+      throw new Error('Validator did not start properly');
+    }
   } catch (err) {
-    console.error('[LOCAL_DEPLOY] Start failed:', err);
-    // Try alternative method
+    // Try alternative start method using the script
+    console.log('[LOCAL_DEPLOY] Trying alternative start method...');
+    const scriptCmd = `docker exec ${containerName} /tmp/start-validator.sh reset`;
     try {
-      const altCmd = `docker exec ${containerName} sh -c "nohup solana-test-validator --reset --quiet > /tmp/validator.log 2>&1 & echo $!"`;
-      const pid = await runCommand(altCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-      console.log('[LOCAL_DEPLOY] Started validator with PID:', pid);
-    } catch (altErr) {
+      const output = await runCommand(scriptCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+      console.log('[LOCAL_DEPLOY] Script output:', output);
+    } catch (scriptErr) {
+      console.error('[LOCAL_DEPLOY] Both start methods failed:', err, scriptErr);
       throw new Error(`Failed to start validator: ${err}`);
     }
-  }
-  
-  // Give validator time to initialize
-  await new Promise(resolve => setTimeout(resolve, 5000));
-  
-  // Check if validator is actually running
-  const psCmd = `docker exec ${containerName} ps aux | grep solana-test-validator | grep -v grep`;
-  try {
-    const psOutput = await runCommand(psCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-    console.log('[LOCAL_DEPLOY] Validator process:', psOutput.substring(0, 200));
-  } catch {
-    console.error('[LOCAL_DEPLOY] No validator process found');
-    throw new Error('Validator failed to start - no process found');
   }
   
   // Wait for validator to be ready
   console.log('[LOCAL_DEPLOY] Waiting for validator to be ready...');
   for (let i = 1; i <= 30; i++) {
     try {
-      // Try direct curl to health endpoint
-      const curlCmd = `docker exec ${containerName} curl -s http://127.0.0.1:8899/health`;
-      const result = await runCommand(curlCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+      const healthCmd = `docker exec ${containerName} curl -s http://127.0.0.1:8899/health`;
+      const result = await runCommand(healthCmd, '.', uuidv4(), { skipSuccessUpdate: true });
       
       if (result && result.includes('ok')) {
         console.log('[LOCAL_DEPLOY] Validator is ready!');
         return;
       }
     } catch {
-      // Try JSON-RPC health check
-      try {
-        const rpcCmd = `docker exec ${containerName} curl -s -X POST http://127.0.0.1:8899 -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}'`;
-        const rpcResult = await runCommand(rpcCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-        if (rpcResult && rpcResult.includes('result')) {
-          console.log('[LOCAL_DEPLOY] Validator is ready (via RPC)!');
-          return;
-        }
-      } catch {
-        // Try solana CLI as last resort
-        try {
-          const checkCmd = `docker exec ${containerName} solana --url http://127.0.0.1:8899 balance 11111111111111111111111111111111`;
-          await runCommand(checkCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-          console.log('[LOCAL_DEPLOY] Validator is ready (via CLI)!');
-          return;
-        } catch {
-          // Not ready yet
-        }
-      }
+      // Not ready yet
     }
     
     if (i % 5 === 0) {
       console.log(`[LOCAL_DEPLOY] Still waiting... (${i}/30)`);
-      
-      // Check if process is still alive
-      const aliveCheck = `docker exec ${containerName} pgrep -f solana-test-validator || echo "dead"`;
-      const aliveResult = await runCommand(aliveCheck, '.', uuidv4(), { skipSuccessUpdate: true });
-      if (aliveResult.trim() === "dead") {
-        console.error('[LOCAL_DEPLOY] Validator process died, attempting restart...');
-        const restartCmd = `docker exec ${containerName} sh -c "solana-test-validator --reset --quiet > /dev/null 2>&1 & echo 'Restarted'"`;
-        try {
-          await runCommand(restartCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-        } catch {
-          // Continue waiting
-        }
-      }
     }
     
     await new Promise(resolve => setTimeout(resolve, 1000));
-  }
-  
-  // Debug: check what's listening on port 8899
-  try {
-    const netstatCmd = `docker exec ${containerName} netstat -tlnp 2>/dev/null | grep 8899 || echo "Nothing on 8899"`;
-    const netstatOutput = await runCommand(netstatCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-    console.error('[LOCAL_DEPLOY] Port 8899 status:', netstatOutput);
-  } catch {
-    // Netstat might not be available
-  }
-  
-  // Check validator log if it exists
-  try {
-    const logCmd = `docker exec ${containerName} tail -20 /tmp/validator.log 2>/dev/null || echo "No log"`;
-    const logOutput = await runCommand(logCmd, '.', uuidv4(), { skipSuccessUpdate: true });
-    console.error('[LOCAL_DEPLOY] Validator log tail:', logOutput);
-  } catch {
-    // Ignore
   }
   
   throw new Error('Validator failed to become accessible after 30 seconds');
@@ -148,33 +146,80 @@ export const deployToLocalValidator = async (
         return next(new AppError('Container not found', 404));
       }
       
+      // Step 0: Ensure container is running
+      await ensureContainerRunning(containerName);
+      
       // Step 1: Ensure validator is running and accessible
       await ensureValidatorRunning(containerName);
       
-      // Step 2: Get program details from the already-built artifacts
-      const rootPath = await getProjectRootPath(projectId);
+      // Step 2: Get program details from the database and built artifacts
+      const db = pool;
+      
+      // Get the actual program name and root path from the database
+      const programQuery = await db.query(
+        `SELECT name, root_path 
+         FROM solanaproject 
+         WHERE id = $1`,
+        [projectId]
+      );
+      
+      if (!programQuery.rows[0]) {
+        throw new Error('Project not found');
+      }
+      
+      // Derive program name from project name (solanaproject doesn't have program_name field)
+      const projectData = programQuery.rows[0];
+      const programName = projectData.name?.toLowerCase().replace(/[^a-z0-9]/g, '_') || 
+                         'untitled_project';
+      
+      // Get the actual root path from the database or use the one from getProjectRootPath
+      const rootPath = projectData.root_path || await getProjectRootPath(projectId);
       const programPath = `/usr/src/${rootPath}`;
       
-      // Get the program name from Anchor.toml
-      const getProgramNameCmd = `docker exec ${containerName} bash -c "cd ${programPath} && grep '^\\[programs.localnet\\]' -A 1 Anchor.toml | grep -oP '^\\w+' | tail -1"`;
-      const programName = (await runCommand(getProgramNameCmd, '.', uuidv4(), { skipSuccessUpdate: true }))
-        .trim() || 'solanaflow';
+      console.log('[LOCAL_DEPLOY] Program name:', programName);
+      console.log('[LOCAL_DEPLOY] Root path:', rootPath);
+      console.log('[LOCAL_DEPLOY] Program path:', programPath);
       
-      console.log(`[LOCAL_DEPLOY] Program name: ${programName}`);
+      // Check if build artifact exists in the container at the correct location
+      let soFile = `/usr/src/${rootPath}/target/deploy/${programName}.so`;
+      let keypairFile = `/usr/src/${rootPath}/target/deploy/${programName}-keypair.json`;
       
-      // The artifacts are in the warm cache location
-      const soFile = `/usr/src/target/deploy/${programName}.so`;
-      const keypairFile = `/usr/src/target/deploy/${programName}-keypair.json`;
+      console.log('[LOCAL_DEPLOY] Checking for artifact at:', soFile);
       
       // Verify the .so file exists (it should from the build pipeline)
-      const soExistsCmd = `docker exec ${containerName} test -f ${soFile} && echo "exists" || echo "missing"`;
+      const soExistsCmd = `docker exec ${containerName} test -f "${soFile}" && echo "exists" || echo "missing"`;
       const soExists = await runCommand(soExistsCmd, '.', uuidv4(), { skipSuccessUpdate: true });
       
       if (soExists.trim() === 'missing') {
-        throw new Error('Program artifact not found. Please build the project first.');
+        // Try alternate paths first - check if it's in /usr/src/target/deploy (without project subdirectory)
+        const altSoPath = `/usr/src/target/deploy/${programName}.so`;
+        const altKeypairPath = `/usr/src/target/deploy/${programName}-keypair.json`;
+        
+        console.log('[LOCAL_DEPLOY] Checking alternate path:', altSoPath);
+        const altCheckCmd = `docker exec ${containerName} test -f "${altSoPath}" && echo "exists" || echo "missing"`;
+        const altExists = await runCommand(altCheckCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+        
+        if (altExists.trim() === 'exists') {
+          console.log('[LOCAL_DEPLOY] Found artifacts at alternate location:', altSoPath);
+          // Update paths to use alternate location
+          soFile = altSoPath;
+          keypairFile = altKeypairPath;
+        } else {
+          // Artifacts should exist in the container from the build process
+          // Last resort: look for any .so file in the container's project directory
+          const findCmd = `docker exec ${containerName} find /usr/src -name "*.so" -type f 2>/dev/null | head -5`;
+          const foundSo = await runCommand(findCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+
+          if (foundSo && foundSo.trim()) {
+            console.log('[LOCAL_DEPLOY] Found .so files at:', foundSo.trim());
+            throw new Error(`Program artifact not found at expected location. Found .so files at: ${foundSo.trim()}. Please check the program name in Anchor.toml matches the deployment configuration.`);
+          } else {
+            throw new Error('Program artifact not found. Please build the project first.');
+          }
+        }
+      } else {
+        console.log('[LOCAL_DEPLOY] Using existing build artifact from pipeline at:', soFile);
       }
-      
-      console.log('[LOCAL_DEPLOY] Using existing build artifact from pipeline');
       
       // Step 3: Get program ID from database or keypair
       let programId: string;
@@ -190,12 +235,12 @@ export const deployToLocalValidator = async (
         console.log(`[LOCAL_DEPLOY] Using program ID from build: ${programId}`);
       } else {
         // Fall back to reading from keypair file
-        const keypairExistsCmd = `docker exec ${containerName} test -f ${keypairFile} && echo "exists" || echo "missing"`;
+        const keypairExistsCmd = `docker exec ${containerName} test -f "${keypairFile}" && echo "exists" || echo "missing"`;
         const keypairExists = await runCommand(keypairExistsCmd, '.', uuidv4(), { skipSuccessUpdate: true });
         
         if (keypairExists.trim() === 'exists') {
           // Get existing program ID
-          const getProgramIdCmd = `docker exec ${containerName} solana-keygen pubkey ${keypairFile}`;
+          const getProgramIdCmd = `docker exec ${containerName} solana-keygen pubkey "${keypairFile}"`;
           programId = (await runCommand(getProgramIdCmd, '.', uuidv4(), { skipSuccessUpdate: true })).trim();
           console.log(`[LOCAL_DEPLOY] Using existing program ID from keypair: ${programId}`);
         } else {
@@ -219,6 +264,37 @@ export const deployToLocalValidator = async (
         console.log('[LOCAL_DEPLOY] Solana CLI configured:', configOutput);
       } catch (err) {
         throw new Error(`Failed to configure Solana CLI: ${err}`);
+      }
+      
+      // Step 4a: Ensure default signer exists
+      const checkSignerCmd = `docker exec ${containerName} test -f /root/.config/solana/id.json && echo "exists" || echo "missing"`;
+      const signerExists = await runCommand(checkSignerCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+      
+      if (signerExists.trim() === 'missing') {
+        console.log('[LOCAL_DEPLOY] Creating default signer keypair...');
+        const createSignerCmd = `docker exec ${containerName} solana-keygen new --no-bip39-passphrase -o /root/.config/solana/id.json --force`;
+        await runCommand(createSignerCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+      }
+      
+      // Step 4b: Airdrop SOL to the default signer
+      const getSignerPubkeyCmd = `docker exec ${containerName} solana address`;
+      const signerPubkey = (await runCommand(getSignerPubkeyCmd, '.', uuidv4(), { skipSuccessUpdate: true })).trim();
+      console.log('[LOCAL_DEPLOY] Default signer pubkey:', signerPubkey);
+      
+      // Airdrop with retry logic
+      for (let i = 0; i < 3; i++) {
+        try {
+          const airdropCmd = `docker exec ${containerName} solana airdrop 10 ${signerPubkey} --url http://127.0.0.1:8899`;
+          await runCommand(airdropCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+          console.log('[LOCAL_DEPLOY] Airdropped 10 SOL to signer');
+          break;
+        } catch (err) {
+          if (i === 2) {
+            console.warn('[LOCAL_DEPLOY] Airdrop failed, but continuing (may already have balance)');
+          } else {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        }
       }
       
       // Step 5: Check if program is already deployed
@@ -254,15 +330,15 @@ export const deployToLocalValidator = async (
           anchor deploy \\
             --program-name ${programName} \\
             --provider.cluster 'http://127.0.0.1:8899' \\
-            --program-keypair ${keypairFile}
+            --program-keypair "${keypairFile}"
         "`;
         
         deployOutput = await runCommand(deployCmd, '.', projectId);
       } else {
         // Upgrade using solana program deploy with explicit URL
         const upgradeCmd = `docker exec ${containerName} bash -c "
-          solana program deploy ${soFile} \\
-            --program-id ${keypairFile} \\
+          solana program deploy \"${soFile}\" \\
+            --program-id \"${keypairFile}\" \\
             --url http://127.0.0.1:8899 \\
             --commitment confirmed
         "`;
@@ -308,15 +384,20 @@ export const deployToLocalValidator = async (
       }
       
       // Step 9: Update project details with local deployment info
+      // Store program ID in both localProgramId and programId fields for compatibility
       await pool.query(
         `UPDATE solanaproject 
          SET details = jsonb_set(
            jsonb_set(
-             COALESCE(details, '{}'::jsonb),
-             '{localDeployment}',
-             $1::jsonb
+             jsonb_set(
+               COALESCE(details, '{}'::jsonb),
+               '{localDeployment}',
+               $1::jsonb
+             ),
+             '{localProgramId}',
+             to_jsonb($2::text)
            ),
-           '{localProgramId}',
+           '{programId}',
            to_jsonb($2::text)
          )
          WHERE id = $3`,
@@ -331,6 +412,8 @@ export const deployToLocalValidator = async (
           projectId
         ]
       );
+      
+      console.log(`[LOCAL_DEPLOY] Stored program ID ${programId} for project ${projectId}`);
       
       // Step 10: Write program ID to .env for frontend
       const envCmd = `docker exec ${containerName} bash -c "
@@ -350,6 +433,25 @@ export const deployToLocalValidator = async (
       
       console.log(`[LOCAL_DEPLOY] Deployment successful! Program ID: ${programId}`);
       
+      // Step 11: Simple health check - don't stop container if it fails
+      console.log('[LOCAL_DEPLOY] Performing quick health check...');
+      let validatorHealthy = true;
+      try {
+        const healthCmd = `docker exec ${containerName} curl -s http://127.0.0.1:8899/health 2>/dev/null || echo 'not-ok'`;
+        const health = await runCommand(healthCmd, '.', uuidv4(), { skipSuccessUpdate: true });
+        validatorHealthy = health.includes('ok');
+        
+        if (validatorHealthy) {
+          console.log('[LOCAL_DEPLOY] Validator is healthy');
+        } else {
+          console.warn('[LOCAL_DEPLOY] Validator health check failed, but deployment succeeded');
+          // Don't fail the deployment, just warn
+        }
+      } catch (err) {
+        console.warn('[LOCAL_DEPLOY] Health check failed:', err);
+        // Continue anyway since deployment succeeded
+      }
+      
       res.json({
         message: `Program ${deploymentType === 'new' ? 'deployed' : 'upgraded'} successfully to local validator`,
         programId,
@@ -358,6 +460,7 @@ export const deployToLocalValidator = async (
         rpcUrl: 'http://localhost:8899',
         websocketUrl: 'ws://localhost:8900',
         faucetUrl: 'http://localhost:9900',
+        validatorStatus: validatorHealthy ? 'running' : 'may need restart',
         idl: idlContent ? JSON.parse(idlContent) : null,
         deployOutput: deployOutput.substring(0, 1000) // First 1000 chars for debugging
       });

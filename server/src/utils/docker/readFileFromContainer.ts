@@ -14,12 +14,22 @@ export async function readFileFromContainer(
   containerName: string,
   filePath: string
 ): Promise<string> {
-  const container = docker.getContainer(containerName);
-
   /* ------------------------------------------------------------------
    * 1) fast path – Docker API /getArchive (tar stream)
    * ------------------------------------------------------------------ */
   try {
+    // Check if docker client is initialized
+    if (!docker) {
+      console.warn('[readFileFromContainer] Docker client not initialized, falling back to exec');
+      throw new Error('Docker client not initialized');
+    }
+
+    const container = docker.getContainer(containerName);
+    if (!container) {
+      console.warn('[readFileFromContainer] Container object is null, falling back to exec');
+      throw new Error('Container object is null');
+    }
+
     const stream = await container.getArchive({ path: filePath });
     const extract = tar.extract();
 

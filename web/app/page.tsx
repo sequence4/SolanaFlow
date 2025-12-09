@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import SolMintApp from "@/components/SolMintApp"; 
+import DynamicComponentLoader from "@/components/DynamicComponentLoader"; 
 
 export default function Home() {
-  return <SolMintApp />;
+  return <DynamicComponentLoader />;
 } 

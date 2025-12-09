@@ -151,7 +151,7 @@ echo "  Logs: $VALIDATOR_LOG"
 # Create log directory if it doesn't exist
 mkdir -p "$LOG_DIR"
 
-# Start validator in background
+# Start validator in background with nohup for persistence
 nohup solana-test-validator \
     --ledger "$LEDGER_DIR" \
     --rpc-port 8899 \
@@ -159,6 +159,7 @@ nohup solana-test-validator \
     --bind-address 0.0.0.0 \
     --rpc-bind-address 0.0.0.0 \
     --faucet-host 0.0.0.0 \
+    --rpc-cors all \
     --quiet \
     --reset \
     --log \
@@ -167,6 +168,16 @@ nohup solana-test-validator \
 
 VALIDATOR_PID=$!
 echo $VALIDATOR_PID > "$VALIDATOR_PID_FILE"
+
+# Ensure the process is really running
+sleep 3
+if ! ps -p $VALIDATOR_PID > /dev/null; then
+    echo -e "${RED}✗ Validator failed to start${NC}"
+    echo "Check logs at: $VALIDATOR_LOG"
+    tail -20 "$VALIDATOR_LOG"
+    rm -f "$VALIDATOR_PID_FILE"
+    exit 1
+fi
 
 echo -e "${YELLOW}Waiting for validator to start (PID: $VALIDATOR_PID)...${NC}"
 
